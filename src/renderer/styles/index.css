@@ -1,14 +1,45 @@
 @import "tailwindcss";
 
-/* 英雄联盟官方色板，注册成可复用 theme token。
-   自动生成 bg-lol-* / text-lol-* / border-lol-* 等工具类，全应用复用。 */
+/* Warm Paper Dashboard：暖白纸感仪表盘风
+   灰米白背景 + 淡网格纹理 + 暖白卡片 + 方正小圆角 + 橙色主点缀。
+   比纯白后台有游戏感，比深蓝金色更轻松，不像外挂工具。
+   app-* 命名中性，配色调整只动这里。 */
 @theme {
-  --color-lol-bg: #0a1428; /* 页面深蓝底 */
-  --color-lol-panel: #010a13; /* 卡片/输出框更深的底 */
-  --color-lol-gold: #c8aa6e; /* 金色：标题、强调、主按钮 */
-  --color-lol-text: #f0e6d2; /* 米白：正文 */
-  --color-lol-muted: #8a9099; /* 灰：次要文字、提示 */
-  --color-lol-accent: #0397ab; /* 青：数据/输出强调 */
-  --color-lol-danger: #e84057; /* 红：错误 */
-  --color-lol-border: #1e2328; /* 边框 */
+  /* 背景：灰米白（偏白不发黄）→ 网格线色（极淡） */
+  --color-app-bg: #f4f1ea;
+  --color-app-bg-grid: #ece8df;
+
+  /* 卡片：暖白（近白）→ 软底 */
+  --color-app-surface: #faf9f7;
+  --color-app-surface-soft: #f3f0e9;
+
+  /* 边框：浅米灰 → 强分割（浅棕灰） */
+  --color-app-border: #ddd4c8;
+  --color-app-border-strong: #c1b2a1;
+
+  /* 文字：深咖黑 → 说明 → 更弱 */
+  --color-app-text: #25201a;
+  --color-app-muted: #8b7a66;
+  --color-app-subtle: #b8aa98;
+
+  /* 主色：暖橙（按钮、图标强调）+ hover + 软底 */
+  --color-app-primary: #e79c20;
+  --color-app-primary-hover: #d8890f;
+  --color-app-primary-soft: #fff1d6;
+
+  /* 语义色 */
+  --color-app-link: #648ac6; /* 蓝灰：链接、状态文本 */
+  --color-app-success: #26bb59; /* 绿：胜利、成功 */
+  --color-app-danger: #a83939; /* 暗红：失败、错误（不刺眼） */
+  --color-app-warning: #e79c20; /* 橙：警告（与主色同） */
+}
+
+/* 纸感网格背景：极淡的格子纹理，作为背景质感而非主视觉。
+   外层容器加 className="app-grid-bg" 即可。 */
+.app-grid-bg {
+  background-color: var(--color-app-bg);
+  background-image:
+    linear-gradient(var(--color-app-bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-app-bg-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
 }

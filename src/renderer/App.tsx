@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AppStatus } from '../shared/api';
 
 // 应用状态调试卡：演示 React 组件通过 window.lolHelper 调 IPC。
-// 样式全部用 Tailwind 工具类 + 自定义 lol-* theme token（见 styles/index.css）。
+// Warm Paper Dashboard 风：纸感网格背景 + 暖白卡片 + 方正小圆角 + 橙主按钮。
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,34 +24,42 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-lol-bg p-8 text-lol-text">
-      <div className="max-w-md">
-        <h1 className="mb-1 text-2xl font-bold text-lol-gold">LOL 助手</h1>
-        <p className="mb-5 text-sm text-lol-muted">
-          Tailwind 已就绪 · 点击调用 IPC
+    <div className="app-grid-bg min-h-screen p-8 text-app-text">
+      <div className="mx-auto max-w-md">
+        <h1 className="mb-1 text-xl font-bold text-app-text">LOL 助手</h1>
+        <p className="mb-6 text-sm text-app-muted">
+          暖白纸感工作台 · 点击调用 IPC
         </p>
-        <button
-          onClick={handleGetStatus}
-          disabled={loading}
-          className="rounded bg-lol-gold px-5 py-2.5 font-semibold text-lol-bg transition-colors enabled:hover:bg-lol-text disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? '请求中…' : '获取应用状态'}
-        </button>
-        {error && (
-          <pre className="mt-4 break-all rounded border border-lol-danger/40 bg-lol-panel p-4 text-sm whitespace-pre-wrap text-lol-danger">
-            {error}
-          </pre>
-        )}
-        {status && (
-          <pre className="mt-4 break-all rounded border border-lol-border bg-lol-panel p-4 text-sm whitespace-pre-wrap text-lol-accent">
-            {JSON.stringify(status, null, 2)}
-          </pre>
-        )}
-        {!status && !error && (
-          <pre className="mt-4 break-all rounded border border-lol-border bg-lol-panel p-4 text-sm whitespace-pre-wrap text-lol-accent">
-            点击按钮，通过 IPC 向主进程请求应用状态…
-          </pre>
-        )}
+
+        <section className="rounded-sm border border-app-border bg-app-surface p-5 shadow-sm">
+          <div className="mb-3 text-sm font-medium text-app-text">
+            应用状态
+          </div>
+
+          <button
+            onClick={handleGetStatus}
+            disabled={loading}
+            className="rounded-lg bg-app-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? '请求中…' : '获取应用状态'}
+          </button>
+
+          {error && (
+            <pre className="mt-4 break-all rounded-sm border border-app-danger/40 bg-app-surface-soft p-4 text-sm whitespace-pre-wrap text-app-danger">
+              {error}
+            </pre>
+          )}
+          {status && (
+            <pre className="mt-4 break-all rounded-sm border border-app-border bg-app-surface-soft p-4 text-sm whitespace-pre-wrap text-app-muted">
+              {JSON.stringify(status, null, 2)}
+            </pre>
+          )}
+          {!status && !error && (
+            <pre className="mt-4 break-all rounded-sm border border-app-border bg-app-surface-soft p-4 text-sm whitespace-pre-wrap text-app-subtle">
+              点击按钮，通过 IPC 向主进程请求应用状态…
+            </pre>
+          )}
+        </section>
       </div>
     </div>
   );
