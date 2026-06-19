@@ -13,6 +13,9 @@
   --color-app-surface: #faf9f7;
   --color-app-surface-soft: #f3f0e9;
 
+  /* 侧边栏：比卡片略深略灰的暖米色，形成稳定的导航区域，与右侧主区拉开层级 */
+  --color-app-sidebar: #ece7dc;
+
   /* 边框：浅米灰 → 强分割（浅棕灰） */
   --color-app-border: #ddd4c8;
   --color-app-border-strong: #c1b2a1;
