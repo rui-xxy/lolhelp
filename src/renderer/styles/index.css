@@ -1,59 +1,14 @@
-:root {
-  color-scheme: dark;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  margin: 0;
-  padding: 2rem;
-  background: #0a1428;
-  color: #f0e6d2;
-}
-.container {
-  max-width: 480px;
-}
-h1 {
-  margin: 0 0 0.25rem;
-  color: #c8aa6e;
-}
-.hint {
-  margin: 0 0 1.25rem;
-  color: #8a9099;
-  font-size: 0.85rem;
-}
-button {
-  background: #c8aa6e;
-  color: #0a1428;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-button:hover:not(:disabled) {
-  background: #f0e6d2;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-pre {
-  margin-top: 1rem;
-  background: #010a13;
-  border: 1px solid #1e2328;
-  border-radius: 4px;
-  padding: 1rem;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 0.85rem;
-  color: #0397ab;
-}
-pre.error {
-  color: #e84057;
-  border-color: #5c2229;
+@import "tailwindcss";
+
+/* 英雄联盟官方色板，注册成可复用 theme token。
+   自动生成 bg-lol-* / text-lol-* / border-lol-* 等工具类，全应用复用。 */
+@theme {
+  --color-lol-bg: #0a1428; /* 页面深蓝底 */
+  --color-lol-panel: #010a13; /* 卡片/输出框更深的底 */
+  --color-lol-gold: #c8aa6e; /* 金色：标题、强调、主按钮 */
+  --color-lol-text: #f0e6d2; /* 米白：正文 */
+  --color-lol-muted: #8a9099; /* 灰：次要文字、提示 */
+  --color-lol-accent: #0397ab; /* 青：数据/输出强调 */
+  --color-lol-danger: #e84057; /* 红：错误 */
+  --color-lol-border: #1e2328; /* 边框 */
 }

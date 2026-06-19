@@ -12,5 +12,6 @@
     "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true
-  }
+  },
+  "exclude": ["vite.main.config.ts", "vite.preload.config.ts", "vite.renderer.config.mts"]
 }
