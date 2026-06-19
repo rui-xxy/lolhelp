@@ -26,7 +26,7 @@ export function AppShell({ title, children }: AppShellProps) {
       {/* ===== 左侧侧边栏（三段式：顶/中/底）===== */}
       <aside
         className={`flex shrink-0 flex-col border-r border-app-border bg-app-sidebar transition-[width] duration-200 ${
-          collapsed ? 'w-14' : 'w-60'
+          collapsed ? 'w-16' : 'w-60'
         }`}
       >
         {/* 顶部：Logo 区容器可拖拽移动窗口，里面的 button 设 no-drag 保证点击折叠有效。
@@ -72,9 +72,10 @@ export function AppShell({ title, children }: AppShellProps) {
           <span className="text-sm font-medium text-app-text">{title}</span>
         </header>
 
-        {/* 主内容区：暖白纸感网格背景，承载功能模块 */}
+        {/* 主内容区：暖白纸感网格背景，承载功能模块。
+            max-w-5xl(1024px) 适配横向信息（战绩列表/英雄/装备/KDA 等）。 */}
         <main className="app-grid-bg flex-1 overflow-y-auto p-8">
-          <div className="mx-auto max-w-md">{children}</div>
+          <div className="mx-auto max-w-5xl">{children}</div>
         </main>
       </div>
     </div>

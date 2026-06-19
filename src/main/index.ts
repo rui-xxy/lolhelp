@@ -15,8 +15,12 @@ const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     title: 'LOL助手',
-    width: 800,
-    height: 600,
+    // 16:10 比例，适配桌面工作台布局（侧边栏+主工作区）。
+    // LOL 助手以后会有横向信息（玩家/英雄/装备/KDA/胜率/标签），需要足够宽度。
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 680,
     // 隐藏系统标题栏文字区，用自己的顶部标题栏；保留原生最小化/最大化/关闭按钮。
     // 拖拽窗口/双击最大化/Windows Snap 仍由原生支持，零 bug 风险。
     titleBarStyle: 'hidden',
