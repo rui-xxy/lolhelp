@@ -53,3 +53,7 @@ pre {
   font-size: 0.85rem;
   color: #0397ab;
 }
+pre.error {
+  color: #e84057;
+  border-color: #5c2229;
+}
