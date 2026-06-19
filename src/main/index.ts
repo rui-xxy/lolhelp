@@ -16,6 +16,10 @@ const createWindow = () => {
     height: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      // 显式锁定安全配置，不依赖 Electron 默认值（默认值可能随版本变化）。
+      // renderer 不能直接用 Node，只能通过 preload 暴露的 window.lolHelper 白名单。
+      nodeIntegration: false,
+      contextIsolation: true,
     },
   });
 
@@ -28,8 +32,10 @@ const createWindow = () => {
     );
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // 仅开发环境自动打开 DevTools；打包后（app.isPackaged === true）不再弹。
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 };
 
 // 统一注册所有 IPC handler（按功能域拆分在 src/main/ipc/handlers/）。
