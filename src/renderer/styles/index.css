@@ -43,3 +43,28 @@
     linear-gradient(90deg, var(--color-app-bg-grid) 1px, transparent 1px);
   background-size: 24px 24px;
 }
+
+/* shadcn 语义 token → 映射到 app-* 体系，shadcn 组件源码一行不改。
+   用 @theme inline 让 var() 原样内联，这样 bg-primary/90 这类透明度修饰才能生效。
+   app-* 仍是单一真实源，这里只是别名引用。 */
+@theme inline {
+  --color-background: var(--color-app-bg);
+  --color-foreground: var(--color-app-text);
+  --color-card: var(--color-app-surface);
+  --color-card-foreground: var(--color-app-text);
+  --color-popover: var(--color-app-surface);
+  --color-popover-foreground: var(--color-app-text);
+  --color-primary: var(--color-app-primary);
+  --color-primary-foreground: #ffffff; /* app-* 没有，按钮文字直接白 */
+  --color-secondary: var(--color-app-surface-soft);
+  --color-secondary-foreground: var(--color-app-text);
+  --color-muted: var(--color-app-surface-soft);
+  --color-muted-foreground: var(--color-app-muted);
+  --color-accent: var(--color-app-surface-soft);
+  --color-accent-foreground: var(--color-app-text);
+  --color-destructive: var(--color-app-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-app-border);
+  --color-input: var(--color-app-border-strong);
+  --color-ring: var(--color-app-primary);
+}

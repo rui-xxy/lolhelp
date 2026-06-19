@@ -10,4 +10,11 @@ export default defineConfig({
   // react()：让 Vite 识别/编译 .tsx（React 19 JSX 自动运行时）
   // tailwindcss()：v4 官方 Vite 插件，自动处理 @import "tailwindcss" 与 class 名扫描
   plugins: [react(), tailwindcss()],
+  // shadcn 组件源码用 @/ 别名 import（@/lib/utils、@/components/ui/*）。
+  // @ 指向 src/renderer（因为 root 是 src/renderer）。
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src/renderer'),
+    },
+  },
 });
