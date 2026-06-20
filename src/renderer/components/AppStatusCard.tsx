@@ -33,7 +33,7 @@ export function AppStatusCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-md shadow-airbnb">
       <CardHeader>
         <CardTitle>应用状态</CardTitle>
         <CardDescription>通过 IPC 向主进程请求应用状态</CardDescription>

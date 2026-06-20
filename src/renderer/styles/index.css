@@ -1,55 +1,51 @@
 @import "tailwindcss";
 
-/* Warm Paper Dashboard：暖白纸感仪表盘风
-   灰米白背景 + 淡网格纹理 + 暖白卡片 + 方正小圆角 + 橙色主点缀。
-   比纯白后台有游戏感，比深蓝金色更轻松，不像外挂工具。
-   app-* 命名中性，配色调整只动这里。 */
+/* 设计基调：Airbnb-inspired consumer surface
+   纯白 canvas + Ink 近黑文字 + Rausch (#ff385c) 单一品牌强调色。
+   形状语言柔软（按钮 8px、卡片 14px 圆角），靠白色层级和 hairline 边框区分区域，
+   单一阴影层级（卡片 hover 浮起），无重度电竞色，无 dark mode。
+   参考 docs 同级的 DESIGN.md（Airbnb 设计系统分析）。
+   保留 app- 前缀避免组件 className 大改，色值严格对齐 Airbnb token。 */
 @theme {
-  /* 背景：灰米白（偏白不发黄）→ 网格线色（极淡） */
-  --color-app-bg: #f4f1ea;
-  --color-app-bg-grid: #ece8df;
+  /* 背景：canvas 纯白 → surface-soft 极浅灰 → surface-strong 略深（侧边栏导航区） */
+  --color-app-bg: #ffffff;
+  --color-app-bg-soft: #f7f7f7;
+  --color-app-sidebar: #f2f2f2;
 
-  /* 卡片：暖白（近白）→ 软底 */
-  --color-app-surface: #faf9f7;
-  --color-app-surface-soft: #f3f0e9;
+  /* 卡片：canvas 纯白 → surface-soft 极浅灰（软底/输入框底） */
+  --color-app-surface: #ffffff;
+  --color-app-surface-soft: #f7f7f7;
 
-  /* 侧边栏：比卡片略深略灰的暖米色，形成稳定的导航区域，与右侧主区拉开层级 */
-  --color-app-sidebar: #ece7dc;
+  /* 边框：hairline 默认浅灰 → border-strong 较重（focus/disabled 描边） */
+  --color-app-border: #dddddd;
+  --color-app-border-strong: #c1c1c1;
 
-  /* 边框：浅米灰 → 强分割（浅棕灰） */
-  --color-app-border: #ddd4c8;
-  --color-app-border-strong: #c1b2a1;
+  /* 文字：ink 近黑（非纯黑）→ body 次级 → muted 说明 → muted-soft 更弱 */
+  --color-app-text: #222222;
+  --color-app-body: #3f3f3f;
+  --color-app-muted: #6a6a6a;
+  --color-app-subtle: #929292;
 
-  /* 文字：深咖黑 → 说明 → 更弱 */
-  --color-app-text: #25201a;
-  --color-app-muted: #8b7a66;
-  --color-app-subtle: #b8aa98;
+  /* 主色：Rausch 红（单一品牌色，用于按钮/强调/选中态）+ active 按压 + disabled 淡红 */
+  --color-app-primary: #ff385c;
+  --color-app-primary-hover: #e00b41;
+  --color-app-primary-soft: #ffd1da;
 
-  /* 主色：暖橙（按钮、图标强调）+ hover + 软底 */
-  --color-app-primary: #e79c20;
-  --color-app-primary-hover: #d8890f;
-  --color-app-primary-soft: #fff1d6;
+  /* 语义色：error 红（比 Rausch 更深更饱和）→ success 绿 → link 蓝（仅法律链接） */
+  --color-app-danger: #c13515;
+  --color-app-danger-hover: #b32505;
+  --color-app-success: #008a05;
+  --color-app-link: #428bff;
 
-  /* 语义色 */
-  --color-app-link: #648ac6; /* 蓝灰：链接、状态文本 */
-  --color-app-success: #26bb59; /* 绿：胜利、成功 */
-  --color-app-danger: #a83939; /* 暗红：失败、错误（不刺眼） */
-  --color-app-warning: #e79c20; /* 橙：警告（与主色同） */
-}
-
-/* 纸感网格背景：极淡的格子纹理，作为背景质感而非主视觉。
-   外层容器加 className="app-grid-bg" 即可。 */
-.app-grid-bg {
-  background-color: var(--color-app-bg);
-  background-image:
-    linear-gradient(var(--color-app-bg-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-app-bg-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
+  /* 圆角系统（Airbnb 形状语言）：xs 4 / sm 8 / md 14 / lg 20 / full 胶囊 */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
 }
 
 /* shadcn 语义 token → 映射到 app-* 体系，shadcn 组件源码一行不改。
-   用 @theme inline 让 var() 原样内联，这样 bg-primary/90 这类透明度修饰才能生效。
-   app-* 仍是单一真实源，这里只是别名引用。 */
+   用 @theme inline 让 var() 原样内联，这样 bg-primary/90 这类透明度修饰才能生效。 */
 @theme inline {
   --color-background: var(--color-app-bg);
   --color-foreground: var(--color-app-text);
@@ -58,7 +54,7 @@
   --color-popover: var(--color-app-surface);
   --color-popover-foreground: var(--color-app-text);
   --color-primary: var(--color-app-primary);
-  --color-primary-foreground: #ffffff; /* app-* 没有，按钮文字直接白 */
+  --color-primary-foreground: #ffffff; /* on-primary：Rausch 底配白字 */
   --color-secondary: var(--color-app-surface-soft);
   --color-secondary-foreground: var(--color-app-text);
   --color-muted: var(--color-app-surface-soft);
@@ -70,4 +66,16 @@
   --color-border: var(--color-app-border);
   --color-input: var(--color-app-border-strong);
   --color-ring: var(--color-app-primary);
+}
+
+/* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
+   系统只有这一个 shadow 定义，其余表面全部 flat。
+   用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */
+@layer utilities {
+  .shadow-airbnb {
+    box-shadow:
+      rgba(0, 0, 0, 0.02) 0 0 0 1px,
+      rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+      rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  }
 }

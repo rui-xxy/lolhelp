@@ -22,7 +22,7 @@ export function AppShell({ title, children }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden text-app-text">
+    <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">
       {/* ===== 左侧侧边栏（三段式：顶/中/底）===== */}
       <aside
         className={`flex shrink-0 flex-col border-r border-app-border bg-app-sidebar transition-[width] duration-200 ${
@@ -72,9 +72,9 @@ export function AppShell({ title, children }: AppShellProps) {
           <span className="text-sm font-medium text-app-text">{title}</span>
         </header>
 
-        {/* 主内容区：暖白纸感网格背景，承载功能模块。
+        {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。
             max-w-5xl(1024px) 适配横向信息（战绩列表/英雄/装备/KDA 等）。 */}
-        <main className="app-grid-bg flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto bg-app-bg p-8">
           <div className="mx-auto max-w-5xl">{children}</div>
         </main>
       </div>

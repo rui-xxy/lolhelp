@@ -8,7 +8,7 @@ export function App() {
     <AppShell title="工作台">
       <h1 className="mb-1 text-xl font-bold">LOL 助手</h1>
       <p className="mb-6 text-sm text-app-muted">
-        暖白纸感工作台 · shadcn 已就绪
+        工作台已就绪 · 点击调用 IPC
       </p>
       <AppStatusCard />
     </AppShell>
