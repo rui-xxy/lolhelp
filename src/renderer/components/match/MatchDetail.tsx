@@ -6,9 +6,10 @@ import type { PlayerMatchDetail } from '../../../shared/api';
 interface MatchDetailProps {
   match: PlayerMatchDetail;
   targetPuuid: string;
+  onPlayerSearch?: (riotId: string) => void;
 }
 
-export function MatchDetail({ match, targetPuuid }: MatchDetailProps) {
+export function MatchDetail({ match, targetPuuid, onPlayerSearch }: MatchDetailProps) {
   return (
     <div className="space-y-4">
       {/* 双队详情 */}
@@ -16,11 +17,13 @@ export function MatchDetail({ match, targetPuuid }: MatchDetailProps) {
         teamId={100}
         participants={match.participants}
         targetPuuid={targetPuuid}
+        onPlayerSearch={onPlayerSearch}
       />
       <TeamBlock
         teamId={200}
         participants={match.participants}
         targetPuuid={targetPuuid}
+        onPlayerSearch={onPlayerSearch}
       />
     </div>
   );

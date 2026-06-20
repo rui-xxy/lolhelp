@@ -7,11 +7,13 @@ import type { MatchParticipantSummary } from '../../../shared/api';
 interface PlayerRowProps {
   participant: MatchParticipantSummary;
   isTarget: boolean; // 是否为当前查询的玩家（高亮）
+  onPlayerSearch?: (riotId: string) => void;
 }
 
-export function PlayerRow({ participant: p, isTarget }: PlayerRowProps) {
+export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRowProps) {
   const kdaColor = p.kda >= 5 ? 'text-app-success' : p.kda >= 3 ? 'text-app-link' : 'text-app-text';
   const itemSlots = Array.from({ length: 7 }, (_, slot) => p.items.find((item) => item.slot === slot));
+  const playerName = p.riotId || p.summonerName || '未知玩家';
 
   return (
     <div
@@ -41,9 +43,16 @@ export function PlayerRow({ participant: p, isTarget }: PlayerRowProps) {
           <GameIcon src={p.primaryRune.icon} alt={p.primaryRune.name} title={p.primaryRune.name} size={18} />
         )}
         <div className="min-w-0">
-          <div className={`break-all leading-4 ${isTarget ? 'font-semibold text-app-text' : 'text-app-text'}`}>
-            {p.riotId || p.summonerName || '未知玩家'}
-          </div>
+          <button
+            type="button"
+            title={playerName}
+            onClick={() => onPlayerSearch?.(playerName)}
+            className={`block break-all text-left leading-4 transition-colors hover:text-app-link hover:underline ${
+              isTarget ? 'font-semibold text-app-text' : 'text-app-text'
+            }`}
+          >
+            {playerName}
+          </button>
           <div className="truncate text-[10px] text-app-subtle">{p.championName}</div>
         </div>
       </div>

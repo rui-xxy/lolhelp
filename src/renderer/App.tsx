@@ -82,6 +82,11 @@ export function App() {
           searchName={matchSearchName}
           searchTrigger={matchSearchTrigger}
           region={matchRegion}
+          onPlayerSearch={(name) => {
+            setMatchSearchName(name);
+            setActiveView('matches');
+            setMatchSearchTrigger((n) => n + 1);
+          }}
         />
       </div>
     </AppShell>

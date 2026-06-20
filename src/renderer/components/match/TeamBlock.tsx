@@ -6,9 +6,10 @@ interface TeamBlockProps {
   teamId: number;
   participants: MatchParticipantSummary[];
   targetPuuid: string; // 当前查询的玩家 puuid（PlayerRow 高亮用）
+  onPlayerSearch?: (riotId: string) => void;
 }
 
-export function TeamBlock({ teamId, participants, targetPuuid }: TeamBlockProps) {
+export function TeamBlock({ teamId, participants, targetPuuid, onPlayerSearch }: TeamBlockProps) {
   const teamPlayers = participants.filter((p) => p.teamId === teamId);
 
   return (
@@ -24,7 +25,12 @@ export function TeamBlock({ teamId, participants, targetPuuid }: TeamBlockProps)
         <span className="text-right">补刀</span>
       </div>
       {teamPlayers.map((p) => (
-        <PlayerRow key={`${p.puuid}-${p.championId}`} participant={p} isTarget={p.puuid === targetPuuid} />
+        <PlayerRow
+          key={`${p.puuid}-${p.championId}`}
+          participant={p}
+          isTarget={p.puuid === targetPuuid}
+          onPlayerSearch={onPlayerSearch}
+        />
       ))}
     </section>
   );
