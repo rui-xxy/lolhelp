@@ -43,5 +43,134 @@ export interface DbApi {}
 export interface LolHelper {
   app: AppApi;
   lcu: LcuApi;
+  match: MatchApi;
   db: DbApi;
+}
+
+// ============================================================================
+// 战绩查询类型（借鉴参考项目 playerTypes.ts，精简到战绩必需部分）
+// ============================================================================
+
+export type SummonerSpellSlot = 'D' | 'F';
+
+// 装备（ID + 名字 + 图标 + 槽位 0-6）
+export interface PlayerItemSummary {
+  id: number;
+  name: string;
+  icon: string;
+  slot: number;
+}
+
+// 召唤师技能（D/F 槽，标记闪现）
+export interface PlayerSpellSummary {
+  id: number;
+  name: string;
+  icon: string;
+  slot: SummonerSpellSlot;
+  isFlash: boolean;
+}
+
+// 符文（基石或副系）
+export interface PlayerRuneSummary {
+  id: number;
+  icon: string;
+  name: string;
+}
+
+// 单个玩家在对局中的完整数据（10 人各一行）
+export interface MatchParticipantSummary {
+  puuid: string;
+  riotId: string;
+  gameName: string;
+  tagLine: string;
+  summonerName: string;
+  profileIconId: number;
+  profileIconUrl: string;
+  teamId: number;
+  teamPosition: string;
+  championId: number;
+  championName: string;
+  championAvatar: string; // 英雄头像 URL（ddragon，由 main 的 heroData 算好）
+  champLevel: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  win: boolean;
+  damage: number;
+  cs: number;
+  gold: number;
+  items: PlayerItemSummary[];
+  spells: PlayerSpellSummary[];
+  primaryRune: PlayerRuneSummary | null;
+  secondaryRune: PlayerRuneSummary | null;
+  visionScore?: number;
+  largestMultiKill?: number;
+}
+
+// 单场对局完整详情（含 10 人 participants）
+export interface PlayerMatchDetail {
+  gameId: number;
+  queueId: number;
+  queueName: string;
+  gameCreation: number;
+  gameDuration: number;
+  championId: number;
+  championName: string;
+  championAvatar: string; // 英雄头像 URL（ddragon，由 main 的 heroData 算好）
+  champLevel: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  win: boolean;
+  damage: number;
+  cs: number;
+  gold: number;
+  items: PlayerItemSummary[];
+  spells: PlayerSpellSummary[];
+  flashKey: SummonerSpellSlot | null;
+  primaryRune: PlayerRuneSummary | null;
+  secondaryRune: PlayerRuneSummary | null;
+  participants: MatchParticipantSummary[];
+}
+
+// 召唤师资料（搜索结果顶部展示）
+export interface PlayerProfile {
+  riotId: string;
+  puuid: string;
+  level: number;
+  profileIconId: number;
+  profileIconUrl: string;
+}
+
+// 战绩汇总统计
+export interface PlayerLookupSummary {
+  wins: number;
+  losses: number;
+  averageKda: number;
+  averageDamage: number;
+  averageCs: number;
+}
+
+// 战绩查询请求
+export interface PlayerLookupRequest {
+  name: string; // 召唤师名或 Riot ID
+  maxMatches?: number; // 兼容旧调用：最多拉几场
+  page?: number; // 页码，从 1 开始
+  pageSize?: number; // 每页场次，默认 12
+}
+
+// 战绩查询结果
+export interface PlayerLookupResult {
+  profile: PlayerProfile;
+  matches: PlayerMatchDetail[];
+  summary: PlayerLookupSummary;
+  totalMatches: number;
+  error?: string; // 失败原因（玩家不存在/客户端未开/请求失败）
+}
+
+// match 域 API 契约
+export interface MatchApi {
+  search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
 }

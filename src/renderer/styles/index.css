@@ -72,6 +72,33 @@
   --color-ring: var(--color-app-primary);
 }
 
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-app-border-strong) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: var(--color-app-border-strong);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-app-muted);
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */

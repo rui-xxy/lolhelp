@@ -1,5 +1,6 @@
 import { registerAppHandlers } from './handlers/app';
 import { registerLcuHandlers } from './handlers/lcu';
+import { registerMatchHandlers } from './handlers/match';
 import { registerDbHandlers } from './handlers/db';
 
 // 统一注册所有 IPC handler。在主进程启动时调用一次。
@@ -7,5 +8,6 @@ import { registerDbHandlers } from './handlers/db';
 export function registerIpcHandlers(): void {
   registerAppHandlers();
   registerLcuHandlers();
+  registerMatchHandlers();
   registerDbHandlers();
 }

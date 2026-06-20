@@ -13,6 +13,8 @@ export const IPC_CHANNELS = {
   // db 域：本地数据/设置（后续阶段填充真实实现）
   DB_GET_SETTINGS: 'db:get-settings',
   DB_SAVE_SETTINGS: 'db:save-settings',
+  // match 域：战绩查询（按名查战绩列表+详情）
+  MATCH_SEARCH: 'match:search',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

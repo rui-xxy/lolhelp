@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { LolHelper } from '../shared/api';
+import type { LolHelper, PlayerLookupRequest } from '../shared/api';
 import { IPC_CHANNELS } from '../shared/channels';
 
 // 用类型约束实现：确保暴露的 API 与契约 LolHelper 完全一致（多一个少一个都报错）。
@@ -11,6 +11,10 @@ const lolHelper: LolHelper = {
   },
   lcu: {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
+  },
+  match: {
+    search: (req: PlayerLookupRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
   },
   db: {
     // 占位：后续阶段填充

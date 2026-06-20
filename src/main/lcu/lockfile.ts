@@ -139,3 +139,34 @@ export function readLockfile(): LcuCredentials | null {
   }
   return null;
 }
+
+// ===== 凭证缓存层 =====
+// 战绩查询等批量 LCU 请求会连续发多次，每次都扫盘读 log 是浪费。
+// token 在客户端单次运行期间稳定（仅重启才变），故加 TTL 缓存。
+// detect-client 仍用 readLockfile()（即时检测，不读缓存）；战绩服务用 getCachedCredentials()。
+const CREDS_CACHE_TTL = 30_000; // 30 秒
+let cachedCreds: LcuCredentials | null = null;
+let cachedCredsAt = 0;
+
+// 带缓存的凭证获取。供战绩服务等批量请求场景复用。
+// 返回 null = 客户端未运行。
+export function getCachedCredentials(): LcuCredentials | null {
+  const now = Date.now();
+  if (cachedCreds && now - cachedCredsAt < CREDS_CACHE_TTL) {
+    return cachedCreds;
+  }
+  const creds = readLockfile();
+  if (creds) {
+    cachedCreds = creds;
+    cachedCredsAt = now;
+  } else {
+    cachedCreds = null; // 客户端没了，清缓存
+  }
+  return creds;
+}
+
+// 凭证失效（请求 401/403 时调用，强制下次重新读取）。
+export function invalidateCredentialsCache(): void {
+  cachedCreds = null;
+  cachedCredsAt = 0;
+}

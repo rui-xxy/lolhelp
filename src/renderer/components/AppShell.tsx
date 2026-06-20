@@ -9,6 +9,7 @@ interface AppShellProps {
   activeView: View; // 当前激活的视图（用于导航项高亮）
   onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
+  fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局（战绩页等双栏全宽视图用）
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -28,6 +29,7 @@ export function AppShell({
   activeView,
   onNavigate,
   children,
+  fullBleed = false,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   // activeView 暂时只用于潜在的状态追踪，当前页不做视觉标记（仅 hover 高亮）。
@@ -106,9 +108,10 @@ export function AppShell({
         </header>
 
         {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。
-            max-w-5xl(1024px) 适配横向信息（战绩列表/英雄/装备/KDA 等）。 */}
-        <main className="flex-1 overflow-y-auto bg-app-bg p-8">
-          <div className="mx-auto max-w-5xl">{children}</div>
+            fullBleed=true 时不加 max-w/padding，由内容自己管布局（战绩页双栏全宽）。
+            fullBleed=false（默认）时 max-w-5xl 居中。 */}
+        <main className={`flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
+          <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
         </main>
       </div>
     </div>
