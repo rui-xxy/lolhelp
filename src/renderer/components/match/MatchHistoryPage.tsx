@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { MatchList } from './MatchList';
+import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 
@@ -216,6 +216,33 @@ export function MatchHistoryPage({
   const selectedMatch = activeTab?.matches.find((match) => match.gameId === activeTab.selectedGameId);
   // SGP 已按 tag 筛选，直接用 matches（不再前端过滤）
   const displayedMatches = activeTab ? getDisplayedMatches(activeTab.matches, activeTab.currentPage) : [];
+
+  // 计算经常一起玩的队友（所有已加载对局中出现≥2次的同队玩家）
+  const recurringMates = new Map<string, RecurringMate>();
+  const targetPuuid = activeTab?.result?.profile.puuid ?? '';
+  if (activeTab && targetPuuid) {
+    const counts: Record<string, { count: number; riotId: string; icon: string }> = {};
+    for (const m of activeTab.matches) {
+      const myTeam = m.participants.find((p) => p.puuid === targetPuuid)?.teamId;
+      if (myTeam == null) continue;
+      for (const p of m.participants) {
+        if (p.puuid === targetPuuid || p.teamId !== myTeam) continue;
+        if (!counts[p.puuid]) {
+          counts[p.puuid] = {
+            count: 0,
+            riotId: p.riotId || p.summonerName || p.gameName || '未知',
+            icon: p.profileIconUrl,
+          };
+        }
+        counts[p.puuid].count++;
+      }
+    }
+    for (const [puuid, info] of Object.entries(counts)) {
+      if (info.count >= 2) {
+        recurringMates.set(puuid, { puuid, riotId: info.riotId, profileIconUrl: info.icon, count: info.count });
+      }
+    }
+  }
   const knownPages = activeTab ? Math.max(1, Math.ceil(activeTab.matches.length / PAGE_SIZE)) : 1;
   const totalPages = activeTab?.hasMore ? knownPages + 5 : knownPages;
   const pageStart = activeTab && displayedMatches.length > 0 ? (activeTab.currentPage - 1) * PAGE_SIZE + 1 : 0;
@@ -432,6 +459,12 @@ export function MatchHistoryPage({
                 onSelect={(gameId) => {
                   if (!activeTab) return;
                   updateTab(activeTab.id, (tab) => ({ ...tab, selectedGameId: gameId }));
+                }}
+                recurringMates={recurringMates}
+                targetPuuid={targetPuuid}
+                onMateClick={(riotId) => {
+                  // 点击队友头像 → 用他的 Riot ID 开新搜索
+                  openSearchTab(riotId, activeTab?.region ?? '');
                 }}
               />
             ) : activeTab?.result?.error ? (

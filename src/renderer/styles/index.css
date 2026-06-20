@@ -99,6 +99,164 @@
   }
 }
 
+@layer components {
+  .match-result-card {
+    position: relative;
+    display: flex;
+    height: 48px;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 0 8px;
+    text-align: left;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .match-result-card::after {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  .match-result-card:hover,
+  .match-result-card--selected {
+    background-color: var(--color-app-surface);
+  }
+
+  .match-result-card:hover::after,
+  .match-result-card--selected::after {
+    opacity: 1;
+  }
+
+  .match-result-card--win::after {
+    background:
+      linear-gradient(112deg, rgba(255, 215, 100, 0.2) 0%, transparent 36%),
+      repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 13px,
+        rgba(239, 124, 26, 0.09) 13px,
+        rgba(239, 124, 26, 0.09) 15px,
+        transparent 15px,
+        transparent 25px
+      );
+  }
+
+  .match-result-card--loss::after {
+    background:
+      linear-gradient(112deg, rgba(207, 49, 84, 0.17) 0%, transparent 36%),
+      repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 13px,
+        rgba(123, 66, 216, 0.1) 13px,
+        rgba(123, 66, 216, 0.1) 15px,
+        transparent 15px,
+        transparent 25px
+      );
+  }
+
+  .match-result-card--win.match-result-card--selected {
+    border-color: rgba(239, 124, 26, 0.38);
+    box-shadow:
+      rgba(239, 124, 26, 0.18) 0 0 0 1px inset,
+      rgba(255, 215, 100, 0.14) 0 2px 10px;
+  }
+
+  .match-result-card--loss.match-result-card--selected {
+    border-color: rgba(207, 49, 84, 0.34);
+    box-shadow:
+      rgba(207, 49, 84, 0.16) 0 0 0 1px inset,
+      rgba(123, 66, 216, 0.12) 0 2px 10px;
+  }
+
+  .match-result-avatar {
+    position: relative;
+    z-index: 10;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .match-result-avatar--win {
+    box-shadow:
+      rgba(255, 215, 100, 0.56) 0 0 0 1px,
+      rgba(24, 184, 214, 0.22) 0 0 9px;
+  }
+
+  .match-result-avatar--loss {
+    box-shadow:
+      rgba(207, 49, 84, 0.44) 0 0 0 1px,
+      rgba(123, 66, 216, 0.18) 0 0 9px;
+  }
+
+  .match-result-mode {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .match-result-badge {
+    display: inline-flex;
+    height: 14px;
+    flex-shrink: 0;
+    align-items: center;
+    border-radius: 2px;
+    padding: 0 4px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 14px;
+    transform: skewX(-8deg);
+  }
+
+  .match-result-card--win .match-result-badge {
+    border: 1px solid rgba(239, 124, 26, 0.34);
+    background: linear-gradient(180deg, #fff6ca 0%, #ffe28b 100%);
+    color: #704000;
+  }
+
+  .match-result-card--loss .match-result-badge {
+    border: 1px solid rgba(207, 49, 84, 0.3);
+    background: linear-gradient(180deg, #ffe5ee 0%, #ffc2d3 100%);
+    color: #7e1835;
+  }
+
+  .match-result-kda {
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .match-result-kda-value {
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .match-result-card--win .match-result-kda-value {
+    color: #7a4300;
+  }
+
+  .match-result-card--loss .match-result-kda-value {
+    color: #6c1c39;
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */
