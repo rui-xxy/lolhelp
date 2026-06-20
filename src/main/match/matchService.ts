@@ -22,8 +22,8 @@ import type {
 //           ?startIndex={偏移}&count={条数}
 // 认证：Bearer {entitlements token}
 //
-// 注意：SGP 只能查当前登录账号（puuid 来自 current-summoner）。
-// 按名查他人需要先注册玩家到 SGP（summoner-ledge），本阶段暂不做。
+// 注意：SGP 按 puuid 查历史；自己的 puuid 来自 current-summoner，
+// 他人的 puuid 先通过 LCU 的 Riot ID 查询拿到。
 
 const DEFAULT_COUNT = 20;
 const MAX_COUNT = 100; // 单次最多 100 场（可翻页拿更多）
@@ -51,21 +51,25 @@ async function requestWithRetry<T>(
 // 按 Riot ID（名字#数字）查 puuid。
 // 关键：必须传完整 Riot ID（gameName#tagLine），# 编码成 %23。
 // 只传 gameName（不带 #tagLine）会返回 422（之前所有失败的根因）。
-// 返回 { puuid, gameName } 或 null（没找到）。
-async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; gameName: string; level: number; profileIconId: number } | null> {
+// 返回 { puuid, riotId } 或 null（没找到）。
+async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; riotId: string; level: number; profileIconId: number } | null> {
   const creds = getCachedCredentials();
   if (!creds) return null;
   const client = new LcuClient(creds);
   // 传完整 Riot ID（含 #），encodeURIComponent 会把 # 编码成 %23
   const encoded = encodeURIComponent(riotId.trim());
   try {
-    const summoner = await client.get<{ puuid?: string; gameName?: string; summonerLevel?: number; profileIconId?: number }>(
+    const summoner = await client.get<{ puuid?: string; gameName?: string; tagLine?: string; summonerLevel?: number; profileIconId?: number }>(
       `/lol-summoner/v1/summoners?name=${encoded}`,
     );
     if (summoner && summoner.puuid) {
+      const gameName = summoner.gameName ?? riotId;
+      const fullRiotId = summoner.tagLine && !gameName.includes('#')
+        ? `${gameName}#${summoner.tagLine}`
+        : gameName;
       return {
         puuid: summoner.puuid,
-        gameName: summoner.gameName ?? riotId,
+        riotId: fullRiotId,
         level: summoner.summonerLevel ?? 0,
         profileIconId: summoner.profileIconId ?? 0,
       };
@@ -74,6 +78,29 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; 
     console.warn('[match] Riot ID 查询失败:', riotId, err);
   }
   return null;
+}
+
+async function fetchCurrentSummonerProfile(): Promise<{ riotId: string; level: number; profileIconId: number }> {
+  const creds = getCachedCredentials();
+  if (!creds) return { riotId: '', level: 0, profileIconId: 0 };
+  const client = new LcuClient(creds);
+  const summoner = await client.get<{
+    gameName?: string;
+    tagLine?: string;
+    displayName?: string;
+    name?: string;
+    summonerLevel?: number;
+    profileIconId?: number;
+  }>('/lol-summoner/v1/current-summoner');
+  const gameName = summoner.gameName || summoner.displayName || summoner.name || '';
+  const riotId = gameName && summoner.tagLine && !gameName.includes('#')
+    ? `${gameName}#${summoner.tagLine}`
+    : gameName;
+  return {
+    riotId,
+    level: summoner.summonerLevel ?? 0,
+    profileIconId: summoner.profileIconId ?? 0,
+  };
 }
 
 // 主入口：查战绩。
@@ -107,14 +134,23 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   let displayName = '';
   let level = 0;
   let profileIconId = 0;
-  if (!isSelfQuery) {
+  if (isSelfQuery) {
+    try {
+      const selfProfile = await fetchCurrentSummonerProfile();
+      displayName = selfProfile.riotId;
+      level = selfProfile.level;
+      profileIconId = selfProfile.profileIconId;
+    } catch (err) {
+      console.warn('[match] 当前账号资料获取失败:', err);
+    }
+  } else {
     // 输入了 Riot ID → 按 LCU 查 puuid
     const lookup = await lookupSummonerByRiotId(inputName);
     if (!lookup) {
       return emptyResult(`未找到玩家「${inputName}」，请确认 Riot ID 格式为 名字#数字（如 小猫猫拳#46662）`);
     }
     targetPuuid = lookup.puuid;
-    displayName = lookup.gameName;
+    displayName = lookup.riotId;
     level = lookup.level;
     profileIconId = lookup.profileIconId;
   }
@@ -123,10 +159,12 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   let games: SgpGame[];
   try {
     const client = new SgpClient(auth);
+    const params: Record<string, string | number> = { startIndex, count };
+    if (req.tag) params.tag = req.tag; // 模式筛选（q_420 等）
     const resp = await requestWithRetry<{ games: SgpGame[] }>(
       client,
       '/match-history-query/v1/products/lol/player/' + targetPuuid + '/SUMMARY',
-      { startIndex, count },
+      params,
     );
     games = resp.games ?? [];
   } catch (err) {
@@ -142,6 +180,17 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     } catch (err) {
       console.warn('[match] 单场映射失败，跳过:', err);
     }
+  }
+
+  const targetParticipant = matches
+    .flatMap((match) => match.participants)
+    .find((participant) => participant.puuid === targetPuuid);
+
+  if (!displayName) {
+    displayName = targetParticipant?.riotId || targetParticipant?.summonerName || '';
+  }
+  if (!profileIconId && targetParticipant?.profileIconId) {
+    profileIconId = targetParticipant.profileIconId;
   }
 
   // 5. 汇总

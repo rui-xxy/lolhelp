@@ -62,6 +62,12 @@ function readRegionFromLog(): string {
   return '';
 }
 
+export function getCurrentRegionFromLog(): RegionConfig | null {
+  const regionKey = readRegionFromLog();
+  if (!regionKey) return null;
+  return getRegionConfig(regionKey);
+}
+
 // 从 LCU 拿 entitlements token + 当前账号 puuid。
 async function fetchLcuAuth(client: LcuClient): Promise<{ accessToken: string; puuid: string }> {
   // entitlements token

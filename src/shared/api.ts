@@ -28,10 +28,17 @@ export interface LcuConnection {
   error?: string; // 失败原因（未找到/格式错/请求失败/国服 403 等）
 }
 
+export interface LcuRegion {
+  key: string;
+  name: string;
+  error?: string;
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
 // detectClient / connect / getCurrentSummoner / getLobby / getChampSelectSession ...
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
+  getCurrentRegion: () => Promise<LcuRegion>;
 }
 
 // 占位接口：后续阶段接入本地数据时填充
@@ -161,6 +168,7 @@ export interface PlayerLookupRequest {
   page?: number; // 兼容旧调用：页码
   pageSize?: number; // 兼容旧调用：每页场次
   region?: string; // 目标大区码（HN10/HN1/TJ100 等），不传用登录账号大区
+  tag?: string; // 模式筛选（q_420 单排/q_450 大乱斗/q_2400 海克斯大乱斗 等），不传=全部
 }
 
 // 战绩查询结果

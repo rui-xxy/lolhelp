@@ -2,7 +2,8 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
 import { readLockfile } from '../../lcu/lockfile';
 import { LcuClient } from '../../lcu/client';
-import type { LcuConnection } from '../../../shared/api';
+import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
+import type { LcuConnection, LcuRegion } from '../../../shared/api';
 
 // 注册 lcu 域 IPC 处理器。
 // 当前实现 detect-client：lockfile 读取 + 真实 LCU 请求验证连通。
@@ -52,6 +53,27 @@ export function registerLcuHandlers(): void {
           found: true,
           connected: false,
           error: `连接失败：${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_GET_CURRENT_REGION,
+    async (): Promise<LcuRegion> => {
+      const region = getCurrentRegionFromLog();
+      if (region) {
+        return { key: region.key, name: region.name };
+      }
+
+      try {
+        const auth = await getSgpAuth();
+        return { key: auth.region.key, name: auth.region.name };
+      } catch (err) {
+        return {
+          key: '',
+          name: '',
+          error: `无法读取当前登录大区：${err instanceof Error ? err.message : String(err)}`,
         };
       }
     },

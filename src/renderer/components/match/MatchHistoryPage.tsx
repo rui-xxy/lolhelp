@@ -27,7 +27,19 @@ interface MatchTab {
   hasMore: boolean;
   selectedGameId: number | null;
   currentPage: number;
+  filterQueue: string; // '' = 全部，'420' = 单排，'450' = 大乱斗 等
 }
+
+// 模式筛选选项（tag → 中文名，tag 是 SGP 的 q_{queueId} 格式）
+const QUEUE_FILTERS = [
+  { key: '', tag: '', name: '全部' },
+  { key: '420', tag: 'q_420', name: '单双排' },
+  { key: '440', tag: 'q_440', name: '灵活组排' },
+  { key: '450', tag: 'q_450', name: '大乱斗' },
+  { key: '2400', tag: 'q_2400', name: '海克斯大乱斗' },
+  { key: '490', tag: 'q_490', name: '快速模式' },
+  { key: '1700', tag: 'q_1700', name: '竞技场' },
+];
 
 function getPageNumbers(currentPage: number, totalPages: number): number[] {
   const maxVisible = 5;
@@ -57,7 +69,13 @@ function makeTabId(): string {
 }
 
 function makeTabTitle(query: string, result: PlayerLookupResult): string {
-  return result.profile.riotId || query || '当前账号';
+  const targetParticipant = result.matches
+    .flatMap((match) => match.participants)
+    .find((participant) => participant.puuid === result.profile.puuid);
+  const resolvedName = result.profile.riotId || targetParticipant?.riotId || targetParticipant?.summonerName || '';
+  if (resolvedName) return resolvedName;
+  if (query) return query;
+  return result.error ? '查询失败' : '账号名读取失败';
 }
 
 export function MatchHistoryPage({
@@ -72,6 +90,7 @@ export function MatchHistoryPage({
 
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
+  const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -81,20 +100,32 @@ export function MatchHistoryPage({
     setTabs((currentTabs) => currentTabs.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
   };
 
+  const getTransparentDragImage = () => {
+    if (!transparentDragImageRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      transparentDragImageRef.current = canvas;
+    }
+    return transparentDragImageRef.current;
+  };
+
   const requestBatch = async (
     query: string,
     regionKey: string,
     startIndex: number,
+    tag?: string,
   ): Promise<PlayerLookupResult> => {
     return window.lolHelper.match.search({
       name: query,
       startIndex,
       pageSize: SGP_BATCH,
       region: regionKey || undefined,
+      tag: tag || undefined,
     });
   };
 
-  const loadInitialTab = async (tabId: string, query: string, regionKey: string) => {
+  const loadInitialTab = async (tabId: string, query: string, regionKey: string, tag?: string) => {
     updateTab(tabId, (tab) => ({
       ...tab,
       loading: true,
@@ -105,10 +136,11 @@ export function MatchHistoryPage({
       hasMore: false,
       selectedGameId: null,
       currentPage: 1,
+      filterQueue: tag ? QUEUE_FILTERS.find((f) => f.tag === tag)?.key ?? '' : '',
     }));
 
     try {
-      const result = await requestBatch(query, regionKey, 0);
+      const result = await requestBatch(query, regionKey, 0, tag);
       updateTab(tabId, (tab) => {
         const nextMatches = result.matches;
         return {
@@ -123,10 +155,12 @@ export function MatchHistoryPage({
         };
       });
     } catch (err) {
+      const errorResult = createEmptyResult(err instanceof Error ? err.message : String(err));
       updateTab(tabId, (tab) => ({
         ...tab,
+        title: makeTabTitle(query, errorResult),
         loading: false,
-        result: createEmptyResult(err instanceof Error ? err.message : String(err)),
+        result: errorResult,
       }));
     }
   };
@@ -136,6 +170,15 @@ export function MatchHistoryPage({
     const existingTab = tabsRef.current.find((tab) => tab.query === query && tab.region === regionKey);
     if (existingTab) {
       setActiveTabId(existingTab.id);
+      if (
+        !existingTab.loading &&
+        (!existingTab.result?.profile.riotId ||
+          existingTab.title === '我的战绩' ||
+          existingTab.title === '当前账号' ||
+          existingTab.title === '账号名读取失败')
+      ) {
+        void loadInitialTab(existingTab.id, query, regionKey);
+      }
       return;
     }
 
@@ -144,7 +187,7 @@ export function MatchHistoryPage({
       id: tabId,
       query,
       region: regionKey,
-      title: query || '当前账号',
+      title: query || '读取账号名...',
       loading: true,
       pageLoading: false,
       result: null,
@@ -153,6 +196,7 @@ export function MatchHistoryPage({
       hasMore: false,
       selectedGameId: null,
       currentPage: 1,
+      filterQueue: '',
     };
 
     setTabs((currentTabs) => [...currentTabs, tab]);
@@ -170,12 +214,32 @@ export function MatchHistoryPage({
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const selectedMatch = activeTab?.matches.find((match) => match.gameId === activeTab.selectedGameId);
+  // SGP 已按 tag 筛选，直接用 matches（不再前端过滤）
   const displayedMatches = activeTab ? getDisplayedMatches(activeTab.matches, activeTab.currentPage) : [];
   const knownPages = activeTab ? Math.max(1, Math.ceil(activeTab.matches.length / PAGE_SIZE)) : 1;
   const totalPages = activeTab?.hasMore ? knownPages + 5 : knownPages;
   const pageStart = activeTab && displayedMatches.length > 0 ? (activeTab.currentPage - 1) * PAGE_SIZE + 1 : 0;
   const pageEnd = displayedMatches.length > 0 ? pageStart + displayedMatches.length - 1 : 0;
   const pageNumbers = activeTab ? getPageNumbers(activeTab.currentPage, totalPages) : [];
+
+  // 切换模式筛选：重新向 SGP 查询该模式的战绩（不是前端过滤）
+  const handleFilterChange = (queueKey: string) => {
+    if (!activeTab) return;
+    const filter = QUEUE_FILTERS.find((f) => f.key === queueKey);
+    const tag = filter?.tag ?? '';
+    // 重新加载该 tab（带 tag）
+    updateTab(activeTab.id, (tab) => ({
+      ...tab,
+      filterQueue: queueKey,
+      currentPage: 1,
+      loading: true,
+      matches: [],
+      loadedUpTo: 0,
+      hasMore: false,
+      selectedGameId: null,
+    }));
+    void loadInitialTab(activeTab.id, activeTab.query, activeTab.region, tag);
+  };
 
   const handlePageChange = async (page: number) => {
     if (!activeTab || activeTab.loading || activeTab.pageLoading) return;
@@ -201,7 +265,8 @@ export function MatchHistoryPage({
       let guard = 0;
 
       while (hasMore && targetEnd > nextMatches.length && guard < 5) {
-        const response = await requestBatch(activeTab.query, activeTab.region, loadedUpTo);
+        const currentTag = QUEUE_FILTERS.find((f) => f.key === activeTab.filterQueue)?.tag;
+        const response = await requestBatch(activeTab.query, activeTab.region, loadedUpTo, currentTag);
         const existingIds = new Set(nextMatches.map((match) => match.gameId));
         const additions = response.matches.filter((match) => !existingIds.has(match.gameId));
         nextMatches = [...nextMatches, ...additions];
@@ -241,12 +306,17 @@ export function MatchHistoryPage({
     });
   };
 
-  const handleDragOverTab = (overTabId: string) => {
+  const handleDragOverTab = (overTabId: string, clientX: number, targetRect: DOMRect) => {
     if (!draggingTabId || draggingTabId === overTabId) return;
+    const targetMiddleX = targetRect.left + targetRect.width / 2;
+
     setTabs((currentTabs) => {
       const from = currentTabs.findIndex((tab) => tab.id === draggingTabId);
       const to = currentTabs.findIndex((tab) => tab.id === overTabId);
       if (from < 0 || to < 0) return currentTabs;
+      if (from < to && clientX < targetMiddleX) return currentTabs;
+      if (from > to && clientX > targetMiddleX) return currentTabs;
+
       const nextTabs = [...currentTabs];
       const [moved] = nextTabs.splice(from, 1);
       nextTabs.splice(to, 0, moved);
@@ -271,17 +341,24 @@ export function MatchHistoryPage({
             <div
               key={tab.id}
               draggable
-              onDragStart={() => setDraggingTabId(tab.id)}
+              onDragStart={(event) => {
+                setDraggingTabId(tab.id);
+                setActiveTabId(tab.id);
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+              }}
               onDragEnd={() => setDraggingTabId(null)}
               onDragOver={(event) => {
                 event.preventDefault();
-                handleDragOverTab(tab.id);
+                event.dataTransfer.dropEffect = 'move';
+                handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
               }}
-              className={`group flex h-7 max-w-44 cursor-grab items-center gap-1.5 rounded-t-sm border border-b-0 px-2 text-xs active:cursor-grabbing ${
+              onDrop={(event) => event.preventDefault()}
+              className={`group flex h-7 max-w-44 cursor-grab items-center gap-1.5 rounded-t-sm border border-b-0 px-2 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 active:cursor-grabbing ${
                 tab.id === activeTabId
                   ? 'border-app-border bg-app-bg-soft text-app-text'
                   : 'border-transparent bg-transparent text-app-muted hover:bg-app-surface-soft hover:text-app-text'
-              }`}
+              } ${tab.id === draggingTabId ? 'z-10 scale-[0.98] opacity-[0.65] shadow-airbnb' : ''}`}
             >
               <button
                 type="button"
@@ -310,12 +387,38 @@ export function MatchHistoryPage({
 
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
         <div className="flex w-[300px] shrink-0 flex-col border-r border-app-border bg-app-sidebar">
-          {activeTab?.result && activeTab.matches.length > 0 && (
+          {/* 汇总统计（常驻，loading 时显示占位） */}
+          {activeTab && (
             <div className="shrink-0 border-b border-app-border px-3 py-2 text-[11px] text-app-muted">
-              <span className="text-app-success">{activeTab.matches.filter((match) => match.win).length}</span>胜{' '}
-              <span className="text-app-danger">{activeTab.matches.filter((match) => !match.win).length}</span>败 ·
-              已加载 {activeTab.matches.length} 场
-              {activeTab.pageLoading && <span className="ml-2 text-app-primary">加载更早战绩...</span>}
+              {activeTab.loading ? (
+                <span className="text-app-subtle">加载中...</span>
+              ) : activeTab.matches.length > 0 ? (
+                <>
+                  <span className="text-app-success">{activeTab.matches.filter((match) => match.win).length}</span>胜{' '}
+                  <span className="text-app-danger">{activeTab.matches.filter((match) => !match.win).length}</span>败 ·
+                  已加载 {activeTab.matches.length} 场
+                  {activeTab.pageLoading && <span className="ml-2 text-app-primary">加载更早战绩...</span>}
+                </>
+              ) : (
+                <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
+              )}
+            </div>
+          )}
+
+          {/* 模式筛选（常驻显示，不依赖有无战绩数据） */}
+          {activeTab && (
+            <div className="flex shrink-0 items-center border-b border-app-border px-3 py-1.5">
+              <select
+                value={activeTab.filterQueue}
+                onChange={(e) => handleFilterChange(e.target.value)}
+                className="h-6 flex-1 rounded-xs border border-app-border bg-app-surface-soft px-1.5 text-[11px] text-app-text focus:border-app-primary focus:outline-none"
+              >
+                {QUEUE_FILTERS.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

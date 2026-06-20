@@ -8,6 +8,7 @@ export const IPC_CHANNELS = {
   LCU_DETECT_CLIENT: 'lcu:detect-client',
   LCU_CONNECT: 'lcu:connect',
   LCU_GET_CURRENT_SUMMONER: 'lcu:get-current-summoner',
+  LCU_GET_CURRENT_REGION: 'lcu:get-current-region',
   LCU_GET_LOBBY: 'lcu:get-lobby',
   LCU_GET_CHAMP_SELECT_SESSION: 'lcu:get-champ-select-session',
   // db 域：本地数据/设置（后续阶段填充真实实现）

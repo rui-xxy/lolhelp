@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
@@ -11,8 +11,7 @@ const PAGE_TITLES: Record<View, string> = {
 };
 
 // 国服大区列表（与 src/main/sgp/region.ts 同步）
-const REGIONS = [
-  { key: '', name: '本区' },
+const BASE_REGIONS = [
   { key: 'HN1', name: '艾欧尼亚' },
   { key: 'HN10', name: '黑色玫瑰' },
   { key: 'TJ100', name: '比尔吉沃特' },
@@ -28,6 +27,37 @@ export function App() {
   const [matchSearchName, setMatchSearchName] = useState('');
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
+  const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer: number | undefined;
+
+    const refreshRegion = async () => {
+      try {
+        const region = await window.lolHelper.lcu.getCurrentRegion();
+        if (cancelled) return;
+        if (region.name && !region.error) {
+          setCurrentRegionName(region.name);
+          return;
+        }
+      } catch {
+        // 等下一轮重试。这里不展示错误文案，避免标题栏出现“未知大区”。
+      }
+
+      if (!cancelled) {
+        retryTimer = window.setTimeout(refreshRegion, 2500);
+      }
+    };
+
+    void refreshRegion();
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [activeView]);
+
+  const regions = [{ key: '', name: currentRegionName }, ...BASE_REGIONS];
 
   // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (
@@ -43,7 +73,7 @@ export function App() {
         onChange={(e) => setMatchRegion(e.target.value)}
         className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none"
       >
-        {REGIONS.map((r) => (
+        {regions.map((r) => (
           <option key={r.key} value={r.key}>{r.name}</option>
         ))}
       </select>

@@ -11,6 +11,7 @@ const lolHelper: LolHelper = {
   },
   lcu: {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
+    getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
   },
   match: {
     search: (req: PlayerLookupRequest) =>
