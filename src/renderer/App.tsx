@@ -1,16 +1,23 @@
-import { AppShell } from '@/components/AppShell';
-import { AppStatusCard } from '@/components/AppStatusCard';
+import { useState } from 'react';
+import { AppShell, type View } from '@/components/AppShell';
+import { HomePage } from '@/components/HomePage';
 
-// 页面根组件：用 AppShell 外壳包裹内容。
-// AppShell 管布局（顶部+侧边栏+主区），这里只传标题和主区内容。
+// 页面根组件：持有当前视图状态，根据视图渲染对应页面，把状态和导航回调传给 AppShell。
+// 视图状态提升到这里（不在 AppShell 内部），让 AppShell 只管布局，App 管视图映射。
+const PAGE_TITLES: Record<View, string> = {
+  home: '主页',
+};
+
 export function App() {
+  const [activeView, setActiveView] = useState<View>('home');
+
   return (
-    <AppShell title="工作台">
-      <h1 className="mb-1 text-xl font-bold">LOL 助手</h1>
-      <p className="mb-6 text-sm text-app-muted">
-        工作台已就绪 · 点击调用 IPC
-      </p>
-      <AppStatusCard />
+    <AppShell
+      title={PAGE_TITLES[activeView]}
+      activeView={activeView}
+      onNavigate={setActiveView}
+    >
+      {activeView === 'home' && <HomePage />}
     </AppShell>
   );
 }

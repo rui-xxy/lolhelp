@@ -20,6 +20,10 @@
   --color-app-border: #dddddd;
   --color-app-border-strong: #c1c1c1;
 
+  /* 导航项 hover 背景：在侧边栏 #f2f2f2 底上的深浅灰高亮（明显可见但不深成黑）。
+     当前页不做视觉标记（仅 hover 高亮）。 */
+  --color-app-nav-hover: #e5e5e5;
+
   /* 文字：ink 近黑（非纯黑）→ body 次级 → muted 说明 → muted-soft 更弱 */
   --color-app-text: #222222;
   --color-app-body: #3f3f3f;

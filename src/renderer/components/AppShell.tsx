@@ -1,8 +1,13 @@
 import { useState } from 'react';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, Home } from 'lucide-react';
+
+// 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
+export type View = 'home';
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
+  activeView: View; // 当前激活的视图（用于导航项高亮）
+  onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
 }
 
@@ -18,8 +23,14 @@ interface AppShellProps {
 // - 左侧侧边栏（含左顶部）：app-sidebar 略深略灰暖米色
 // - 右侧主工作区（含右顶部）：app-surface 暖白，主内容区带网格纹理
 // - 右上角 titleBarOverlay 区（约 138px）保留给原生窗口控制按钮
-export function AppShell({ title, children }: AppShellProps) {
+export function AppShell({
+  title,
+  activeView,
+  onNavigate,
+  children,
+}: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
+  // activeView 暂时只用于潜在的状态追踪，当前页不做视觉标记（仅 hover 高亮）。
 
   return (
     <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">
@@ -50,12 +61,22 @@ export function AppShell({ title, children }: AppShellProps) {
           </button>
         </div>
 
-        {/* 中间：占位内容区（折叠时空白） */}
-        <div className="flex-1 overflow-hidden p-4">
-          {!collapsed && (
-            <p className="text-xs text-app-subtle">导航区域 · 待填充</p>
-          )}
-        </div>
+        {/* 中间：导航区。折叠时只显图标，展开时图标+文本。
+            只有鼠标 hover 才显示浅灰高亮 + 文字加深；当前页不特殊标记。 */}
+        <nav className="flex-1 overflow-hidden p-2">
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigate('home');
+            }}
+            title={collapsed ? '主页' : undefined}
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+          >
+            <Home className="size-4 shrink-0" />
+            {!collapsed && <span className="truncate">主页</span>}
+          </a>
+        </nav>
 
         {/* 底部：状态占位区 */}
         <div className="shrink-0 border-t border-app-border p-3">
