@@ -63,6 +63,7 @@ interface SgpParticipant {
   quadraKills: number;
   pentaKills: number;
   largestMultiKill: number;
+  largestKillingSpree: number;
   perks?: {
     styles?: Array<{
       description: string;
@@ -209,6 +210,7 @@ function mapParticipant(p: SgpParticipant, ddVersion: string): MatchParticipantS
     secondaryRune: secondary,
     visionScore: p.visionScore,
     largestMultiKill: p.largestMultiKill,
+    largestKillingSpree: p.largestKillingSpree,
   };
 }
 
@@ -250,6 +252,10 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string, ddVersion
     primaryRune: primary,
     secondaryRune: secondary,
     participants,
+    tripleKills: target?.tripleKills ?? 0,
+    quadraKills: target?.quadraKills ?? 0,
+    pentaKills: target?.pentaKills ?? 0,
+    largestKillingSpree: target?.largestKillingSpree ?? 0,
   };
 }
 

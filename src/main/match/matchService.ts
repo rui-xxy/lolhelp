@@ -109,7 +109,13 @@ async function fetchCurrentSummonerProfile(): Promise<{ riotId: string; level: n
 export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLookupResult> {
   const count = Math.min(MAX_COUNT, Math.max(1, Math.floor(req.pageSize ?? req.maxMatches ?? DEFAULT_COUNT)));
   const startIndex = Math.max(0, Math.floor(req.startIndex ?? 0));
-  const inputName = (req.name ?? '').trim();
+  // 清洗输入：去不可见字符（零宽/方向控制符），统一各种 # 变体为标准 #，去多余空格
+  const rawName = (req.name ?? '')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '') // 零宽/方向控制符
+    .replace(/[﹟＃]/g, '#') // 全角/变体 # → 标准 #
+    .replace(/\s*#\s*/g, '#') // # 两边空格去掉
+    .trim();
+  const inputName = rawName;
   const isSelfQuery = ['', '自己', '我', 'me', 'self'].includes(inputName.toLowerCase());
 
   // 1. SGP 认证（同时拿到当前账号 puuid + 大区 + entitlements token）
@@ -147,7 +153,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     // 输入了 Riot ID → 按 LCU 查 puuid
     const lookup = await lookupSummonerByRiotId(inputName);
     if (!lookup) {
-      return emptyResult(`未找到玩家「${inputName}」，请确认 Riot ID 格式为 名字#数字（如 小猫猫拳#46662）`);
+      return emptyResult(`未找到玩家「${inputName}」，请确认 Riot ID 格式为 名字#数字`);
     }
     targetPuuid = lookup.puuid;
     displayName = lookup.riotId;

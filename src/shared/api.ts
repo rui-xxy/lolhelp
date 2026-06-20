@@ -113,6 +113,10 @@ export interface MatchParticipantSummary {
   secondaryRune: PlayerRuneSummary | null;
   visionScore?: number;
   largestMultiKill?: number;
+  largestKillingSpree?: number; // 最大连杀（≥7 = 超神）
+  tripleKills?: number;
+  quadraKills?: number;
+  pentaKills?: number;
 }
 
 // 单场对局完整详情（含 10 人 participants）
@@ -140,6 +144,10 @@ export interface PlayerMatchDetail {
   primaryRune: PlayerRuneSummary | null;
   secondaryRune: PlayerRuneSummary | null;
   participants: MatchParticipantSummary[];
+  tripleKills?: number;
+  quadraKills?: number;
+  pentaKills?: number;
+  largestKillingSpree?: number; // ≥7 = 超神
 }
 
 // 召唤师资料（搜索结果顶部展示）
