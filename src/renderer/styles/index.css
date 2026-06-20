@@ -255,6 +255,145 @@
   .match-result-card--loss .match-result-kda-value {
     color: #6c1c39;
   }
+
+  .match-detail-table {
+    width: 100%;
+    overflow: hidden;
+    color: var(--color-app-text);
+  }
+
+  .match-detail-header {
+    display: grid;
+    grid-template-columns: 38px minmax(190px, 1.45fr) 154px 64px 58px 58px 40px;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--color-app-border);
+    padding: 0 10px 8px;
+    color: var(--color-app-subtle);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .team-detail-block {
+    position: relative;
+  }
+
+  .team-detail-block + .team-detail-block {
+    margin-top: 10px;
+  }
+
+  .team-detail-divider {
+    display: flex;
+    height: 28px;
+    align-items: center;
+    gap: 7px;
+    border-bottom: 1px solid rgba(221, 221, 221, 0.76);
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .team-detail-divider::before {
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+    content: "";
+  }
+
+  .team-detail-block--blue .team-detail-divider {
+    background: linear-gradient(90deg, rgba(66, 139, 255, 0.1), transparent 58%);
+  }
+
+  .team-detail-block--red .team-detail-divider {
+    background: linear-gradient(90deg, rgba(193, 53, 21, 0.08), transparent 58%);
+  }
+
+  .team-detail-block--blue .team-detail-divider::before {
+    background: #428bff;
+  }
+
+  .team-detail-block--red .team-detail-divider::before {
+    background: #c13515;
+  }
+
+  .team-detail-name {
+    color: var(--color-app-body);
+  }
+
+  .team-detail-result {
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .player-detail-row {
+    display: grid;
+    min-height: 54px;
+    grid-template-columns: 38px minmax(190px, 1.45fr) 154px 64px 58px 58px 40px;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(221, 221, 221, 0.74);
+    padding: 7px 10px;
+    font-size: 12px;
+    transition:
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .player-detail-row:hover {
+    background-color: rgba(255, 255, 255, 0.64);
+  }
+
+  .player-detail-row--target {
+    background:
+      linear-gradient(90deg, rgba(255, 215, 100, 0.13), transparent 46%),
+      rgba(255, 255, 255, 0.48);
+    box-shadow: rgba(239, 124, 26, 0.18) 0 0 0 1px inset;
+  }
+
+  .player-detail-avatar {
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: rgba(0, 0, 0, 0.05) 0 0 0 1px;
+  }
+
+  .player-detail-runes {
+    display: flex;
+    width: 18px;
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .player-detail-rune-icon {
+    border-radius: 999px;
+  }
+
+  .player-detail-rune-placeholder {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border: 1px solid rgba(193, 193, 193, 0.44);
+    border-radius: 999px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(229, 229, 229, 0.28)),
+      rgba(221, 221, 221, 0.34);
+  }
+
+  .player-detail-name {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: left;
+    line-height: 16px;
+    transition: color 150ms ease;
+  }
+
+  .player-detail-name:hover {
+    color: var(--color-app-link);
+    text-decoration: underline;
+  }
 }
 
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。

@@ -11,18 +11,15 @@ interface TeamBlockProps {
 
 export function TeamBlock({ teamId, participants, targetPuuid, onPlayerSearch }: TeamBlockProps) {
   const teamPlayers = participants.filter((p) => p.teamId === teamId);
+  const teamName = teamId === 100 ? '蓝色方' : '红色方';
+  const teamTone = teamId === 100 ? 'team-detail-block--blue' : 'team-detail-block--red';
+  const teamWon = teamPlayers[0]?.win ?? false;
 
   return (
-    <section className="overflow-hidden rounded-sm border border-app-border bg-app-surface">
-      {/* 表头（列对齐参考，浅色） */}
-      <div className="grid grid-cols-[38px_minmax(170px,1.35fr)_152px_64px_52px_52px_36px] items-center gap-2 border-b border-app-border px-3 py-2 text-[10px] font-medium text-app-subtle">
-        <span></span>
-        <span>玩家</span>
-        <span className="text-center">装备</span>
-        <span className="text-center">KDA</span>
-        <span className="text-right">经济</span>
-        <span className="text-right">伤害</span>
-        <span className="text-right">补刀</span>
+    <section className={`team-detail-block ${teamTone}`}>
+      <div className="team-detail-divider">
+        <span className="team-detail-name">{teamName}</span>
+        <span className="team-detail-result">{teamWon ? 'WIN' : 'LOSE'}</span>
       </div>
       {teamPlayers.map((p) => (
         <PlayerRow

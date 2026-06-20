@@ -160,9 +160,11 @@ function collectRunes(p: SgpParticipant): {
         if (meta) primary = { id: keystoneId, name: meta.name, icon: meta.icon };
       }
     } else if (style.description === 'subStyle') {
-      if (style.style) {
-        const meta = getRuneById(style.style);
-        if (meta) secondary = { id: style.style, name: meta.name, icon: meta.icon };
+      // 副系：用第一个具体符文 perk（style 是系别ID如8300=启迪，不在datas.json里）
+      const subPerkId = style.selections?.[0]?.perk ?? style.style;
+      if (subPerkId) {
+        const meta = getRuneById(subPerkId) ?? getRuneById(style.style);
+        if (meta) secondary = { id: subPerkId, name: meta.name, icon: meta.icon };
       }
     }
   }

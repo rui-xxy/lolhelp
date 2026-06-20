@@ -11,8 +11,16 @@ interface MatchDetailProps {
 
 export function MatchDetail({ match, targetPuuid, onPlayerSearch }: MatchDetailProps) {
   return (
-    <div className="space-y-4">
-      {/* 双队详情 */}
+    <div className="match-detail-table">
+      <div className="match-detail-header">
+        <span></span>
+        <span>玩家</span>
+        <span className="text-center">装备</span>
+        <span className="text-center">KDA</span>
+        <span className="text-right">经济</span>
+        <span className="text-right">伤害</span>
+        <span className="text-right">补刀</span>
+      </div>
       <TeamBlock
         teamId={100}
         participants={match.participants}

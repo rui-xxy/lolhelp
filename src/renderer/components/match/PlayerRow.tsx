@@ -2,7 +2,7 @@ import { GameIcon } from './GameIcon';
 import type { MatchParticipantSummary } from '../../../shared/api';
 
 // 玩家行：双队详情里的一名玩家。
-// 布局：英雄头像 | 召唤师名+召唤师技能+主符文 | 装备栏 | KDA | 经济 | 伤害
+// 布局：英雄头像 | 召唤师名+召唤师技能+主/副符文 | 装备栏 | KDA | 经济 | 伤害
 // 高密度紧凑信息行，用 grid 对齐各列，保证横向可比。
 interface PlayerRowProps {
   participant: MatchParticipantSummary;
@@ -17,9 +17,7 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
 
   return (
     <div
-      className={`grid min-h-[58px] grid-cols-[38px_minmax(170px,1.35fr)_152px_64px_52px_52px_36px] items-center gap-2 border-t border-app-border px-3 py-2 text-[12px] transition-colors ${
-        isTarget ? 'bg-app-surface-soft' : 'hover:bg-app-surface-soft'
-      }`}
+      className={`player-detail-row ${isTarget ? 'player-detail-row--target' : ''}`}
     >
       {/* 英雄头像 */}
       <GameIcon
@@ -28,10 +26,10 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
         title={`${p.championName} Lv.${p.champLevel}`}
         size={34}
         rounded
-        className="ring-1 ring-black/5"
+        className="player-detail-avatar"
       />
 
-      {/* 召唤师名 + 召唤师技能 + 主符文 */}
+      {/* 召唤师名 + 召唤师技能 + 主/副符文 */}
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex flex-col gap-1.5">
           {/* 召唤师技能（2个，竖排小图标） */}
@@ -39,21 +37,41 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
             <GameIcon key={sp.id} src={sp.icon} alt={sp.name} title={sp.name} size={18} />
           ))}
         </div>
-        {p.primaryRune && (
-          <GameIcon src={p.primaryRune.icon} alt={p.primaryRune.name} title={p.primaryRune.name} size={18} />
-        )}
+        <div className="player-detail-runes">
+          {p.primaryRune ? (
+            <GameIcon
+              src={p.primaryRune.icon}
+              alt={p.primaryRune.name}
+              title={p.primaryRune.name}
+              size={18}
+              className="player-detail-rune-icon"
+            />
+          ) : (
+            <span className="player-detail-rune-placeholder" title="无主符文" />
+          )}
+          {p.secondaryRune ? (
+            <GameIcon
+              src={p.secondaryRune.icon}
+              alt={p.secondaryRune.name}
+              title={p.secondaryRune.name}
+              size={18}
+              className="player-detail-rune-icon"
+            />
+          ) : (
+            <span className="player-detail-rune-placeholder" title="无副符文" />
+          )}
+        </div>
         <div className="min-w-0">
           <button
             type="button"
             title={playerName}
             onClick={() => onPlayerSearch?.(playerName)}
-            className={`block break-all text-left leading-4 transition-colors hover:text-app-link hover:underline ${
+            className={`player-detail-name ${
               isTarget ? 'font-semibold text-app-text' : 'text-app-text'
             }`}
           >
             {playerName}
           </button>
-          <div className="truncate text-[10px] text-app-subtle">{p.championName}</div>
         </div>
       </div>
 
@@ -71,7 +89,6 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
       {/* KDA */}
       <div className={`text-center tabular-nums ${kdaColor}`}>
         <div className="font-semibold">{p.kills}/{p.deaths}/{p.assists}</div>
-        <div className="text-[10px] font-normal text-app-subtle">{p.kda.toFixed(1)}</div>
       </div>
 
       {/* 经济 */}
