@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MatchList } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
@@ -18,10 +18,16 @@ function getPageNumbers(currentPage: number, totalPages: number): number[] {
 }
 
 // 战绩查询页：左侧历史列表（固定分页）+ 右侧对局详情。
-// 翻页：前 N 页从已加载数据切片（瞬时）；翻到未加载区间时，按需向 SGP 请求批次累加。
-// 用 ref 同步跟踪累加数据，避免 setState 异步导致翻页逻辑读到旧值卡死。
-export function MatchHistoryPage() {
-  const [searchName, setSearchName] = useState('');
+// 搜索框已移到顶部标题栏（App.tsx 的 headerExtra），本组件通过 props 接收搜索词和触发信号。
+// 搜索触发：searchTrigger 自增时执行一次搜索（用 searchName 的值）。
+// 翻页：前 N 页从已加载数据切片（瞬时）；翻到未加载区间时按需向 SGP 请求批次累加。
+interface MatchHistoryPageProps {
+  searchName: string; // 来自标题栏搜索框的值
+  searchTrigger: number; // 自增触发搜索（变化时执行搜索）
+  region?: string; // 目标大区码（HN10/HN1 等），不传用登录大区
+}
+
+export function MatchHistoryPage({ searchName, searchTrigger, region }: MatchHistoryPageProps) {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [result, setResult] = useState<PlayerLookupResult | null>(null);
@@ -41,6 +47,7 @@ export function MatchHistoryPage() {
       name,
       startIndex,
       pageSize: SGP_BATCH,
+      region: region || undefined,
     });
     const existing = new Set(matchesRef.current.map((m) => m.gameId));
     const newOnes = res.matches.filter((m) => !existing.has(m.gameId));
@@ -84,10 +91,16 @@ export function MatchHistoryPage() {
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await runSearch(searchName.trim());
-  };
+  // 监听标题栏搜索框触发：searchTrigger 自增时执行搜索。
+  // 用 ref 记录上次值，避免 mount 时和重复触发。
+  const lastTriggerRef = useRef(0);
+  useEffect(() => {
+    if (searchTrigger === lastTriggerRef.current) return;
+    lastTriggerRef.current = searchTrigger;
+    if (searchTrigger > 0) {
+      runSearch(searchName.trim());
+    }
+  }, [searchTrigger, searchName]);
 
   // 翻页：若目标页超出已加载，串行加载批次直到覆盖（加载期间保留当前页，不清空）。
   const handlePageChange = async (page: number) => {
@@ -141,30 +154,7 @@ export function MatchHistoryPage() {
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
-      {/* 搜索栏 */}
-      <div className="shrink-0 border-b border-app-border bg-app-surface px-4 py-3">
-        <form onSubmit={handleSearch} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" />
-            <input
-              type="text"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              placeholder="留空查询自己，或输入召唤师名"
-              className="h-9 w-full rounded-sm border border-app-border bg-app-surface-soft pr-3 pl-9 text-sm text-app-text placeholder:text-app-subtle focus:border-app-primary focus:bg-app-surface focus:outline-none"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="h-9 rounded-sm bg-app-primary px-4 text-sm font-medium text-white transition-colors enabled:hover:bg-app-primary-hover disabled:opacity-50"
-          >
-            {loading ? '查询中…' : '查询'}
-          </button>
-        </form>
-      </div>
-
-      {/* 主体：双栏 */}
+      {/* 主体：双栏（搜索栏已移到顶部标题栏） */}
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
         {/* 左侧：历史列表（固定分页） */}
         <div className="flex w-[300px] shrink-0 flex-col border-r border-app-border bg-app-sidebar">

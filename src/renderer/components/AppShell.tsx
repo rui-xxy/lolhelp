@@ -9,7 +9,8 @@ interface AppShellProps {
   activeView: View; // 当前激活的视图（用于导航项高亮）
   onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
-  fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局（战绩页等双栏全宽视图用）
+  fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
+  headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -30,6 +31,7 @@ export function AppShell({
   onNavigate,
   children,
   fullBleed = false,
+  headerExtra,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   // activeView 暂时只用于潜在的状态追踪，当前页不做视觉标记（仅 hover 高亮）。
@@ -103,8 +105,12 @@ export function AppShell({
         {/* 顶部标题区：延续主工作区背景（app-surface）。
             可拖拽移动窗口（-webkit-app-region:drag）。
             右侧 padding 留出 titleBarOverlay 原生控制按钮的空间。 */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-app-border bg-app-surface pr-[138px] pl-4 [-webkit-app-region:drag]">
-          <span className="text-sm font-medium text-app-text">{title}</span>
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface pr-[138px] pl-4 [-webkit-app-region:drag]">
+          {headerExtra ? (
+            <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
+          ) : (
+            <span className="text-sm font-medium text-app-text">{title}</span>
+          )}
         </header>
 
         {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。

@@ -1,6 +1,9 @@
 import { getSgpAuth, invalidateSgpAuth } from '../sgp/auth';
 import { SgpClient } from '../sgp/client';
+import { getCachedCredentials } from '../lcu/lockfile';
+import { LcuClient } from '../lcu/client';
 import { getDataDragonVersion } from '../lcu/heroData';
+import { getRegionConfig } from '../sgp/region';
 import { extractMatchDetail, buildLookupSummary, type SgpGame } from './matchMapper';
 import type {
   PlayerLookupRequest,
@@ -45,14 +48,44 @@ async function requestWithRetry<T>(
   }
 }
 
-// 主入口：查战绩（当前登录账号）。
+// 按 Riot ID（名字#数字）查 puuid。
+// 关键：必须传完整 Riot ID（gameName#tagLine），# 编码成 %23。
+// 只传 gameName（不带 #tagLine）会返回 422（之前所有失败的根因）。
+// 返回 { puuid, gameName } 或 null（没找到）。
+async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; gameName: string; level: number; profileIconId: number } | null> {
+  const creds = getCachedCredentials();
+  if (!creds) return null;
+  const client = new LcuClient(creds);
+  // 传完整 Riot ID（含 #），encodeURIComponent 会把 # 编码成 %23
+  const encoded = encodeURIComponent(riotId.trim());
+  try {
+    const summoner = await client.get<{ puuid?: string; gameName?: string; summonerLevel?: number; profileIconId?: number }>(
+      `/lol-summoner/v1/summoners?name=${encoded}`,
+    );
+    if (summoner && summoner.puuid) {
+      return {
+        puuid: summoner.puuid,
+        gameName: summoner.gameName ?? riotId,
+        level: summoner.summonerLevel ?? 0,
+        profileIconId: summoner.profileIconId ?? 0,
+      };
+    }
+  } catch (err) {
+    console.warn('[match] Riot ID 查询失败:', riotId, err);
+  }
+  return null;
+}
+
+// 主入口：查战绩。
+// 输入为空/自己/我/me → 查当前登录账号；输入"名字#数字" → 查该玩家。
 // 支持翻页：count 是本次拉取条数，startIndex 是偏移（0/100/200...）。
-// 前端首次 startIndex=0, count=100；点"加载更多"startIndex+=100 再拉一批。
 export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLookupResult> {
   const count = Math.min(MAX_COUNT, Math.max(1, Math.floor(req.pageSize ?? req.maxMatches ?? DEFAULT_COUNT)));
   const startIndex = Math.max(0, Math.floor(req.startIndex ?? 0));
+  const inputName = (req.name ?? '').trim();
+  const isSelfQuery = ['', '自己', '我', 'me', 'self'].includes(inputName.toLowerCase());
 
-  // 1. SGP 认证
+  // 1. SGP 认证（同时拿到当前账号 puuid + 大区 + entitlements token）
   let auth;
   try {
     auth = await getSgpAuth();
@@ -60,13 +93,39 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     return emptyResult(err instanceof Error ? err.message : String(err));
   }
 
-  // 2. 请求战绩列表（一次拿 N 场，每场含 10 人详情）
+  // 如果指定了目标大区，覆盖 auth 的 region（跨区查询）。
+  // entitlements token 通用，能查任何大区；puuid 只在玩家注册的大区有数据。
+  if (req.region) {
+    const targetRegion = getRegionConfig(req.region);
+    if (targetRegion) {
+      auth = { ...auth, region: targetRegion };
+    }
+  }
+
+  // 2. 确定查谁的 puuid
+  let targetPuuid = auth.puuid;
+  let displayName = '';
+  let level = 0;
+  let profileIconId = 0;
+  if (!isSelfQuery) {
+    // 输入了 Riot ID → 按 LCU 查 puuid
+    const lookup = await lookupSummonerByRiotId(inputName);
+    if (!lookup) {
+      return emptyResult(`未找到玩家「${inputName}」，请确认 Riot ID 格式为 名字#数字（如 小猫猫拳#46662）`);
+    }
+    targetPuuid = lookup.puuid;
+    displayName = lookup.gameName;
+    level = lookup.level;
+    profileIconId = lookup.profileIconId;
+  }
+
+  // 3. 请求战绩列表（用 targetPuuid，查自己或他人）
   let games: SgpGame[];
   try {
     const client = new SgpClient(auth);
     const resp = await requestWithRetry<{ games: SgpGame[] }>(
       client,
-      '/match-history-query/v1/products/lol/player/' + auth.puuid + '/SUMMARY',
+      '/match-history-query/v1/products/lol/player/' + targetPuuid + '/SUMMARY',
       { startIndex, count },
     );
     games = resp.games ?? [];
@@ -74,27 +133,29 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     return emptyResult(`战绩获取失败：${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 3. 字段映射
+  // 4. 字段映射（用 targetPuuid 标记当前查询的玩家）
   const ddVersion = getDataDragonVersion();
   const matches: PlayerMatchDetail[] = [];
   for (const game of games) {
     try {
-      matches.push(extractMatchDetail(game, auth.puuid, ddVersion));
+      matches.push(extractMatchDetail(game, targetPuuid, ddVersion));
     } catch (err) {
       console.warn('[match] 单场映射失败，跳过:', err);
     }
   }
 
-  // 4. 汇总
+  // 5. 汇总
   const summary = buildLookupSummary(matches);
 
   return {
     profile: {
-      riotId: '',
-      puuid: auth.puuid,
-      level: 0,
-      profileIconId: 0,
-      profileIconUrl: '',
+      riotId: displayName,
+      puuid: targetPuuid,
+      level,
+      profileIconId,
+      profileIconUrl: profileIconId
+        ? `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/profileicon/${profileIconId}.png`
+        : '',
     },
     matches,
     summary,
