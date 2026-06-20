@@ -10,7 +10,7 @@ const lolHelper: LolHelper = {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_STATUS),
   },
   lcu: {
-    // 占位：后续阶段填充
+    detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
   },
   db: {
     // 占位：后续阶段填充

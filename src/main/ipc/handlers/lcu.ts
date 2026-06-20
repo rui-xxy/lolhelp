@@ -1,7 +1,59 @@
+import { ipcMain } from 'electron';
+import { IPC_CHANNELS } from '../../../shared/channels';
+import { readLockfile } from '../../lcu/lockfile';
+import { LcuClient } from '../../lcu/client';
+import type { LcuConnection } from '../../../shared/api';
+
 // 注册 lcu 域 IPC 处理器。
-// 占位：第 5+ 阶段接入 LCU 后在此注册真实实现。
-// 预留通道：lcu:detect-client / lcu:connect / lcu:get-current-summoner /
-//           lcu:get-lobby / lcu:get-champ-select-session
+// 当前实现 detect-client：lockfile 读取 + 真实 LCU 请求验证连通。
+// 后续 connect/getCurrentSummoner/getLobby/getChampSelectSession 在此追加。
 export function registerLcuHandlers(): void {
-  // TODO: 后续阶段实现 LCU 客户端连接与数据读取
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_DETECT_CLIENT,
+    async (): Promise<LcuConnection> => {
+      // 1. 读 lockfile（客户端没跑则找不到）
+      let creds;
+      try {
+        creds = readLockfile();
+      } catch (err) {
+        return {
+          found: false,
+          connected: false,
+          error: `lockfile 解析失败：${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+      if (!creds) {
+        return {
+          found: false,
+          connected: false,
+          error: '未检测到 LOL 客户端（lockfile 不存在或为空）',
+        };
+      }
+
+      // 2. 用凭证发验证请求（current-summoner 是文档唯一给完整字段的端点）
+      try {
+        const client = new LcuClient(creds);
+        // 国服把召唤师名放在 gameName（displayName 为空），国际服在 displayName。
+        // 按 gameName > displayName > name 优先级取第一个非空的。
+        const summoner = await client.get<{
+          gameName?: string;
+          displayName?: string;
+          name?: string;
+        }>('/lol-summoner/v1/current-summoner');
+        const summonerName =
+          summoner.gameName || summoner.displayName || summoner.name || '';
+        return {
+          found: true,
+          connected: true,
+          summonerName,
+        };
+      } catch (err) {
+        return {
+          found: true,
+          connected: false,
+          error: `连接失败：${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    },
+  );
 }

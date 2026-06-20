@@ -20,9 +20,19 @@ export interface AppApi {
   getStatus: () => Promise<AppStatus>;
 }
 
+// detect-client 返回：LCU 客户端连通验证结果。
+export interface LcuConnection {
+  found: boolean; // 客户端是否检测到（lockfile 存在且非空）
+  connected: boolean; // 是否成功发了 LCU 请求（found=true 且请求返回 2xx）
+  summonerName?: string; // connected 时的召唤师名（来自 current-summoner）
+  error?: string; // 失败原因（未找到/格式错/请求失败/国服 403 等）
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
 // detectClient / connect / getCurrentSummoner / getLobby / getChampSelectSession ...
-export interface LcuApi {}
+export interface LcuApi {
+  detectClient: () => Promise<LcuConnection>;
+}
 
 // 占位接口：后续阶段接入本地数据时填充
 // getSettings / saveSettings ...
