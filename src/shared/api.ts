@@ -155,10 +155,11 @@ export interface PlayerLookupSummary {
 
 // 战绩查询请求
 export interface PlayerLookupRequest {
-  name: string; // 召唤师名或 Riot ID
-  maxMatches?: number; // 兼容旧调用：最多拉几场
-  page?: number; // 页码，从 1 开始
-  pageSize?: number; // 每页场次，默认 12
+  name: string; // 召唤师名或 Riot ID（SGP 阶段仅查当前账号，name 留空即可）
+  maxMatches?: number; // 最多拉几场（旧调用兼容，默认 20）
+  startIndex?: number; // SGP 分页起点（0 开始，翻页用）
+  page?: number; // 兼容旧调用：页码
+  pageSize?: number; // 兼容旧调用：每页场次
 }
 
 // 战绩查询结果
