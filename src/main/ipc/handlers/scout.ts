@@ -1,6 +1,11 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
-import { runScout } from '../../scout/scoutEngine';
+import {
+  createScoutSessionState,
+  getScoutSessionKey,
+  runScoutSession,
+  type ScoutSessionState,
+} from '../../scout/scoutEngine';
 import { resolvePuuid, fetchMatchesByPuuid } from '../../match/matchService';
 import type { ScoutConfig, ScoutResult } from '../../../shared/api';
 
@@ -12,6 +17,7 @@ import type { ScoutConfig, ScoutResult } from '../../../shared/api';
 
 // 取消标志：webContents.id → 是否已取消
 const cancelFlags = new Map<number, boolean>();
+const sessions = new Map<number, { key: string; session: ScoutSessionState }>();
 
 export function registerScoutHandlers(): void {
   ipcMain.handle(
@@ -20,9 +26,17 @@ export function registerScoutHandlers(): void {
       const wcId = event.sender.id;
       // 标记新一轮任务（清除上次的取消标志）
       cancelFlags.set(wcId, false);
+      const sessionKey = getScoutSessionKey(config);
+      const shouldContinue = (config.excludePuuids?.length ?? 0) > 0;
+      let entry = sessions.get(wcId);
+      if (!shouldContinue || !entry || entry.key !== sessionKey) {
+        entry = { key: sessionKey, session: createScoutSessionState() };
+        sessions.set(wcId, entry);
+      }
 
-      const result = await runScout({
+      const result = await runScoutSession({
         config,
+        session: entry.session,
         now: Date.now(),
         deps: {
           resolvePuuid: (seedId) => resolvePuuid(seedId, config.region),
@@ -40,6 +54,9 @@ export function registerScoutHandlers(): void {
 
       // 清理本轮标志
       cancelFlags.delete(wcId);
+      if (result.error && !entry.session.initialized) {
+        sessions.delete(wcId);
+      }
       return result;
     },
   );
@@ -52,4 +69,5 @@ export function registerScoutHandlers(): void {
 // webContents 销毁时清理标志，避免内存泄漏
 export function cleanupScoutForWebContents(wcId: number): void {
   cancelFlags.delete(wcId);
+  sessions.delete(wcId);
 }

@@ -43,27 +43,6 @@ const CONCURRENCY = 5; // 候选查询并发数
 const SEED_FETCH_COUNT = 30; // 种子查 30 场
 const CANDIDATE_FETCH_COUNT = 5; // 候选查 5 场
 
-// 简易并发池：items 并发跑 fn，最多 concurrency 个同时
-async function mapPool<T>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  let index = 0;
-  const worker = async () => {
-    while (index < items.length) {
-      const i = index++;
-      try {
-        await fn(items[i]);
-      } catch {
-        // 单个失败不阻断整体
-      }
-    }
-  };
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
-  await Promise.all(workers);
-}
-
 // 从战绩的 participants 里派生玩家 profile（避免再发一次请求查资料）
 function deriveProfile(puuid: string, matches: PlayerMatchDetail[]): PlayerProfile {
   for (const m of matches) {
@@ -95,12 +74,71 @@ function buildHit(
   };
 }
 
+export interface ScoutSessionState {
+  initialized: boolean;
+  queue: Array<{ puuid: string; depth: number }>;
+  visited: Set<string>;
+  queued: Set<string>;
+  pendingCandidates: string[];
+  candidateQueued: Set<string>;
+  candidateChecked: Set<string>;
+}
+
+export function createScoutSessionState(): ScoutSessionState {
+  return {
+    initialized: false,
+    queue: [],
+    visited: new Set<string>(),
+    queued: new Set<string>(),
+    pendingCandidates: [],
+    candidateQueued: new Set<string>(),
+    candidateChecked: new Set<string>(),
+  };
+}
+
+export function getScoutSessionKey(config: ScoutConfig): string {
+  return JSON.stringify({
+    seedId: config.seedId.trim(),
+    championIds: [...config.championIds].sort((a, b) => a - b),
+    kdaThreshold: config.kdaThreshold,
+    hoursWindow: config.hoursWindow,
+    region: config.region ?? '',
+    tag: config.tag ?? '',
+    topSeedsPerGame: config.topSeedsPerGame ?? 2,
+  });
+}
+
+function enqueueSeed(session: ScoutSessionState, puuid: string, depth: number) {
+  if (!puuid || session.visited.has(puuid) || session.queued.has(puuid)) return;
+  session.queued.add(puuid);
+  session.queue.push({ puuid, depth });
+}
+
+function enqueueCandidate(session: ScoutSessionState, puuid: string) {
+  if (!puuid || session.candidateChecked.has(puuid) || session.candidateQueued.has(puuid)) return;
+  session.candidateQueued.add(puuid);
+  session.pendingCandidates.push(puuid);
+}
+
 // 主入口
 export async function runScout(params: RunScoutParams): Promise<ScoutResult> {
-  const { config, deps, onProgress, shouldCancel } = params;
+  return runScoutSession({
+    ...params,
+    session: createScoutSessionState(),
+  });
+}
+
+export async function runScoutSession(
+  params: RunScoutParams & { session: ScoutSessionState },
+): Promise<ScoutResult> {
+  const { config, deps, onProgress, shouldCancel, session } = params;
   const now = params.now ?? Date.now();
   const topN = config.topSeedsPerGame ?? 2;
+  const targetCount = Math.max(1, Math.floor(config.targetCount || 1));
   const excludedPuuids = new Set(config.excludePuuids ?? []);
+  for (const puuid of excludedPuuids) {
+    session.candidateChecked.add(puuid);
+  }
 
   const stats = { totalRequests: 0, totalSeeds: 0, totalCandidates: 0, depth: 0 };
   const hits: ScoutHit[] = [];
@@ -111,102 +149,104 @@ export async function runScout(params: RunScoutParams): Promise<ScoutResult> {
       phase,
       checked: stats.totalCandidates,
       hits: hits.length,
-      target: config.targetCount,
-      seedQueueRemaining: queue.length,
+      target: targetCount,
+      seedQueueRemaining: session.queue.length,
       latestHit,
     });
   };
 
-  // 种子队列：{ puuid, depth }
-  const queue: Array<{ puuid: string; depth: number }> = [];
-  const visited = new Set<string>(); // 已查战绩的 puuid（种子）
-  const queued = new Set<string>(); // 已进入过扩散队列的 puuid，避免重复入队导致队列膨胀
-  const candidateChecked = new Set<string>(); // 已判定达标的 puuid（候选+种子自己）
+  async function processPendingCandidates(): Promise<void> {
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, session.pendingCandidates.length) },
+      async () => {
+        while (!cancel() && hits.length < targetCount && session.pendingCandidates.length > 0) {
+          const candPuuid = session.pendingCandidates.shift();
+          if (!candPuuid || session.candidateChecked.has(candPuuid)) continue;
 
-  const enqueueSeed = (puuid: string, depth: number) => {
-    if (!puuid || visited.has(puuid) || queued.has(puuid)) return;
-    queued.add(puuid);
-    queue.push({ puuid, depth });
-  };
+          session.candidateChecked.add(candPuuid);
+          stats.totalCandidates++;
 
+          let candMatches: PlayerMatchDetail[];
+          try {
+            candMatches = await deps.fetchMatches(candPuuid, CANDIDATE_FETCH_COUNT, config.tag);
+            stats.totalRequests++;
+          } catch {
+            continue;
+          }
 
-  // 1. 解析种子 Riot ID → puuid
-  pushProgress('seeding');
-  const seed = await deps.resolvePuuid(config.seedId);
-  if (!seed) {
-    return {
-      hits: [],
-      aborted: false,
-      error: `未找到种子玩家「${config.seedId || '自己'}」`,
-      stats,
-    };
+          const qualifying = filterQualifying(candMatches, config, now);
+          if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(candPuuid)) {
+            const hit = buildHit(candPuuid, candMatches, qualifying, config.championIds);
+            hits.push(hit);
+            pushProgress('scanning', hit);
+          }
+        }
+      },
+    );
+    await Promise.all(workers);
   }
-  enqueueSeed(seed.puuid, 0);
 
-  // 2. BFS 主循环
-  while (queue.length > 0) {
-    if (cancel() || hits.length >= config.targetCount) break;
+  // 1. 解析种子 Riot ID → puuid。session 已初始化时说明这是下一批，直接沿用队列。
+  pushProgress(session.initialized ? 'scanning' : 'seeding');
+  if (!session.initialized) {
+    const seed = await deps.resolvePuuid(config.seedId);
+    if (!seed) {
+      return {
+        hits: [],
+        aborted: false,
+        error: `未找到种子玩家「${config.seedId || '自己'}」`,
+        stats,
+      };
+    }
+    enqueueSeed(session, seed.puuid, 0);
+    session.initialized = true;
+  }
 
-    const node = queue.shift();
+  // 2. BFS 主循环：先消费上一批留下的候选，再继续取种子扩散。
+  while (!cancel() && hits.length < targetCount) {
+    if (session.pendingCandidates.length > 0) {
+      await processPendingCandidates();
+      pushProgress('scanning');
+      continue;
+    }
+
+    const node = session.queue.shift();
     if (!node) break;
-    if (visited.has(node.puuid)) continue;
-    visited.add(node.puuid);
+    if (session.visited.has(node.puuid)) continue;
+    session.visited.add(node.puuid);
     stats.totalSeeds++;
     if (node.depth > stats.depth) stats.depth = node.depth;
 
-    // 2a. 种子查 30 场
     let seedMatches: PlayerMatchDetail[];
     try {
       seedMatches = await deps.fetchMatches(node.puuid, SEED_FETCH_COUNT, config.tag);
       stats.totalRequests++;
     } catch {
-      continue; // 种子战绩拉取失败，跳过
+      continue;
     }
 
-    // 2b. 种子自己判定达标（已有 30 场，直接筛）
-    if (!candidateChecked.has(node.puuid)) {
-      candidateChecked.add(node.puuid);
+    if (!session.candidateChecked.has(node.puuid)) {
+      session.candidateChecked.add(node.puuid);
       stats.totalCandidates++;
       const qualifying = filterQualifying(seedMatches, config, now);
-      if (qualifying.length > 0 && hits.length < config.targetCount && !excludedPuuids.has(node.puuid)) {
+      if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(node.puuid)) {
         const hit = buildHit(node.puuid, seedMatches, qualifying, config.championIds);
         hits.push(hit);
         pushProgress('scanning', hit);
       }
     }
 
-    // 2c. 收集候选（场里其他用过指定英雄的人）→ 并发查 5 场判定
-    const candidatePuuids = collectCandidates(seedMatches, config.championIds, node.puuid)
-      .filter((p) => !candidateChecked.has(p));
-    candidatePuuids.forEach((p) => candidateChecked.add(p));
-    stats.totalCandidates += candidatePuuids.length;
-    pushProgress('scanning');
+    for (const candPuuid of collectCandidates(seedMatches, config.championIds, node.puuid)) {
+      enqueueCandidate(session, candPuuid);
+    }
 
-    await mapPool(candidatePuuids, CONCURRENCY, async (candPuuid) => {
-      if (cancel() || hits.length >= config.targetCount) return;
-      let candMatches: PlayerMatchDetail[];
-      try {
-        candMatches = await deps.fetchMatches(candPuuid, CANDIDATE_FETCH_COUNT, config.tag);
-        stats.totalRequests++;
-      } catch {
-        return; // 单候选失败跳过
-      }
-      const qualifying = filterQualifying(candMatches, config, now);
-      if (qualifying.length > 0 && hits.length < config.targetCount && !excludedPuuids.has(candPuuid)) {
-        const hit = buildHit(candPuuid, candMatches, qualifying, config.championIds);
-        hits.push(hit);
-        pushProgress('scanning', hit);
-      }
-    });
-    pushProgress('scanning');
-    if (hits.length >= config.targetCount) break;
-
-    // 2d. 扩散线：每场综合分前 N 名（MVP）→ 下一轮种子
     for (const m of seedMatches) {
       for (const seedPuuid of pickSeeds(m, topN)) {
-          enqueueSeed(seedPuuid, node.depth + 1);
+        enqueueSeed(session, seedPuuid, node.depth + 1);
       }
     }
+
+    pushProgress('scanning');
   }
 
   pushProgress(cancel() ? 'aborted' : 'done');
