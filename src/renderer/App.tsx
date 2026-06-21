@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { FriendPanel } from './components/FriendPanel';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
@@ -46,6 +47,26 @@ export function App() {
   const [matchSearchName, setMatchSearchName] = useState('');
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
+  const [showFriendPanel, setShowFriendPanel] = useState(false);
+
+  // 切换好友面板：面板从战绩区右侧“推出”（与战绩区并排，不覆盖战绩区）。
+  // 通过 resize 窗口补偿面板宽度，战绩区宽度恒定。
+  // 时序关键（消除中间区跳动）：
+  // - 打开：先 await resize(+288) 让窗口物理变宽，再 setShow(true)。
+  //   setSize 是 native 同步调用，但 Chromium viewport 更新在下一帧；
+  //   await 返回后立即 setState，React DOM 变更与 viewport 变化合并到同一帧，
+  //   flex-1 中间区宽度始终不变，无“先压窄再撑回”的跳动帧。
+  // - 关闭：先 setShow(false) 撤面板，再 resize(-288) 缩窗，两者并发合并成一帧。
+  const FRIEND_PANEL_WIDTH = 288;
+  const toggleFriendPanel = async () => {
+    if (showFriendPanel) {
+      setShowFriendPanel(false);
+      void window.lolHelper.window.resize(-FRIEND_PANEL_WIDTH);
+    } else {
+      await window.lolHelper.window.resize(FRIEND_PANEL_WIDTH);
+      setShowFriendPanel(true);
+    }
+  };
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
 
   useEffect(() => {
@@ -115,6 +136,15 @@ export function App() {
     </form>
   ) : null;
 
+  // 点击好友查战绩：切到战绩页 + 填入 Riot ID + 触发搜索
+  const handleFriendClick = (riotId: string) => {
+    setActiveView('matches');
+    setMatchSearchName(riotId);
+    setMatchRegion(''); // 好友默认本区
+    // 延迟触发搜索（等视图切换完成）
+    setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
+  };
+
   return (
     <AppShell
       title={PAGE_TITLES[activeView]}
@@ -122,6 +152,10 @@ export function App() {
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches'}
       headerExtra={matchSearchBar}
+      onFriendClick={handleFriendClick}
+      friendPanel={<FriendPanel onFriendClick={handleFriendClick} />}
+      showFriendPanel={showFriendPanel}
+      onToggleFriendPanel={toggleFriendPanel}
     >
       <div className={activeView === 'home' ? '' : 'hidden'}>
         <HomePage />

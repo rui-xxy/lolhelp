@@ -11,11 +11,14 @@ export const IPC_CHANNELS = {
   LCU_GET_CURRENT_REGION: 'lcu:get-current-region',
   LCU_GET_LOBBY: 'lcu:get-lobby',
   LCU_GET_CHAMP_SELECT_SESSION: 'lcu:get-champ-select-session',
+  LCU_GET_FRIENDS: 'lcu:get-friends',
   // db 域：本地数据/设置（后续阶段填充真实实现）
   DB_GET_SETTINGS: 'db:get-settings',
   DB_SAVE_SETTINGS: 'db:save-settings',
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
+  // window 域：窗口控制
+  WINDOW_RESIZE: 'window:resize',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

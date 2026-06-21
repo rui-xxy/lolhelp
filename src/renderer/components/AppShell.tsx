@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords } from 'lucide-react';
+import { PanelLeft, Home, Swords, Users } from 'lucide-react';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches';
@@ -11,6 +11,10 @@ interface AppShellProps {
   children: React.ReactNode; // 主工作区内容
   fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
   headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
+  onFriendClick: (riotId: string) => void; // 点击好友查战绩
+  friendPanel?: React.ReactNode; // 右侧好友面板内容（可选，不传则不显示栏）
+  showFriendPanel: boolean; // 好友面板是否展开
+  onToggleFriendPanel: () => void; // 切换好友面板显隐
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -32,6 +36,10 @@ export function AppShell({
   children,
   fullBleed = false,
   headerExtra,
+  onFriendClick,
+  friendPanel,
+  showFriendPanel,
+  onToggleFriendPanel,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   // activeView 暂时只用于潜在的状态追踪，当前页不做视觉标记（仅 hover 高亮）。
@@ -111,6 +119,18 @@ export function AppShell({
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
+          {/* 右侧：好友面板开关图标 */}
+          <button
+            onClick={onToggleFriendPanel}
+            className={`relative ml-auto flex size-8 items-center justify-center rounded-sm transition-colors [-webkit-app-region:no-drag] ${
+              showFriendPanel
+                ? 'bg-app-surface-soft text-app-primary'
+                : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+            }`}
+            title="好友列表"
+          >
+            <Users className="size-4" />
+          </button>
         </header>
 
         {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。
@@ -120,6 +140,14 @@ export function AppShell({
           <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
         </main>
       </div>
+
+      {/* ===== 右侧好友面板（flex 并排，从战绩区右侧“推出”）=====
+          通过 resize 窗口补偿面板宽度，战绩区宽度恒定不被挤压。 */}
+      {showFriendPanel && friendPanel && (
+        <div className="flex w-72 shrink-0 flex-col border-l border-app-border bg-app-surface">
+          {friendPanel}
+        </div>
+      )}
     </div>
   );
 }

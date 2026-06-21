@@ -34,11 +34,35 @@ export interface LcuRegion {
   error?: string;
 }
 
+// 单个好友信息（来自 lol-chat/v1/friends）
+export interface FriendInfo {
+  puuid: string;
+  gameName: string;
+  gameTag: string;
+  summonerId: number;
+  icon: number; // 头像图标 ID
+  availability: string; // offline / dnd / away / chat / online
+  groupName: string; // 分组名
+  note: string; // 备注
+  statusMessage: string; // 状态消息
+  lastSeenOnlineTimestamp: number | null;
+  product: string; // 当前在哪个产品（空=LOL 客户端大厅）
+  lol?: {
+    gameStatus?: string; // inGame / outOfGame / inQueue
+    gameMode?: string; // CLASSIC / ARAM / TUTORIAL
+    gameQueueType?: string; // RANKED_SOLO_5x5 等
+    championId?: number; // 当前英雄
+    gameId?: number; // 当前对局 ID
+    rankedLeagueTier?: string; // 段位
+    level?: number; // 等级
+  };
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
-// detectClient / connect / getCurrentSummoner / getLobby / getChampSelectSession ...
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
+  getFriends: () => Promise<FriendInfo[]>;
 }
 
 // 占位接口：后续阶段接入本地数据时填充
@@ -51,7 +75,13 @@ export interface LolHelper {
   app: AppApi;
   lcu: LcuApi;
   match: MatchApi;
+  window: WindowApi;
   db: DbApi;
+}
+
+// window 域：窗口控制
+export interface WindowApi {
+  resize: (deltaWidth: number) => Promise<void>;
 }
 
 // ============================================================================

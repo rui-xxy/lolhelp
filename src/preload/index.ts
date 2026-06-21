@@ -12,10 +12,15 @@ const lolHelper: LolHelper = {
   lcu: {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
     getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
+    getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
   },
   match: {
     search: (req: PlayerLookupRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
+  },
+  window: {
+    resize: (deltaWidth: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, deltaWidth),
   },
   db: {
     // 占位：后续阶段填充
