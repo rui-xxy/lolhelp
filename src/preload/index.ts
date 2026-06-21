@@ -21,6 +21,8 @@ const lolHelper: LolHelper = {
   window: {
     resize: (deltaWidth: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, deltaWidth),
+    setWidth: (width: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_WIDTH, width),
   },
   db: {
     // 占位：后续阶段填充

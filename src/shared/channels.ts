@@ -19,6 +19,7 @@ export const IPC_CHANNELS = {
   MATCH_SEARCH: 'match:search',
   // window 域：窗口控制
   WINDOW_RESIZE: 'window:resize',
+  WINDOW_SET_WIDTH: 'window:set-width',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

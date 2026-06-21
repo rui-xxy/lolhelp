@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
@@ -10,6 +10,13 @@ const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
 };
+
+const EXPANDED_FRIEND_PANEL_WIDTH = 288;
+const HIDDEN_FRIEND_PANEL_WIDTH = 0;
+const FIXED_WORKSPACE_WIDTH = 1280;
+const EXPANDED_APP_WIDTH = FIXED_WORKSPACE_WIDTH + EXPANDED_FRIEND_PANEL_WIDTH;
+const HIDDEN_APP_WIDTH = FIXED_WORKSPACE_WIDTH + HIDDEN_FRIEND_PANEL_WIDTH;
+const FRIEND_PANEL_ANIMATION_MS = 220;
 
 // 国服大区列表（与 src/main/sgp/region.ts 同步）
 const BASE_REGIONS = [
@@ -48,6 +55,8 @@ export function App() {
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
+  const [friendPanelHidden, setFriendPanelHidden] = useState(false);
+  const friendPanelTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,13 +134,56 @@ export function App() {
     setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
   }, []);
 
+  const setWindowWidth = useCallback((width: number) => {
+    void window.lolHelper.window.setWidth(width).catch((err) => {
+      console.error('[friend] 设置好友栏窗口宽度失败:', err);
+    });
+  }, []);
+
+  useEffect(() => {
+    setWindowWidth(EXPANDED_APP_WIDTH);
+    return () => {
+      if (friendPanelTimerRef.current !== null) {
+        window.clearTimeout(friendPanelTimerRef.current);
+      }
+    };
+  }, [setWindowWidth]);
+
+  const toggleFriendPanelHidden = useCallback(() => {
+    if (friendPanelTimerRef.current !== null) {
+      window.clearTimeout(friendPanelTimerRef.current);
+      friendPanelTimerRef.current = null;
+    }
+
+    if (friendPanelHidden) {
+      setWindowWidth(EXPANDED_APP_WIDTH);
+      friendPanelTimerRef.current = window.setTimeout(() => {
+        setFriendPanelHidden(false);
+        friendPanelTimerRef.current = null;
+      }, 40);
+      return;
+    }
+
+    setFriendPanelHidden(true);
+    friendPanelTimerRef.current = window.setTimeout(() => {
+      setWindowWidth(HIDDEN_APP_WIDTH);
+      friendPanelTimerRef.current = null;
+    }, FRIEND_PANEL_ANIMATION_MS);
+  }, [friendPanelHidden, setWindowWidth]);
+
   return (
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches'}
       headerExtra={matchSearchBar}
-      friendPanel={<FriendPanel onFriendClick={handleFriendClick} />}
+      friendPanelHidden={friendPanelHidden}
+      onToggleFriendPanel={toggleFriendPanelHidden}
+      friendPanel={
+        <FriendPanel
+          onFriendClick={handleFriendClick}
+        />
+      }
     >
       <div className={activeView === 'home' ? '' : 'hidden'}>
         <HomePage />

@@ -82,6 +82,7 @@ export interface LolHelper {
 // window 域：窗口控制
 export interface WindowApi {
   resize: (deltaWidth: number) => Promise<void>;
+  setWidth: (width: number) => Promise<void>;
 }
 
 // ============================================================================

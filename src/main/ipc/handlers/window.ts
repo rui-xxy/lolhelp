@@ -18,4 +18,14 @@ export function registerWindowHandlers(): void {
       win.setSize(width + deltaWidth, height);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WINDOW_SET_WIDTH,
+    async (_event, nextWidth: number) => {
+      const win = getMainWindow();
+      if (!win || win.isDestroyed()) return;
+      const [, height] = win.getSize();
+      win.setSize(nextWidth, height);
+    },
+  );
 }

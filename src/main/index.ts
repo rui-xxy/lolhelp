@@ -6,7 +6,9 @@ import { registerIpcHandlers } from './ipc';
 const APP_WINDOW_TITLE = 'LOL助手';
 const PREVIOUS_WORKSPACE_WIDTH = 1280;
 const FRIEND_PANEL_WIDTH = 288;
+const HIDDEN_FRIEND_PANEL_WIDTH = 0;
 const DEFAULT_WINDOW_WIDTH = PREVIOUS_WORKSPACE_WIDTH + FRIEND_PANEL_WIDTH;
+const MIN_WINDOW_WIDTH = PREVIOUS_WORKSPACE_WIDTH + HIDDEN_FRIEND_PANEL_WIDTH;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -44,7 +46,7 @@ const createWindow = () => {
     // 三栏常驻布局：保持原 1280 工作区宽度，再额外加右侧 288px 好友栏。
     width: DEFAULT_WINDOW_WIDTH,
     height: 800,
-    minWidth: 1280,
+    minWidth: MIN_WINDOW_WIDTH,
     minHeight: 680,
     // 隐藏系统标题栏文字区，用自己的顶部标题栏；保留原生最小化/最大化/关闭按钮。
     // 拖拽窗口/双击最大化/Windows Snap 仍由原生支持，零 bug 风险。

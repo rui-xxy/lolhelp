@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords } from 'lucide-react';
+import { PanelLeft, Home, Swords, Users } from 'lucide-react';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches';
+
+const LEGACY_WORKSPACE_WIDTH = 1280;
+const EXPANDED_SIDEBAR_WIDTH = 240;
+const COLLAPSED_SIDEBAR_WIDTH = 64;
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
@@ -10,6 +14,8 @@ interface AppShellProps {
   children: React.ReactNode; // 主工作区内容
   fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
   headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
+  friendPanelHidden?: boolean; // 好友栏是否隐藏
+  onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
 }
 
@@ -31,9 +37,13 @@ export function AppShell({
   children,
   fullBleed = false,
   headerExtra,
+  friendPanelHidden = false,
+  onToggleFriendPanel,
   friendPanel,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const sidebarWidth = collapsed ? COLLAPSED_SIDEBAR_WIDTH : EXPANDED_SIDEBAR_WIDTH;
+  const workspaceWidth = LEGACY_WORKSPACE_WIDTH - sidebarWidth;
 
   return (
     <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">
@@ -100,13 +110,30 @@ export function AppShell({
       </aside>
 
       {/* ===== 右侧主工作区（顶部标题 + 主内容）===== */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div
+        className="flex min-w-0 flex-none flex-col"
+        style={{ width: `${workspaceWidth}px` }}
+      >
         {/* 顶部标题区：延续主工作区背景（app-surface），可拖拽移动窗口。 */}
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface px-4 [-webkit-app-region:drag]">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface pr-[138px] pl-4 [-webkit-app-region:drag]">
           {headerExtra ? (
             <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
+          )}
+          {onToggleFriendPanel && (
+            <button
+              onClick={onToggleFriendPanel}
+              className={`ml-auto flex size-8 items-center justify-center rounded-sm transition-colors [-webkit-app-region:no-drag] ${
+                friendPanelHidden
+                  ? 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                  : 'bg-app-surface-soft text-app-primary hover:bg-app-nav-hover'
+              }`}
+              title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
+              aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
+            >
+              <Users className="size-4" />
+            </button>
           )}
         </header>
 
@@ -118,7 +145,15 @@ export function AppShell({
         </main>
       </div>
 
-      {friendPanel && <aside className="friend-panel-column">{friendPanel}</aside>}
+      {friendPanel && (
+        <aside
+          className={`friend-panel-column ${
+            friendPanelHidden ? 'friend-panel-column--hidden' : ''
+          }`}
+        >
+          {friendPanel}
+        </aside>
+      )}
     </div>
   );
 }

@@ -92,8 +92,8 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   return (
     <div className="flex h-full flex-col bg-app-surface">
       {/* 头部 */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-app-border bg-app-surface pr-[138px] pl-3 [-webkit-app-region:drag]">
-        <span className="text-xs font-semibold text-app-text">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface pr-[138px] pl-3 [-webkit-app-region:drag]">
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
           好友 {onlineCount}/{friends.length}
         </span>
         <button
