@@ -4,6 +4,7 @@ import {
   getSummonerSpellById,
   getRuneById,
 } from '../lcu/heroData';
+import { buildProfileIcon } from '../lcu/gameData';
 import { getQueueName } from './queueNames';
 import type {
   PlayerItemSummary,
@@ -178,7 +179,7 @@ function collectRunes(p: SgpParticipant): {
 }
 
 // 映射单个 participant
-function mapParticipant(p: SgpParticipant, ddVersion: string): MatchParticipantSummary {
+function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
   const hero = getHeroByKey(p.championId);
   const items = collectItems(p);
   const spells = collectSpells(p);
@@ -194,9 +195,7 @@ function mapParticipant(p: SgpParticipant, ddVersion: string): MatchParticipantS
     tagLine: p.riotIdTagline ?? '',
     summonerName: p.summonerName ?? '',
     profileIconId: p.profileIcon ?? 0,
-    profileIconUrl: p.profileIcon
-      ? `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/profileicon/${p.profileIcon}.png`
-      : '',
+    profileIconUrl: p.profileIcon ? buildProfileIcon(p.profileIcon) : '',
     teamId: p.teamId,
     teamPosition: p.teamPosition || p.role || p.lane || '',
     championId: p.championId,
@@ -224,12 +223,12 @@ function mapParticipant(p: SgpParticipant, ddVersion: string): MatchParticipantS
 
 // 把 SGP 单场映射成 PlayerMatchDetail（含 10 人完整详情）。
 // targetPuuid 用于标记当前查询的玩家。
-export function extractMatchDetail(game: SgpGame, targetPuuid: string, ddVersion: string): PlayerMatchDetail {
+export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMatchDetail {
   const json = game.json;
   const targetP = json.participants.find((p) => p.puuid === targetPuuid);
   const hero = targetP ? getHeroByKey(targetP.championId) : null;
 
-  const participants = json.participants.map((p) => mapParticipant(p, ddVersion));
+  const participants = json.participants.map((p) => mapParticipant(p));
 
   const target = targetP ?? json.participants[0];
   const items = target ? collectItems(target) : [];

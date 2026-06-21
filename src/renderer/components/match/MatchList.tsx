@@ -1,10 +1,12 @@
 import { GameIcon } from './GameIcon';
+import { ProfileIcon } from '../ProfileIcon';
 import type { PlayerMatchDetail } from '../../../shared/api';
 
 // 经常一起玩的队友信息（出现≥2次）
 export interface RecurringMate {
   puuid: string;
   riotId: string;
+  profileIconId: number;
   profileIconUrl: string;
   count: number; // 一起玩了几场
 }
@@ -89,11 +91,13 @@ export function MatchList({
                     const info = recurringMates.get(mate.puuid);
                     if (!info) return null;
                     return (
-                      <img
+                      <ProfileIcon
                         key={mate.puuid}
+                        iconId={info.profileIconId}
                         src={info.profileIconUrl}
                         alt={info.riotId}
                         title={`${info.riotId}（一起${info.count}场）`}
+                        size={32}
                         onClick={(e) => {
                           e.stopPropagation();
                           onMateClick(info.riotId);

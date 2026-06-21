@@ -221,7 +221,7 @@ export function MatchHistoryPage({
   const recurringMates = new Map<string, RecurringMate>();
   const targetPuuid = activeTab?.result?.profile.puuid ?? '';
   if (activeTab && targetPuuid) {
-    const counts: Record<string, { count: number; riotId: string; icon: string }> = {};
+    const counts: Record<string, { count: number; riotId: string; iconId: number; icon: string }> = {};
     for (const m of activeTab.matches) {
       const myTeam = m.participants.find((p) => p.puuid === targetPuuid)?.teamId;
       if (myTeam == null) continue;
@@ -231,6 +231,7 @@ export function MatchHistoryPage({
           counts[p.puuid] = {
             count: 0,
             riotId: p.riotId || p.summonerName || p.gameName || '未知',
+            iconId: p.profileIconId,
             icon: p.profileIconUrl,
           };
         }
@@ -239,7 +240,13 @@ export function MatchHistoryPage({
     }
     for (const [puuid, info] of Object.entries(counts)) {
       if (info.count >= 2) {
-        recurringMates.set(puuid, { puuid, riotId: info.riotId, profileIconUrl: info.icon, count: info.count });
+        recurringMates.set(puuid, {
+          puuid,
+          riotId: info.riotId,
+          profileIconId: info.iconId,
+          profileIconUrl: info.icon,
+          count: info.count,
+        });
       }
     }
   }

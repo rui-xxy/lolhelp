@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
+import { ProfileIcon } from './ProfileIcon';
 
 // 好友列表面板（内联侧栏，不是弹窗）。
 // 分组显示好友、在线状态、备注，点击好友查战绩。
@@ -135,9 +136,6 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                       const isOffline = friend.availability === 'offline';
                       const statusText = getGameStatus(friend);
                       const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-gray-400';
-                      const iconUrl = friend.icon
-                        ? `https://ddragon.leagueoflegends.com/cdn/15.21.1/img/profileicon/${friend.icon}.png`
-                        : '';
                       return (
                         <button
                           key={friend.puuid}
@@ -148,16 +146,14 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                         >
                           {/* 头像 + 状态圆点 */}
                           <div className="relative shrink-0">
-                            {iconUrl ? (
-                              <img
-                                src={iconUrl}
-                                alt={friend.gameName}
-                                loading="lazy"
-                                className="size-8 rounded-full border border-app-border object-cover"
-                              />
-                            ) : (
-                              <div className="size-8 rounded-full bg-app-surface-soft" />
-                            )}
+                            <ProfileIcon
+                              iconId={friend.icon}
+                              src={friend.iconUrl}
+                              srcs={friend.iconUrls}
+                              alt={friend.note || friend.gameName}
+                              size={32}
+                              className="border border-app-border"
+                            />
                             <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border border-app-surface ${statusColor}`} />
                           </div>
                           {/* 名字 + 状态 */}

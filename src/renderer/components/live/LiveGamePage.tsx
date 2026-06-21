@@ -3,11 +3,11 @@ import { ChevronLeft, ChevronRight, Moon, RefreshCw, Sparkles, Star, Sun, Swords
 import { motion } from 'framer-motion';
 import type { LiveBattlePlayer } from '../../../shared/api';
 
-const DDRAGON_VERSION = '15.21.1';
 const HISTORY_PAGE_SIZE = 8;
 
 function championIcon(alias: string) {
-  return alias ? `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${alias}.png` : '';
+  // 用腾讯图床（国内稳定），不依赖 ddragon 版本号
+  return alias ? `https://game.gtimg.cn/images/lol/act/img/champion/${alias}.png` : '';
 }
 
 function phaseLabel(phase: string) {

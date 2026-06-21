@@ -2,6 +2,8 @@ import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
+// LCU game-data 预加载：启动后后台拉最新英雄/装备/技能/符文数据覆盖 datas.json 兜底
+import { preloadGameData } from './lcu/gameData';
 
 const APP_WINDOW_TITLE = 'LOL助手';
 const PREVIOUS_WORKSPACE_WIDTH = 1280;
@@ -87,6 +89,13 @@ const createWindow = () => {
 // 统一注册所有 IPC handler（按功能域拆分在 src/main/ipc/handlers/）。
 // 在 app ready 前注册即可，与原内联 handler 时机等价。
 registerIpcHandlers();
+
+// 应用启动后后台预加载 LCU game-data（最新英雄/装备/技能/符文）。
+// 不 await、不阻塞启动；失败静默（heroData 自动用 datas.json 兜底）。
+// 延迟 3 秒，给 LCU 客户端 lockfile/日志就绪一点时间。
+setTimeout(() => {
+  void preloadGameData();
+}, 3000);
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

@@ -4,6 +4,7 @@ import { readLockfile, getCachedCredentials } from '../../lcu/lockfile';
 import { LcuClient } from '../../lcu/client';
 import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
 import type { LcuConnection, LcuRegion, FriendInfo } from '../../../shared/api';
+import { buildProfileIconCandidates } from '../../../shared/gameAssets';
 
 // 注册 lcu 域 IPC 处理器。
 // 当前实现 detect-client：lockfile 读取 + 真实 LCU 请求验证连通。
@@ -94,20 +95,27 @@ export function registerLcuHandlers(): void {
         '/lol-chat/v1/friends',
       );
       if (!Array.isArray(raw)) return [];
-      return raw.map((f) => ({
-        puuid: String(f.puuid ?? ''),
-        gameName: String(f.gameName ?? ''),
-        gameTag: String(f.gameTag ?? ''),
-        summonerId: Number(f.summonerId ?? 0),
-        icon: Number(f.icon ?? 0),
-        availability: String(f.availability ?? 'offline'),
-        groupName: String(f.groupName ?? '**Default'),
-        note: String(f.note ?? ''),
-        statusMessage: String(f.statusMessage ?? ''),
-        lastSeenOnlineTimestamp: (f.lastSeenOnlineTimestamp as number) ?? null,
-        product: String(f.product ?? ''),
-        lol: f.lol as FriendInfo['lol'],
-      }));
+      return raw.map((f) => {
+        const icon = Number(f.icon ?? 0);
+        const iconUrls = buildProfileIconCandidates(icon);
+
+        return {
+          puuid: String(f.puuid ?? ''),
+          gameName: String(f.gameName ?? ''),
+          gameTag: String(f.gameTag ?? ''),
+          summonerId: Number(f.summonerId ?? 0),
+          icon,
+          iconUrl: iconUrls[0] ?? '',
+          iconUrls,
+          availability: String(f.availability ?? 'offline'),
+          groupName: String(f.groupName ?? '**Default'),
+          note: String(f.note ?? ''),
+          statusMessage: String(f.statusMessage ?? ''),
+          lastSeenOnlineTimestamp: (f.lastSeenOnlineTimestamp as number) ?? null,
+          product: String(f.product ?? ''),
+          lol: f.lol as FriendInfo['lol'],
+        };
+      });
     } catch {
       return [];
     }

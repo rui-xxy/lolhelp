@@ -40,6 +40,8 @@ export interface FriendInfo {
   gameName: string;
   gameTag: string;
   summonerId: number;
+  iconUrl?: string;
+  iconUrls?: string[];
   icon: number; // 头像图标 ID
   availability: string; // offline / dnd / away / chat / online
   groupName: string; // 分组名

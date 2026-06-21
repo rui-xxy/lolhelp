@@ -2,7 +2,7 @@ import { getSgpAuth, invalidateSgpAuth } from '../sgp/auth';
 import { SgpClient } from '../sgp/client';
 import { getCachedCredentials } from '../lcu/lockfile';
 import { LcuClient } from '../lcu/client';
-import { getDataDragonVersion } from '../lcu/heroData';
+import { buildProfileIcon } from '../lcu/gameData';
 import { getRegionConfig } from '../sgp/region';
 import { extractMatchDetail, buildLookupSummary, type SgpGame } from './matchMapper';
 import type {
@@ -178,11 +178,10 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   }
 
   // 4. 字段映射（用 targetPuuid 标记当前查询的玩家）
-  const ddVersion = getDataDragonVersion();
   const matches: PlayerMatchDetail[] = [];
   for (const game of games) {
     try {
-      matches.push(extractMatchDetail(game, targetPuuid, ddVersion));
+      matches.push(extractMatchDetail(game, targetPuuid));
     } catch (err) {
       console.warn('[match] 单场映射失败，跳过:', err);
     }
@@ -208,9 +207,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
       puuid: targetPuuid,
       level,
       profileIconId,
-      profileIconUrl: profileIconId
-        ? `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/profileicon/${profileIconId}.png`
-        : '',
+      profileIconUrl: profileIconId ? buildProfileIcon(profileIconId) : '',
     },
     matches,
     summary,
@@ -296,11 +293,10 @@ export async function fetchMatchesByPuuid(
       params,
     );
     const games = resp.games ?? [];
-    const ddVersion = getDataDragonVersion();
     const matches: PlayerMatchDetail[] = [];
     for (const game of games) {
       try {
-        matches.push(extractMatchDetail(game, puuid, ddVersion));
+        matches.push(extractMatchDetail(game, puuid));
       } catch (err) {
         console.warn('[match] 单场映射失败，跳过:', err);
       }

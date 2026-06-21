@@ -1,4 +1,5 @@
 import { GameIcon } from '../match/GameIcon';
+import { ProfileIcon } from '../ProfileIcon';
 import type { ScoutHit } from '../../../shared/api';
 
 // 达标者卡片：展示一个高手 + 他的达标场次。
@@ -21,11 +22,11 @@ export function ScoutHitCard({ hit, index, onPlayerClick }: ScoutHitCardProps) {
         <span className="shrink-0 text-sm font-bold tabular-nums text-app-subtle">
           #{index + 1}
         </span>
-        <GameIcon
+        <ProfileIcon
+          iconId={profile.profileIconId}
           src={profile.profileIconUrl}
           alt={riotId}
           size={36}
-          rounded
           className="ring-2 ring-app-border"
         />
         <div className="min-w-0 flex-1">

@@ -215,3 +215,63 @@ export function getDataDragonVersion(): string {
   ensureHeroDataLoaded();
   return dataDragonVersion;
 }
+
+// LCU 预加载刷新的入参类型（与 gameData.ts 的输出对齐）
+interface LcuRefreshData {
+  champions: { id: number; alias: string; name: string; title: string; avatar: string; tags: string[] }[];
+  items: { id: number; name: string; icon: string }[];
+  spells: { id: number; name: string; icon: string }[];
+  runes: { id: number; name: string; icon: string }[];
+}
+
+// 用 LCU 拉取的最新数据覆盖刷新模块级缓存（由 gameData.preloadGameData 调用）。
+// 重建与 loadFromFile 完全一致的双索引结构（数字 id + alias），保证下游 getHeroByKey 不变。
+// 任一类别为空则跳过该类别（保留 datas.json 兜底），不全量清空。
+export function refreshFromLcu(data: LcuRefreshData): void {
+  // 英雄：重建 id + alias 双索引
+  if (data.champions.length > 0) {
+    const entries: Record<string, HeroSummary> = {};
+    const list: HeroSummary[] = [];
+    for (const c of data.champions) {
+      const summary: HeroSummary = {
+        id: c.id,
+        alias: c.alias,
+        name: c.name,
+        title: c.title,
+        avatar: c.avatar,
+        tags: c.tags,
+      };
+      const idKey = String(summary.id);
+      entries[idKey] = summary;
+      if (summary.alias) entries[summary.alias] = summary;
+      list.push(summary);
+    }
+    heroCache = entries;
+    heroList = list;
+  }
+  // 装备
+  if (data.items.length > 0) {
+    const itemEntries: Record<number, ItemSummary> = {};
+    for (const it of data.items) {
+      itemEntries[it.id] = { id: it.id, name: it.name, icon: it.icon };
+    }
+    itemCache = itemEntries;
+  }
+  // 技能
+  if (data.spells.length > 0) {
+    const spellEntries: Record<number, SummonerSpellSummary> = {};
+    for (const s of data.spells) {
+      spellEntries[s.id] = { id: s.id, name: s.name, icon: s.icon };
+    }
+    spellCache = spellEntries;
+  }
+  // 符文
+  if (data.runes.length > 0) {
+    const runeEntries: Record<number, RuneSummary> = {};
+    for (const r of data.runes) {
+      runeEntries[r.id] = { id: r.id, name: r.name, icon: r.icon };
+    }
+    runeCache = runeEntries;
+  }
+  dataLoaded = true;
+}
