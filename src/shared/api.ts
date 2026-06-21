@@ -82,6 +82,9 @@ export interface LolHelper {
 // window 域：窗口控制
 export interface WindowApi {
   resize: (deltaWidth: number) => Promise<void>;
+  toggleFriendPanel: () => Promise<boolean>;
+  searchFriend: (riotId: string) => void;
+  onFriendSearch: (callback: (riotId: string) => void) => () => void;
 }
 
 // ============================================================================

@@ -6,13 +6,10 @@ export type View = 'home' | 'matches';
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
-  activeView: View; // 当前激活的视图（用于导航项高亮）
   onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
   fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
   headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
-  onFriendClick: (riotId: string) => void; // 点击好友查战绩
-  friendPanel?: React.ReactNode; // 右侧好友面板内容（可选，不传则不显示栏）
   showFriendPanel: boolean; // 好友面板是否展开
   onToggleFriendPanel: () => void; // 切换好友面板显隐
 }
@@ -31,18 +28,14 @@ interface AppShellProps {
 // - 右上角 titleBarOverlay 区（约 138px）保留给原生窗口控制按钮
 export function AppShell({
   title,
-  activeView,
   onNavigate,
   children,
   fullBleed = false,
   headerExtra,
-  onFriendClick,
-  friendPanel,
   showFriendPanel,
   onToggleFriendPanel,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
-  // activeView 暂时只用于潜在的状态追踪，当前页不做视觉标记（仅 hover 高亮）。
 
   return (
     <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">
@@ -141,13 +134,6 @@ export function AppShell({
         </main>
       </div>
 
-      {/* ===== 右侧好友面板（flex 并排，从战绩区右侧“推出”）=====
-          通过 resize 窗口补偿面板宽度，战绩区宽度恒定不被挤压。 */}
-      {showFriendPanel && friendPanel && (
-        <div className="flex w-72 shrink-0 flex-col border-l border-app-border bg-app-surface">
-          {friendPanel}
-        </div>
-      )}
     </div>
   );
 }

@@ -59,8 +59,9 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   const groups = new Map<string, FriendInfo[]>();
   for (const f of friends) {
     const g = f.groupName || '**Default';
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g)!.push(f);
+    const list = groups.get(g) ?? [];
+    list.push(f);
+    groups.set(g, list);
   }
   for (const [, list] of groups) {
     list.sort((a, b) => {
@@ -89,16 +90,16 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-app-surface">
       {/* 头部 */}
-      <div className="flex shrink-0 items-center justify-between border-b border-app-border px-3 py-2">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-app-border px-3 [-webkit-app-region:drag]">
         <span className="text-xs font-semibold text-app-text">
           好友 {onlineCount}/{friends.length}
         </span>
         <button
           onClick={loadFriends}
           disabled={loading}
-          className="text-app-subtle transition-colors hover:text-app-text"
+          className="rounded-xs p-1 text-app-subtle transition-colors [-webkit-app-region:no-drag] hover:bg-app-surface-soft hover:text-app-text"
           title="刷新"
         >
           <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
