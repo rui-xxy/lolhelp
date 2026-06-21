@@ -1,6 +1,7 @@
 import { registerAppHandlers } from './handlers/app';
 import { registerLcuHandlers } from './handlers/lcu';
 import { registerMatchHandlers } from './handlers/match';
+import { registerLiveHandlers } from './handlers/live';
 import { registerWindowHandlers } from './handlers/window';
 import { registerDbHandlers } from './handlers/db';
 
@@ -10,6 +11,7 @@ export function registerIpcHandlers(): void {
   registerAppHandlers();
   registerLcuHandlers();
   registerMatchHandlers();
+  registerLiveHandlers();
   registerWindowHandlers();
   registerDbHandlers();
 }

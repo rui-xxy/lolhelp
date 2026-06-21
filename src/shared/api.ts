@@ -75,8 +75,55 @@ export interface LolHelper {
   app: AppApi;
   lcu: LcuApi;
   match: MatchApi;
+  live: LiveApi;
   window: WindowApi;
   db: DbApi;
+}
+
+// ============================================================================
+// 实时对局类型
+// ============================================================================
+
+// 单个玩家的实时对局数据（含最近战绩摘要）
+export interface LiveBattlePlayer {
+  puuid: string;
+  summonerId: number;
+  riotId: string;
+  gameName: string;
+  championId: number;
+  championName: string;
+  championAlias: string;
+  teamId: number;
+  // 统计摘要（从最近 N 场算）
+  kda: number;
+  winRate: number;
+  matchCount: number;
+  history: {
+    championId: number;
+    championName: string;
+    championAlias: string;
+    queueName: string;
+    kills: number;
+    deaths: number;
+    assists: number;
+    win: boolean;
+    timeStr: string; // 显示用（如 "3-29" 或 "5时"）
+  }[];
+}
+
+// 完整实时对局信息
+export interface LiveBattleInfo {
+  inGame: boolean;
+  phase: string; // ChampSelect / InProgress / GameStart / None
+  queueName: string;
+  myTeam: LiveBattlePlayer[];
+  enemyTeam: LiveBattlePlayer[];
+  error?: string;
+}
+
+// live 域 API 契约
+export interface LiveApi {
+  getBattle: () => Promise<LiveBattleInfo>;
 }
 
 // window 域：窗口控制

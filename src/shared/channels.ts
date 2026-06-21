@@ -20,6 +20,8 @@ export const IPC_CHANNELS = {
   // window 域：窗口控制
   WINDOW_RESIZE: 'window:resize',
   WINDOW_SET_WIDTH: 'window:set-width',
+  // live 域：实时对局
+  LIVE_GET_BATTLE: 'live:get-battle',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

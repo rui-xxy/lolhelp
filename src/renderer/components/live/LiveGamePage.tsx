@@ -1,227 +1,205 @@
-import { useState, useEffect } from 'react';
-import { Sparkles, Swords, Moon, Sun, Star } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Moon, RefreshCw, Sparkles, Star, Sun, Swords } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { LiveBattlePlayer } from '../../../shared/api';
 
-// Mock Data（后续接真实数据后替换）
-const blueTeam = [
-  { id: 1, name: 'phetmenodi#vn2', champ: 'Qiyana', kda: '25.2', winRate: '55%', matches: 11,
-    history: [
-      { champ: 'Qiyana', type: '单双', score: '10/10/10', time: '4-2' },
-      { champ: 'Qiyana', type: '单双', score: '4/2/2', time: '4-2', win: true },
-      { champ: 'Qiyana', type: '单双', score: '4/18/10', time: '4-2' },
-      { champ: 'Qiyana', type: '单双', score: '3/10/11', time: '3-31' },
-      { champ: 'Qiyana', type: '单双', score: '11/9/14', time: '3-31', win: true },
-      { champ: 'Qiyana', type: '单双', score: '18/7/10', time: '3-31', win: true },
-    ]
-  },
-  { id: 2, name: 'DoremonDPT#bunny', champ: 'JarvanIV', kda: '35.4', winRate: '64%', matches: 11,
-    history: [
-      { champ: 'Nautilus', type: '单双', score: '9/3/5', time: '36分', win: true },
-      { champ: 'Veigar', type: '单双', score: '3/4/1', time: '1时' },
-      { champ: 'Malzahar', type: '单双', score: '3/4/7', time: '1时' },
-      { champ: 'Kaisa', type: '单双', score: '6/7/10', time: '2时', win: true },
-      { champ: 'Vex', type: '单双', score: '14/8/15', time: '3时', win: true },
-      { champ: 'Kassadin', type: '单双', score: '15/8/13', time: '3时', win: true },
-    ]
-  },
-  { id: 3, name: 'Dạ Mộc Tê#0001', champ: 'Ahri', kda: '28.7', winRate: '27%', matches: 11,
-    history: [
-      { champ: 'Ahri', type: '单双', score: '0/2/2', time: '36分' },
-      { champ: 'Lux', type: '单双', score: '7/9/8', time: '1时' },
-      { champ: 'Ahri', type: '单双', score: '4/8/14', time: '2时' },
-      { champ: 'Ahri', type: '单双', score: '3/12/21', time: '4-1' },
-      { champ: 'Ahri', type: '单双', score: '14/9/13', time: '3-29', win: true },
-      { champ: 'Lux', type: '单双', score: '5/10/6', time: '3-29' },
-    ]
-  },
-  { id: 4, name: 'Vào Cả Người#1997', champ: 'Caitlyn', kda: '26.8', winRate: '36%', matches: 11,
-    history: [
-      { champ: 'Caitlyn', type: '单双', score: '12/7/8', time: '5时' },
-      { champ: 'Heimerdinger', type: '单双', score: '5/5/8', time: '5时' },
-      { champ: 'Aatrox', type: '单双', score: '2/10/2', time: '6时' },
-      { champ: 'Caitlyn', type: '单双', score: '2/5/4', time: '7时' },
-      { champ: 'Caitlyn', type: '单双', score: '2/2/6', time: '10时', win: true },
-      { champ: 'Heimerdinger', type: '单双', score: '0/1/1', time: '10时' },
-    ]
-  },
-  { id: 5, name: 'Nguyễn Tấn Tài#8888', champ: 'Pantheon', kda: '35.8', winRate: '73%', matches: 11,
-    history: [
-      { champ: 'Pantheon', type: '单双', score: '0/1/2', time: '31分', win: true },
-      { champ: 'Alistar', type: '单双', score: '0/4/11', time: '1时' },
-      { champ: 'Pantheon', type: '单双', score: '1/5/16', time: '1时', win: true },
-      { champ: 'Pantheon', type: '单双', score: '2/1/6', time: '2时', win: true },
-      { champ: 'Lux', type: '单双', score: '2/7/12', time: '2时' },
-      { champ: 'Pantheon', type: '单双', score: '4/4/9', time: '3时', win: true },
-    ]
-  }
-];
+const DDRAGON_VERSION = '15.21.1';
+const HISTORY_PAGE_SIZE = 8;
 
-const redTeam = [
-  { id: 6, name: 'Dragùn Gió#5922', champ: 'Graves', kda: '50.4', winRate: '73%', matches: 11,
-    history: [
-      { champ: 'Aatrox', type: '单双', score: '5/3/9', time: '33分', win: true },
-      { champ: 'Darius', type: '单双', score: '8/7/18', time: '1时', win: true },
-      { champ: 'Ezreal', type: '单双', score: '7/3/7', time: '1时', win: true },
-      { champ: 'Vayne', type: '单双', score: '11/4/11', time: '2时', win: true },
-      { champ: 'Nidalee', type: '单双', score: '15/6/6', time: '3-29' },
-      { champ: 'Jhin', type: '单双', score: '14/10/10', time: '3-29' },
-    ]
-  },
-  { id: 7, name: 'crooooza#8601', champ: 'Zed', kda: '18.8', winRate: '55%', matches: 11,
-    history: [
-      { champ: 'Talon', type: '单双', score: '8/13/15', time: '42分' },
-      { champ: 'Renekton', type: '单双', score: '12/9/4', time: '1时', win: true },
-      { champ: 'Brand', type: '单双', score: '7/12/12', time: '2时' },
-      { champ: 'Brand', type: '单双', score: '2/6/16', time: '2时', win: true },
-      { champ: 'Zed', type: '单双', score: '4/15/14', time: '4-2', win: true },
-      { champ: 'Sylas', type: '单双', score: '6/9/13', time: '4-2', win: true },
-    ]
-  },
-  { id: 8, name: 'iu bé Miu#miuu', champ: 'Fizz', kda: '23.2', winRate: '73%', matches: 11,
-    history: [
-      { champ: 'Vex', type: '单双', score: '21/5/9', time: '33分', win: true },
-      { champ: 'Xerath', type: '单双', score: '4/11/6', time: '1时', win: true },
-      { champ: 'Fizz', type: '单双', score: '5/2/3', time: '1时', win: true },
-      { champ: 'Ekko', type: '单双', score: '6/4/7', time: '2时', win: true },
-      { champ: 'Vex', type: '单双', score: '9/9/5', time: '3-29' },
-      { champ: 'Brand', type: '单双', score: '4/12/10', time: '3-29' },
-    ]
-  },
-  { id: 9, name: 'July 14th 2000#VN2', champ: 'Ornn', kda: '19.6', winRate: '45%', matches: 11,
-    history: [
-      { champ: 'Ornn', type: '单双', score: '3/9/2', time: '23时' },
-      { champ: 'Pantheon', type: '单双', score: '7/13/15', time: '4-2' },
-      { champ: 'Rumble', type: '单双', score: '12/7/13', time: '4-1', win: true },
-      { champ: 'Nautilus', type: '其他', score: '3/13/23', time: '3-31' },
-      { champ: 'Nidalee', type: '单双', score: '8/11/8', time: '3-30' },
-      { champ: 'LeeSin', type: '单双', score: '7/10/20', time: '3-28', win: true },
-    ]
-  },
-  { id: 10, name: 'hniSgnoC0506#7947', champ: 'Karma', kda: '28.1', winRate: '27%', matches: 11,
-    history: [
-      { champ: 'Nautilus', type: '灵活', score: '4/12/7', time: '29分' },
-      { champ: 'Karma', type: '单双', score: '13/9/22', time: '3-28', win: true },
-      { champ: 'Karma', type: '单双', score: '7/4/13', time: '3-28', win: true },
-      { champ: 'Nami', type: '单双', score: '11/9/10', time: '3-28' },
-      { champ: 'Nautilus', type: '单双', score: '2/9/20', time: '3-27' },
-      { champ: 'Sylas', type: '单双', score: '9/10/16', time: '3-27' },
-    ]
-  }
-];
-
-interface PlayerData {
-  id: number; name: string; champ: string; kda: string; winRate: string; matches: number;
-  history: { champ: string; type: string; score: string; time: string; win?: boolean }[];
+function championIcon(alias: string) {
+  return alias ? `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${alias}.png` : '';
 }
 
-// 塔罗牌卡组件
-function TarotCard({ player, isRedTeam, isLoaded, index }: { player: PlayerData; isRedTeam?: boolean; isLoaded: boolean; index: number }) {
+function phaseLabel(phase: string) {
+  if (!phase) return '待检测';
+
+  const map: Record<string, string> = {
+    ChampSelect: '选人阶段',
+    GameStart: '载入阶段',
+    InProgress: '对局中',
+  };
+
+  return map[phase] ?? phase;
+}
+
+function TarotCard({
+  player,
+  isRedTeam,
+  isLoaded,
+  index,
+  historyPage,
+}: {
+  player: LiveBattlePlayer;
+  isRedTeam?: boolean;
+  isLoaded: boolean;
+  index: number;
+  historyPage: number;
+}) {
+  const champIcon = championIcon(player.championAlias);
+  const historyOffset = historyPage * HISTORY_PAGE_SIZE;
+  const visibleHistory = player.history.slice(historyOffset, historyOffset + HISTORY_PAGE_SIZE);
+  const teamAccent = isRedTeam ? 'text-[#b64c40]' : 'text-[#3f76b5]';
+  const teamWash = isRedTeam
+    ? 'bg-gradient-to-br from-[#fff5f1] via-[#fbf9f6] to-[#fbf9f6]'
+    : 'bg-gradient-to-br from-[#f1f6ff] via-[#fbf9f6] to-[#fbf9f6]';
+
   return (
-    <div className="group relative w-[196px] shrink-0 [perspective:1200px]">
+    <div className="live-tarot-card group relative min-w-0 [perspective:1200px]">
       <motion.div
         className="relative h-full w-full [transform-style:preserve-3d]"
-        initial={{ rotateY: 180 }}
-        animate={{ rotateY: isLoaded ? 0 : 180 }}
-        transition={{ duration: 1.2, delay: index * 0.15, type: 'spring', stiffness: 45, damping: 15 }}
+        initial={{ rotateY: 180, opacity: 0.78 }}
+        animate={{ rotateY: isLoaded ? 0 : 180, opacity: isLoaded ? 1 : 0.78 }}
+        transition={{ duration: 0.72, delay: index * 0.045, type: 'spring', stiffness: 72, damping: 18 }}
       >
-        {/* ===== 正面（数据） ===== */}
-        <div className="relative w-full overflow-hidden rounded-sm border-2 border-[#b8956a] bg-[#fbf9f6] shadow-[0_4px_12px_rgba(139,115,85,0.15)] [backface-visibility:hidden]">
-          <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[3px] border border-[#b8956a] bg-[#fbf9f6] shadow-[0_5px_14px_rgba(90,68,42,0.15)] [backface-visibility:hidden]">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.035]"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)',
+              backgroundSize: '16px 16px',
+            }}
+          />
 
-          {/* 头部 */}
-          <div className={`relative border-b-2 border-[#b8956a] p-1.5 ${isRedTeam ? 'bg-gradient-to-br from-[#fff0f0] to-[#fbf9f6]' : 'bg-gradient-to-br from-[#f0f4ff] to-[#fbf9f6]'}`}>
-            <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-[#b8956a] to-transparent opacity-30" />
-            <div className="flex items-center gap-1.5">
-              <div className="relative size-8 shrink-0 overflow-hidden rounded-full border border-[#b8956a] shadow-inner">
-                <img src={`https://ddragon.leagueoflegends.com/cdn/14.8.1/img/champion/${player.champ}.png`} alt={player.champ} className="h-full w-full scale-110 object-cover" />
+          <div className={`relative border-b border-[#b8956a]/75 px-2 py-1.5 ${teamWash}`}>
+            <div className="flex items-center gap-2">
+              <div className="relative size-9 shrink-0 overflow-hidden rounded-full border border-[#b8956a] bg-[#efe8dc] shadow-inner">
+                {champIcon && (
+                  <img
+                    src={champIcon}
+                    alt={player.championName}
+                    className="h-full w-full scale-110 object-cover"
+                  />
+                )}
               </div>
-              <div className="flex min-w-0 flex-col">
-                <span className="w-full truncate font-serif text-[11px] font-bold text-[#4a3b2c]">{player.name}</span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-bold leading-4 text-[#3d3022]">{player.gameName}</div>
                 <div className="mt-0.5 flex items-center gap-1">
-                  {isRedTeam ? <Sun size={9} className="text-[#c75b5b]" /> : <Moon size={9} className="text-[#5b8bc7]" />}
-                  <span className="text-[9px] font-serif font-bold uppercase tracking-widest text-[#8b7355]">{isRedTeam ? 'Sun Arcana' : 'Moon Arcana'}</span>
+                  {isRedTeam ? <Sun size={9} className={teamAccent} /> : <Moon size={9} className={teamAccent} />}
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#8b7355]">
+                    {isRedTeam ? 'Sun' : 'Moon'}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 数据三宫格 */}
-          <div className="grid grid-cols-3 gap-[1px] border-b-2 border-[#b8956a] bg-[#b8956a]">
-            <div className="flex flex-col items-center bg-[#fbf9f6] py-0.5">
-              <span className="mb-0.5 font-serif text-[8px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">KDA</span>
-              <span className="font-mono text-[11px] font-bold leading-none text-[#4a3b2c]">{player.kda}</span>
+          <div className="grid h-8 shrink-0 grid-cols-3 gap-px border-b border-[#b8956a]/75 bg-[#b8956a]/75">
+            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
+              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">KDA</span>
+              <span className="mt-1 font-mono text-[11px] font-bold leading-none text-[#3d3022]">
+                {player.kda.toFixed(1)}
+              </span>
             </div>
-            <div className="flex flex-col items-center bg-[#fbf9f6] py-0.5">
-              <span className="mb-0.5 font-serif text-[8px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Win Rate</span>
-              <span className={`font-mono text-[11px] font-bold leading-none ${parseInt(player.winRate) >= 50 ? 'text-[#4e8c61]' : 'text-[#c75b5b]'}`}>{player.winRate}</span>
+            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
+              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Win%</span>
+              <span
+                className={`mt-1 font-mono text-[11px] font-bold leading-none ${
+                  player.winRate >= 50 ? 'text-[#3d8a58]' : 'text-[#bd4a48]'
+                }`}
+              >
+                {player.winRate}%
+              </span>
             </div>
-            <div className="flex flex-col items-center bg-[#fbf9f6] py-0.5">
-              <span className="mb-0.5 font-serif text-[8px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Matches</span>
-              <span className="font-mono text-[11px] font-bold leading-none text-[#4a3b2c]">{player.matches}</span>
+            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
+              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Games</span>
+              <span className="mt-1 font-mono text-[11px] font-bold leading-none text-[#3d3022]">
+                {player.matchCount}
+              </span>
             </div>
           </div>
 
-          {/* 历史战绩 */}
-          <div className="space-y-px bg-[#f5f2eb] p-1">
-            <div className="mb-1 flex items-center justify-center gap-1.5 opacity-60">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#b8956a]" />
-              <Star size={7} className="text-[#b8956a]" />
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#b8956a]" />
-            </div>
-            {player.history.map((h, idx) => (
-              <div key={idx} className="group/row flex items-center justify-between rounded border border-[#e8e3db] bg-[#fbf9f6] px-1.5 py-0.5 transition-all hover:border-[#b8956a] hover:shadow-sm">
-                <div className="flex items-center gap-1.5">
-                  <div className="size-4 shrink-0 overflow-hidden rounded-full border border-[#b8956a]/60 opacity-90">
-                    <img src={`https://ddragon.leagueoflegends.com/cdn/14.8.1/img/champion/${h.champ}.png`} alt={h.champ} className="h-full w-full scale-110 object-cover" />
+          <div className="flex min-h-0 flex-1 flex-col bg-[#f3eee5] p-1.5">
+            <div
+              className="live-history-list min-h-0 flex-1"
+              style={{
+                gridTemplateRows:
+                  visibleHistory.length > 0 ? `repeat(${visibleHistory.length}, minmax(0, 1fr))` : undefined,
+              }}
+            >
+              {visibleHistory.length > 0 ? (
+                visibleHistory.map((history, historyIndex) => (
+                  <div
+                    key={`${history.championAlias}-${historyIndex}`}
+                    className={`grid min-h-0 grid-cols-[22px_31px_minmax(0,1fr)_39px] items-center gap-1.5 rounded-[3px] border px-1.5 ${
+                      history.win
+                        ? 'border-[#d8e8d5] bg-[#fbf9f6]/95'
+                        : 'border-[#ead7d0] bg-[#fbf9f6]/95'
+                    }`}
+                  >
+                    <div className="size-5 overflow-hidden rounded-full border border-[#b8956a]/45 bg-[#eee7dc]">
+                      <img
+                        src={championIcon(history.championAlias)}
+                        alt={history.championName}
+                        className="h-full w-full scale-110 object-cover"
+                        onError={(event) => {
+                          (event.currentTarget as HTMLImageElement).style.opacity = '0';
+                        }}
+                      />
+                    </div>
+                    <span className="truncate text-[10px] font-bold text-[#5f5244]">{history.queueName.slice(0, 2)}</span>
+                    <span
+                      className={`truncate text-center font-mono text-[11px] font-bold tracking-tight ${
+                        history.win ? 'text-[#3d8a58]' : 'text-[#bd4a48]'
+                      }`}
+                    >
+                      {history.kills}/{history.deaths}/{history.assists}
+                    </span>
+                    <span className="truncate text-right font-mono text-[10px] font-bold text-[#3d3022]">
+                      {history.timeStr}
+                    </span>
                   </div>
-                  <span className="w-[20px] font-serif text-[9px] font-bold text-[#6b5d4f]">{h.type}</span>
+                ))
+              ) : (
+                <div className="row-span-8 flex items-center justify-center rounded-[3px] border border-dashed border-[#d9cbb8] text-[10px] text-[#8b7355]">
+                  {player.history.length > 0 ? '本页暂无更多' : '暂无近期战绩'}
                 </div>
-                <span className={`font-mono text-[11px] font-bold tracking-tight ${h.win ? 'text-[#4e8c61]' : 'text-[#c75b5b]'}`}>{h.score}</span>
-                <span className="w-[30px] text-right font-mono text-[10px] font-bold tracking-tighter text-[#4a3b2c]">{h.time}</span>
-              </div>
-            ))}
-            <div className="mt-1 flex items-center justify-center gap-1.5 opacity-60">
-              <div className="h-px w-6 bg-gradient-to-r from-transparent to-[#b8956a]" />
-              <div className="size-1 rounded-full bg-[#b8956a]" />
-              <div className="h-px w-6 bg-gradient-to-l from-transparent to-[#b8956a]" />
+              )}
             </div>
           </div>
 
-          {/* 四角装饰 */}
-          <div className="absolute left-1 top-1 size-2 border-t-[1.5px] border-l-[1.5px] border-[#b8956a]" />
-          <div className="absolute right-1 top-1 size-2 border-t-[1.5px] border-r-[1.5px] border-[#b8956a]" />
+          <div className="absolute left-1 top-1 size-2 border-l-[1.5px] border-t-[1.5px] border-[#b8956a]" />
+          <div className="absolute right-1 top-1 size-2 border-r-[1.5px] border-t-[1.5px] border-[#b8956a]" />
           <div className="absolute bottom-1 left-1 size-2 border-b-[1.5px] border-l-[1.5px] border-[#b8956a]" />
           <div className="absolute bottom-1 right-1 size-2 border-b-[1.5px] border-r-[1.5px] border-[#b8956a]" />
         </div>
 
-        {/* ===== 背面（封面） ===== */}
-        <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-sm border-2 border-[#b8956a] bg-[#fbf9f6] shadow-[0_4px_12px_rgba(139,115,85,0.15)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
-          <div className="pointer-events-none absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)', backgroundSize: '12px 12px' }} />
-          <div className="absolute inset-2 border border-[#b8956a]/40" />
-          <div className="absolute inset-3 border border-[#b8956a]/20" />
-          <div className="absolute left-1 top-1 size-4 border-t-[1.5px] border-l-[1.5px] border-[#b8956a]" />
-          <div className="absolute right-1 top-1 size-4 border-t-[1.5px] border-r-[1.5px] border-[#b8956a]" />
+        <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[3px] border border-[#b8956a] bg-[#fbf9f6] shadow-[0_5px_14px_rgba(90,68,42,0.15)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.045]"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)',
+              backgroundSize: '12px 12px',
+            }}
+          />
+          <div className="absolute inset-2 border border-[#b8956a]/35" />
+          <div className="absolute left-1 top-1 size-4 border-l-[1.5px] border-t-[1.5px] border-[#b8956a]" />
+          <div className="absolute right-1 top-1 size-4 border-r-[1.5px] border-t-[1.5px] border-[#b8956a]" />
           <div className="absolute bottom-1 left-1 size-4 border-b-[1.5px] border-l-[1.5px] border-[#b8956a]" />
           <div className="absolute bottom-1 right-1 size-4 border-b-[1.5px] border-r-[1.5px] border-[#b8956a]" />
-          <div className="absolute top-8 flex w-full flex-col items-center">
+          <div className="absolute top-5 flex w-full flex-col items-center">
             <Star size={10} className="mb-1 text-[#b8956a] opacity-80" />
-            <span className="font-serif text-[10px] font-bold uppercase tracking-[0.4em] text-[#8b7355]">Destiny</span>
-            <div className="mt-1 h-px w-16 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent opacity-50" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#8b7355]">Destiny</span>
           </div>
-          <div className="relative mt-2 flex items-center justify-center">
-            <div className="absolute size-[110px] rotate-45 border border-[#b8956a]/40" />
-            <div className="absolute size-[95px] rotate-45 border border-[#b8956a]/20" />
-            <div className="absolute size-[130px] animate-[spin_30s_linear_infinite] rounded-full border border-dashed border-[#b8956a]/50" />
-            <div className="absolute size-[140px] rounded-full border border-[#b8956a]/20" />
-            <div className="relative z-10 size-20 overflow-hidden rounded-full border-[3px] border-[#b8956a] bg-[#fbf9f6] shadow-[0_0_20px_rgba(184,149,106,0.3)]">
-              <img src={`https://ddragon.leagueoflegends.com/cdn/14.8.1/img/champion/${player.champ}.png`} alt={player.champ} className="h-full w-full scale-110 object-cover opacity-90 mix-blend-multiply" />
+          <div className="relative flex items-center justify-center">
+            <div className="absolute size-20 rotate-45 border border-[#b8956a]/40" />
+            <div className="absolute size-24 animate-[spin_30s_linear_infinite] rounded-full border border-dashed border-[#b8956a]/50" />
+            <div className="relative z-10 size-14 overflow-hidden rounded-full border-[3px] border-[#b8956a] bg-[#fbf9f6] shadow-[0_0_18px_rgba(184,149,106,0.28)]">
+              {champIcon && (
+                <img
+                  src={champIcon}
+                  alt={player.championName}
+                  className="h-full w-full scale-110 object-cover opacity-90 mix-blend-multiply"
+                />
+              )}
             </div>
           </div>
-          <div className="absolute bottom-10 flex w-full flex-col items-center px-4">
-            <span className="w-full truncate text-center font-serif text-[13px] font-bold text-[#4a3b2c]">{player.name}</span>
-            <div className="mt-1.5 flex w-full items-center justify-center gap-2 opacity-80">
+          <div className="absolute bottom-7 flex w-full flex-col items-center px-2">
+            <span className="w-full truncate text-center text-[12px] font-bold text-[#3d3022]">{player.gameName}</span>
+            <div className="mt-1 flex w-full items-center justify-center gap-2 opacity-80">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#b8956a]" />
-              <span className="font-mono text-[9px] uppercase tracking-widest text-[#b8956a]">{player.champ}</span>
+              <span className="max-w-[72px] truncate font-mono text-[8px] uppercase tracking-wider text-[#b8956a]">
+                {player.championName}
+              </span>
               <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#b8956a]" />
             </div>
           </div>
@@ -232,38 +210,183 @@ function TarotCard({ player, isRedTeam, isLoaded, index }: { player: PlayerData;
 }
 
 export function LiveGamePage() {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [myTeam, setMyTeam] = useState<LiveBattlePlayer[]>([]);
+  const [enemyTeam, setEnemyTeam] = useState<LiveBattlePlayer[]>([]);
+  const [inGame, setInGame] = useState(false);
+  const [phase, setPhase] = useState('');
+  const [error, setError] = useState('');
+  const [loadedCards, setLoadedCards] = useState<Set<number>>(new Set());
+  const [historyPage, setHistoryPage] = useState(0);
+  const cardTimerIds = useRef<number[]>([]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 2500);
-    return () => clearTimeout(timer);
+  const clearCardTimers = useCallback(() => {
+    cardTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
+    cardTimerIds.current = [];
   }, []);
 
-  return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#f5ebd9] font-serif text-[#4a3b2c]">
-      {/* 背景：羊皮纸纹理 + 渐变 + 对角虚线 */}
-      <div className="pointer-events-none absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-40 mix-blend-multiply" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#f5ebd9] via-[#f0e6d2] to-[#e8dcc4]" />
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.35]" style={{ backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><path d='M0 0 L60 60 M60 0 L0 60' stroke='%23b8956a' stroke-width='1' stroke-dasharray='5 5' opacity='0.5'/><path d='M27 30 L33 30 M30 27 L30 33 M-3 0 L3 0 M0 -3 L0 3 M57 0 L63 0 M60 -3 L60 3 M-3 60 L3 60 M0 57 L0 63 M57 60 L63 60 M60 57 L60 63' stroke='%23b8956a' stroke-width='1.5' stroke-linecap='round' opacity='1'/></svg>")`, backgroundSize: '60px 60px' }} />
-      <div className="pointer-events-none absolute left-1/2 top-1/4 size-[600px] -translate-x-1/2 rounded-full bg-[#d4c5b0]/20 blur-[120px]" />
+  const fetchBattle = useCallback(async () => {
+    clearCardTimers();
+    setLoading(true);
+    setError('');
 
-      {/* 主体内容（标题栏已移到 AppShell headerExtra） */}
-      <div className="flex flex-1 items-center justify-center overflow-auto p-3">
-        <div className="flex min-w-max flex-col pb-3">
-          {/* 蓝队 */}
-          <div className="flex gap-1">
-            {blueTeam.map((player, idx) => <TarotCard key={player.id} player={player} isLoaded={isLoaded} index={idx} />)}
+    try {
+      const info = await window.lolHelper.live.getBattle();
+      setInGame(info.inGame);
+      setPhase(info.phase);
+      if (info.error) setError(info.error);
+
+      if (info.inGame) {
+        setLoadedCards(new Set());
+        setHistoryPage(0);
+        setMyTeam(info.myTeam);
+        setEnemyTeam(info.enemyTeam);
+        const total = info.myTeam.length + info.enemyTeam.length;
+
+        for (let i = 0; i < total; i += 1) {
+          const timerId = window.setTimeout(() => {
+            setLoadedCards((prev) => new Set([...prev, i]));
+          }, i * 85);
+          cardTimerIds.current.push(timerId);
+        }
+      } else {
+        setLoadedCards(new Set());
+        setHistoryPage(0);
+        setMyTeam([]);
+        setEnemyTeam([]);
+      }
+    } catch (err) {
+      setInGame(false);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [clearCardTimers]);
+
+  useEffect(() => {
+    fetchBattle();
+    return clearCardTimers;
+  }, [clearCardTimers, fetchBattle]);
+
+  const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
+  const hasBattle = inGame && allPlayers.length > 0;
+  const isLoaded = hasBattle && loadedCards.size >= allPlayers.length;
+  const maxHistoryCount = useMemo(
+    () => allPlayers.reduce((max, player) => Math.max(max, player.history.length), 0),
+    [allPlayers],
+  );
+  const totalHistoryPages = Math.max(1, Math.ceil(maxHistoryCount / HISTORY_PAGE_SIZE));
+  const historyStart = maxHistoryCount > 0 ? historyPage * HISTORY_PAGE_SIZE + 1 : 0;
+  const historyEnd = Math.min(maxHistoryCount, (historyPage + 1) * HISTORY_PAGE_SIZE);
+  const statusText = loading ? '读取中' : hasBattle ? phaseLabel(phase) : error ? '读取失败' : '未进入对局';
+
+  useEffect(() => {
+    setHistoryPage((currentPage) => Math.min(currentPage, totalHistoryPages - 1));
+  }, [totalHistoryPages]);
+
+  const handleHistoryPageChange = (delta: number) => {
+    setHistoryPage((currentPage) => Math.min(totalHistoryPages - 1, Math.max(0, currentPage + delta)));
+  };
+
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#f3ead8] font-serif text-[#4a3b2c]">
+      <div className="pointer-events-none absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-38 mix-blend-multiply" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f5eddf] via-[#f1e7d5] to-[#e9dcc5]" />
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
+        <div className="mb-2 flex h-7 shrink-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 px-2.5 py-1 shadow-[0_2px_10px_rgba(95,75,48,0.07)] backdrop-blur">
+            <Sparkles size={12} className="shrink-0 text-[#b8956a]" />
+            <span className="truncate text-[11px] font-bold text-[#7d674c]">{statusText}</span>
+            <span className={`size-1.5 shrink-0 rounded-full ${
+              loading ? 'animate-pulse bg-[#b8956a]' : isLoaded ? 'bg-[#3d8a58]' : 'bg-[#bd4a48]'
+            }`} />
           </div>
-          {/* 中央分隔线 */}
-          <div className="my-1 flex w-full items-center gap-3 opacity-60">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
-            <Swords size={12} className="text-[#b8956a]" />
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
+
+          <div className="flex min-w-0 items-center gap-2">
+            {hasBattle && (
+              <div className="flex h-7 items-center gap-1 rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 px-1.5 shadow-[0_2px_10px_rgba(95,75,48,0.07)] backdrop-blur">
+                <button
+                  type="button"
+                  title="上一页战绩"
+                  aria-label="上一页战绩"
+                  disabled={historyPage <= 0}
+                  onClick={() => handleHistoryPageChange(-1)}
+                  className="grid size-5 place-items-center rounded-full text-[#8b7355] transition-colors enabled:hover:bg-[#efe5d5] enabled:hover:text-[#3d3022] disabled:opacity-30"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <div className="flex min-w-[112px] items-center justify-center gap-1 px-1 font-mono text-[10px] font-bold text-[#6d5a43]">
+                  <span>{historyStart}-{historyEnd}</span>
+                  <span className="text-[#aa987f]">/</span>
+                  <span>{maxHistoryCount}</span>
+                  <span className="ml-1 text-[#aa987f]">{historyPage + 1}/{totalHistoryPages}</span>
+                </div>
+                <button
+                  type="button"
+                  title="下一页战绩"
+                  aria-label="下一页战绩"
+                  disabled={historyPage >= totalHistoryPages - 1}
+                  onClick={() => handleHistoryPageChange(1)}
+                  className="grid size-5 place-items-center rounded-full text-[#8b7355] transition-colors enabled:hover:bg-[#efe5d5] enabled:hover:text-[#3d3022] disabled:opacity-30"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={fetchBattle}
+              disabled={loading}
+              title="刷新实时对局"
+              className="grid size-7 place-items-center rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 text-[#8b7355] shadow-[0_2px_10px_rgba(95,75,48,0.07)] transition-colors hover:bg-[#efe5d5] hover:text-[#3d3022] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            </button>
           </div>
-          {/* 红队 */}
-          <div className="flex gap-1">
-            {redTeam.map((player, idx) => <TarotCard key={player.id} player={player} isRedTeam isLoaded={isLoaded} index={idx + 5} />)}
-          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto">
+          {error && !inGame ? (
+            <div className="flex h-full items-center justify-center text-sm text-[#8b7355]">{error}</div>
+          ) : !hasBattle && !loading ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-[#8b7355]">
+              <Star size={24} className="opacity-45" />
+              <span className="text-sm">当前不在游戏中</span>
+              <span className="text-xs opacity-65">进入对局或选人阶段后点击刷新</span>
+            </div>
+          ) : (
+            <div className="live-card-board">
+              <div className="live-team-grid">
+                {myTeam.map((player, idx) => (
+                  <TarotCard
+                    key={`${player.puuid}-${idx}`}
+                    player={player}
+                    isLoaded={loadedCards.has(idx)}
+                    index={idx}
+                    historyPage={historyPage}
+                  />
+                ))}
+              </div>
+              <div className="live-versus-divider">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
+                <Swords size={12} className="shrink-0 text-[#b8956a]" />
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
+              </div>
+              <div className="live-team-grid">
+                {enemyTeam.map((player, idx) => (
+                  <TarotCard
+                    key={`${player.puuid}-${idx}`}
+                    player={player}
+                    isRedTeam
+                    isLoaded={loadedCards.has(idx + myTeam.length)}
+                    index={idx + myTeam.length}
+                    historyPage={historyPage}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

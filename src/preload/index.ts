@@ -18,6 +18,9 @@ const lolHelper: LolHelper = {
     search: (req: PlayerLookupRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
   },
+  live: {
+    getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
+  },
   window: {
     resize: (deltaWidth: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, deltaWidth),
