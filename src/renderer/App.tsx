@@ -3,12 +3,14 @@ import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { LiveGamePage } from './components/live/LiveGamePage';
 import { FriendPanel } from './components/FriendPanel';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
+  live: '实时对局',
 };
 
 const EXPANDED_FRIEND_PANEL_WIDTH = 288;
@@ -175,7 +177,7 @@ export function App() {
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches'}
+      fullBleed={activeView === 'matches' || activeView === 'live'}
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
@@ -199,6 +201,9 @@ export function App() {
             setMatchSearchTrigger((n) => n + 1);
           }}
         />
+      </div>
+      <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
+        <LiveGamePage />
       </div>
     </AppShell>
   );

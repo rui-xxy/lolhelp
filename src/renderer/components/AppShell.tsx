@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords, Users } from 'lucide-react';
+import { PanelLeft, Home, Swords, Radar, Users } from 'lucide-react';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
-export type View = 'home' | 'matches';
+export type View = 'home' | 'matches' | 'live';
 
 const LEGACY_WORKSPACE_WIDTH = 1280;
 const EXPANDED_SIDEBAR_WIDTH = 240;
@@ -100,6 +100,18 @@ export function AppShell({
           >
             <Swords className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">战绩</span>}
+          </a>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigate('live');
+            }}
+            title={collapsed ? '实时对局' : undefined}
+            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+          >
+            <Radar className="size-4 shrink-0" />
+            {!collapsed && <span className="truncate">实时对局</span>}
           </a>
         </nav>
 
