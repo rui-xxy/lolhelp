@@ -227,3 +227,87 @@ function emptyResult(error: string): PlayerLookupResult {
     error,
   };
 }
+
+// ============================================================================
+// 以下两个导出函数供 scout 引擎复用（共享 SGP 认证链 + 字段映射）。
+// searchPlayer 走"Riot ID→puuid→战绩→组装 Result"完整链路；
+// scout 需要把这两步拆开：先解析种子 puuid，再批量按 puuid 查战绩。
+// ============================================================================
+
+// 按 Riot ID（或空=自己）解析 puuid + 显示名。复用 searchPlayer 的输入清洗。
+// region 可选（跨区查询）。返回 null 表示未找到。
+export async function resolvePuuid(
+  seedId: string,
+  region?: string,
+): Promise<{ puuid: string; riotId: string } | null> {
+  let auth;
+  try {
+    auth = await getSgpAuth();
+  } catch {
+    return null;
+  }
+  if (region) {
+    const targetRegion = getRegionConfig(region);
+    if (targetRegion) auth = { ...auth, region: targetRegion };
+  }
+
+  const rawName = (seedId ?? '')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
+    .replace(/[﹟＃]/g, '#')
+    .replace(/\s*#\s*/g, '#')
+    .trim();
+  const isSelf = ['', '自己', '我', 'me', 'self'].includes(rawName.toLowerCase());
+
+  if (isSelf) {
+    return { puuid: auth.puuid, riotId: '' };
+  }
+  const lookup = await lookupSummonerByRiotId(rawName);
+  if (!lookup) return null;
+  return { puuid: lookup.puuid, riotId: lookup.riotId };
+}
+
+// 按 puuid + count 查战绩（已字段映射好）。带模式 tag、可选跨区 region。
+// 复用 requestWithRetry 的 401/403 重试。返回空数组表示拉取失败或无数据。
+export async function fetchMatchesByPuuid(
+  puuid: string,
+  count: number,
+  tag?: string,
+  region?: string,
+): Promise<PlayerMatchDetail[]> {
+  let auth;
+  try {
+    auth = await getSgpAuth();
+  } catch {
+    return [];
+  }
+  if (region) {
+    const targetRegion = getRegionConfig(region);
+    if (targetRegion) auth = { ...auth, region: targetRegion };
+  }
+
+  const safeCount = Math.min(MAX_COUNT, Math.max(1, Math.floor(count)));
+  const client = new SgpClient(auth);
+  const params: Record<string, string | number> = { startIndex: 0, count: safeCount };
+  if (tag) params.tag = tag;
+  try {
+    const resp = await requestWithRetry<{ games: SgpGame[] }>(
+      client,
+      '/match-history-query/v1/products/lol/player/' + puuid + '/SUMMARY',
+      params,
+    );
+    const games = resp.games ?? [];
+    const ddVersion = getDataDragonVersion();
+    const matches: PlayerMatchDetail[] = [];
+    for (const game of games) {
+      try {
+        matches.push(extractMatchDetail(game, puuid, ddVersion));
+      } catch (err) {
+        console.warn('[match] 单场映射失败，跳过:', err);
+      }
+    }
+    return matches;
+  } catch (err) {
+    console.warn('[match] puuid 战绩拉取失败:', puuid, err);
+    return [];
+  }
+}

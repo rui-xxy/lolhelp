@@ -1,5 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import type { LolHelper, PlayerLookupRequest } from '../shared/api';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type {
+  AppSettings,
+  LolHelper,
+  PlayerLookupRequest,
+  ScoutConfig,
+  ScoutProgress,
+} from '../shared/api';
 import { IPC_CHANNELS } from '../shared/channels';
 
 // 用类型约束实现：确保暴露的 API 与契约 LolHelper 完全一致（多一个少一个都报错）。
@@ -17,6 +23,7 @@ const lolHelper: LolHelper = {
   match: {
     search: (req: PlayerLookupRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
+    getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
@@ -28,7 +35,26 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_WIDTH, width),
   },
   db: {
-    // 占位：后续阶段填充
+    getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_SETTINGS),
+    saveSettings: (settings: AppSettings) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DB_SAVE_SETTINGS, settings),
+  },
+  scout: {
+    // find：长任务。onProgress 通过 scout:progress 推送（每出一个达标者回调一次）。
+    // 用 once 绑定监听，任务结束（invoke resolve）后解绑，避免重复绑定。
+    find: (config: ScoutConfig, onProgress?: (p: ScoutProgress) => void) => {
+      if (onProgress) {
+        const handler = (_e: IpcRendererEvent, progress: ScoutProgress) =>
+          onProgress(progress);
+        ipcRenderer.on(IPC_CHANNELS.SCOUT_PROGRESS, handler);
+        // invoke 完成后无论成功失败都解绑
+        return ipcRenderer
+          .invoke(IPC_CHANNELS.SCOUT_FIND, config)
+          .finally(() => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT_PROGRESS, handler));
+      }
+      return ipcRenderer.invoke(IPC_CHANNELS.SCOUT_FIND, config);
+    },
+    cancel: () => ipcRenderer.invoke(IPC_CHANNELS.SCOUT_CANCEL),
   },
 };
 

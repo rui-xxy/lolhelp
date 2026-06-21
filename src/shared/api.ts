@@ -67,7 +67,34 @@ export interface LcuApi {
 
 // 占位接口：后续阶段接入本地数据时填充
 // getSettings / saveSettings ...
-export type DbApi = Record<string, never>;
+
+// ============================================================================
+// 设置（用户偏好，持久化到本地 JSON）
+// ============================================================================
+
+// 应用设置：存到 userData/lolhelper-settings.json
+export interface AppSettings {
+  // 收藏的英雄 ID（高手雷达查指定英雄时的默认来源）
+  favoriteChampions: number[];
+  // 雷达默认参数（用户上次用过的配置，下次打开时回填）
+  scoutDefaults?: Partial<ScoutConfig>;
+}
+
+// 本地设置读写契约
+export interface DbApi {
+  getSettings: () => Promise<AppSettings>;
+  saveSettings: (settings: AppSettings) => Promise<void>;
+}
+
+// 英雄摘要（给前端英雄选择器用，来自 heroData 的 HeroSummary 映射）
+export interface ChampionSummary {
+  id: number;
+  alias: string;
+  name: string;
+  title: string;
+  avatar: string;
+  tags: string[];
+}
 
 // preload 暴露给 renderer 的总入口
 // （与 contextBridge.exposeInMainWorld 的 key 'lolHelper' 对齐）
@@ -78,6 +105,7 @@ export interface LolHelper {
   live: LiveApi;
   window: WindowApi;
   db: DbApi;
+  scout: ScoutApi;
 }
 
 // ============================================================================
@@ -195,6 +223,7 @@ export interface MatchParticipantSummary {
   tripleKills?: number;
   quadraKills?: number;
   pentaKills?: number;
+  teamDamagePercentage?: number; // 伤害占团队比例（0~1，MVP 综合分用）
 }
 
 // 单场对局完整详情（含 10 人 participants）
@@ -269,4 +298,64 @@ export interface PlayerLookupResult {
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
+  // 返回英雄列表（给前端英雄选择器用）
+  getChampions: () => Promise<ChampionSummary[]>;
+}
+
+// ============================================================================
+// 高手扩散搜索（Scout）类型
+// ============================================================================
+
+// 雷达查询配置
+export interface ScoutConfig {
+  seedId: string; // 种子召唤师 Riot ID（名字#数字），留空=查自己
+  championIds: number[]; // 指定英雄（达人必须用这些英雄达标）
+  kdaThreshold: number; // KDA 达标阈值（默认 5.0）
+  hoursWindow: number; // 时间窗（小时，默认 3），达标场须在此时间内
+  targetCount: number; // 目标达标人数（默认 10）
+  region?: string; // 大区码（不传=本区）
+  tag?: string; // 模式筛选（q_420 等，不传=全部）
+  topSeedsPerGame?: number; // 每场取综合分前 N 名当扩散种子（默认 2）
+  excludePuuids?: string[]; // 继续搜索时排除已展示过的达标者
+}
+
+// 单个达标者（一个高手）
+export interface ScoutHit {
+  profile: PlayerProfile;
+  qualifyingMatches: PlayerMatchDetail[]; // 该高手的达标场次（用指定英雄 + 时间窗内 + KDA 达标）
+  totalChampionGames: number; // 该高手用指定英雄的总场次（统计参考）
+}
+
+// 进度推送（main → renderer，达标一个推一个）
+export interface ScoutProgress {
+  phase: 'seeding' | 'scanning' | 'done' | 'aborted' | 'error';
+  checked: number; // 已检查候选数
+  hits: number; // 已达标人数
+  target: number; // 目标人数
+  seedQueueRemaining: number; // 剩余待扩散种子数
+  latestHit?: ScoutHit; // 最新达标者（前端立即渲染一张卡）
+}
+
+// 最终结果
+export interface ScoutResult {
+  hits: ScoutHit[];
+  aborted: boolean; // 是否因上限保护/取消提前停止
+  error?: string;
+  stats: {
+    totalRequests: number; // 总请求数
+    totalSeeds: number; // 总扩散过的种子数
+    totalCandidates: number; // 总候选数
+    depth: number; // 实际扩散深度
+  };
+}
+
+// scout 域 API 契约
+// find 是长任务：onProgress 在每出一个达标者时被回调（增量渲染）。
+// cancel 取消当前正在跑的任务（按 SCOUT_FIND 的 requestId 匹配）。
+export interface ScoutApi {
+  find: (
+    config: ScoutConfig,
+    onProgress?: (progress: ScoutProgress) => void,
+  ) => Promise<ScoutResult>;
+  cancel: () => Promise<void>;
 }

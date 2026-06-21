@@ -41,6 +41,14 @@
   --color-app-success: #008a05;
   --color-app-link: #428bff;
 
+  /* 胜负语义色（战绩/雷达卡片高亮用，与 match-result-card 的金/紫基调呼应） */
+  --color-app-win: #ef7c1a;
+  --color-app-win-bg: #fff6ca;
+  --color-app-win-border: rgba(239, 124, 26, 0.34);
+  --color-app-loss: #cf3154;
+  --color-app-loss-bg: #ffe5ee;
+  --color-app-loss-border: rgba(207, 49, 84, 0.3);
+
   /* 圆角系统（Airbnb 形状语言）：xs 4 / sm 8 / md 14 / lg 20 / full 胶囊 */
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -484,6 +492,68 @@
   .player-detail-name:hover {
     color: var(--color-app-link);
     text-decoration: underline;
+  }
+
+  /* ===== 高手雷达（Scout）组件 ===== */
+
+  /* 达标者卡片：白底圆角卡，hover 微浮起 */
+  .scout-hit-card {
+    background: var(--color-app-surface);
+    border: 1px solid var(--color-app-border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .scout-hit-card:hover {
+    border-color: var(--color-app-primary-soft);
+    box-shadow:
+      rgba(255, 56, 92, 0.06) 0 0 0 1px inset,
+      rgba(0, 0, 0, 0.04) 0 2px 8px;
+  }
+
+  /* 英雄选择网格：自适应列 */
+  .scout-champion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  /* 单个英雄格 */
+  .scout-champion-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-app-border);
+    border-radius: var(--radius-xs);
+    padding: 6px 2px 4px;
+    background: var(--color-app-surface);
+    cursor: pointer;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease;
+  }
+
+  .scout-champion-cell:hover {
+    border-color: var(--color-app-primary);
+    background: var(--color-app-surface-soft);
+  }
+
+  .scout-champion-cell--selected {
+    border-color: var(--color-app-primary);
+    background: var(--color-app-primary-soft);
+  }
+
+  .scout-champion-cell--selected:hover {
+    border-color: var(--color-app-primary);
+    background: var(--color-app-primary-soft);
   }
 }
 

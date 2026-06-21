@@ -64,6 +64,11 @@ interface SgpParticipant {
   pentaKills: number;
   largestMultiKill: number;
   largestKillingSpree: number;
+  // challenges 字段（SGP 在 participant.challenges 下，扁平字段在顶层声明用到的）
+  challenges?: {
+    teamDamagePercentage?: number; // 伤害占团队比例（0~1）
+    [k: string]: unknown;
+  };
   perks?: {
     styles?: Array<{
       description: string;
@@ -213,6 +218,7 @@ function mapParticipant(p: SgpParticipant, ddVersion: string): MatchParticipantS
     visionScore: p.visionScore,
     largestMultiKill: p.largestMultiKill,
     largestKillingSpree: p.largestKillingSpree,
+    teamDamagePercentage: p.challenges?.teamDamagePercentage,
   };
 }
 

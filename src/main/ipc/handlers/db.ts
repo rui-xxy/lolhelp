@@ -1,6 +1,19 @@
-// 注册 db 域 IPC 处理器。
-// 占位：后续阶段接入本地数据/设置后在此注册真实实现。
-// 预留通道：db:get-settings / db:save-settings
+import { ipcMain } from 'electron';
+import { IPC_CHANNELS } from '../../../shared/channels';
+import { getSettings, saveSettings } from '../../settings/store';
+import type { AppSettings } from '../../../shared/api';
+
+// 注册 db 域 IPC 处理器：本地设置读写。
+// 实现 db:get-settings / db:save-settings（通道名之前已预留）。
 export function registerDbHandlers(): void {
-  // TODO: 后续阶段实现本地数据读写与用户设置
+  ipcMain.handle(IPC_CHANNELS.DB_GET_SETTINGS, async (): Promise<AppSettings> => {
+    return getSettings();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.DB_SAVE_SETTINGS,
+    async (_event, settings: AppSettings): Promise<void> => {
+      saveSettings(settings);
+    },
+  );
 }

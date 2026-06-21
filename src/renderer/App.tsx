@@ -4,6 +4,7 @@ import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
 import { LiveGamePage } from './components/live/LiveGamePage';
+import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
@@ -11,6 +12,7 @@ const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
   live: '实时对局',
+  scout: '高手雷达',
 };
 
 const EXPANDED_FRIEND_PANEL_WIDTH = 288;
@@ -177,7 +179,7 @@ export function App() {
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches' || activeView === 'live'}
+      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout'}
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
@@ -204,6 +206,15 @@ export function App() {
       </div>
       <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
         <LiveGamePage />
+      </div>
+      <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
+        <ScoutPage
+          onPlayerSearch={(name) => {
+            setMatchSearchName(name);
+            setActiveView('matches');
+            setMatchSearchTrigger((n) => n + 1);
+          }}
+        />
       </div>
     </AppShell>
   );

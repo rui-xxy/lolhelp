@@ -22,6 +22,12 @@ export const IPC_CHANNELS = {
   WINDOW_SET_WIDTH: 'window:set-width',
   // live 域：实时对局
   LIVE_GET_BATTLE: 'live:get-battle',
+  // scout 域：高手扩散搜索
+  SCOUT_FIND: 'scout:find',
+  SCOUT_PROGRESS: 'scout:progress', // 进度推送（main → renderer）
+  SCOUT_CANCEL: 'scout:cancel',
+  // match 域：英雄列表（给选择器用）
+  MATCH_GET_CHAMPIONS: 'match:get-champions',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）
