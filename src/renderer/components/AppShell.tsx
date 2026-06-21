@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords, Users } from 'lucide-react';
+import { PanelLeft, Home, Swords } from 'lucide-react';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches';
@@ -10,8 +10,7 @@ interface AppShellProps {
   children: React.ReactNode; // 主工作区内容
   fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
   headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
-  showFriendPanel: boolean; // 好友面板是否展开
-  onToggleFriendPanel: () => void; // 切换好友面板显隐
+  friendPanel?: React.ReactNode; // 常驻右侧好友栏
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -32,8 +31,7 @@ export function AppShell({
   children,
   fullBleed = false,
   headerExtra,
-  showFriendPanel,
-  onToggleFriendPanel,
+  friendPanel,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -103,27 +101,13 @@ export function AppShell({
 
       {/* ===== 右侧主工作区（顶部标题 + 主内容）===== */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* 顶部标题区：延续主工作区背景（app-surface）。
-            可拖拽移动窗口（-webkit-app-region:drag）。
-            右侧 padding 留出 titleBarOverlay 原生控制按钮的空间。 */}
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface pr-[138px] pl-4 [-webkit-app-region:drag]">
+        {/* 顶部标题区：延续主工作区背景（app-surface），可拖拽移动窗口。 */}
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface px-4 [-webkit-app-region:drag]">
           {headerExtra ? (
             <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
-          {/* 右侧：好友面板开关图标 */}
-          <button
-            onClick={onToggleFriendPanel}
-            className={`relative ml-auto flex size-8 items-center justify-center rounded-sm transition-colors [-webkit-app-region:no-drag] ${
-              showFriendPanel
-                ? 'bg-app-surface-soft text-app-primary'
-                : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
-            }`}
-            title="好友列表"
-          >
-            <Users className="size-4" />
-          </button>
         </header>
 
         {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。
@@ -134,6 +118,7 @@ export function AppShell({
         </main>
       </div>
 
+      {friendPanel && <aside className="friend-panel-column">{friendPanel}</aside>}
     </div>
   );
 }

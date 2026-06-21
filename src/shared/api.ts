@@ -67,7 +67,7 @@ export interface LcuApi {
 
 // 占位接口：后续阶段接入本地数据时填充
 // getSettings / saveSettings ...
-export interface DbApi {}
+export type DbApi = Record<string, never>;
 
 // preload 暴露给 renderer 的总入口
 // （与 contextBridge.exposeInMainWorld 的 key 'lolHelper' 对齐）
@@ -82,9 +82,6 @@ export interface LolHelper {
 // window 域：窗口控制
 export interface WindowApi {
   resize: (deltaWidth: number) => Promise<void>;
-  toggleFriendPanel: () => Promise<boolean>;
-  searchFriend: (riotId: string) => void;
-  onFriendSearch: (callback: (riotId: string) => void) => () => void;
 }
 
 // ============================================================================

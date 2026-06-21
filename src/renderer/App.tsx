@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { FriendPanel } from './components/FriendPanel';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
@@ -46,15 +47,6 @@ export function App() {
   const [matchSearchName, setMatchSearchName] = useState('');
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
-  const [showFriendPanel, setShowFriendPanel] = useState(false);
-
-  const toggleFriendPanel = async () => {
-    try {
-      setShowFriendPanel(await window.lolHelper.window.toggleFriendPanel());
-    } catch (err) {
-      console.error('[friend] 好友面板打开失败，请重启应用以加载最新主进程/preload:', err);
-    }
-  };
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
 
   useEffect(() => {
@@ -133,18 +125,13 @@ export function App() {
     setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
   }, []);
 
-  useEffect(() => {
-    return window.lolHelper.window.onFriendSearch(handleFriendClick);
-  }, [handleFriendClick]);
-
   return (
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches'}
       headerExtra={matchSearchBar}
-      showFriendPanel={showFriendPanel}
-      onToggleFriendPanel={toggleFriendPanel}
+      friendPanel={<FriendPanel onFriendClick={handleFriendClick} />}
     >
       <div className={activeView === 'home' ? '' : 'hidden'}>
         <HomePage />

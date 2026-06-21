@@ -3,6 +3,11 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
 
+const APP_WINDOW_TITLE = 'LOL助手';
+const PREVIOUS_WORKSPACE_WIDTH = 1280;
+const FRIEND_PANEL_WIDTH = 288;
+const DEFAULT_WINDOW_WIDTH = PREVIOUS_WORKSPACE_WIDTH + FRIEND_PANEL_WIDTH;
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -11,15 +16,35 @@ if (started) {
 // 隐藏 Electron 默认菜单栏（File/Edit/View/Window），避免破坏现代桌面应用感。
 Menu.setApplicationMenu(null);
 
+function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win === mainWindow || win.isDestroyed()) continue;
+
+    const url = win.webContents.getURL();
+    const { width } = win.getBounds();
+    const isLegacyDevFriendWindow =
+      Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL) &&
+      width <= FRIEND_PANEL_WIDTH + 80 &&
+      url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    const isLegacyFriendWindow =
+      win.getTitle() === '好友' ||
+      url.includes('panel=friends') ||
+      isLegacyDevFriendWindow;
+
+    if (isLegacyFriendWindow) {
+      win.close();
+    }
+  }
+}
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    title: 'LOL助手',
-    // 16:10 比例，适配桌面工作台布局（侧边栏+主工作区）。
-    // LOL 助手以后会有横向信息（玩家/英雄/装备/KDA/胜率/标签），需要足够宽度。
-    width: 1280,
+    title: APP_WINDOW_TITLE,
+    // 三栏常驻布局：保持原 1280 工作区宽度，再额外加右侧 288px 好友栏。
+    width: DEFAULT_WINDOW_WIDTH,
     height: 800,
-    minWidth: 1024,
+    minWidth: 1280,
     minHeight: 680,
     // 隐藏系统标题栏文字区，用自己的顶部标题栏；保留原生最小化/最大化/关闭按钮。
     // 拖拽窗口/双击最大化/Windows Snap 仍由原生支持，零 bug 风险。
@@ -46,6 +71,9 @@ const createWindow = () => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
+
+  closeLegacyFriendWindows(mainWindow);
+  mainWindow.webContents.once('did-finish-load', () => closeLegacyFriendWindows(mainWindow));
 
   // 仅开发环境自动打开 DevTools；打包后（app.isPackaged === true）不再弹。
   // 用 'detach' 模式：DevTools 作为独立浮窗，不 dock 在应用窗口内（避免占用右侧/底部布局空间）。

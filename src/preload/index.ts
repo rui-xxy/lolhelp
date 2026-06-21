@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { IpcRendererEvent } from 'electron';
 import type { LolHelper, PlayerLookupRequest } from '../shared/api';
 import { IPC_CHANNELS } from '../shared/channels';
 
@@ -22,16 +21,6 @@ const lolHelper: LolHelper = {
   window: {
     resize: (deltaWidth: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, deltaWidth),
-    toggleFriendPanel: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_TOGGLE_FRIEND_PANEL),
-    searchFriend: (riotId: string) => {
-      ipcRenderer.send(IPC_CHANNELS.WINDOW_FRIEND_SEARCH, riotId);
-    },
-    onFriendSearch: (callback: (riotId: string) => void) => {
-      const listener = (_event: IpcRendererEvent, riotId: string) => callback(riotId);
-      ipcRenderer.on(IPC_CHANNELS.WINDOW_FRIEND_SEARCH, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.WINDOW_FRIEND_SEARCH, listener);
-    },
   },
   db: {
     // 占位：后续阶段填充
