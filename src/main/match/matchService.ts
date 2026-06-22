@@ -9,6 +9,7 @@ import type {
   PlayerLookupRequest,
   PlayerLookupResult,
   PlayerMatchDetail,
+  PlayerRankSummary,
 } from '../../shared/api';
 
 // 战绩查询服务（SGP 版）：走腾讯云端 SGP，能查完整历史（不受 LCU 21 场缓存限制）。
@@ -27,6 +28,44 @@ import type {
 
 const DEFAULT_COUNT = 20;
 const MAX_COUNT = 100; // 单次最多 100 场（可翻页拿更多）
+
+interface LcuRankQueue {
+  queueType?: string;
+  queue?: string;
+  tier?: string;
+  ratedTier?: string;
+  division?: string;
+  rank?: string;
+  leaguePoints?: number;
+  ratedRating?: number;
+  wins?: number;
+  losses?: number;
+}
+
+interface LcuRankedStats {
+  queueMap?: Record<string, LcuRankQueue>;
+  queues?: LcuRankQueue[];
+  highestRankedEntry?: LcuRankQueue;
+  rankedEntry?: LcuRankQueue;
+}
+
+const RANK_QUEUE_NAMES: Record<string, string> = {
+  RANKED_SOLO_5x5: '单双',
+  RANKED_FLEX_SR: '灵活',
+};
+
+const RANK_TIER_NAMES: Record<string, string> = {
+  CHALLENGER: '王者',
+  GRANDMASTER: '宗师',
+  MASTER: '大师',
+  DIAMOND: '钻石',
+  EMERALD: '翡翠',
+  PLATINUM: '铂金',
+  GOLD: '黄金',
+  SILVER: '白银',
+  BRONZE: '黄铜',
+  IRON: '黑铁',
+};
 
 // 带凭证失效重试的请求：401/403 时清缓存重新认证。
 async function requestWithRetry<T>(
@@ -48,30 +87,207 @@ async function requestWithRetry<T>(
   }
 }
 
+function collectRankQueues(stats: LcuRankedStats | LcuRankQueue[] | null | undefined): LcuRankQueue[] {
+  if (!stats) return [];
+  if (Array.isArray(stats)) return stats;
+
+  const queues: LcuRankQueue[] = [];
+  if (stats.highestRankedEntry) {
+    queues.push(stats.highestRankedEntry);
+  }
+  if (stats.rankedEntry) {
+    queues.push(stats.rankedEntry);
+  }
+  if (Array.isArray(stats.queues)) {
+    queues.push(...stats.queues);
+  }
+  if (stats.queueMap) {
+    for (const [queueType, queue] of Object.entries(stats.queueMap)) {
+      queues.push({ ...queue, queueType: queue.queueType ?? queueType });
+    }
+  }
+  const possibleQueue = stats as LcuRankQueue;
+  if (possibleQueue.tier || possibleQueue.ratedTier) {
+    queues.push(possibleQueue);
+  }
+  return queues;
+}
+
+function normalizeRankTier(rawTier?: string): string {
+  const tier = String(rawTier ?? '').toUpperCase();
+  if (!tier || tier === 'NONE' || tier === 'NA' || tier === 'UNRANKED') return '';
+  return tier;
+}
+
+function normalizeRankDivision(rawDivision?: string): string {
+  const division = String(rawDivision ?? '').toUpperCase();
+  if (!division || division === 'NONE' || division === 'NA') return '';
+  return division;
+}
+
+function toFiniteNumber(value: unknown): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function mapRankQueue(queue: LcuRankQueue): PlayerRankSummary | null {
+  const tier = normalizeRankTier(queue.tier ?? queue.ratedTier);
+  if (!tier) return null;
+
+  const queueType = queue.queueType ?? queue.queue ?? '';
+  const queueName = RANK_QUEUE_NAMES[queueType] ?? '';
+  const division = normalizeRankDivision(queue.division ?? queue.rank);
+  const leaguePoints = toFiniteNumber(queue.leaguePoints ?? queue.ratedRating);
+  const tierText = RANK_TIER_NAMES[tier] ?? tier;
+  const divisionText = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tier) ? '' : division;
+  const displayText = [
+    queueName,
+    tierText,
+    divisionText,
+    leaguePoints > 0 ? String(leaguePoints) : '',
+  ].filter(Boolean).join(' ');
+
+  return {
+    queueType,
+    queueName,
+    tier,
+    division,
+    leaguePoints,
+    wins: toFiniteNumber(queue.wins),
+    losses: toFiniteNumber(queue.losses),
+    displayText,
+  };
+}
+
+function pickRankSummary(stats: LcuRankedStats | LcuRankQueue[] | null | undefined): PlayerRankSummary | null {
+  const ranks = collectRankQueues(stats)
+    .map((queue) => mapRankQueue(queue))
+    .filter((rank): rank is PlayerRankSummary => Boolean(rank));
+
+  return (
+    ranks.find((rank) => rank.queueType === 'RANKED_SOLO_5x5') ??
+    ranks.find((rank) => rank.queueType === 'RANKED_FLEX_SR') ??
+    ranks[0] ??
+    null
+  );
+}
+
+async function fetchRankByPuuid(
+  client: LcuClient,
+  puuid: string,
+  summonerId?: number,
+): Promise<PlayerRankSummary | null> {
+  const paths = [
+    puuid ? `/lol-ranked/v1/ranked-stats/${encodeURIComponent(puuid)}` : '',
+    summonerId ? `/lol-ranked/v1/ranked-stats/${summonerId}` : '',
+  ].filter(Boolean);
+
+  for (const path of paths) {
+    try {
+      const stats = await client.get<LcuRankedStats | LcuRankQueue[]>(path);
+      const rank = pickRankSummary(stats);
+      if (rank) return rank;
+    } catch {
+      // 段位只是附加信息，失败不能影响战绩查询。
+    }
+  }
+  return null;
+}
+
+async function fetchCurrentRank(
+  client: LcuClient,
+  puuid?: string,
+  summonerId?: number,
+): Promise<PlayerRankSummary | null> {
+  try {
+    const stats = await client.get<LcuRankedStats | LcuRankQueue[]>('/lol-ranked/v1/current-ranked-stats');
+    const rank = pickRankSummary(stats);
+    if (rank) return rank;
+  } catch {
+    // 国服/版本差异下可能没有 current-ranked-stats，继续用 ranked-stats 兜底。
+  }
+  return fetchRankByPuuid(client, puuid ?? '', summonerId);
+}
+
+async function fetchSummonerIdByPuuid(client: LcuClient, puuid: string): Promise<number | undefined> {
+  const paths = [
+    `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(puuid)}`,
+    `/lol-summoner/v1/summoners/puuid/${encodeURIComponent(puuid)}`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const summoner = await client.get<{ summonerId?: number }>(path);
+      if (typeof summoner.summonerId === 'number') return summoner.summonerId;
+    } catch {
+      // 不同客户端版本可能只支持其中一个路径，继续尝试。
+    }
+  }
+  return undefined;
+}
+
+const playerRankCache = new Map<string, PlayerRankSummary | null>();
+
+export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
+  if (!puuid) return null;
+  if (playerRankCache.has(puuid)) {
+    return playerRankCache.get(puuid) ?? null;
+  }
+
+  const creds = getCachedCredentials();
+  if (!creds) {
+    return null;
+  }
+
+  const client = new LcuClient(creds);
+  let rank = await fetchRankByPuuid(client, puuid);
+  if (!rank) {
+    const summonerId = await fetchSummonerIdByPuuid(client, puuid);
+    if (summonerId) {
+      rank = await fetchRankByPuuid(client, '', summonerId);
+    }
+  }
+  playerRankCache.set(puuid, rank);
+  return rank;
+}
+
 // 按 Riot ID（名字#数字）查 puuid。
 // 关键：必须传完整 Riot ID（gameName#tagLine），# 编码成 %23。
 // 只传 gameName（不带 #tagLine）会返回 422（之前所有失败的根因）。
 // 返回 { puuid, riotId } 或 null（没找到）。
-async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; riotId: string; level: number; profileIconId: number } | null> {
+async function lookupSummonerByRiotId(riotId: string): Promise<{
+  puuid: string;
+  riotId: string;
+  level: number;
+  profileIconId: number;
+  rank: PlayerRankSummary | null;
+} | null> {
   const creds = getCachedCredentials();
   if (!creds) return null;
   const client = new LcuClient(creds);
   // 传完整 Riot ID（含 #），encodeURIComponent 会把 # 编码成 %23
   const encoded = encodeURIComponent(riotId.trim());
   try {
-    const summoner = await client.get<{ puuid?: string; gameName?: string; tagLine?: string; summonerLevel?: number; profileIconId?: number }>(
-      `/lol-summoner/v1/summoners?name=${encoded}`,
-    );
+    const summoner = await client.get<{
+      puuid?: string;
+      gameName?: string;
+      tagLine?: string;
+      summonerId?: number;
+      summonerLevel?: number;
+      profileIconId?: number;
+    }>(`/lol-summoner/v1/summoners?name=${encoded}`);
     if (summoner && summoner.puuid) {
       const gameName = summoner.gameName ?? riotId;
       const fullRiotId = summoner.tagLine && !gameName.includes('#')
         ? `${gameName}#${summoner.tagLine}`
         : gameName;
+      const rank = await fetchRankByPuuid(client, summoner.puuid, summoner.summonerId);
       return {
         puuid: summoner.puuid,
         riotId: fullRiotId,
         level: summoner.summonerLevel ?? 0,
         profileIconId: summoner.profileIconId ?? 0,
+        rank,
       };
     }
   } catch (err) {
@@ -80,11 +296,18 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{ puuid: string; 
   return null;
 }
 
-async function fetchCurrentSummonerProfile(): Promise<{ riotId: string; level: number; profileIconId: number }> {
+async function fetchCurrentSummonerProfile(): Promise<{
+  riotId: string;
+  level: number;
+  profileIconId: number;
+  rank: PlayerRankSummary | null;
+}> {
   const creds = getCachedCredentials();
-  if (!creds) return { riotId: '', level: 0, profileIconId: 0 };
+  if (!creds) return { riotId: '', level: 0, profileIconId: 0, rank: null };
   const client = new LcuClient(creds);
   const summoner = await client.get<{
+    puuid?: string;
+    summonerId?: number;
     gameName?: string;
     tagLine?: string;
     displayName?: string;
@@ -100,6 +323,7 @@ async function fetchCurrentSummonerProfile(): Promise<{ riotId: string; level: n
     riotId,
     level: summoner.summonerLevel ?? 0,
     profileIconId: summoner.profileIconId ?? 0,
+    rank: await fetchCurrentRank(client, summoner.puuid, summoner.summonerId),
   };
 }
 
@@ -140,12 +364,14 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   let displayName = '';
   let level = 0;
   let profileIconId = 0;
+  let rank: PlayerRankSummary | null = null;
   if (isSelfQuery) {
     try {
       const selfProfile = await fetchCurrentSummonerProfile();
       displayName = selfProfile.riotId;
       level = selfProfile.level;
       profileIconId = selfProfile.profileIconId;
+      rank = selfProfile.rank;
     } catch (err) {
       console.warn('[match] 当前账号资料获取失败:', err);
     }
@@ -159,6 +385,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     displayName = lookup.riotId;
     level = lookup.level;
     profileIconId = lookup.profileIconId;
+    rank = lookup.rank;
   }
 
   // 3. 请求战绩列表（用 targetPuuid，查自己或他人）
@@ -208,6 +435,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
       level,
       profileIconId,
       profileIconUrl: profileIconId ? buildProfileIcon(profileIconId) : '',
+      rank,
     },
     matches,
     summary,
@@ -217,7 +445,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
 
 function emptyResult(error: string): PlayerLookupResult {
   return {
-    profile: { riotId: '', puuid: '', level: 0, profileIconId: 0, profileIconUrl: '' },
+    profile: { riotId: '', puuid: '', level: 0, profileIconId: 0, profileIconUrl: '', rank: null },
     matches: [],
     summary: { wins: 0, losses: 0, averageKda: 0, averageDamage: 0, averageCs: 0 },
     totalMatches: 0,

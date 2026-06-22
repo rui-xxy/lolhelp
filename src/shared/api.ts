@@ -260,12 +260,24 @@ export interface PlayerMatchDetail {
 }
 
 // 召唤师资料（搜索结果顶部展示）
+export interface PlayerRankSummary {
+  queueType: string;
+  queueName: string;
+  tier: string;
+  division: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  displayText: string;
+}
+
 export interface PlayerProfile {
   riotId: string;
   puuid: string;
   level: number;
   profileIconId: number;
   profileIconUrl: string;
+  rank?: PlayerRankSummary | null;
 }
 
 // 战绩汇总统计

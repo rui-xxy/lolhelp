@@ -495,7 +495,7 @@
     background: var(--color-app-surface);
     border: 1px solid var(--color-app-border);
     border-radius: var(--radius-md);
-    padding: 14px;
+    padding: 12px 12px 12px 10px;
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease;
@@ -506,6 +506,33 @@
     box-shadow:
       rgba(255, 56, 92, 0.06) 0 0 0 1px inset,
       rgba(0, 0, 0, 0.04) 0 2px 8px;
+  }
+
+  .scout-rank-rail {
+    position: relative;
+    display: flex;
+    min-height: 84px;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding-left: 10px;
+    text-align: center;
+  }
+
+  .scout-rank-rail::before {
+    content: '';
+    position: absolute;
+    inset: 6px 0 6px 9px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(246, 247, 249, 0.45));
+    pointer-events: none;
+  }
+
+  .scout-rank-rail > * {
+    position: relative;
+    z-index: 1;
   }
 
   /* 英雄选择网格：自适应列 */

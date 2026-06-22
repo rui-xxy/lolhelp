@@ -1,6 +1,7 @@
 import { GameIcon } from '../match/GameIcon';
 import { ProfileIcon } from '../ProfileIcon';
-import type { ScoutHit } from '../../../shared/api';
+import { RankEmblem } from '../RankEmblem';
+import type { PlayerRankSummary, ScoutHit } from '../../../shared/api';
 
 // 达标者卡片：展示一个高手 + 他的达标场次。
 // 点击卡片 → 查他完整战绩（复用 onPlayerSearch）。
@@ -11,61 +12,94 @@ interface ScoutHitCardProps {
   onPlayerClick: (riotId: string) => void;
 }
 
+const RANK_TIER_NAMES: Record<string, string> = {
+  CHALLENGER: '王者',
+  GRANDMASTER: '宗师',
+  MASTER: '大师',
+  DIAMOND: '钻石',
+  EMERALD: '翡翠',
+  PLATINUM: '铂金',
+  GOLD: '黄金',
+  SILVER: '白银',
+  BRONZE: '黄铜',
+  IRON: '黑铁',
+};
+
+function getRankMain(rank: PlayerRankSummary): string {
+  const tierName = RANK_TIER_NAMES[rank.tier] ?? rank.tier;
+  const division = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(rank.tier) ? '' : rank.division;
+  return [tierName, division].filter(Boolean).join(' ');
+}
+
+function getRankSub(rank: PlayerRankSummary): string {
+  return [rank.queueName || '排位', rank.leaguePoints > 0 ? String(rank.leaguePoints) : ''].filter(Boolean).join(' ');
+}
+
 export function ScoutHitCard({ hit, index, onPlayerClick }: ScoutHitCardProps) {
-  const { profile, qualifyingMatches, totalChampionGames } = hit;
+  const { profile, qualifyingMatches } = hit;
   const riotId = profile.riotId || '未知玩家';
+  const rank = profile.rank;
 
   return (
     <div className="scout-hit-card group">
-      {/* 顶部：排名 + 头像 + 名字 + 统计 + 查战绩按钮 */}
-      <div className="flex items-center gap-3">
-        <span className="shrink-0 text-sm font-bold tabular-nums text-app-subtle">
+      <div className={`grid items-stretch gap-3 ${rank ? 'grid-cols-[34px_minmax(0,1fr)_92px]' : 'grid-cols-[34px_minmax(0,1fr)]'}`}>
+        <span className="pt-1 text-center text-sm font-bold tabular-nums text-app-subtle">
           #{index + 1}
         </span>
-        <ProfileIcon
-          iconId={profile.profileIconId}
-          src={profile.profileIconUrl}
-          alt={riotId}
-          size={36}
-          className="ring-2 ring-app-border"
-        />
         <div className="min-w-0 flex-1">
-          <button
-            onClick={() => riotId && onPlayerClick(riotId)}
-            disabled={!riotId}
-            className="block max-w-full truncate text-left text-sm font-semibold text-app-text transition-colors hover:text-app-primary disabled:hover:text-app-text"
-            title={`查看 ${riotId} 的完整战绩`}
-          >
-            {riotId}
-          </button>
-          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-app-muted">
-            <span>达标 <b className="tabular-nums text-app-text">{qualifyingMatches.length}</b> 场</span>
-            <span className="text-app-border">·</span>
-            <span>指定英雄共 <b className="tabular-nums text-app-text">{totalChampionGames}</b> 场</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 达标场次列表（紧凑横排） */}
-      {qualifyingMatches.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {qualifyingMatches.map((m) => (
-            <div
-              key={m.gameId}
-              className={`flex items-center gap-1.5 rounded-xs border px-2 py-1 text-[11px] tabular-nums ${
-                m.win
-                  ? 'border-app-win-border bg-app-win-bg text-app-text'
-                  : 'border-app-loss-border bg-app-loss-bg text-app-text'
-              }`}
-              title={`${m.championName} · ${m.queueName} · ${m.kills}/${m.deaths}/${m.assists}`}
-            >
-              <GameIcon src={m.championAvatar} alt={m.championName} size={16} rounded />
-              <span className="font-medium">{m.kills}/{m.deaths}/{m.assists}</span>
-              <span className="text-app-subtle">{m.kda.toFixed(1)}</span>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <ProfileIcon
+              iconId={profile.profileIconId}
+              src={profile.profileIconUrl}
+              alt={riotId}
+              size={40}
+              className="ring-2 ring-app-border"
+            />
+            <div className="min-w-0 flex-1">
+              <button
+                onClick={() => riotId && onPlayerClick(riotId)}
+                disabled={!riotId}
+                className="block max-w-full truncate text-left text-sm font-semibold leading-5 text-app-text transition-colors hover:text-app-primary disabled:hover:text-app-text"
+                title={`查看 ${riotId} 的完整战绩`}
+              >
+                {riotId}
+              </button>
             </div>
-          ))}
+          </div>
+
+          {qualifyingMatches.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {qualifyingMatches.map((m) => (
+                <div
+                  key={m.gameId}
+                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 py-1.5 text-[11px] tabular-nums ${
+                    m.win
+                      ? 'border-app-win-border bg-app-win-bg text-app-text'
+                      : 'border-app-loss-border bg-app-loss-bg text-app-text'
+                  }`}
+                  title={`${m.championName} · ${m.queueName} · ${m.kills}/${m.deaths}/${m.assists}`}
+                >
+                  <GameIcon src={m.championAvatar} alt={m.championName} size={18} rounded />
+                  <span className="font-semibold">{m.kills}/{m.deaths}/{m.assists}</span>
+                  <span className="text-app-subtle">{m.kda.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {rank && (
+          <div className="scout-rank-rail" title={rank.displayText}>
+            <RankEmblem rank={rank} size={48} variant="mini" />
+            <span className="mt-1 max-w-full truncate text-[11px] font-semibold leading-4 text-app-text">
+              {getRankMain(rank)}
+            </span>
+            <span className="max-w-full truncate text-[10px] leading-3 text-app-muted">
+              {getRankSub(rank)}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

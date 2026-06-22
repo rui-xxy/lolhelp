@@ -6,7 +6,7 @@ import {
   runScoutSession,
   type ScoutSessionState,
 } from '../../scout/scoutEngine';
-import { resolvePuuid, fetchMatchesByPuuid } from '../../match/matchService';
+import { fetchMatchesByPuuid, fetchPlayerRankByPuuid, resolvePuuid } from '../../match/matchService';
 import type { ScoutConfig, ScoutResult } from '../../../shared/api';
 
 // 注册 scout 域 IPC 处理器：高手扩散搜索。
@@ -42,6 +42,7 @@ export function registerScoutHandlers(): void {
           resolvePuuid: (seedId) => resolvePuuid(seedId, config.region),
           fetchMatches: (puuid, count, tag) =>
             fetchMatchesByPuuid(puuid, count, tag, config.region),
+          fetchRank: fetchPlayerRankByPuuid,
         },
         onProgress: (progress) => {
           // 推送给发起方 renderer。webContents 可能已销毁（窗口关闭），加保护。

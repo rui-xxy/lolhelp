@@ -13,6 +13,7 @@
 import type {
   PlayerMatchDetail,
   PlayerProfile,
+  PlayerRankSummary,
   ScoutConfig,
   ScoutHit,
   ScoutProgress,
@@ -27,6 +28,8 @@ export interface ScoutDeps {
   resolvePuuid: (seedId: string) => Promise<{ puuid: string; riotId: string } | null>;
   // 查某人战绩（已映射好的 PlayerMatchDetail[]），带模式 tag
   fetchMatches: (puuid: string, count: number, tag?: string) => Promise<PlayerMatchDetail[]>;
+  // 达标者段位补充信息；失败时返回 null，不影响雷达搜索。
+  fetchRank?: (puuid: string) => Promise<PlayerRankSummary | null>;
 }
 
 // 引擎运行参数
@@ -72,6 +75,22 @@ function buildHit(
     qualifyingMatches: qualifying,
     totalChampionGames: countChampionGames(allMatches, championIds),
   };
+}
+
+async function enrichHitRank(hit: ScoutHit, deps: ScoutDeps): Promise<ScoutHit> {
+  if (!deps.fetchRank) return hit;
+  try {
+    const rank = await deps.fetchRank(hit.profile.puuid);
+    return {
+      ...hit,
+      profile: {
+        ...hit.profile,
+        rank,
+      },
+    };
+  } catch {
+    return hit;
+  }
 }
 
 export interface ScoutSessionState {
@@ -176,7 +195,10 @@ export async function runScoutSession(
 
           const qualifying = filterQualifying(candMatches, config, now);
           if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(candPuuid)) {
-            const hit = buildHit(candPuuid, candMatches, qualifying, config.championIds);
+            const hit = await enrichHitRank(
+              buildHit(candPuuid, candMatches, qualifying, config.championIds),
+              deps,
+            );
             hits.push(hit);
             pushProgress('scanning', hit);
           }
@@ -230,7 +252,10 @@ export async function runScoutSession(
       stats.totalCandidates++;
       const qualifying = filterQualifying(seedMatches, config, now);
       if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(node.puuid)) {
-        const hit = buildHit(node.puuid, seedMatches, qualifying, config.championIds);
+        const hit = await enrichHitRank(
+          buildHit(node.puuid, seedMatches, qualifying, config.championIds),
+          deps,
+        );
         hits.push(hit);
         pushProgress('scanning', hit);
       }

@@ -56,12 +56,16 @@ function getDisplayedMatches(matches: PlayerMatchDetail[], page: number): Player
 
 function createEmptyResult(error: string): PlayerLookupResult {
   return {
-    profile: { riotId: '', puuid: '', level: 0, profileIconId: 0, profileIconUrl: '' },
+    profile: { riotId: '', puuid: '', level: 0, profileIconId: 0, profileIconUrl: '', rank: null },
     matches: [],
     summary: { wins: 0, losses: 0, averageKda: 0, averageDamage: 0, averageCs: 0 },
     totalMatches: 0,
     error,
   };
+}
+
+function getRankText(profile: PlayerLookupResult['profile'] | null | undefined): string {
+  return profile?.rank?.displayText || '未定级';
 }
 
 function makeTabId(): string {
@@ -427,12 +431,17 @@ export function MatchHistoryPage({
               {activeTab.loading ? (
                 <span className="text-app-subtle">加载中...</span>
               ) : activeTab.matches.length > 0 ? (
-                <>
-                  <span className="text-app-success">{activeTab.matches.filter((match) => match.win).length}</span>胜{' '}
-                  <span className="text-app-danger">{activeTab.matches.filter((match) => !match.win).length}</span>败 ·
-                  已加载 {activeTab.matches.length} 场
-                  {activeTab.pageLoading && <span className="ml-2 text-app-primary">加载更早战绩...</span>}
-                </>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 truncate">
+                    <span className="text-app-success">{activeTab.matches.filter((match) => match.win).length}</span>胜{' '}
+                    <span className="text-app-danger">{activeTab.matches.filter((match) => !match.win).length}</span>败 ·
+                    已加载 {activeTab.matches.length} 场
+                    {activeTab.pageLoading && <span className="ml-2 text-app-primary">加载更早战绩...</span>}
+                  </div>
+                  <span className="max-w-[120px] shrink-0 truncate text-right font-medium text-app-text">
+                    {getRankText(activeTab.result?.profile)}
+                  </span>
+                </div>
               ) : (
                 <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
               )}
