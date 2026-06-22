@@ -334,25 +334,19 @@
     color: #7e1835;
   }
 
-  .match-result-kda {
+  .match-result-time {
     position: relative;
     z-index: 10;
     flex-shrink: 0;
+    min-width: 44px;
     text-align: right;
   }
 
-  .match-result-kda-value {
-    font-size: 12px;
-    font-weight: 800;
+  .match-result-time-value {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
-  }
-
-  .match-result-card--win .match-result-kda-value {
-    color: #7a4300;
-  }
-
-  .match-result-card--loss .match-result-kda-value {
-    color: #6c1c39;
   }
 
   .match-detail-table {

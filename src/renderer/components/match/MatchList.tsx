@@ -21,6 +21,23 @@ interface MatchListProps {
   onMateClick: (riotId: string) => void; // 点击队友头像查他战绩
 }
 
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+function formatPlayedAt(gameCreation: number): string {
+  const elapsed = Math.max(0, Date.now() - gameCreation);
+  if (elapsed < HOUR_MS) {
+    return `${Math.max(1, Math.floor(elapsed / MINUTE_MS))}分钟`;
+  }
+  if (elapsed < DAY_MS) {
+    return `${Math.floor(elapsed / HOUR_MS)}小时`;
+  }
+
+  const date = new Date(gameCreation);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
 export function MatchList({
   matches,
   selectedGameId,
@@ -41,8 +58,7 @@ export function MatchList({
     <div className="flex h-full flex-col gap-1.5 overflow-hidden">
       {matches.map((m) => {
         const isSelected = m.gameId === selectedGameId;
-        const date = new Date(m.gameCreation);
-        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+        const playedAt = formatPlayedAt(m.gameCreation);
         const resultClass = m.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
 
@@ -80,7 +96,6 @@ export function MatchList({
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums">
                   <span className="text-app-muted">{m.kills}/{m.deaths}/{m.assists}</span>
-                  <span className="text-app-subtle">{dateStr}</span>
                 </div>
               </div>
 
@@ -111,9 +126,8 @@ export function MatchList({
               )}
             </div>
 
-            <div className="match-result-kda">
-              <div className="text-[9px] text-app-subtle">KDA</div>
-              <div className="match-result-kda-value">{m.kda.toFixed(1)}</div>
+            <div className="match-result-time">
+              <div className="match-result-time-value">{playedAt}</div>
             </div>
           </button>
         );
