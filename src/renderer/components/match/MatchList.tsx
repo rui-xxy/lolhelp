@@ -1,6 +1,8 @@
 import { GameIcon } from './GameIcon';
 import { ProfileIcon } from '../ProfileIcon';
 import type { PlayerMatchDetail } from '../../../shared/api';
+import { buildChampionSplashFromAvatar } from '../../../shared/gameAssets';
+import type { CSSProperties } from 'react';
 
 // 经常一起玩的队友信息（出现≥2次）
 export interface RecurringMate {
@@ -61,6 +63,11 @@ export function MatchList({
         const playedAt = formatPlayedAt(m.gameCreation);
         const resultClass = m.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
+        const fallbackSkinBackground = buildChampionSplashFromAvatar(m.championAvatar, m.championId, null, 1);
+        const skinBackground =
+          !m.championSplashUrl || /_0\.jpg$/i.test(m.championSplashUrl)
+            ? fallbackSkinBackground
+            : m.championSplashUrl;
 
         // 找这场里同队的、出现≥2次的队友（排除自己）
         const matesInThisGame = m.participants
@@ -73,7 +80,14 @@ export function MatchList({
           <button
             key={m.gameId}
             onClick={() => onSelect(m.gameId)}
-            className={`match-result-card ${resultClass} ${selectedClass}`}
+            className={`match-result-card ${resultClass} ${selectedClass} ${
+              skinBackground ? 'match-result-card--has-skin' : ''
+            }`}
+            style={
+              skinBackground
+                ? ({ '--match-skin-bg': `url("${skinBackground}")` } as CSSProperties)
+                : undefined
+            }
           >
         {/* 英雄头像 */}
             <GameIcon

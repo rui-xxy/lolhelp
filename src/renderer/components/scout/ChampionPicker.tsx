@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Star, Search, X } from 'lucide-react';
+import { Save, Star, Search, X } from 'lucide-react';
 import { GameIcon } from '../match/GameIcon';
-import type { ChampionSummary } from '../../../shared/api';
+import type { ChampionPreset, ChampionSummary } from '../../../shared/api';
 
 // 英雄选择网格（放在弹窗里）。
 //
@@ -36,22 +36,31 @@ interface ChampionPickerProps {
   champions: ChampionSummary[];
   selectedIds: number[];
   favoriteIds: number[];
+  championPresets?: ChampionPreset[];
   onChange: (ids: number[]) => void;
   onToggleFavorite?: (id: number) => void;
+  onSavePreset?: () => void;
+  onApplyPreset?: (ids: number[]) => void;
+  onDeletePreset?: (id: string) => void;
 }
 
 export function ChampionPicker({
   champions,
   selectedIds,
   favoriteIds,
+  championPresets = [],
   onChange,
   onToggleFavorite,
+  onSavePreset,
+  onApplyPreset,
+  onDeletePreset,
 }: ChampionPickerProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+  const championMap = useMemo(() => new Map(champions.map((c) => [c.id, c])), [champions]);
 
   // 显示名：datas.json 的 title 是真名（安妮），name 是称号（黑暗之女）
   const displayName = (c: ChampionSummary) => c.title || c.name;
@@ -86,9 +95,10 @@ export function ChampionPicker({
 
   // 已选的英雄详情
   const selectedChampions = useMemo(() => {
-    const map = new Map(champions.map((c) => [c.id, c]));
-    return selectedIds.map((id) => map.get(id)).filter((c): c is ChampionSummary => Boolean(c));
-  }, [selectedIds, champions]);
+    return selectedIds
+      .map((id) => championMap.get(id))
+      .filter((c): c is ChampionSummary => Boolean(c));
+  }, [selectedIds, championMap]);
 
   const toggle = (id: number) => {
     if (selectedSet.has(id)) {
@@ -119,12 +129,81 @@ export function ChampionPicker({
               </button>
             </span>
           ))}
-          <button
-            onClick={() => onChange([])}
-            className="ml-auto text-[11px] text-app-subtle transition-colors hover:text-app-primary"
-          >
-            清空
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {onSavePreset && (
+              <button
+                onClick={onSavePreset}
+                className="flex items-center gap-1 rounded-xs border border-app-border bg-app-surface px-2 py-1 text-[11px] font-medium text-app-text transition-colors hover:border-app-primary hover:text-app-primary"
+              >
+                <Save className="size-3" />
+                保存当前
+              </button>
+            )}
+            <button
+              onClick={() => onChange([])}
+              className="text-[11px] text-app-subtle transition-colors hover:text-app-primary"
+            >
+              清空
+            </button>
+          </div>
+        </div>
+      )}
+
+      {championPresets.length > 0 && (
+        <div className="rounded-xs border border-app-border bg-app-surface-soft px-2 py-2">
+          <div className="mb-1.5 flex items-center justify-between text-[11px] text-app-subtle">
+            <span>已保存方案</span>
+            <span>点击直接套用</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {championPresets.map((preset) => {
+              const previewChampions = preset.championIds
+                .map((id) => championMap.get(id))
+                .filter((c): c is ChampionSummary => Boolean(c))
+                .slice(0, 5);
+              return (
+                <div
+                  key={preset.id}
+                  className="group flex max-w-full items-center overflow-hidden rounded-xs border border-app-border bg-app-surface transition-colors hover:border-app-primary/70"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onApplyPreset?.(preset.championIds)}
+                    className="flex min-w-0 items-center gap-1.5 px-2 py-1 text-left"
+                    title={preset.name}
+                  >
+                    <span className="flex shrink-0 -space-x-1">
+                      {previewChampions.map((c) => (
+                        <GameIcon
+                          key={c.id}
+                          src={c.avatar}
+                          alt={displayName(c)}
+                          size={16}
+                          rounded
+                        />
+                      ))}
+                    </span>
+                    <span className="max-w-36 truncate text-[11px] font-medium text-app-text">
+                      {preset.name}
+                    </span>
+                    <span className="text-[10px] tabular-nums text-app-subtle">
+                      {preset.championIds.length}
+                    </span>
+                  </button>
+                  {onDeletePreset && (
+                    <button
+                      type="button"
+                      onClick={() => onDeletePreset(preset.id)}
+                      className="flex size-6 shrink-0 items-center justify-center text-app-subtle opacity-0 transition-opacity hover:text-app-danger group-hover:opacity-100"
+                      title="删除方案"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

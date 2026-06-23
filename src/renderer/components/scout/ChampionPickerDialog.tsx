@@ -1,6 +1,6 @@
 import { Dialog } from 'radix-ui';
 import { ChampionPicker } from './ChampionPicker';
-import type { ChampionSummary } from '../../../shared/api';
+import type { ChampionPreset, ChampionSummary } from '../../../shared/api';
 
 // 英雄选择弹窗：点「选择英雄」按钮触发，弹出大窗选英雄。
 // 用 radix-ui 的 Dialog 原语（项目已有 radix-ui 依赖）。
@@ -13,8 +13,12 @@ interface ChampionPickerDialogProps {
   champions: ChampionSummary[];
   selectedIds: number[];
   favoriteIds: number[];
+  championPresets?: ChampionPreset[];
   onChange: (ids: number[]) => void;
   onToggleFavorite?: (id: number) => void;
+  onSavePreset?: () => void;
+  onApplyPreset?: (ids: number[]) => void;
+  onDeletePreset?: (id: string) => void;
 }
 
 export function ChampionPickerDialog({
@@ -23,8 +27,12 @@ export function ChampionPickerDialog({
   champions,
   selectedIds,
   favoriteIds,
+  championPresets,
   onChange,
   onToggleFavorite,
+  onSavePreset,
+  onApplyPreset,
+  onDeletePreset,
 }: ChampionPickerDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -63,15 +71,19 @@ export function ChampionPickerDialog({
                 champions={champions}
                 selectedIds={selectedIds}
                 favoriteIds={favoriteIds}
+                championPresets={championPresets}
                 onChange={onChange}
                 onToggleFavorite={onToggleFavorite}
+                onSavePreset={onSavePreset}
+                onApplyPreset={onApplyPreset}
+                onDeletePreset={onDeletePreset}
               />
             )}
           </div>
 
           {/* 底部：确定按钮 */}
           <div className="flex items-center justify-between border-t border-app-border bg-app-surface-soft px-5 py-3">
-            <span className="text-[11px] text-app-subtle">点星标可收藏英雄，点格子选/取消</span>
+            <span className="text-[11px] text-app-subtle">点方案可一键套用，点格子选/取消</span>
             <Dialog.Close className="rounded-sm bg-app-primary px-5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover">
               确定（{selectedIds.length}）
             </Dialog.Close>

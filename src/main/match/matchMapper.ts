@@ -5,6 +5,7 @@ import {
   getRuneById,
 } from '../lcu/heroData';
 import { buildProfileIcon } from '../lcu/gameData';
+import { buildChampionSplashByAlias } from '../../shared/gameAssets';
 import { getQueueName } from './queueNames';
 import type {
   PlayerItemSummary,
@@ -35,9 +36,18 @@ interface SgpParticipant {
   profileIcon: number;
   championId: number;
   championName: string;
+  championSkinId?: number;
+  skinId?: number;
+  skinVariant?: number | string;
   champLevel: number;
   teamId: number;
   teamPosition: string;
+  premadeId?: string | number;
+  premadeTeamId?: string | number;
+  premadeGroupId?: string | number;
+  partyId?: string | number;
+  playerSubteamId?: string | number;
+  groupId?: string | number;
   role: string;
   lane: string;
   kills: number;
@@ -113,6 +123,19 @@ function calcCs(p: SgpParticipant): number {
   return (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0);
 }
 
+function normalizePremadeId(p: SgpParticipant): string | undefined {
+  const raw =
+    p.premadeId ??
+    p.premadeTeamId ??
+    p.premadeGroupId ??
+    p.partyId ??
+    p.playerSubteamId ??
+    p.groupId;
+  const value = String(raw ?? '').trim();
+  if (!value || value === '0' || value === 'NaN' || value === '-1') return undefined;
+  return value;
+}
+
 // 收集装备（item0~item6）
 function collectItems(p: SgpParticipant): PlayerItemSummary[] {
   const slots = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6];
@@ -181,6 +204,12 @@ function collectRunes(p: SgpParticipant): {
 // 映射单个 participant
 function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
   const hero = getHeroByKey(p.championId);
+  const championSplashUrl = buildChampionSplashByAlias(
+    hero?.alias ?? '',
+    p.championId,
+    p.skinVariant ?? p.championSkinId ?? p.skinId,
+    1,
+  );
   const items = collectItems(p);
   const spells = collectSpells(p);
   const { primary, secondary } = collectRunes(p);
@@ -198,9 +227,11 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
     profileIconUrl: p.profileIcon ? buildProfileIcon(p.profileIcon) : '',
     teamId: p.teamId,
     teamPosition: p.teamPosition || p.role || p.lane || '',
+    premadeId: normalizePremadeId(p),
     championId: p.championId,
     championName: p.championName || hero?.name || `英雄${p.championId}`,
     championAvatar: hero?.avatar ?? '',
+    championSplashUrl,
     champLevel: p.champLevel ?? 1,
     kills: p.kills,
     deaths: p.deaths,
@@ -227,6 +258,14 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
   const json = game.json;
   const targetP = json.participants.find((p) => p.puuid === targetPuuid);
   const hero = targetP ? getHeroByKey(targetP.championId) : null;
+  const championSplashUrl = targetP
+    ? buildChampionSplashByAlias(
+        hero?.alias ?? '',
+        targetP.championId,
+        targetP.skinVariant ?? targetP.championSkinId ?? targetP.skinId,
+        1,
+      )
+    : '';
 
   const participants = json.participants.map((p) => mapParticipant(p));
 
@@ -244,6 +283,7 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
     championId: target?.championId ?? 0,
     championName: target?.championName || hero?.name || '',
     championAvatar: hero?.avatar ?? '',
+    championSplashUrl,
     champLevel: target?.champLevel ?? 1,
     kills: target?.kills ?? 0,
     deaths: target?.deaths ?? 0,

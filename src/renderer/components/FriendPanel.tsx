@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
+import type { CSSProperties } from 'react';
 
 // 好友列表面板（内联侧栏，不是弹窗）。
 // 分组显示好友、在线状态、备注，点击好友查战绩。
@@ -21,6 +22,46 @@ const AVAILABILITY_COLOR: Record<string, string> = {
   offline: 'bg-gray-400',
 };
 
+const FRIEND_REFRESH_INTERVAL_MS = 3000;
+
+type FriendStatusKind =
+  | 'ranked-solo'
+  | 'ranked-flex'
+  | 'normal-game'
+  | 'aram'
+  | 'queue'
+  | 'champ-select'
+  | 'lobby'
+  | 'online'
+  | 'offline';
+
+const FRIEND_STATUS_CLASS: Record<FriendStatusKind, string> = {
+  'ranked-solo': 'friend-status--ranked-solo',
+  'ranked-flex': 'friend-status--ranked-flex',
+  'normal-game': 'friend-status--normal-game',
+  aram: 'friend-status--aram',
+  queue: 'friend-status--queue',
+  'champ-select': 'friend-status--champ-select',
+  lobby: 'friend-status--lobby',
+  online: 'friend-status--online',
+  offline: 'friend-status--offline',
+};
+
+function getFriendStatusKind(friend: FriendInfo): FriendStatusKind {
+  if (friend.availability === 'offline') return 'offline';
+  const lol = friend.lol;
+  if (!lol) return 'online';
+  if (lol.gameStatus === 'inGame') {
+    if (lol.gameQueueType === 'RANKED_SOLO_5x5') return 'ranked-solo';
+    if (lol.gameQueueType === 'RANKED_FLEX_SR') return 'ranked-flex';
+    if (lol.gameMode === 'ARAM') return 'aram';
+    return 'normal-game';
+  }
+  if (lol.gameStatus === 'inQueue') return 'queue';
+  if (lol.gameStatus === 'championSelect') return 'champ-select';
+  return 'lobby';
+}
+
 function getGameStatus(friend: FriendInfo): string {
   if (friend.availability === 'offline') return '';
   const lol = friend.lol;
@@ -35,26 +76,60 @@ function getGameStatus(friend: FriendInfo): string {
   return '大厅';
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function formatGameDuration(startedAt: string | number | undefined, now: number): string {
+  let startedAtMs = Number(startedAt ?? 0);
+  if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return '';
+  if (startedAtMs < 1_000_000_000_000) startedAtMs *= 1000;
+
+  const elapsed = Math.max(0, now - startedAtMs);
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+
+  if (hours > 0) return `${hours}:${pad2(minutes)}:${pad2(seconds)}`;
+  return `${minutes}:${pad2(seconds)}`;
+}
+
 export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const refreshingRef = useRef(false);
 
-  const loadFriends = useCallback(async () => {
-    setLoading(true);
+  const loadFriends = useCallback(async (showLoading = true) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    if (showLoading) setLoading(true);
     try {
       const list = await window.lolHelper.lcu.getFriends();
       setFriends(list);
     } catch {
       setFriends([]);
     } finally {
-      setLoading(false);
+      refreshingRef.current = false;
+      if (showLoading) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadFriends();
+    void loadFriends(true);
+    const timer = window.setInterval(() => {
+      void loadFriends(false);
+    }, FRIEND_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
   }, [loadFriends]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime((time) => time + 1000), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // 按分组归类
   const groups = new Map<string, FriendInfo[]>();
@@ -98,7 +173,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
           好友 {onlineCount}/{friends.length}
         </span>
         <button
-          onClick={loadFriends}
+          onClick={() => loadFriends(true)}
           disabled={loading}
           className="rounded-xs p-1 text-app-subtle transition-colors [-webkit-app-region:no-drag] hover:bg-app-surface-soft hover:text-app-text"
           title="刷新"
@@ -134,15 +209,30 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                   <div>
                     {list.map((friend) => {
                       const isOffline = friend.availability === 'offline';
+                      const statusKind = getFriendStatusKind(friend);
                       const statusText = getGameStatus(friend);
                       const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-gray-400';
+                      const championSplashUrl = friend.lol?.championSplashUrl ?? '';
+                      const gameDuration =
+                        friend.lol?.gameStatus === 'inGame'
+                          ? formatGameDuration(friend.lol.timeStamp, currentTime)
+                          : '';
                       return (
                         <button
                           key={friend.puuid}
                           onClick={() => handleFriendClick(friend)}
-                          className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-app-nav-hover ${
+                          className={`friend-row flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left ${
+                            championSplashUrl ? 'friend-row--has-skin' : ''
+                          } ${
+                            gameDuration ? 'pr-14' : ''
+                          } ${
                             isOffline ? 'opacity-50' : ''
                           }`}
+                          style={
+                            championSplashUrl
+                              ? ({ '--friend-skin-bg': `url("${championSplashUrl}")` } as CSSProperties)
+                              : undefined
+                          }
                         >
                           {/* 头像 + 状态圆点 */}
                           <div className="relative shrink-0">
@@ -161,11 +251,15 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                             <div className="truncate text-xs font-medium text-app-text">
                               {friend.note || friend.gameName}
                             </div>
-                            <span className="truncate text-[10px] text-app-subtle">
+                            <span className={`friend-status ${FRIEND_STATUS_CLASS[statusKind]}`}>
                               {statusText || '离线'}
-                              {friend.gameTag ? ` · #${friend.gameTag}` : ''}
                             </span>
                           </div>
+                          {gameDuration && (
+                            <span className="friend-row-timer tabular-nums">
+                              {gameDuration}
+                            </span>
+                          )}
                         </button>
                       );
                     })}

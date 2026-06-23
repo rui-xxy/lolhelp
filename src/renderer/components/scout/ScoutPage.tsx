@@ -5,6 +5,7 @@ import { GameIcon } from '../match/GameIcon';
 import { ScoutHitCard } from './ScoutHitCard';
 import type {
   AppSettings,
+  ChampionPreset,
   ChampionSummary,
   ScoutConfig,
   ScoutHit,
@@ -67,8 +68,9 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
 export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
   const [config, setConfig] = useState<ScoutConfig>(DEFAULT_CONFIG);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({ favoriteChampions: [] });
+  const [settings, setSettings] = useState<AppSettings>({ favoriteChampions: [], championPresets: [] });
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [championPresets, setChampionPresets] = useState<ChampionPreset[]>([]);
 
   const [running, setRunning] = useState(false);
   const [hits, setHits] = useState<ScoutHit[]>([]);
@@ -105,6 +107,7 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
         setChampions(champs);
         setSettings(s);
         setFavoriteIds(s.favoriteChampions ?? []);
+        setChampionPresets(s.championPresets ?? []);
         // 回填上次的雷达配置
         if (s.scoutDefaults) {
           setConfig((c) => ({ ...c, ...s.scoutDefaults }));
@@ -146,6 +149,65 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
   const updateConfig = (patch: Partial<ScoutConfig>) => {
     setConfig((c) => ({ ...c, ...patch }));
   };
+
+  const getChampionDisplayName = useCallback(
+    (id: number) => {
+      const champion = championMap.get(id);
+      return champion?.title || champion?.name || `英雄${id}`;
+    },
+    [championMap],
+  );
+
+  const makeChampionPresetName = useCallback(
+    (ids: number[]) => {
+      const names = ids.slice(0, 3).map(getChampionDisplayName);
+      if (names.length === 0) return '英雄方案';
+      return ids.length > 3 ? `${names.join('、')} 等${ids.length}` : names.join('、');
+    },
+    [getChampionDisplayName],
+  );
+
+  const sameChampionSet = useCallback((a: number[], b: number[]) => {
+    if (a.length !== b.length) return false;
+    const left = [...a].sort((x, y) => x - y);
+    const right = [...b].sort((x, y) => x - y);
+    return left.every((id, index) => id === right[index]);
+  }, []);
+
+  const saveChampionPreset = useCallback(() => {
+    const ids = [...config.championIds];
+    if (ids.length === 0) return;
+    const existing = championPresets.find((preset) => sameChampionSet(preset.championIds, ids));
+    const preset: ChampionPreset = {
+      id: existing?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: existing?.name ?? makeChampionPresetName(ids),
+      championIds: ids,
+      updatedAt: Date.now(),
+    };
+    const next = [preset, ...championPresets.filter((item) => item.id !== preset.id)].slice(0, 12);
+    setChampionPresets(next);
+    persistSettings({ ...settings, championPresets: next });
+  }, [
+    championPresets,
+    config.championIds,
+    makeChampionPresetName,
+    persistSettings,
+    sameChampionSet,
+    settings,
+  ]);
+
+  const applyChampionPreset = useCallback((ids: number[]) => {
+    setConfig((c) => ({ ...c, championIds: [...ids] }));
+  }, []);
+
+  const deleteChampionPreset = useCallback(
+    (id: string) => {
+      const next = championPresets.filter((preset) => preset.id !== id);
+      setChampionPresets(next);
+      persistSettings({ ...settings, championPresets: next });
+    },
+    [championPresets, persistSettings, settings],
+  );
 
   const canStart =
     !running &&
@@ -492,8 +554,12 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
         champions={champions}
         selectedIds={config.championIds}
         favoriteIds={favoriteIds}
+        championPresets={championPresets}
         onChange={(ids) => updateConfig({ championIds: ids })}
         onToggleFavorite={toggleFavorite}
+        onSavePreset={saveChampionPreset}
+        onApplyPreset={applyChampionPreset}
+        onDeletePreset={deleteChampionPreset}
       />
     </div>
   );

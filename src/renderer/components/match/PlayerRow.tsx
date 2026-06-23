@@ -1,5 +1,7 @@
 import { GameIcon } from './GameIcon';
 import type { MatchParticipantSummary } from '../../../shared/api';
+import { buildChampionSplashFromAvatar } from '../../../shared/gameAssets';
+import type { CSSProperties } from 'react';
 
 // 玩家行：双队详情里的一名玩家。
 // 布局：英雄头像 | 召唤师名+召唤师技能+主/副符文 | 装备栏 | KDA | 经济 | 伤害
@@ -7,17 +9,29 @@ import type { MatchParticipantSummary } from '../../../shared/api';
 interface PlayerRowProps {
   participant: MatchParticipantSummary;
   isTarget: boolean; // 是否为当前查询的玩家（高亮）
+  premadeTone?: 'amber' | 'cyan' | 'violet' | 'rose' | 'emerald';
   onPlayerSearch?: (riotId: string) => void;
 }
 
-export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRowProps) {
-  const kdaColor = p.kda >= 5 ? 'text-app-success' : p.kda >= 3 ? 'text-app-link' : 'text-app-text';
+export function PlayerRow({ participant: p, isTarget, premadeTone, onPlayerSearch }: PlayerRowProps) {
   const itemSlots = Array.from({ length: 7 }, (_, slot) => p.items.find((item) => item.slot === slot));
   const playerName = p.riotId || p.summonerName || '未知玩家';
+  const fallbackSkinBackground = buildChampionSplashFromAvatar(p.championAvatar, p.championId, null, 1);
+  const skinBackground =
+    !p.championSplashUrl || /_0\.jpg$/i.test(p.championSplashUrl)
+      ? fallbackSkinBackground
+      : p.championSplashUrl;
 
   return (
     <div
-      className={`player-detail-row ${isTarget ? 'player-detail-row--target' : ''}`}
+      className={`player-detail-row ${skinBackground ? 'player-detail-row--has-skin' : ''} ${
+        isTarget ? 'player-detail-row--target' : ''
+      }`}
+      style={
+        skinBackground
+          ? ({ '--player-skin-bg': `url("${skinBackground}")` } as CSSProperties)
+          : undefined
+      }
     >
       {/* 英雄头像 */}
       <GameIcon
@@ -67,8 +81,8 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
             title={playerName}
             onClick={() => onPlayerSearch?.(playerName)}
             className={`player-detail-name ${
-              isTarget ? 'font-semibold text-app-text' : 'text-app-text'
-            }`}
+              premadeTone ? `player-detail-name--premade player-detail-name--premade-${premadeTone}` : ''
+            } ${isTarget ? 'font-semibold' : ''}`}
           >
             {playerName}
           </button>
@@ -87,7 +101,7 @@ export function PlayerRow({ participant: p, isTarget, onPlayerSearch }: PlayerRo
       </div>
 
       {/* KDA */}
-      <div className={`text-center tabular-nums ${kdaColor}`}>
+      <div className="text-center tabular-nums text-app-text">
         <div className="font-semibold">{p.kills}/{p.deaths}/{p.assists}</div>
       </div>
 

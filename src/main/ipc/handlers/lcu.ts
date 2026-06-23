@@ -4,7 +4,147 @@ import { readLockfile, getCachedCredentials } from '../../lcu/lockfile';
 import { LcuClient } from '../../lcu/client';
 import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
 import type { LcuConnection, LcuRegion, FriendInfo } from '../../../shared/api';
-import { buildProfileIconCandidates } from '../../../shared/gameAssets';
+import { buildChampionSplashByAlias, buildProfileIconCandidates } from '../../../shared/gameAssets';
+import { getHeroByKey } from '../../lcu/heroData';
+
+const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
+const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
+const activeGameChampionCache = new Map<string, { championId: number; expiresAt: number }>();
+
+function readStringField(source: Record<string, unknown>, keys: string[]): string | number {
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value as string | number;
+    }
+  }
+  return '';
+}
+
+function readLolPayload(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') {
+    return { ...(value as Record<string, unknown>) };
+  }
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === 'object' ? { ...(parsed as Record<string, unknown>) } : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function readNumberField(source: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const value = source[key];
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return 0;
+}
+
+function getFriendChampionId(rawLol: Record<string, unknown>): number {
+  const explicit = readNumberField(rawLol, [
+    'championId',
+    'championID',
+    'champion_id',
+    'selectedChampionId',
+    'selectedChampionID',
+    'selectedChampion',
+    'champion',
+  ]);
+  if (explicit > 0) return explicit;
+
+  for (const [key, value] of Object.entries(rawLol)) {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z]/g, '');
+    if (!['championid', 'selectedchampionid'].includes(normalizedKey)) continue;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return 0;
+}
+
+function isFriendInGame(rawLol: Record<string, unknown>): boolean {
+  return String(rawLol.gameStatus ?? '') === 'inGame';
+}
+
+function buildActiveGamePaths(friend: {
+  summonerId: number;
+  puuid: string;
+  gameName: string;
+  gameTag: string;
+}): string[] {
+  const paths: string[] = [];
+  if (friend.summonerId > 0) {
+    paths.push(`/lol-spectator/v1/active-games/by-summoner/${friend.summonerId}`);
+  }
+  if (friend.puuid) {
+    paths.push(`/lol-spectator/v1/active-games/by-puuid/${encodeURIComponent(friend.puuid)}`);
+  }
+  if (friend.gameName) {
+    paths.push(
+      `/lol-spectator/v1/active-games/by-summoner-name/${encodeURIComponent(friend.gameName)}`,
+    );
+    if (friend.gameTag) {
+      paths.push(
+        `/lol-spectator/v1/active-games/by-summoner-name/${encodeURIComponent(
+          `${friend.gameName}#${friend.gameTag}`,
+        )}`,
+      );
+    }
+  }
+  return paths;
+}
+
+function pickActiveGameChampionId(
+  activeGame: Record<string, unknown>,
+  friend: { summonerId: number; puuid: string; gameName: string },
+): number {
+  const participants =
+    (activeGame.participants as Array<Record<string, unknown>> | undefined) ?? [];
+  const participant =
+    participants.find((p) => Number(p.summonerId ?? 0) === friend.summonerId) ??
+    participants.find((p) => String(p.puuid ?? '') === friend.puuid) ??
+    participants.find((p) => String(p.summonerName ?? '') === friend.gameName);
+  const championId = Number(participant?.championId ?? 0);
+  return Number.isFinite(championId) && championId > 0 ? championId : 0;
+}
+
+async function getActiveGameChampionId(
+  client: LcuClient,
+  friend: { summonerId: number; puuid: string; gameName: string; gameTag: string },
+): Promise<number> {
+  if (friend.summonerId <= 0 && !friend.puuid && !friend.gameName) return 0;
+
+  const now = Date.now();
+  const cacheKey = [friend.summonerId, friend.puuid, friend.gameName, friend.gameTag].join('|');
+  const cached = activeGameChampionCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.championId;
+
+  for (const path of buildActiveGamePaths(friend)) {
+    try {
+      const activeGame = await client.get<Record<string, unknown>>(path);
+      const championId = pickActiveGameChampionId(activeGame, friend);
+      if (championId > 0) {
+        activeGameChampionCache.set(cacheKey, {
+          championId,
+          expiresAt: now + ACTIVE_GAME_CHAMPION_CACHE_TTL_MS,
+        });
+        return championId;
+      }
+    } catch {
+      // Different regions/client builds expose different spectator helpers.
+    }
+  }
+
+  activeGameChampionCache.set(cacheKey, {
+    championId: 0,
+    expiresAt: now + ACTIVE_GAME_MISS_CACHE_TTL_MS,
+  });
+  return 0;
+}
 
 // 注册 lcu 域 IPC 处理器。
 // 当前实现 detect-client：lockfile 读取 + 真实 LCU 请求验证连通。
@@ -95,15 +235,47 @@ export function registerLcuHandlers(): void {
         '/lol-chat/v1/friends',
       );
       if (!Array.isArray(raw)) return [];
-      return raw.map((f) => {
+      return Promise.all(raw.map(async (f) => {
         const icon = Number(f.icon ?? 0);
         const iconUrls = buildProfileIconCandidates(icon);
+        const rawLol = readLolPayload(f.lol);
+        const summonerId = Number(f.summonerId ?? 0);
+        const puuid = String(f.puuid ?? '');
+        const gameName = String(f.gameName ?? '');
+        const gameTag = String(f.gameTag ?? '');
+        let championId = getFriendChampionId(rawLol);
+        if ((!Number.isFinite(championId) || championId <= 0) && isFriendInGame(rawLol)) {
+          championId = await getActiveGameChampionId(client, {
+            summonerId,
+            puuid,
+            gameName,
+            gameTag,
+          });
+        }
+        const championSkinId = readStringField(rawLol, [
+          'skinVariant',
+          'skinId',
+          'championSkinId',
+          'selectedSkinId',
+          'selectedSkin',
+          'skinIndex',
+        ]);
+        const hero = championId > 0 ? getHeroByKey(championId) : null;
+        const lol = Object.keys(rawLol).length > 0 ? (rawLol as FriendInfo['lol']) : undefined;
+        if (lol && hero?.alias) {
+          lol.championId = championId;
+          lol.championSplashUrl = buildChampionSplashByAlias(
+            hero.alias,
+            championId,
+            championSkinId as string | number,
+          );
+        }
 
         return {
-          puuid: String(f.puuid ?? ''),
-          gameName: String(f.gameName ?? ''),
-          gameTag: String(f.gameTag ?? ''),
-          summonerId: Number(f.summonerId ?? 0),
+          puuid,
+          gameName,
+          gameTag,
+          summonerId,
           icon,
           iconUrl: iconUrls[0] ?? '',
           iconUrls,
@@ -113,9 +285,9 @@ export function registerLcuHandlers(): void {
           statusMessage: String(f.statusMessage ?? ''),
           lastSeenOnlineTimestamp: (f.lastSeenOnlineTimestamp as number) ?? null,
           product: String(f.product ?? ''),
-          lol: f.lol as FriendInfo['lol'],
+          lol,
         };
-      });
+      }));
     } catch {
       return [];
     }

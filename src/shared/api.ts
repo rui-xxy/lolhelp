@@ -54,6 +54,8 @@ export interface FriendInfo {
     gameMode?: string; // CLASSIC / ARAM / TUTORIAL
     gameQueueType?: string; // RANKED_SOLO_5x5 等
     championId?: number; // 当前英雄
+    championSplashUrl?: string; // 当前英雄/皮肤背景
+    timeStamp?: string | number; // 游戏开始时间戳（LCU 好友状态）
     gameId?: number; // 当前对局 ID
     rankedLeagueTier?: string; // 段位
     level?: number; // 等级
@@ -78,8 +80,17 @@ export interface LcuApi {
 export interface AppSettings {
   // 收藏的英雄 ID（高手雷达查指定英雄时的默认来源）
   favoriteChampions: number[];
+  // 英雄选择方案：保存一整组指定英雄，便于下次一键套用
+  championPresets?: ChampionPreset[];
   // 雷达默认参数（用户上次用过的配置，下次打开时回填）
   scoutDefaults?: Partial<ScoutConfig>;
+}
+
+export interface ChampionPreset {
+  id: string;
+  name: string;
+  championIds: number[];
+  updatedAt: number;
 }
 
 // 本地设置读写契约
@@ -203,9 +214,11 @@ export interface MatchParticipantSummary {
   profileIconUrl: string;
   teamId: number;
   teamPosition: string;
+  premadeId?: string;
   championId: number;
   championName: string;
   championAvatar: string; // 英雄头像 URL（ddragon，由 main 的 heroData 算好）
+  championSplashUrl?: string;
   champLevel: number;
   kills: number;
   deaths: number;
@@ -238,6 +251,7 @@ export interface PlayerMatchDetail {
   championId: number;
   championName: string;
   championAvatar: string; // 英雄头像 URL（ddragon，由 main 的 heroData 算好）
+  championSplashUrl?: string;
   champLevel: number;
   kills: number;
   deaths: number;

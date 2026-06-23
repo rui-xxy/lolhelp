@@ -12,6 +12,7 @@ const SETTINGS_FILE = 'lolhelper-settings.json';
 
 const DEFAULT_SETTINGS: AppSettings = {
   favoriteChampions: [],
+  championPresets: [],
 };
 
 function resolveSettingsPath(): string {
@@ -28,6 +29,19 @@ export function getSettings(): AppSettings {
     return {
       favoriteChampions: Array.isArray(parsed.favoriteChampions)
         ? parsed.favoriteChampions.filter((x) => typeof x === 'number')
+        : [],
+      championPresets: Array.isArray(parsed.championPresets)
+        ? parsed.championPresets
+            .filter((preset) => preset && typeof preset === 'object')
+            .map((preset) => ({
+              id: typeof preset.id === 'string' ? preset.id : String(Date.now()),
+              name: typeof preset.name === 'string' ? preset.name : '英雄方案',
+              championIds: Array.isArray(preset.championIds)
+                ? preset.championIds.filter((x) => typeof x === 'number')
+                : [],
+              updatedAt: typeof preset.updatedAt === 'number' ? preset.updatedAt : 0,
+            }))
+            .filter((preset) => preset.championIds.length > 0)
         : [],
       scoutDefaults: parsed.scoutDefaults ?? undefined,
     };
