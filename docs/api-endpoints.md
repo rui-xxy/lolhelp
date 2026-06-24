@@ -638,7 +638,123 @@ previousSeasonAchievedTier, previousSeasonAchievedRank, ratedRating...
 
 ---
 
-## 六、附录：项目代码位置索引
+## 六、客户端本地文件数据源（API 之外的金矿）
+
+> LCU/SGP 端点之外，客户端本地文件里藏着大量设置和数据。国服很多 LCU 端点（收藏/库存）被禁（403），但**这些数据在本地文件里都有**。安装目录默认 `D:/WeGameApps/英雄联盟`（需自动探测）。
+
+### 6.1 游戏内设置 — `Game/Config/game.cfg`（INI 格式，4KB）
+
+**综合页"系统/界面"分组的真实数据源**（之前 LCU `game-settings` 端点找不到的字段全在这里）：
+
+`[General]` 段字段（实测）：
+| 字段 | 含义 |
+|---|---|
+| `AutoSendCrashReport` | 自动发送崩溃报告（1/0） |
+| `LowSpecMachineAdaptation` | 低配机器适应模式 |
+| `CloseClientDuringGame` | 游戏期间关闭客户端 |
+| `DisableInteractiveBackground` | 禁用互动背景效果 |
+| `DisableChampionSkillText` | 禁用英雄技能说明文本 |
+| `LearnSpellOnCast` | 施法时学习技能 |
+| `ThemeMusic` | 主题音乐 |
+| `TargetChampionsOnlyAsToggle` | 仅以英雄为目标（切换） |
+| `SnapCameraOnRespawn` | 重生时镜头对齐 |
+| `ShowTurretRangeIndicators` | 显示防御塔范围 |
+| `ShowCursorLocator` | 显示光标定位 |
+| `RelativeTeamColors` | 相对队伍颜色 |
+| `RecommendJunglePaths` | 推荐打野路线 |
+| `PredictMovement` | 预测移动 |
+| `CfgVersion` | 配置版本号（如 16.12.788.4269） |
+| `WindowMode` / `Width` / `Height` | 窗口模式/宽/高（0窗口/1全屏/2无边框） |
+| ... 还有 General/HUD/Volume/FloatingText 等分类共 94 字段 |
+
+> **结论**：综合页的所有设置项都应直接读写 `game.cfg`，而非走 LCU（LCU 的 `game-settings` 端点只是部分镜像，缺低配/崩溃报告等字段）。
+
+### 6.2 热键 — `Game/Config/input.ini`（INI 格式，6KB）
+
+`[GameEvents]`（166 个热键）+ `[HUDEvents]` + `[Quickbinds]`（快捷施法）+ `[ShopEvents]`。每个键位如 `evtSpell1=[q]`。
+
+### 6.3 出装方案 — `Game/Config/ItemSets.json`（JSON，~1KB+）
+
+用户自定义的装备推荐方案，含 `accountId` + `itemSets[]`（每套含 associatedChampions/maps/blocks/items）。**写入这里能让游戏内显示自定义出装推荐**。
+
+### 6.4 持久化设置 — `Game/Config/PersistedSettings.json`（JSON，60KB）
+
+游戏所有设置的完整持久化版本（含历史值），比 game.cfg 更全。作"字段字典参考"用，**不作写入目标**（以 game.cfg 为准）。
+
+### 6.5 五杀统计 — `Game/Config/pallas_UltKill.ini`（INI）
+
+记录每个英雄（uid）的五杀次数统计（如 `uid1073742157=1621`）。**有意思的小众数据**。
+
+### 6.6 语音/音效开关 — `Game/Config/pallas_lol_voice.ini`
+
+`[VoiceSwitch] Panel=0 Mic=0`（语音面板/麦克风开关）。
+
+### 6.7 云顶阵容偏好 — `Game/Config/TFTTeamPlansPreferences.yaml`（YAML，31KB）
+
+云顶之弈的阵容规划偏好（注册阵容索引、提醒开关等）。跨账号同步用。
+
+---
+
+### 6.8 ★ 客户端偏好设置 — `LeagueClient/Config/*.yaml`（5 个文件，API 外的重要补充）
+
+| 文件 | 大小 | 内容 | 价值 |
+|---|---|---|---|
+| `LeagueClientSettings.yaml` | 1KB | 安装/区域/locale/crash_reporting/game-settings 状态 | ⚠️ 低 |
+| `LCUAccountPreferences.yaml` | 25KB | **每个英雄的默认皮肤映射**（champ-select.skins，如 `1:1040`=英雄1默认皮肤1040）、符文页偏好 | ⭐⭐⭐ **"上次用的皮肤"记忆** |
+| `LCULocalPreferences.yaml` | 2KB | 音频开关(masterSoundEnabled)、预组语音(inputVolume/vadSensitivity)、录像提示、动画开关、皮肤查看器 | ⭐⭐ 客户端级设置 |
+| `PerksPreferences.yaml` | 9KB | 符文页完整定义（pages[]，每页含主副系/具体符文/属性碎片） | ⭐⭐ 符文页读写 |
+| `TFTPreferences.yaml` | 1KB | 云顶收藏/外观偏好（companion/皮肤收藏） | ⚠️ |
+
+**LCUAccountPreferences.yaml 的 champ-select.skins**：
+```yaml
+champ-select:
+    data:
+        skins:
+            1: 1040      # 英雄1(Annie)默认用皮肤1040
+            10: 10067    # 英雄10默认用皮肤10067
+            101: 101031
+            ...
+```
+> 这是**每个英雄上次选用的皮肤 ID**（171 个英雄全有）。结合皮肤元数据（`/lol-game-data/assets/v1/skins.json`）能显示"该玩家每个英雄爱用什么皮肤"。
+
+---
+
+## 七、客户端可读写的本地文件清单汇总
+
+| 文件 | 格式 | 可读 | 可写 | 用途 |
+|---|---|---|---|---|
+| `Game/Config/game.cfg` | INI | ✅ | ✅ | 游戏设置（94字段） |
+| `Game/Config/input.ini` | INI | ✅ | ✅ | 热键（166项） |
+| `Game/Config/ItemSets.json` | JSON | ✅ | ✅ | 出装方案 |
+| `Game/Config/PersistedSettings.json` | JSON | ✅ | ⚠️ 只参考 | 设置完整版（字典） |
+| `Game/Config/pallas_UltKill.ini` | INI | ✅ | ❌ | 五杀统计（只读展示） |
+| `LeagueClient/Config/LCUAccountPreferences.yaml` | YAML | ✅ | ⚠️ 谨慎 | 英雄默认皮肤/符文偏好 |
+| `LeagueClient/Config/LCULocalPreferences.yaml` | YAML | ✅ | ⚠️ 谨慎 | 客户端音频/语音/动画设置 |
+| `LeagueClient/Config/PerksPreferences.yaml` | YAML | ✅ | ⚠️ 谨慎 | 符文页 |
+
+> **写入约束**（V3 设计文档）：游戏对局中禁止写 input.ini/game.cfg；写入前自动备份；原子写（tmp+rename）；YAML 用白名单（禁止整文件复制）。客户端运行时写 game.cfg 可能不实时生效（需重启）。
+
+---
+
+## 八、API 与本地文件的对应关系（重要）
+
+| 想要的数据 | API 端点（国服） | 本地文件 |
+|---|---|---|
+| 拥有英雄数 | ✅ SGP challenges(505001) | ❌ 无 |
+| 拥有皮肤数 | ✅ SGP challenges(510001) | ❌ 无 |
+| 综合页设置（低配/崩溃/背景） | ❌ LCU 无此端点 | ✅ `game.cfg [General]` |
+| 热键 | ✅ LCU game-settings(input) | ✅ `input.ini` |
+| 出装方案 | ⚠️ LCU item-sets | ✅ `ItemSets.json` |
+| 每英雄上次用的皮肤 | ❌ 无端点 | ✅ `LCUAccountPreferences.yaml` |
+| 符文页 | ✅ LCU perks/pages | ✅ `PerksPreferences.yaml` |
+| 战绩 | ✅ SGP | ❌ 无（不落本地） |
+| 段位 | ✅ LCU/SGP | ❌ 无 |
+
+> **关键洞察**：国服 API（SGP challenges + 战绩）和本地文件是**互补**的。API 擅长查别人的动态数据（战绩/段位/资产数），本地文件擅长自己账号的配置（设置/皮肤记忆/出装/符文）。换号设置同步功能必须靠本地文件读写。
+
+---
+
+## 九、附录：项目代码位置索引
 
 | 模块 | 文件 |
 |---|---|
