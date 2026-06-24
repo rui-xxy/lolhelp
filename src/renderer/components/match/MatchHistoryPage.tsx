@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
+import { ProfileIcon } from '../ProfileIcon';
+import { RankEmblem } from '../RankEmblem';
 
 const PAGE_SIZE = 12;
 const SGP_BATCH = 100;
@@ -56,7 +58,17 @@ function getDisplayedMatches(matches: PlayerMatchDetail[], page: number): Player
 
 function createEmptyResult(error: string): PlayerLookupResult {
   return {
-    profile: { riotId: '', puuid: '', level: 0, profileIconId: 0, profileIconUrl: '', rank: null },
+    profile: {
+      riotId: '',
+      puuid: '',
+      level: 0,
+      profileIconId: 0,
+      profileIconUrl: '',
+      rank: null,
+      ranks: [],
+      championCount: null,
+      skinCount: null,
+    },
     matches: [],
     summary: { wins: 0, losses: 0, averageKda: 0, averageDamage: 0, averageCs: 0 },
     totalMatches: 0,
@@ -82,6 +94,177 @@ function makeTabTitle(query: string, result: PlayerLookupResult): string {
   return result.error ? '查询失败' : '账号名读取失败';
 }
 
+interface CommonChampion {
+  championId: number;
+  championName: string;
+  championAvatar: string;
+  games: number;
+  wins: number;
+  kdaTotal: number;
+}
+
+function getDisplayName(riotId: string | undefined): string {
+  const normalized = (riotId ?? '').trim();
+  const [gameName] = normalized.split('#');
+  return gameName || normalized || '未知玩家';
+}
+
+function getProfileRanks(profile: PlayerLookupResult['profile'] | null | undefined) {
+  const ranks = profile?.ranks?.length ? profile.ranks : profile?.rank ? [profile.rank] : [];
+  return ranks;
+}
+
+function getQueueRank(profile: PlayerLookupResult['profile'] | null | undefined, queueType: string) {
+  return getProfileRanks(profile).find((rank) => rank.queueType === queueType) ?? null;
+}
+
+function formatOptionalNumber(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '--';
+}
+
+function getRankWinRate(rank: NonNullable<PlayerLookupResult['profile']['rank']>): string {
+  const total = rank.wins + rank.losses;
+  if (total <= 0) return '--';
+  return `${Math.round((rank.wins / total) * 100)}%`;
+}
+
+function getCommonChampions(matches: PlayerMatchDetail[]): CommonChampion[] {
+  const stats = new Map<number, CommonChampion>();
+  for (const match of matches) {
+    const current = stats.get(match.championId) ?? {
+      championId: match.championId,
+      championName: match.championName,
+      championAvatar: match.championAvatar,
+      games: 0,
+      wins: 0,
+      kdaTotal: 0,
+    };
+    current.games += 1;
+    current.wins += match.win ? 1 : 0;
+    current.kdaTotal += match.kda;
+    stats.set(match.championId, current);
+  }
+
+  return Array.from(stats.values())
+    .sort((a, b) => b.games - a.games || b.wins - a.wins || b.kdaTotal - a.kdaTotal)
+    .slice(0, 6);
+}
+
+function RankSummaryCard({
+  label,
+  rank,
+}: {
+  label: string;
+  rank: NonNullable<PlayerLookupResult['profile']['rank']> | null;
+}) {
+  return (
+    <div className="flex min-h-[92px] items-center gap-3 rounded-sm border border-app-border bg-app-surface px-4 py-3">
+      {rank ? (
+        <RankEmblem rank={rank} size={48} variant="mini" />
+      ) : (
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-app-surface-soft text-[10px] text-app-subtle">
+          未定
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-app-text">{label}</div>
+        <div className="mt-1 truncate text-sm font-semibold text-app-text">{rank?.displayText || '未定级'}</div>
+        <div className="mt-1 text-[11px] text-app-muted">
+          {rank ? `${rank.leaguePoints} LP · ${rank.wins}胜 ${rank.losses}负 · 胜率 ${getRankWinRate(rank)}` : '暂无排位数据'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlayerProfilePanel({
+  result,
+  matches,
+}: {
+  result: PlayerLookupResult;
+  matches: PlayerMatchDetail[];
+}) {
+  const profile = result.profile;
+  const displayName = getDisplayName(profile.riotId);
+  const soloRank = getQueueRank(profile, 'RANKED_SOLO_5x5');
+  const flexRank = getQueueRank(profile, 'RANKED_FLEX_SR');
+  const commonChampions = getCommonChampions(matches);
+
+  return (
+    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4">
+      <div className="rounded-sm border border-app-border bg-app-surface p-5 shadow-airbnb">
+        <div className="flex items-center gap-4">
+          <ProfileIcon
+            iconId={profile.profileIconId}
+            src={profile.profileIconUrl}
+            alt={displayName}
+            title={profile.riotId}
+            size={64}
+            className="ring-2 ring-app-border"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xl font-semibold text-app-text" title={profile.riotId}>
+              {displayName}
+            </div>
+            <div className="mt-1 text-xs text-app-muted">等级 {formatOptionalNumber(profile.level)}</div>
+          </div>
+          <div className="grid min-w-[210px] grid-cols-2 gap-2 text-center">
+            <div className="rounded-sm bg-app-surface-soft px-3 py-2">
+              <div className="text-lg font-semibold text-app-text">{formatOptionalNumber(profile.championCount)}</div>
+              <div className="mt-0.5 text-[11px] text-app-muted">英雄</div>
+            </div>
+            <div className="rounded-sm bg-app-surface-soft px-3 py-2">
+              <div className="text-lg font-semibold text-app-text">{formatOptionalNumber(profile.skinCount)}</div>
+              <div className="mt-0.5 text-[11px] text-app-muted">皮肤</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <RankSummaryCard label="单双排" rank={soloRank} />
+        <RankSummaryCard label="灵活组排" rank={flexRank} />
+      </div>
+
+      <div className="rounded-sm border border-app-border bg-app-surface p-5">
+        <div className="mb-3 text-sm font-semibold text-app-text">常玩英雄</div>
+        {commonChampions.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {commonChampions.map((champion) => {
+              const winRate = champion.games > 0 ? Math.round((champion.wins / champion.games) * 100) : 0;
+              const averageKda = champion.games > 0 ? (champion.kdaTotal / champion.games).toFixed(1) : '--';
+              return (
+                <div
+                  key={champion.championId}
+                  className="flex items-center gap-3 rounded-sm bg-app-surface-soft px-3 py-2"
+                >
+                  <img
+                    src={champion.championAvatar}
+                    alt={champion.championName}
+                    className="size-9 shrink-0 rounded-full object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-app-text">{champion.championName}</div>
+                    <div className="mt-0.5 text-[11px] text-app-muted">
+                      {champion.games} 场 · 胜率 {winRate}% · KDA {averageKda}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-sm bg-app-surface-soft px-3 py-8 text-center text-xs text-app-subtle">
+            暂无可统计的英雄数据
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function MatchHistoryPage({
   searchName,
   searchTrigger,
@@ -91,6 +274,7 @@ export function MatchHistoryPage({
   const [tabs, setTabs] = useState<MatchTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const [profilePanelTabId, setProfilePanelTabId] = useState<string | null>(null);
 
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
@@ -259,10 +443,12 @@ export function MatchHistoryPage({
   const pageStart = activeTab && displayedMatches.length > 0 ? (activeTab.currentPage - 1) * PAGE_SIZE + 1 : 0;
   const pageEnd = displayedMatches.length > 0 ? pageStart + displayedMatches.length - 1 : 0;
   const pageNumbers = activeTab ? getPageNumbers(activeTab.currentPage, totalPages) : [];
+  const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
 
   // 切换模式筛选：重新向 SGP 查询该模式的战绩（不是前端过滤）
   const handleFilterChange = (queueKey: string) => {
     if (!activeTab) return;
+    setProfilePanelTabId(null);
     const filter = QUEUE_FILTERS.find((f) => f.key === queueKey);
     const tag = filter?.tag ?? '';
     // 重新加载该 tab（带 tag）
@@ -281,6 +467,7 @@ export function MatchHistoryPage({
 
   const handlePageChange = async (page: number) => {
     if (!activeTab || activeTab.loading || activeTab.pageLoading) return;
+    setProfilePanelTabId(null);
 
     const targetEnd = page * PAGE_SIZE;
     if (targetEnd <= activeTab.matches.length || !activeTab.hasMore) {
@@ -333,6 +520,7 @@ export function MatchHistoryPage({
   };
 
   const handleCloseTab = (tabId: string) => {
+    setProfilePanelTabId((current) => (current === tabId ? null : current));
     setTabs((currentTabs) => {
       const nextTabs = currentTabs.filter((tab) => tab.id !== tabId);
       if (activeTabId === tabId) {
@@ -450,11 +638,40 @@ export function MatchHistoryPage({
 
           {/* 模式筛选（常驻显示，不依赖有无战绩数据） */}
           {activeTab && (
-            <div className="flex shrink-0 items-center border-b border-app-border px-3 py-1.5">
+            <div className="flex shrink-0 items-center gap-2 border-b border-app-border px-3 py-1.5">
+              {activeTab.result?.profile ? (
+                <button
+                  type="button"
+                  disabled={!activeTab.result.profile.puuid}
+                  onClick={() =>
+                    setProfilePanelTabId((current) => (current === activeTab.id ? null : activeTab.id))
+                  }
+                  className={`flex h-8 min-w-0 flex-1 items-center gap-2 rounded-xs px-1.5 text-left transition-colors disabled:cursor-default disabled:opacity-50 ${
+                    isProfilePanelOpen
+                      ? 'bg-app-surface-soft text-app-text'
+                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                  }`}
+                  title={activeTab.result.profile.riotId}
+                >
+                  <ProfileIcon
+                    iconId={activeTab.result.profile.profileIconId}
+                    src={activeTab.result.profile.profileIconUrl}
+                    alt={getDisplayName(activeTab.result.profile.riotId)}
+                    size={22}
+                  />
+                  <span className="min-w-0 truncate text-xs font-medium">
+                    {getDisplayName(activeTab.result.profile.riotId)}
+                  </span>
+                </button>
+              ) : (
+                <div className="flex h-8 min-w-0 flex-1 items-center text-xs text-app-subtle">
+                  {activeTab.loading ? '读取玩家...' : '暂无玩家'}
+                </div>
+              )}
               <select
                 value={activeTab.filterQueue}
                 onChange={(e) => handleFilterChange(e.target.value)}
-                className="h-6 flex-1 rounded-xs border border-app-border bg-app-surface-soft px-1.5 text-[11px] text-app-text focus:border-app-primary focus:outline-none"
+                className="h-7 w-28 shrink-0 rounded-xs border border-app-border bg-app-surface-soft px-1.5 text-[11px] text-app-text focus:border-app-primary focus:outline-none"
               >
                 {QUEUE_FILTERS.map((f) => (
                   <option key={f.key} value={f.key}>
@@ -474,12 +691,14 @@ export function MatchHistoryPage({
                 selectedGameId={activeTab?.selectedGameId ?? null}
                 onSelect={(gameId) => {
                   if (!activeTab) return;
+                  setProfilePanelTabId(null);
                   updateTab(activeTab.id, (tab) => ({ ...tab, selectedGameId: gameId }));
                 }}
                 recurringMates={recurringMates}
                 targetPuuid={targetPuuid}
                 onMateClick={(riotId) => {
                   // 点击队友头像 → 用他的 Riot ID 开新搜索
+                  setProfilePanelTabId(null);
                   openSearchTab(riotId, activeTab?.region ?? '');
                 }}
               />
@@ -548,7 +767,9 @@ export function MatchHistoryPage({
         </div>
 
         <div className="min-w-0 flex-1 overflow-y-auto p-5">
-          {selectedMatch && activeTab ? (
+          {isProfilePanelOpen && activeTab?.result ? (
+            <PlayerProfilePanel result={activeTab.result} matches={activeTab.matches} />
+          ) : selectedMatch && activeTab ? (
             <MatchDetail
               match={selectedMatch}
               targetPuuid={activeTab.result?.profile.puuid ?? ''}

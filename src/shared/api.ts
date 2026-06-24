@@ -460,6 +460,9 @@ export interface PlayerProfile {
   profileIconId: number;
   profileIconUrl: string;
   rank?: PlayerRankSummary | null;
+  ranks?: PlayerRankSummary[];
+  championCount?: number | null;
+  skinCount?: number | null;
 }
 
 // 战绩汇总统计
