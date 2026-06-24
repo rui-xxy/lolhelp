@@ -1,6 +1,5 @@
 import { app } from 'electron';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import type {
   LolBlockedPlayer,
@@ -13,31 +12,44 @@ import type {
 import { LcuClient } from '../lcu/client';
 import { readCredentialsForInstallRoot } from '../lcu/lockfile';
 import {
-  atomicWriteText,
   executeFileTransaction,
   type FileWritePlan,
 } from './fileTransaction';
-import { DEFAULT_LOL_ROOT_PATH } from '../../shared/constants';
 import {
   coerceHotkeyValue,
   normalizeHotkeyValues,
   type LcuInputSettings,
 } from './hotkeyValues';
-
-interface ConfigProfileSnapshots {
-  gameCfg?: string;
-  inputIni?: string;
-  persistedSettings?: string;
-}
-
-interface ConfigProfile extends LolConfigProfileSummary {
-  values: LolConfigValues;
-  snapshots: ConfigProfileSnapshots;
-}
-
-interface ProfileStore {
-  profiles: ConfigProfile[];
-}
+import {
+  boolFlag,
+  clamp,
+  flagToBool,
+  iniValue,
+  parseIni,
+  percentToRatio,
+  ratioToPercent,
+  setFirstYamlScalar,
+  setIniValue,
+  setYamlSectionChildScalar,
+  toNumber,
+  yamlBool,
+  yamlNumber,
+  yamlScalar,
+} from './configText';
+import {
+  getConfigPaths,
+  getFileStatuses,
+  readText,
+  resolveRootPath,
+  rootLooksValid,
+} from './configPaths';
+import {
+  gameResolution,
+  listProfileSummaries,
+  readProfileStore,
+  writeProfileStore,
+  type ConfigProfileSnapshots,
+} from './profileStore';
 
 interface PersistedSetting {
   name: string;
@@ -65,8 +77,6 @@ interface GameField {
   getValue: (values: LolConfigValues) => string;
   getLcuValue?: (values: LolConfigValues) => boolean | number | string;
 }
-
-const PROFILE_FILE = 'lol-config-profiles.json';
 
 const DEFAULT_VALUES: LolConfigValues = {
   client: {
@@ -241,189 +251,6 @@ function normalizeValues(values: LolConfigValues): LolConfigValues {
   };
 }
 
-function getConfigPaths(rootPath: string): Record<string, string> {
-  return {
-    gameCfg: path.join(rootPath, 'Game', 'Config', 'game.cfg'),
-    inputIni: path.join(rootPath, 'Game', 'Config', 'input.ini'),
-    persistedSettings: path.join(rootPath, 'Game', 'Config', 'PersistedSettings.json'),
-    lcuLocalPreferences: path.join(rootPath, 'LeagueClient', 'Config', 'LCULocalPreferences.yaml'),
-    lcuAccountPreferences: path.join(rootPath, 'LeagueClient', 'Config', 'LCUAccountPreferences.yaml'),
-    leagueClientSettings: path.join(rootPath, 'LeagueClient', 'Config', 'LeagueClientSettings.yaml'),
-  };
-}
-
-function profileStorePath(): string {
-  return path.join(app.getPath('userData'), PROFILE_FILE);
-}
-
-function normalizeRootPath(rootPath?: string): string {
-  const trimmed = (rootPath ?? '').trim().replace(/^["']|["']$/g, '');
-  return trimmed || DEFAULT_LOL_ROOT_PATH;
-}
-
-function rootLooksValid(rootPath: string): boolean {
-  return fs.existsSync(path.join(rootPath, 'Game', 'Config')) ||
-    fs.existsSync(path.join(rootPath, 'LeagueClient', 'Config'));
-}
-
-function resolveRootPath(rootPath?: string): string {
-  const requested = normalizeRootPath(rootPath);
-  if (rootLooksValid(requested)) return requested;
-
-  const candidates = new Set<string>([requested, DEFAULT_LOL_ROOT_PATH]);
-  for (const drive of ['C:', 'D:', 'E:', 'F:', 'G:']) {
-    candidates.add(path.join(drive, 'WeGameApps', '英雄联盟'));
-    candidates.add(path.join(drive, '英雄联盟'));
-    candidates.add(path.join(drive, 'Riot Games', 'League of Legends'));
-  }
-
-  for (const candidate of candidates) {
-    if (rootLooksValid(candidate)) return candidate;
-  }
-  return requested;
-}
-
-function readText(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
-}
-
-function fileStatus(key: string, label: string, filePath: string): LolConfigFileStatus {
-  try {
-    const stat = fs.statSync(filePath);
-    return {
-      key,
-      label,
-      path: filePath,
-      exists: stat.isFile(),
-      size: stat.size,
-      updatedAt: stat.mtimeMs,
-    };
-  } catch {
-    return {
-      key,
-      label,
-      path: filePath,
-      exists: false,
-      size: 0,
-      updatedAt: null,
-    };
-  }
-}
-
-function getFileStatuses(rootPath: string): LolConfigFileStatus[] {
-  const paths = getConfigPaths(rootPath);
-  return [
-    fileStatus('gameCfg', '游戏内配置 game.cfg', paths.gameCfg),
-    fileStatus('inputIni', '按键配置 input.ini', paths.inputIni),
-    fileStatus('persistedSettings', '账号持久化 PersistedSettings.json', paths.persistedSettings),
-    fileStatus('lcuLocalPreferences', '客户端本地偏好 LCULocalPreferences.yaml', paths.lcuLocalPreferences),
-    fileStatus('lcuAccountPreferences', '客户端账号偏好 LCUAccountPreferences.yaml', paths.lcuAccountPreferences),
-    fileStatus('leagueClientSettings', '客户端同步标记 LeagueClientSettings.yaml', paths.leagueClientSettings),
-  ];
-}
-
-function parseIni(content: string | null): Record<string, Record<string, string>> {
-  const data: Record<string, Record<string, string>> = {};
-  if (!content) return data;
-
-  let section = '';
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith(';') || line.startsWith('#')) continue;
-
-    const sectionMatch = line.match(/^\[([^\]]+)]$/);
-    if (sectionMatch) {
-      section = sectionMatch[1];
-      data[section] = data[section] ?? {};
-      continue;
-    }
-
-    const equalsIndex = line.indexOf('=');
-    if (equalsIndex <= 0) continue;
-    const key = line.slice(0, equalsIndex).trim();
-    const value = line.slice(equalsIndex + 1).trim();
-    data[section] = data[section] ?? {};
-    data[section][key] = value;
-  }
-
-  return data;
-}
-
-function iniValue(
-  data: Record<string, Record<string, string>>,
-  section: string,
-  key: string,
-  fallback: string,
-): string {
-  return data[section]?.[key] ?? fallback;
-}
-
-function flagToBool(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) return fallback;
-  if (value === '1') return true;
-  if (value === '0') return false;
-  if (value.toLowerCase() === 'true') return true;
-  if (value.toLowerCase() === 'false') return false;
-  return fallback;
-}
-
-function boolFlag(value: boolean): string {
-  return value ? '1' : '0';
-}
-
-function toNumber(value: string | undefined, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function ratioToPercent(value: string | undefined, fallback: number): number {
-  const parsed = toNumber(value, fallback / 100);
-  return clamp(Math.round(parsed * 100), 0, 100);
-}
-
-function percentToRatio(value: number): string {
-  return (clamp(value, 0, 100) / 100).toFixed(4);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function yamlScalar(content: string | null, key: string): string | null {
-  if (!content) return null;
-  const pattern = new RegExp(`^\\s*${escapeRegExp(key)}:\\s*(.*?)\\s*$`, 'm');
-  const match = content.match(pattern);
-  if (!match) return null;
-  return unquoteYamlScalar(match[1]);
-}
-
-function unquoteYamlScalar(value: string): string {
-  const trimmed = value.trim();
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
-function yamlBool(content: string | null, key: string, fallback: boolean): boolean {
-  const value = yamlScalar(content, key);
-  if (value === null) return fallback;
-  return flagToBool(value, fallback);
-}
-
-function yamlNumber(content: string | null, key: string, fallback: number): number {
-  const value = yamlScalar(content, key);
-  return toNumber(value ?? undefined, fallback);
-}
-
 function readValues(rootPath: string): LolConfigValues {
   const paths = getConfigPaths(rootPath);
   const gameCfg = readText(paths.gameCfg);
@@ -536,42 +363,6 @@ function readValues(rootPath: string): LolConfigValues {
   };
 
   return values;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function setIniValue(content: string, section: string, key: string, value: string): string {
-  const newline = content.includes('\r\n') ? '\r\n' : '\n';
-  const lines = content ? content.split(/\r?\n/) : [];
-  const sectionPattern = new RegExp(`^\\s*\\[${escapeRegExp(section)}]\\s*$`, 'i');
-  const keyPattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=`, 'i');
-
-  const sectionIndex = lines.findIndex((line) => sectionPattern.test(line));
-  if (sectionIndex === -1) {
-    if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
-    lines.push(`[${section}]`, `${key}=${value}`);
-    return lines.join(newline);
-  }
-
-  let nextSectionIndex = lines.length;
-  for (let i = sectionIndex + 1; i < lines.length; i += 1) {
-    if (/^\s*\[[^\]]+]\s*$/.test(lines[i])) {
-      nextSectionIndex = i;
-      break;
-    }
-  }
-
-  for (let i = sectionIndex + 1; i < nextSectionIndex; i += 1) {
-    if (keyPattern.test(lines[i])) {
-      lines[i] = `${key}=${value}`;
-      return lines.join(newline);
-    }
-  }
-
-  lines.splice(nextSectionIndex, 0, `${key}=${value}`);
-  return lines.join(newline);
 }
 
 function applyGameValuesToContent(content: string, values: LolConfigValues): string {
@@ -1151,63 +942,6 @@ async function syncValuesToLcu(rootPath: string, values: LolConfigValues): Promi
   return true;
 }
 
-function formatYamlValue(value: string | number | boolean): string {
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'number') return String(value);
-  return JSON.stringify(value);
-}
-
-function setFirstYamlScalar(
-  content: string,
-  key: string,
-  value: string | number | boolean,
-): string {
-  const newline = content.includes('\r\n') ? '\r\n' : '\n';
-  const lines = content.split(/\r?\n/);
-  const pattern = new RegExp(`^(\\s*)${escapeRegExp(key)}:\\s*.*$`);
-  for (let i = 0; i < lines.length; i += 1) {
-    const match = lines[i].match(pattern);
-    if (match) {
-      lines[i] = `${match[1]}${key}: ${formatYamlValue(value)}`;
-      return lines.join(newline);
-    }
-  }
-  return content;
-}
-
-function indentation(line: string): number {
-  const match = line.match(/^(\s*)/);
-  return match ? match[1].length : 0;
-}
-
-function setYamlSectionChildScalar(
-  content: string,
-  sectionKey: string,
-  childKey: string,
-  value: string | number | boolean,
-): string {
-  const newline = content.includes('\r\n') ? '\r\n' : '\n';
-  const lines = content.split(/\r?\n/);
-  const sectionPattern = new RegExp(`^\\s*${escapeRegExp(sectionKey)}:\\s*$`);
-
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!sectionPattern.test(lines[i])) continue;
-    const sectionIndent = indentation(lines[i]);
-    const childPattern = new RegExp(`^(\\s*)${escapeRegExp(childKey)}:\\s*.*$`);
-
-    for (let j = i + 1; j < lines.length; j += 1) {
-      if (lines[j].trim() && indentation(lines[j]) <= sectionIndent) break;
-      const match = lines[j].match(childPattern);
-      if (match) {
-        lines[j] = `${match[1]}${childKey}: ${formatYamlValue(value)}`;
-        return lines.join(newline);
-      }
-    }
-  }
-
-  return content;
-}
-
 function applyLcuLocalValuesToContent(content: string, values: LolConfigValues): string {
   let next = content;
   next = setFirstYamlScalar(next, 'masterSoundEnabled', values.client.clientAudioEnabled);
@@ -1336,57 +1070,6 @@ function applyValuesToDisk(
   };
 }
 
-function readProfileStore(): ProfileStore {
-  try {
-    const raw = fs.readFileSync(profileStorePath(), 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<ProfileStore>;
-    return {
-      profiles: Array.isArray(parsed.profiles)
-        ? parsed.profiles.filter(isConfigProfile)
-          .map((profile) => ({ ...profile, values: normalizeValues(profile.values) }))
-        : [],
-    };
-  } catch {
-    return { profiles: [] };
-  }
-}
-
-function isConfigProfile(profile: unknown): profile is ConfigProfile {
-  if (!profile || typeof profile !== 'object') return false;
-  const candidate = profile as Partial<ConfigProfile>;
-  return Boolean(
-    candidate.id &&
-    candidate.name &&
-    candidate.values &&
-    candidate.snapshots &&
-    typeof candidate.createdAt === 'number' &&
-    typeof candidate.updatedAt === 'number',
-  );
-}
-
-function writeProfileStore(store: ProfileStore): void {
-  const filePath = profileStorePath();
-  atomicWriteText(filePath, JSON.stringify(store, null, 2));
-}
-
-function summarizeProfile(profile: ConfigProfile): LolConfigProfileSummary {
-  return {
-    id: profile.id,
-    name: profile.name,
-    createdAt: profile.createdAt,
-    updatedAt: profile.updatedAt,
-    sourceRootPath: profile.sourceRootPath,
-    gameResolution: profile.gameResolution,
-  };
-}
-
-function listProfileSummaries(): LolConfigProfileSummary[] {
-  return readProfileStore()
-    .profiles
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .map(summarizeProfile);
-}
-
 function buildSnapshots(rootPath: string, values: LolConfigValues): ConfigProfileSnapshots {
   const paths = getConfigPaths(rootPath);
   const gameCfg = readText(paths.gameCfg);
@@ -1400,10 +1083,6 @@ function buildSnapshots(rootPath: string, values: LolConfigValues): ConfigProfil
       ? applyPersistedValuesToContent(persistedSettings, values)
       : undefined,
   };
-}
-
-function gameResolution(values: LolConfigValues): string {
-  return `${values.game.width} x ${values.game.height}`;
 }
 
 export async function readLeagueConfig(rootPath?: string): Promise<{
@@ -1441,7 +1120,7 @@ export async function readLeagueConfig(rootPath?: string): Promise<{
     found,
     values,
     files,
-    profiles: listProfileSummaries(),
+    profiles: listProfileSummaries(normalizeValues),
     warnings,
   };
 }
@@ -1470,7 +1149,7 @@ export function saveLeagueConfigProfile(
   values: LolConfigValues,
 ): LolConfigProfileSummary[] {
   const resolvedRootPath = resolveRootPath(rootPath);
-  const store = readProfileStore();
+  const store = readProfileStore(normalizeValues);
   const trimmedName = name.trim() || '我的配置';
   const now = Date.now();
   const existing = store.profiles.find((profile) => profile.name === trimmedName);
@@ -1496,14 +1175,14 @@ export function saveLeagueConfigProfile(
   }
 
   writeProfileStore(store);
-  return listProfileSummaries();
+  return listProfileSummaries(normalizeValues);
 }
 
 export async function applyLeagueConfigProfile(
   profileId: string,
   rootPath?: string,
 ): Promise<LolConfigApplyResult> {
-  const store = readProfileStore();
+  const store = readProfileStore(normalizeValues);
   const profile = store.profiles.find((item) => item.id === profileId);
   if (!profile) {
     throw new Error('未找到要应用的配置方案');
@@ -1533,8 +1212,8 @@ export async function applyLeagueConfigProfile(
 }
 
 export function deleteLeagueConfigProfile(profileId: string): LolConfigProfileSummary[] {
-  const store = readProfileStore();
+  const store = readProfileStore(normalizeValues);
   store.profiles = store.profiles.filter((profile) => profile.id !== profileId);
   writeProfileStore(store);
-  return listProfileSummaries();
+  return listProfileSummaries(normalizeValues);
 }
