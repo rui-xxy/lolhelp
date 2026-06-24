@@ -202,9 +202,12 @@ export interface LolGameConfigValues {
   voiceMute: boolean;
 }
 
+export type LolHotkeyValues = Record<string, Record<string, string>>;
+
 export interface LolConfigValues {
   client: LolClientConfigValues;
   game: LolGameConfigValues;
+  hotkeys: LolHotkeyValues;
 }
 
 export interface LolConfigFileStatus {

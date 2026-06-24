@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   Check,
   Download,
@@ -17,6 +26,7 @@ import type {
   LolConfigState,
   LolConfigValues,
   LolGameConfigValues,
+  LolHotkeyValues,
 } from '../../../shared/api';
 
 interface SettingsDialogProps {
@@ -24,10 +34,32 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type TabKey = 'client' | 'game' | 'profiles';
+type TabKey = 'client' | 'game' | 'hotkeys' | 'profiles';
 type ClientSectionKey = 'general' | 'notifications' | 'chat' | 'sound' | 'voice' | 'blocked';
 type GameSectionKey = 'controls' | 'gameplay' | 'alerts' | 'combat' | 'cooldowns' | 'video' | 'interface' | 'audio';
+type HotkeySectionKey = string;
 type Notice = { type: 'success' | 'error'; text: string } | null;
+type HotkeyCategoryKey =
+  | 'hero'
+  | 'spell-summoner'
+  | 'items'
+  | 'movement'
+  | 'camera'
+  | 'display'
+  | 'communication'
+  | 'menus'
+  | 'shop'
+  | 'quickcast'
+  | 'training'
+  | 'other';
+type HotkeyBinding = { section: string; key: string; value: string };
+type HotkeyCaptureTarget = HotkeyBinding & { label: string };
+type HotkeyCategory = {
+  key: HotkeyCategoryKey;
+  label: string;
+  defaultOpen?: boolean;
+  bindings: HotkeyBinding[];
+};
 
 const DEFAULT_ROOT_PATH = 'D:\\WeGameApps\\英雄联盟';
 
@@ -100,6 +132,175 @@ const GAME_SECTIONS: { key: GameSectionKey; label: string }[] = [
   { key: 'audio', label: '声音' },
 ];
 
+const HOTKEY_SECTION_ORDER = ['GameEvents', 'HUDEvents', 'Quickbinds', 'ShopEvents', 'WASD'];
+
+const HOTKEY_CATEGORIES: { key: HotkeyCategoryKey; label: string; defaultOpen?: boolean }[] = [
+  { key: 'hero', label: '英雄热键', defaultOpen: true },
+  { key: 'spell-summoner', label: '英雄技能和召唤师技能' },
+  { key: 'items', label: '道具' },
+  { key: 'movement', label: '玩家移动' },
+  { key: 'camera', label: '镜头控制' },
+  { key: 'display', label: '显示' },
+  { key: 'communication', label: '交流' },
+  { key: 'menus', label: '菜单' },
+  { key: 'shop', label: '道具商店' },
+  { key: 'quickcast', label: '快捷施法' },
+  { key: 'training', label: '训练模式' },
+  { key: 'other', label: '其他' },
+];
+
+const HERO_HOTKEY_GROUPS: { label: string; refs: { section: string; key: string; label: string }[] }[] = [
+  {
+    label: '英雄技能',
+    refs: [
+      { section: 'GameEvents', key: 'evtCastSpell1', label: 'Q' },
+      { section: 'GameEvents', key: 'evtCastSpell2', label: 'W' },
+      { section: 'GameEvents', key: 'evtCastSpell3', label: 'E' },
+      { section: 'GameEvents', key: 'evtCastSpell4', label: 'R' },
+    ],
+  },
+  {
+    label: '召唤师技能',
+    refs: [
+      { section: 'GameEvents', key: 'evtCastAvatarSpell1', label: 'D' },
+      { section: 'GameEvents', key: 'evtCastAvatarSpell2', label: 'F' },
+    ],
+  },
+  {
+    label: '分路任务',
+    refs: [
+      { section: 'GameEvents', key: 'evtCastRoleBound', label: 'V' },
+    ],
+  },
+  {
+    label: '道具',
+    refs: [
+      { section: 'GameEvents', key: 'evtUseItem1', label: '1' },
+      { section: 'GameEvents', key: 'evtUseItem2', label: '2' },
+      { section: 'GameEvents', key: 'evtUseItem3', label: '3' },
+      { section: 'GameEvents', key: 'evtUseItem4', label: '5' },
+      { section: 'GameEvents', key: 'evtUseItem5', label: '6' },
+      { section: 'GameEvents', key: 'evtUseItem6', label: '7' },
+      { section: 'GameEvents', key: 'evtUseItem7', label: '回城' },
+    ],
+  },
+  {
+    label: '饰品',
+    refs: [
+      { section: 'GameEvents', key: 'evtUseVisionItem', label: '4' },
+    ],
+  },
+];
+
+const HERO_HOTKEY_REF_KEYS = new Set(
+  HERO_HOTKEY_GROUPS.flatMap((group) => group.refs.map((ref) => `${ref.section}.${ref.key}`)),
+);
+
+const HOTKEY_LABELS: Record<string, string> = {
+  evtCastSpell1: '施放技能 Q',
+  evtCastSpell2: '施放技能 W',
+  evtCastSpell3: '施放技能 E',
+  evtCastSpell4: '施放技能 R',
+  evtCastAvatarSpell1: '召唤师技能 1',
+  evtCastAvatarSpell2: '召唤师技能 2',
+  evtCastRoleBound: '角色绑定技能',
+  evtUseItem1: '使用物品 1',
+  evtUseItem2: '使用物品 2',
+  evtUseItem3: '使用物品 3',
+  evtUseItem4: '使用物品 4',
+  evtUseItem5: '使用物品 5',
+  evtUseItem6: '使用物品 6',
+  evtUseItem7: '回城',
+  evtUseVisionItem: '使用饰品',
+  evtToggleMinionHealthBars: '切换小兵生命条',
+  evtSysMenu: '系统菜单',
+  evtPlayerAttackMove: '玩家攻击移动',
+  evtPlayerAttackMoveClick: '攻击移动点击',
+  evtPlayerAttackOnlyClick: '仅攻击英雄点击',
+  evtPlayerHoldPosition: '原地待命',
+  evtPlayerStopPosition: '停止',
+  evtPlayerMoveClick: '移动点击',
+  evtPetMoveClick: '宠物移动点击',
+  evtCameraSnap: '镜头回到英雄',
+  evtCameraLockToggle: '锁定镜头',
+  evtSelectSelf: '选择自己',
+  evtSelectAlly1: '选择队友 1',
+  evtSelectAlly2: '选择队友 2',
+  evtSelectAlly3: '选择队友 3',
+  evtSelectAlly4: '选择队友 4',
+  evtScrollUp: '镜头上移',
+  evtScrollDown: '镜头下移',
+  evtScrollLeft: '镜头左移',
+  evtScrollRight: '镜头右移',
+  evtOpenShop: '打开商店',
+  evtShowScoreBoard: '显示计分板',
+  evtShowCharacterMenu: '显示角色面板',
+  evtShowSummonerNames: '显示召唤师名称',
+  evtShowHealthBars: '显示生命条',
+  evtShowVoicePanel: '显示语音面板',
+  evtChatHistory: '聊天记录',
+  evtChampionOnly: '只以英雄为目标',
+  evtChampMasteryDisplay: '显示英雄成就',
+  evtEmoteJoke: '笑话',
+  evtEmoteTaunt: '嘲讽',
+  evtEmoteDance: '跳舞',
+  evtEmoteLaugh: '大笑',
+  evtEmoteToggle: '切换表情',
+  evtRadialEmoteInstantOpen: '打开表情轮盘',
+  evtRadialEmoteOpen: '打开表情轮盘',
+  evtRadialEmotePlaySlot0: '播放表情 1',
+  evtRadialEmotePlaySlot1: '播放表情 2',
+  evtRadialEmotePlaySlot2: '播放表情 3',
+  evtRadialEmotePlaySlot3: '播放表情 4',
+  evtRadialEmotePlaySlot4: '播放表情 5',
+  evtRadialEmotePlaySlot5: '播放表情 6',
+  evtRadialEmotePlaySlot6: '播放表情 7',
+  evtRadialEmotePlaySlot7: '播放表情 8',
+  evtRadialEmotePlaySlot8: '播放表情 9',
+  evtPushToTalk: '按键说话',
+  evtPushToTalkTeam: '队伍语音按键说话',
+  evtLevelSpell1: '升级技能 Q',
+  evtLevelSpell2: '升级技能 W',
+  evtLevelSpell3: '升级技能 E',
+  evtLevelSpell4: '升级技能 R',
+  evtSmartCastSpell1: '快捷施法 Q',
+  evtSmartCastSpell2: '快捷施法 W',
+  evtSmartCastSpell3: '快捷施法 E',
+  evtSmartCastSpell4: '快捷施法 R',
+  evtNormalCastSpell1: '常规施法 Q',
+  evtNormalCastSpell2: '常规施法 W',
+  evtNormalCastSpell3: '常规施法 E',
+  evtNormalCastSpell4: '常规施法 R',
+  evtSelfCastSpell1: '自我施法 Q',
+  evtSelfCastSpell2: '自我施法 W',
+  evtSelfCastSpell3: '自我施法 E',
+  evtSelfCastSpell4: '自我施法 R',
+  evntPlayerPing: '信号',
+  evntPlayerPingCursor: '光标信号',
+  evntPlayerPingDanger: '危险信号',
+  evntPlayerPingCursorDanger: '光标危险信号',
+  evtPlayerPingAllIn: '全力以赴信号',
+  evtPlayerPingComeHere: '协助我信号',
+  evtPlayerPingMIA: '敌人消失信号',
+  evtPlayerPingOMW: '正在路上信号',
+  evtPlayerPingPush: '推进信号',
+  evtPlayerPingRadialDanger: '危险轮盘信号',
+  evtPlayerPingVisionNeeded: '需要视野信号',
+  evtTogglePlayerStats: '切换玩家统计',
+  evtToggleMouseClip: '切换鼠标限制',
+  evtToggleFPSAndLatency: '切换 FPS 和延迟',
+  evtToggleDeathRecapShowcase: '显示死亡回放',
+  evtHoldShowScoreBoard: '按住显示计分板',
+  evtDrawHud: '显示界面',
+  evtDragScrollLock: '拖动滚屏锁定',
+  evtOnUIMouse4Pan: '鼠标拖动画面',
+  evtReciprocityTrigger: '回应互动',
+  evtReciprocityMyBadTrigger: '回应失误',
+  evtShopSwitchTabs: '商店切换标签',
+  evtShopFocusSearch: '商店搜索',
+  PlayerPingCursorDanger: '光标危险信号',
+};
+
 function formatTime(timestamp: number | null): string {
   if (!timestamp) return '-';
   return new Date(timestamp).toLocaleString();
@@ -111,6 +312,217 @@ function percentLabel(value: number): string {
 
 function profileLabel(profile: LolConfigProfileSummary): string {
   return `${profile.name} · ${profile.gameResolution}`;
+}
+
+function targetLabel(target: string): string {
+  const targetMap: Record<string, string> = {
+    Spell1: 'Q',
+    Spell2: 'W',
+    Spell3: 'E',
+    Spell4: 'R',
+    AvatarSpell1: '召唤师技能 1',
+    AvatarSpell2: '召唤师技能 2',
+    Item1: '物品 1',
+    Item2: '物品 2',
+    Item3: '物品 3',
+    Item4: '物品 4',
+    Item5: '物品 5',
+    Item6: '物品 6',
+    VisionItem: '饰品',
+    RoleBound: '角色绑定技能',
+  };
+  return targetMap[target] ?? target;
+}
+
+function hotkeyLabel(key: string): string {
+  if (HOTKEY_LABELS[key]) return HOTKEY_LABELS[key];
+  const quickbindMatch = key.match(/^evtCast(Spell[1-4]|AvatarSpell[1-2]|RoleBound)smart$/)
+    ?? key.match(/^evtUse(Item[1-6]|VisionItem)smart$/);
+  if (quickbindMatch) return `${targetLabel(quickbindMatch[1])}快捷施法`;
+  const smartMatch = key.match(/^evt(.+?)(Spell[1-4]|AvatarSpell[1-2]|Item[1-6]|VisionItem|RoleBound)$/);
+  if (smartMatch) {
+    const prefixMap: Record<string, string> = {
+      SmartCast: '快捷施法',
+      SmartCastWithIndicator: '带指示器快捷施法',
+      SmartPlusSelfCast: '快捷自我施法',
+      SmartPlusSelfCastWithIndicator: '带指示器快捷自我施法',
+      NormalCast: '常规施法',
+      SelfCast: '自我施法',
+    };
+    return [prefixMap[smartMatch[1]], targetLabel(smartMatch[2])].filter(Boolean).join(' ') || key;
+  }
+  return key
+    ? '未命名热键'
+    : '热键';
+}
+
+function isSwitchHotkey(section: string, value: string): boolean {
+  return section === 'Quickbinds' && (value === '0' || value === '1');
+}
+
+function quickbindKeyFor(key: string): string | null {
+  if (key.match(/^evtCast(Spell[1-4]|AvatarSpell[1-2]|RoleBound)$/)) return `${key}smart`;
+  if (key.match(/^evtUse(Item[1-6]|VisionItem)$/)) return `${key}smart`;
+  return null;
+}
+
+function displayHotkeyToken(token: string): string {
+  if (!token || token === '<Unbound>' || token.toLowerCase() === 'null') return '未绑定';
+  if (/^[a-z]$/.test(token)) return token.toUpperCase();
+  if (/^Button 1$/i.test(token)) return '鼠标左键';
+  if (/^Button 2$/i.test(token)) return '鼠标右键';
+  if (/^Button 3$/i.test(token)) return '鼠标中键';
+  if (/^Button 4$/i.test(token)) return '鼠标侧键 1';
+  if (/^Button 5$/i.test(token)) return '鼠标侧键 2';
+  const labelMap: Record<string, string> = {
+    Space: '空格',
+    Return: '回车',
+    Enter: '回车',
+    Esc: 'Esc',
+    Tab: 'Tab',
+    Backspace: '退格',
+    Delete: '删除',
+    Insert: '插入',
+    Home: 'Home',
+    End: 'End',
+    PageUp: 'Page Up',
+    PageDown: 'Page Down',
+    'Up Arrow': '↑',
+    'Down Arrow': '↓',
+    'Left Arrow': '←',
+    'Right Arrow': '→',
+    Ctrl: 'Ctrl',
+    Alt: 'Alt',
+    Shift: 'Shift',
+  };
+  return labelMap[token] ?? token;
+}
+
+function displayHotkeyValue(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === 'null' || normalized === '[<Unbound>]') return '未绑定';
+
+  return normalized
+    .split(',')
+    .map((combo) => {
+      const tokens = [...combo.matchAll(/\[([^\]]+)\]/g)].map((match) => match[1]);
+      if (tokens.length === 0) return displayHotkeyToken(combo.trim());
+      return tokens.map(displayHotkeyToken).join(' + ');
+    })
+    .join(' / ');
+}
+
+function hotkeyTokenFromKeyboard(key: string): string | null {
+  if (key === 'Control') return 'Ctrl';
+  if (key === 'Alt') return 'Alt';
+  if (key === 'Shift') return 'Shift';
+  if (key === 'Meta') return null;
+  if (key === ' ') return 'Space';
+  if (key === 'Escape') return 'Esc';
+  if (key === 'Enter') return 'Return';
+  if (key === 'ArrowUp') return 'Up Arrow';
+  if (key === 'ArrowDown') return 'Down Arrow';
+  if (key === 'ArrowLeft') return 'Left Arrow';
+  if (key === 'ArrowRight') return 'Right Arrow';
+  if (key.length === 1) return key.toLowerCase();
+  if (/^F\d{1,2}$/.test(key)) return key;
+  return key;
+}
+
+function bracketHotkeyToken(token: string): string {
+  return `[${token}]`;
+}
+
+function composeCapturedHotkey(
+  token: string,
+  modifiers: Pick<ReactKeyboardEvent | ReactMouseEvent, 'ctrlKey' | 'altKey' | 'shiftKey'>,
+): string {
+  const parts: string[] = [];
+  const tokenIsModifier = token === 'Ctrl' || token === 'Alt' || token === 'Shift';
+  if (!tokenIsModifier && modifiers.ctrlKey) parts.push('Ctrl');
+  if (!tokenIsModifier && modifiers.altKey) parts.push('Alt');
+  if (!tokenIsModifier && modifiers.shiftKey) parts.push('Shift');
+  parts.push(token);
+  return parts.map(bracketHotkeyToken).join('');
+}
+
+function hotkeyFromKeyboardEvent(event: ReactKeyboardEvent): string | null {
+  const token = hotkeyTokenFromKeyboard(event.key);
+  if (!token) return null;
+  return composeCapturedHotkey(token, event);
+}
+
+function hotkeyFromMouseEvent(event: ReactMouseEvent): string | null {
+  const buttonMap: Record<number, string> = {
+    0: 'Button 1',
+    1: 'Button 3',
+    2: 'Button 2',
+    3: 'Button 4',
+    4: 'Button 5',
+  };
+  const token = buttonMap[event.button];
+  if (!token) return null;
+  return composeCapturedHotkey(token, event);
+}
+
+function hotkeyRefKey(binding: Pick<HotkeyBinding, 'section' | 'key'>): string {
+  return `${binding.section}.${binding.key}`;
+}
+
+function isHeroHotkey(binding: Pick<HotkeyBinding, 'section' | 'key'>): boolean {
+  return HERO_HOTKEY_REF_KEYS.has(hotkeyRefKey(binding));
+}
+
+function hotkeyCategoryFor(binding: Pick<HotkeyBinding, 'section' | 'key'>): HotkeyCategoryKey {
+  const { section, key } = binding;
+
+  if (isHeroHotkey(binding)) return 'hero';
+  if (section === 'Quickbinds') return 'quickcast';
+  if (section === 'ShopEvents' || key === 'evtOpenShop') return 'shop';
+  if (/Practice|Training/i.test(key)) return 'training';
+  if (/Item|VisionItem/i.test(key)) return 'items';
+  if (/Spell|AvatarSpell|RoleBound/i.test(key) || key.startsWith('evtLevelSpell')) return 'spell-summoner';
+  if (/Show|Toggle|DrawHud|HealthBars|ScoreBoard|CharacterMenu|SummonerNames|FPS|DeathRecap|Minion/i.test(key) || section === 'HUDEvents') {
+    return 'display';
+  }
+  if (/Ping|Emote|Chat|Voice|PushToTalk|Reciprocity/i.test(key)) return 'communication';
+  if (/Player|Pet|ChampionOnly/i.test(key)) return 'movement';
+  if (/Camera|Scroll|SelectAlly|SelectSelf|Mouse4Pan|DragScroll/i.test(key)) return 'camera';
+  if (/Menu|Sys|Shop/i.test(key)) return 'menus';
+
+  return 'other';
+}
+
+function flattenHotkeys(values: LolHotkeyValues): HotkeyBinding[] {
+  return Object.keys(values ?? {})
+    .sort((a, b) => {
+      const ai = HOTKEY_SECTION_ORDER.indexOf(a);
+      const bi = HOTKEY_SECTION_ORDER.indexOf(b);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      return a.localeCompare(b);
+    })
+    .flatMap((section) =>
+      Object.entries(values[section] ?? {}).map(([key, value]) => ({
+        section,
+        key,
+        value,
+      })),
+    );
+}
+
+function buildHotkeyCategories(bindings: HotkeyBinding[]): HotkeyCategory[] {
+  const grouped = new Map<HotkeyCategoryKey, HotkeyBinding[]>();
+  for (const binding of bindings) {
+    const category = hotkeyCategoryFor(binding);
+    grouped.set(category, [...(grouped.get(category) ?? []), binding]);
+  }
+
+  return HOTKEY_CATEGORIES
+    .map((category) => ({
+      ...category,
+      bindings: grouped.get(category.key) ?? [],
+    }))
+    .filter((category) => category.bindings.length > 0);
 }
 
 function useSettingsScrollSpy<TSection extends string>(
@@ -218,6 +630,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     void refresh(DEFAULT_ROOT_PATH);
   }, [open]);
 
+  useEffect(() => {
+    document.querySelector<HTMLElement>('[data-settings-scroll]')?.scrollTo({ top: 0 });
+  }, [tab]);
+
   const updateClient = useCallback(<K extends keyof LolClientConfigValues>(
     key: K,
     value: LolClientConfigValues[K],
@@ -247,6 +663,23 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             client: key === 'hidePlayerNames'
               ? { ...current.client, hideAllPlayerNamesForMe: Boolean(value) }
               : current.client,
+          }
+        : current,
+    );
+  }, []);
+
+  const updateHotkey = useCallback((section: string, key: string, value: string) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            hotkeys: {
+              ...current.hotkeys,
+              [section]: {
+                ...(current.hotkeys[section] ?? {}),
+                [key]: value,
+              },
+            },
           }
         : current,
     );
@@ -387,6 +820,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         <nav className="hidden">
           <TabButton active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
           <TabButton active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
+          <TabButton active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
           <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
         </nav>
 
@@ -395,6 +829,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <nav className="space-y-1">
               <TabButton active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
               <TabButton active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
+              <TabButton active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
               <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
             </nav>
           </aside>
@@ -414,6 +849,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               )}
               {tab === 'game' && (
                 <GameSettings values={draft.game} onChange={updateGame} />
+              )}
+              {tab === 'hotkeys' && (
+                <HotkeySettings values={draft.hotkeys} onChange={updateHotkey} />
               )}
               {tab === 'profiles' && (
                 <ProfileSettings
@@ -837,6 +1275,443 @@ function GameSettings({
           />
         ))}
       </aside>
+    </div>
+  );
+}
+
+function HotkeySettings({
+  values,
+  onChange,
+}: {
+  values: LolHotkeyValues;
+  onChange: (section: string, key: string, value: string) => void;
+}) {
+  const [activeSection, setActiveSection] = useState<HotkeySectionKey>('hero');
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ hero: true });
+  const [captureTarget, setCaptureTarget] = useState<HotkeyCaptureTarget | null>(null);
+  const allBindings = useMemo(() => flattenHotkeys(values), [values]);
+  const categories = useMemo(() => buildHotkeyCategories(allBindings), [allBindings]);
+
+  const navSections = useMemo(
+    () => categories.map((item) => ({ key: item.key, label: item.label })),
+    [categories],
+  );
+  useSettingsScrollSpy<HotkeySectionKey>('hotkeys', navSections, setActiveSection);
+
+  const goToSection = useCallback((section: HotkeySectionKey) => {
+    setActiveSection(section);
+    setOpenSections((current) => ({ ...current, [section]: true }));
+    document.getElementById(`hotkeys-section-${section}`)?.scrollIntoView({
+      block: 'start',
+      behavior: 'smooth',
+    });
+  }, []);
+
+  const toggleSection = useCallback((section: HotkeySectionKey) => {
+    setOpenSections((current) => ({ ...current, [section]: !(current[section] ?? false) }));
+  }, []);
+
+  const openCapture = useCallback((binding: HotkeyBinding) => {
+    setCaptureTarget({ ...binding, label: hotkeyLabel(binding.key) });
+  }, []);
+
+  if (allBindings.length === 0) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm text-app-muted">
+        未读取到 input.ini 热键配置
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto grid w-full max-w-[720px] grid-cols-[minmax(0,1fr)_32px] gap-4 pb-8">
+      <div className="min-w-0 space-y-8">
+        {categories.map((category) => (
+          <HotkeyCategoryPanel
+            key={category.key}
+            category={category}
+            open={openSections[category.key] ?? Boolean(category.defaultOpen)}
+            onToggle={() => toggleSection(category.key)}
+          >
+            {category.key === 'hero' ? (
+              <HeroHotkeyOverview
+                bindings={category.bindings}
+                values={values}
+                onChange={onChange}
+                onCapture={openCapture}
+              />
+            ) : (
+              <HotkeyRows bindings={category.bindings} onChange={onChange} onCapture={openCapture} />
+            )}
+          </HotkeyCategoryPanel>
+        ))}
+      </div>
+
+      <aside className="sticky top-4 flex h-[360px] flex-col items-center justify-center gap-3">
+        {navSections.map((item) => (
+          <SectionDot
+            key={item.key}
+            active={activeSection === item.key}
+            label={item.label}
+            onClick={() => goToSection(item.key)}
+          />
+        ))}
+      </aside>
+      {captureTarget && (
+        <HotkeyCaptureDialog
+          target={captureTarget}
+          onClose={() => setCaptureTarget(null)}
+          onConfirm={(nextValue) => {
+            onChange(captureTarget.section, captureTarget.key, nextValue);
+            setCaptureTarget(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function HotkeyCategoryPanel({
+  category,
+  open,
+  onToggle,
+  children,
+}: {
+  category: HotkeyCategory;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section id={`hotkeys-section-${category.key}`} className="scroll-mt-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 py-2 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-base font-semibold text-app-text">{category.label}</span>
+        </span>
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-app-bg-soft text-lg font-semibold text-app-muted">
+          {open ? '-' : '+'}
+        </span>
+      </button>
+      {open && <div className="pt-2">{children}</div>}
+    </section>
+  );
+}
+
+function HeroHotkeyOverview({
+  bindings,
+  values,
+  onChange,
+  onCapture,
+}: {
+  bindings: HotkeyBinding[];
+  values: LolHotkeyValues;
+  onChange: (section: string, key: string, value: string) => void;
+  onCapture: (binding: HotkeyBinding) => void;
+}) {
+  const visibleKeys = new Set(bindings.map(hotkeyRefKey));
+  const groups = HERO_HOTKEY_GROUPS
+    .map((group) => ({
+      ...group,
+      refs: group.refs.filter((ref) => visibleKeys.has(hotkeyRefKey(ref)) && values[ref.section]?.[ref.key] !== undefined),
+    }))
+    .filter((group) => group.refs.length > 0);
+
+  const updateAllQuickbinds = (enabled: boolean) => {
+    for (const group of HERO_HOTKEY_GROUPS) {
+      for (const ref of group.refs) {
+        const quickbindKey = quickbindKeyFor(ref.key);
+        if (quickbindKey && values.Quickbinds?.[quickbindKey] !== undefined) {
+          onChange('Quickbinds', quickbindKey, enabled ? '1' : '0');
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-6 rounded-sm bg-app-bg-soft px-5 py-5">
+      <div className="mx-auto grid h-16 max-w-[560px] grid-cols-2 rounded-sm bg-app-surface p-1">
+        <button type="button" className="rounded-sm bg-app-primary/15 text-sm font-semibold text-app-text">
+          全局
+        </button>
+        <button type="button" className="rounded-sm text-sm font-semibold text-app-muted">
+          当前英雄
+        </button>
+      </div>
+
+      <div className="grid grid-cols-[minmax(0,1fr)_190px] gap-x-6 gap-y-5">
+        <div className="space-y-5">
+          {groups.filter((group) => group.label === '英雄技能' || group.label === '道具').map((group) => (
+            <HeroHotkeyGroup
+              key={group.label}
+              group={group}
+              values={values}
+              onChange={onChange}
+              onCapture={onCapture}
+            />
+          ))}
+        </div>
+        <div className="space-y-5">
+          {groups.filter((group) => group.label !== '英雄技能' && group.label !== '道具').map((group) => (
+            <HeroHotkeyGroup
+              key={group.label}
+              group={group}
+              values={values}
+              onChange={onChange}
+              onCapture={onCapture}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => updateAllQuickbinds(true)}>
+          全部设为快捷施法
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => updateAllQuickbinds(false)}>
+          全部设为常规施法
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function HeroHotkeyGroup({
+  group,
+  values,
+  onChange,
+  onCapture,
+}: {
+  group: { label: string; refs: { section: string; key: string; label: string }[] };
+  values: LolHotkeyValues;
+  onChange: (section: string, key: string, value: string) => void;
+  onCapture: (binding: HotkeyBinding) => void;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 text-sm font-semibold text-app-muted">{group.label}</h4>
+      <div className="flex flex-wrap gap-2">
+        {group.refs.map((ref) => {
+          const quickbindKey = quickbindKeyFor(ref.key);
+          const smartValue = quickbindKey ? values.Quickbinds?.[quickbindKey] : undefined;
+          const value = values[ref.section]?.[ref.key] ?? '';
+          return (
+            <HeroHotkeyBox
+              key={`${ref.section}-${ref.key}`}
+              label={ref.label}
+              value={value}
+              smart={smartValue === '1'}
+              smartToggleVisible={smartValue !== undefined}
+              onCapture={() => onCapture({ section: ref.section, key: ref.key, value })}
+              onToggleSmart={() => {
+                if (quickbindKey && smartValue !== undefined) {
+                  onChange('Quickbinds', quickbindKey, smartValue === '1' ? '0' : '1');
+                }
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function HeroHotkeyBox({
+  label,
+  value,
+  smart,
+  smartToggleVisible,
+  onCapture,
+  onToggleSmart,
+}: {
+  label: string;
+  value: string;
+  smart: boolean;
+  smartToggleVisible: boolean;
+  onCapture: () => void;
+  onToggleSmart: () => void;
+}) {
+  const displayValue = displayHotkeyValue(value);
+  const compact = displayValue.length > 6;
+
+  return (
+    <div className="w-[82px]">
+      <button
+        type="button"
+        onClick={onCapture}
+        className="flex h-[74px] w-full flex-col overflow-hidden rounded-sm bg-app-surface text-app-text shadow-sm ring-1 ring-app-border transition hover:ring-app-primary"
+        aria-label={`修改${label}`}
+      >
+        <span className="flex min-h-0 flex-1 items-center justify-center px-1">
+          <span className={`truncate font-semibold ${compact ? 'text-sm' : 'text-3xl'}`}>
+            {displayValue}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleSmart}
+        disabled={!smartToggleVisible}
+        className={`mt-1 flex h-6 w-full items-center justify-center rounded-sm text-base transition ${
+          smart
+            ? 'bg-app-primary/15 text-app-primary'
+            : 'bg-app-surface text-app-muted'
+        } ${smartToggleVisible ? 'hover:text-app-primary' : 'opacity-35'}`}
+        aria-label={`${smart ? '关闭' : '开启'}${label}快捷施法`}
+      >
+        ↩
+      </button>
+    </div>
+  );
+}
+
+function HotkeyRows({
+  bindings,
+  onChange,
+  onCapture,
+}: {
+  bindings: HotkeyBinding[];
+  onChange: (section: string, key: string, value: string) => void;
+  onCapture: (binding: HotkeyBinding) => void;
+}) {
+  return (
+    <div className="max-w-[560px] space-y-1">
+      {bindings.map((binding) => (
+        <HotkeyRow
+          key={`${binding.section}-${binding.key}`}
+          section={binding.section}
+          bindingKey={binding.key}
+          value={binding.value}
+          onChange={(nextValue) => onChange(binding.section, binding.key, nextValue)}
+          onCapture={() => onCapture(binding)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function KeyBindingButton({
+  value,
+  onClick,
+}: {
+  value: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-8 min-w-0 rounded-sm bg-app-bg-soft px-3 text-left text-sm font-medium text-app-text outline-none ring-1 ring-app-border transition hover:ring-app-primary focus-visible:ring-app-primary"
+    >
+      <span className="block truncate">{displayHotkeyValue(value)}</span>
+    </button>
+  );
+}
+
+function HotkeyCaptureDialog({
+  target,
+  onClose,
+  onConfirm,
+}: {
+  target: HotkeyCaptureTarget;
+  onClose: () => void;
+  onConfirm: (value: string) => void;
+}) {
+  const [captured, setCaptured] = useState(target.value);
+  const captureRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    captureRef.current?.focus();
+  }, []);
+
+  const captureKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextValue = hotkeyFromKeyboardEvent(event);
+    if (nextValue) setCaptured(nextValue);
+  };
+
+  const captureMouse = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextValue = hotkeyFromMouseEvent(event);
+    if (nextValue) setCaptured(nextValue);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35">
+      <div className="w-[360px] rounded-md border border-app-border bg-app-surface p-4 shadow-airbnb">
+        <h3 className="text-base font-semibold text-app-text">修改键位</h3>
+        <p className="mt-1 text-sm text-app-muted">{target.label}</p>
+        <div
+          ref={captureRef}
+          tabIndex={0}
+          onKeyDown={captureKeyboard}
+          onMouseDown={captureMouse}
+          onContextMenu={(event) => event.preventDefault()}
+          className="mt-4 flex h-28 cursor-crosshair items-center justify-center rounded-sm bg-app-bg-soft px-4 text-center outline-none ring-1 ring-app-border focus:ring-app-primary"
+        >
+          <span className="text-2xl font-semibold text-app-text">{displayHotkeyValue(captured)}</span>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setCaptured('[<Unbound>]')}>
+            清空
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              取消
+            </Button>
+            <Button size="sm" onClick={() => onConfirm(captured)}>
+              确认
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HotkeyRow({
+  section,
+  bindingKey,
+  value,
+  onChange,
+  onCapture,
+}: {
+  section: string;
+  bindingKey: string;
+  value: string;
+  onChange: (value: string) => void;
+  onCapture: () => void;
+}) {
+  const label = hotkeyLabel(bindingKey);
+
+  return (
+    <div className="grid grid-cols-[220px_260px] items-center gap-3 py-1.5">
+      <div className="min-w-0">
+        <div className="truncate text-sm text-app-body" title={label}>{label}</div>
+      </div>
+      {isSwitchHotkey(section, value) ? (
+        <div className="flex justify-start">
+          <SwitchControl checked={value === '1'} onChange={(checked) => onChange(checked ? '1' : '0')} />
+        </div>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2">
+          <KeyBindingButton value={value} onClick={onCapture} />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onChange('[<Unbound>]')}
+            aria-label="清空热键"
+            title="清空"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

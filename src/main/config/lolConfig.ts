@@ -7,6 +7,7 @@ import type {
   LolConfigApplyResult,
   LolConfigFileStatus,
   LolConfigProfileSummary,
+  LolHotkeyValues,
   LolConfigValues,
 } from '../../shared/api';
 import { LcuClient } from '../lcu/client';
@@ -146,6 +147,7 @@ const DEFAULT_VALUES: LolConfigValues = {
     voiceVolume: 100,
     voiceMute: false,
   },
+  hotkeys: {},
 };
 
 const GAME_FIELDS: GameField[] = [
@@ -220,11 +222,29 @@ function cloneDefaultValues(): LolConfigValues {
   return JSON.parse(JSON.stringify(DEFAULT_VALUES)) as LolConfigValues;
 }
 
+function normalizeHotkeyValues(hotkeys: unknown): LolHotkeyValues {
+  if (!hotkeys || typeof hotkeys !== 'object') return {};
+  const result: LolHotkeyValues = {};
+  for (const [section, bindings] of Object.entries(hotkeys as Record<string, unknown>)) {
+    if (!bindings || typeof bindings !== 'object') continue;
+    const normalizedBindings: Record<string, string> = {};
+    for (const [key, value] of Object.entries(bindings as Record<string, unknown>)) {
+      if (!key) continue;
+      normalizedBindings[key] = value == null ? 'null' : String(value);
+    }
+    if (Object.keys(normalizedBindings).length > 0) {
+      result[section] = normalizedBindings;
+    }
+  }
+  return result;
+}
+
 function normalizeValues(values: LolConfigValues): LolConfigValues {
   const defaults = cloneDefaultValues();
   return {
     client: { ...defaults.client, ...(values.client ?? {}) },
     game: { ...defaults.game, ...(values.game ?? {}) },
+    hotkeys: normalizeHotkeyValues(values.hotkeys),
   };
 }
 
@@ -415,9 +435,11 @@ function readValues(rootPath: string): LolConfigValues {
   const paths = getConfigPaths(rootPath);
   const gameCfg = readText(paths.gameCfg);
   const gameIni = parseIni(gameCfg);
+  const inputIni = readText(paths.inputIni);
   const localPrefs = readText(paths.lcuLocalPreferences);
   const accountPrefs = readText(paths.lcuAccountPreferences);
   const values = cloneDefaultValues();
+  values.hotkeys = parseIni(inputIni);
 
   values.client = {
     lowSpecMode: yamlBool(localPrefs, 'potatoModeEnabled', values.client.lowSpecMode),
@@ -567,6 +589,16 @@ function applyGameValuesToContent(content: string, values: LolConfigValues): str
   return next;
 }
 
+function applyInputValuesToContent(content: string, values: LolConfigValues): string {
+  let next = content;
+  for (const [section, bindings] of Object.entries(values.hotkeys ?? {})) {
+    for (const [key, value] of Object.entries(bindings)) {
+      next = setIniValue(next, section, key, value);
+    }
+  }
+  return next;
+}
+
 function applyPersistedValuesToContent(content: string, values: LolConfigValues): string {
   const parsed = JSON.parse(content) as PersistedSettingsRoot;
   parsed.files = Array.isArray(parsed.files) ? parsed.files : [];
@@ -593,10 +625,38 @@ function applyPersistedValuesToContent(content: string, values: LolConfigValues)
     }
   }
 
+  if (Object.keys(values.hotkeys ?? {}).length > 0) {
+    let inputFile = parsed.files.find((file) => file.name.toLowerCase() === 'input.ini');
+    if (!inputFile) {
+      inputFile = { name: 'Input.ini', sections: [] };
+      parsed.files.push(inputFile);
+    }
+    inputFile.sections = Array.isArray(inputFile.sections) ? inputFile.sections : [];
+
+    for (const [sectionName, bindings] of Object.entries(values.hotkeys)) {
+      let section = inputFile.sections.find((item) => item.name === sectionName);
+      if (!section) {
+        section = { name: sectionName, settings: [] };
+        inputFile.sections.push(section);
+      }
+      section.settings = Array.isArray(section.settings) ? section.settings : [];
+      for (const [key, value] of Object.entries(bindings)) {
+        let setting = section.settings.find((item) => item.name === key);
+        if (!setting) {
+          setting = { name: key, value };
+          section.settings.push(setting);
+        } else {
+          setting.value = value;
+        }
+      }
+    }
+  }
+
   return JSON.stringify(parsed, null, 4);
 }
 
 type LcuGameSettings = Record<string, Record<string, boolean | number | string>>;
+type LcuInputSettings = Record<string, Record<string, boolean | number | string | null>>;
 type LcuSettingData = Record<string, unknown>;
 
 interface LcuSettingEnvelope<T extends LcuSettingData = LcuSettingData> {
@@ -823,6 +883,32 @@ function mergeLiveGameSettings(values: LolConfigValues, settings: LcuGameSetting
   boolValue('Volume', 'VoiceMute', (value) => { values.game.voiceMute = value; });
 }
 
+function mergeLiveInputSettings(values: LolConfigValues, settings: LcuInputSettings): void {
+  const hotkeys: LolHotkeyValues = {};
+  for (const [section, bindings] of Object.entries(settings)) {
+    if (!bindings || typeof bindings !== 'object') continue;
+    const nextBindings: Record<string, string> = {};
+    for (const [key, value] of Object.entries(bindings)) {
+      nextBindings[key] = value == null ? 'null' : String(value);
+    }
+    if (Object.keys(nextBindings).length > 0) {
+      hotkeys[section] = nextBindings;
+    }
+  }
+  if (Object.keys(hotkeys).length > 0) {
+    values.hotkeys = hotkeys;
+  }
+}
+
+function applyHotkeysToLcuInputSettings(settings: LcuInputSettings, values: LolConfigValues): void {
+  for (const [section, bindings] of Object.entries(values.hotkeys ?? {})) {
+    settings[section] = settings[section] ?? {};
+    for (const [key, value] of Object.entries(bindings)) {
+      settings[section][key] = value;
+    }
+  }
+}
+
 async function mergeLiveClientSettings(rootPath: string, values: LolConfigValues): Promise<boolean> {
   const client = getLcuClientForRoot(rootPath);
   if (!client) return false;
@@ -840,6 +926,7 @@ async function mergeLiveClientSettings(rootPath: string, values: LolConfigValues
   const profilePrivacy = await getLcuOptional<LcuProfilePrivacy>(client, '/lol-summoner/v1/current-summoner/profile-privacy');
   const privacyView = await getLcuOptional<LcuPrivacyView>(client, '/lol-summoner-profiles/v1/get-privacy-view');
   const gameSettings = await getLcuOptional<LcuGameSettings>(client, '/lol-game-settings/v1/game-settings');
+  const inputSettings = await getLcuOptional<LcuInputSettings>(client, '/lol-game-settings/v1/input-settings');
 
   const masterSoundEnabled = optionalBool(localAudio?.data?.masterSoundEnabled);
   if (masterSoundEnabled !== null) values.client.clientAudioEnabled = masterSoundEnabled;
@@ -904,6 +991,7 @@ async function mergeLiveClientSettings(rootPath: string, values: LolConfigValues
   if (anonymityEnabled !== null) values.client.hideMyIdentityFromOthers = anonymityEnabled;
 
   if (gameSettings) mergeLiveGameSettings(values, gameSettings);
+  if (inputSettings) mergeLiveInputSettings(values, inputSettings);
   if (blockedPlayers) values.client.blockedPlayers = normalizeBlockedPlayers(blockedPlayers);
 
   return true;
@@ -983,6 +1071,12 @@ async function syncValuesToLcu(rootPath: string, values: LolConfigValues): Promi
   setLcuValue(settings, 'Volume', 'VoiceMute', values.game.voiceMute);
 
   await client.patch('/lol-game-settings/v1/game-settings', settings);
+
+  const inputSettings = await getLcuOptional<LcuInputSettings>(client, '/lol-game-settings/v1/input-settings');
+  if (inputSettings) {
+    applyHotkeysToLcuInputSettings(inputSettings, values);
+    await client.patch('/lol-game-settings/v1/input-settings', inputSettings);
+  }
 
   await patchLcuSetting(client, 'local', 'lol-audio', (data) => {
     data.masterSoundEnabled = values.client.clientAudioEnabled;
@@ -1172,6 +1266,17 @@ function applyValuesToDisk(rootPath: string, values: LolConfigValues): LolConfig
     );
   }
 
+  const inputIni = readText(paths.inputIni);
+  if (inputIni !== null) {
+    backupAndWrite(
+      rootPath,
+      paths.inputIni,
+      applyInputValuesToContent(inputIni, values),
+      backupDir,
+      filesWritten,
+    );
+  }
+
   const persistedSettings = readText(paths.persistedSettings);
   if (persistedSettings !== null) {
     backupAndWrite(
@@ -1294,7 +1399,7 @@ function buildSnapshots(rootPath: string, values: LolConfigValues): ConfigProfil
 
   return {
     gameCfg: gameCfg !== null ? applyGameValuesToContent(gameCfg, values) : undefined,
-    inputIni: inputIni ?? undefined,
+    inputIni: inputIni !== null ? applyInputValuesToContent(inputIni, values) : undefined,
     persistedSettings: persistedSettings !== null
       ? applyPersistedValuesToContent(persistedSettings, values)
       : undefined,
@@ -1420,7 +1525,13 @@ export async function applyLeagueConfigProfile(
     );
   }
   if (profile.snapshots.inputIni !== undefined) {
-    backupAndWrite(resolvedRootPath, paths.inputIni, profile.snapshots.inputIni, backupDir, filesWritten);
+    backupAndWrite(
+      resolvedRootPath,
+      paths.inputIni,
+      applyInputValuesToContent(profile.snapshots.inputIni, profile.values),
+      backupDir,
+      filesWritten,
+    );
   }
   if (profile.snapshots.persistedSettings !== undefined) {
     backupAndWrite(
@@ -1432,7 +1543,11 @@ export async function applyLeagueConfigProfile(
     );
   }
 
-  if (profile.snapshots.gameCfg === undefined || profile.snapshots.persistedSettings === undefined) {
+  if (
+    profile.snapshots.gameCfg === undefined ||
+    profile.snapshots.inputIni === undefined ||
+    profile.snapshots.persistedSettings === undefined
+  ) {
     const valuesResult = applyValuesToDisk(resolvedRootPath, profile.values);
     try {
       valuesResult.lcuSynced = await syncValuesToLcu(resolvedRootPath, profile.values);
