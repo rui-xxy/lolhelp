@@ -6,6 +6,7 @@ import { MatchHistoryPage } from './components/match/MatchHistoryPage';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
+import { SettingsDialog } from './components/settings/SettingsDialog';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
@@ -60,6 +61,7 @@ export function App() {
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
   const [friendPanelHidden, setFriendPanelHidden] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const friendPanelTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -183,6 +185,7 @@ export function App() {
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
+      onOpenSettings={() => setSettingsOpen(true)}
       friendPanel={
         <FriendPanel
           onFriendClick={handleFriendClick}
@@ -216,6 +219,7 @@ export function App() {
           }}
         />
       </div>
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AppShell>
   );
 }

@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   AppSettings,
+  LolConfigApplyProfileRequest,
+  LolConfigApplyValuesRequest,
+  LolConfigSaveProfileRequest,
   LolHelper,
   PlayerLookupRequest,
   ScoutConfig,
@@ -38,6 +41,18 @@ const lolHelper: LolHelper = {
     getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_SETTINGS),
     saveSettings: (settings: AppSettings) =>
       ipcRenderer.invoke(IPC_CHANNELS.DB_SAVE_SETTINGS, settings),
+  },
+  config: {
+    read: (rootPath?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_READ, rootPath),
+    applyValues: (req: LolConfigApplyValuesRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_APPLY_VALUES, req),
+    saveProfile: (req: LolConfigSaveProfileRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_SAVE_PROFILE, req),
+    applyProfile: (req: LolConfigApplyProfileRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_APPLY_PROFILE, req),
+    deleteProfile: (profileId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_DELETE_PROFILE, profileId),
   },
   scout: {
     // find：长任务。onProgress 通过 scout:progress 推送（每出一个达标者回调一次）。

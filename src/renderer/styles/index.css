@@ -823,6 +823,17 @@
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */
 @layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
   .shadow-airbnb {
     box-shadow:
       rgba(0, 0, 0, 0.02) 0 0 0 1px,

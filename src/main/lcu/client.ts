@@ -1,28 +1,46 @@
 import https from 'node:https';
 import type { LcuCredentials } from './lockfile';
 
-// 最小 LCU 客户端：只做 detect-client 验证需要的请求。
-// 完整客户端（重试/超时/类型化 DTO/POST/WebSocket）留到后续战绩阶段。
-//
-// LCU 连接三要素（来自技术文档）：
-// 1. 地址：https://127.0.0.1:<port>（port 来自 lockfile）
-// 2. 认证：HTTP Basic Auth，用户名固定 'riot'，密码 = lockfile token
-// 3. 证书：自签名，必须 rejectUnauthorized:false 关闭校验
 export class LcuClient {
   constructor(private creds: LcuCredentials) {}
 
-  // 发 GET 请求。path 形如 '/lol-summoner/v1/current-summoner'。
-  // 返回解析后的 JSON；客户端未响应/凭证错误/非 2xx 时 reject。
   get<T = unknown>(requestPath: string): Promise<T> {
+    return this.request<T>('GET', requestPath);
+  }
+
+  put<T = unknown>(requestPath: string, body: unknown): Promise<T> {
+    return this.request<T>('PUT', requestPath, body);
+  }
+
+  patch<T = unknown>(requestPath: string, body: unknown): Promise<T> {
+    return this.request<T>('PATCH', requestPath, body);
+  }
+
+  post<T = unknown>(requestPath: string, body: unknown): Promise<T> {
+    return this.request<T>('POST', requestPath, body);
+  }
+
+  private request<T = unknown>(
+    method: 'GET' | 'PUT' | 'PATCH' | 'POST',
+    requestPath: string,
+    body?: unknown,
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
+      const payload = body === undefined ? undefined : JSON.stringify(body);
       const req = https.request(
         {
           hostname: '127.0.0.1',
           port: this.creds.port,
           path: requestPath,
-          method: 'GET',
-          auth: `riot:${this.creds.token}`, // Basic Auth，用户名固定 riot
-          rejectUnauthorized: false, // 自签名证书，关闭校验
+          method,
+          auth: `riot:${this.creds.token}`,
+          rejectUnauthorized: false,
+          headers: payload
+            ? {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload),
+              }
+            : undefined,
         },
         (res) => {
           let data = '';
@@ -30,17 +48,18 @@ export class LcuClient {
           res.on('end', () => {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               try {
-                resolve(JSON.parse(data) as T);
+                resolve(data ? (JSON.parse(data) as T) : (undefined as T));
               } catch {
-                reject(new Error(`LCU 返回非 JSON：${data.slice(0, 100)}`));
+                reject(new Error(`LCU returned non-JSON: ${data.slice(0, 100)}`));
               }
-            } else {
-              reject(new Error(`LCU 请求失败：HTTP ${res.statusCode}`));
+              return;
             }
+            reject(new Error(`LCU ${method} ${requestPath} failed: HTTP ${res.statusCode}`));
           });
         },
       );
       req.on('error', reject);
+      if (payload) req.write(payload);
       req.end();
     });
   }

@@ -99,6 +99,173 @@ export interface DbApi {
   saveSettings: (settings: AppSettings) => Promise<void>;
 }
 
+// ============================================================================
+// League 配置同步：客户端设置 + 游戏内设置
+// ============================================================================
+
+export interface LolClientConfigValues {
+  lowSpecMode: boolean;
+  disableInteractiveBackground: boolean;
+  closeClientDuringGame: boolean;
+  disableChampionSkillText: boolean;
+  clientAudioEnabled: boolean;
+  uploadCrashReports: boolean;
+  careerPrivate: boolean;
+  blockNonFriendGameInvites: boolean;
+  linkClickWarningEnabled: boolean;
+  moreUnreadsEnabled: boolean;
+  friendRequestToastsEnabled: boolean;
+  teamVoiceEnabled: boolean;
+  autoJoinTeamVoice: boolean;
+  muteOnConnect: boolean;
+  voiceInputMode: 'voiceActivity' | 'pushToTalk' | string;
+  voiceInputDeviceHandle: string;
+  voiceInputDeviceName: string;
+  voiceInputVolume: number;
+  voiceSensitivity: number;
+  hideAllPlayerNamesForMe: boolean;
+  hideMyNameFromOthers: boolean;
+  hideMyIdentityFromOthers: boolean;
+  blockedPlayers: LolBlockedPlayer[];
+}
+
+export interface LolBlockedPlayer {
+  id: string;
+  puuid: string;
+  summonerId: number;
+  gameName: string;
+  gameTag: string;
+  icon: number;
+}
+
+export interface LolGameConfigValues {
+  gameMouseSpeed: number;
+  mapScrollSpeed: number;
+  keyboardScrollSpeed: number;
+  snapCameraOnRespawn: boolean;
+  scrollSmoothingEnabled: boolean;
+  middleClickDragScrollEnabled: boolean;
+  cameraLockMode: number;
+  autoAcquireTarget: boolean;
+  autoDisplayTarget: boolean;
+  showAttackRadius: boolean;
+  enableTargetedAttackMove: boolean;
+  disableHudSpellClick: boolean;
+  showTurretRangeIndicators: boolean;
+  predictMovement: boolean;
+  recommendJunglePaths: boolean;
+  targetChampionsOnlyAsToggle: boolean;
+  windowMode: string;
+  width: number;
+  height: number;
+  enableAudio: boolean;
+  cursorScale: number;
+  enableHudAnimations: boolean;
+  shadowQuality: number;
+  characterQuality: number;
+  effectsQuality: number;
+  environmentQuality: number;
+  frameCapType: number;
+  waitForVerticalSync: boolean;
+  enableFxaa: boolean;
+  globalScale: number;
+  chatScale: number;
+  minimapScale: number;
+  showFpsAndLatency: boolean;
+  showTimestamps: boolean;
+  showAlliedChat: boolean;
+  showAllChannelChat: boolean;
+  hidePlayerNames: boolean;
+  showSummonerNames: number;
+  flashScreenWhenDamaged: boolean;
+  flashScreenWhenStunned: boolean;
+  showOffScreenPointsOfInterest: boolean;
+  enableLineMissileVis: boolean;
+  showSpellCosts: boolean;
+  showSpellRecommendations: boolean;
+  showPlayerStats: boolean;
+  showNeutralCamps: boolean;
+  numericCooldownFormat: number;
+  masterVolume: number;
+  masterMute: boolean;
+  musicVolume: number;
+  musicMute: boolean;
+  sfxVolume: number;
+  sfxMute: boolean;
+  ambienceVolume: number;
+  ambienceMute: boolean;
+  pingsVolume: number;
+  pingsMute: boolean;
+  announcerVolume: number;
+  announcerMute: boolean;
+  voiceVolume: number;
+  voiceMute: boolean;
+}
+
+export interface LolConfigValues {
+  client: LolClientConfigValues;
+  game: LolGameConfigValues;
+}
+
+export interface LolConfigFileStatus {
+  key: string;
+  label: string;
+  path: string;
+  exists: boolean;
+  size: number;
+  updatedAt: number | null;
+}
+
+export interface LolConfigProfileSummary {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  sourceRootPath: string;
+  gameResolution: string;
+}
+
+export interface LolConfigState {
+  rootPath: string;
+  found: boolean;
+  values: LolConfigValues;
+  files: LolConfigFileStatus[];
+  profiles: LolConfigProfileSummary[];
+  warnings: string[];
+}
+
+export interface LolConfigApplyResult {
+  rootPath: string;
+  backupDir: string | null;
+  filesWritten: string[];
+  lcuSynced: boolean;
+  lcuError?: string;
+}
+
+export interface LolConfigSaveProfileRequest {
+  name: string;
+  rootPath?: string;
+  values: LolConfigValues;
+}
+
+export interface LolConfigApplyValuesRequest {
+  rootPath?: string;
+  values: LolConfigValues;
+}
+
+export interface LolConfigApplyProfileRequest {
+  profileId: string;
+  rootPath?: string;
+}
+
+export interface LolConfigApi {
+  read: (rootPath?: string) => Promise<LolConfigState>;
+  applyValues: (req: LolConfigApplyValuesRequest) => Promise<LolConfigApplyResult>;
+  saveProfile: (req: LolConfigSaveProfileRequest) => Promise<LolConfigProfileSummary[]>;
+  applyProfile: (req: LolConfigApplyProfileRequest) => Promise<LolConfigApplyResult>;
+  deleteProfile: (profileId: string) => Promise<LolConfigProfileSummary[]>;
+}
+
 // 英雄摘要（给前端英雄选择器用，来自 heroData 的 HeroSummary 映射）
 export interface ChampionSummary {
   id: number;
@@ -119,6 +286,7 @@ export interface LolHelper {
   window: WindowApi;
   db: DbApi;
   scout: ScoutApi;
+  config: LolConfigApi;
 }
 
 // ============================================================================

@@ -15,6 +15,12 @@ export const IPC_CHANNELS = {
   // db 域：本地数据/设置（后续阶段填充真实实现）
   DB_GET_SETTINGS: 'db:get-settings',
   DB_SAVE_SETTINGS: 'db:save-settings',
+  // config 域：League 客户端/游戏内配置读取、保存和一键应用
+  CONFIG_READ: 'config:read',
+  CONFIG_APPLY_VALUES: 'config:apply-values',
+  CONFIG_SAVE_PROFILE: 'config:save-profile',
+  CONFIG_APPLY_PROFILE: 'config:apply-profile',
+  CONFIG_DELETE_PROFILE: 'config:delete-profile',
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
   // window 域：窗口控制

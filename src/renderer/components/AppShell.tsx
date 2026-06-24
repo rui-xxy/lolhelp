@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords, Radar, Users, Crosshair } from 'lucide-react';
+import { PanelLeft, Home, Swords, Radar, Users, Crosshair, Settings } from 'lucide-react';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches' | 'live' | 'scout';
@@ -17,6 +17,7 @@ interface AppShellProps {
   friendPanelHidden?: boolean; // 好友栏是否隐藏
   onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
+  onOpenSettings?: () => void; // 打开设置窗口
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -40,6 +41,7 @@ export function AppShell({
   friendPanelHidden = false,
   onToggleFriendPanel,
   friendPanel,
+  onOpenSettings,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarWidth = collapsed ? COLLAPSED_SIDEBAR_WIDTH : EXPANDED_SIDEBAR_WIDTH;
@@ -125,6 +127,20 @@ export function AppShell({
             <Crosshair className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">高手雷达</span>}
           </a>
+          {onOpenSettings && (
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                onOpenSettings();
+              }}
+              title={collapsed ? '设置' : undefined}
+              className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+            >
+              <Settings className="size-4 shrink-0" />
+              {!collapsed && <span className="truncate">设置</span>}
+            </a>
+          )}
         </nav>
 
         {/* 底部：状态占位区 */}

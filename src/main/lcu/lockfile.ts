@@ -1,48 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// LCU 连接所需的全部凭证。
-// 国际服来自 lockfile，国服（腾讯）来自 LeagueClientUx.log（lockfile 为空）。
-// 本模块遍历所有候选 LeagueClient 目录，每个目录依次尝试 lockfile 和 log，
-// 谁先返回有效凭证就用谁——避免"命中空的国际服目录就停"的问题。
 export interface LcuCredentials {
-  pid: string; // 客户端进程 ID
-  port: string; // app-port（LCU HTTPS 监听端口）
-  token: string; // remoting-auth-token（Basic Auth 密码）
-  protocol: string; // 固定 'https'
+  pid: string;
+  port: string;
+  token: string;
+  protocol: string;
 }
 
-// LeagueClient 候选安装路径（相对盘符根）。覆盖国际服 / 国服 WeGame / 变体。
 const CANDIDATE_CLIENT_DIRS = [
-  path.join('WeGameApps', '英雄联盟', 'LeagueClient'), // 国服 WeGame（实测主路径，优先）
-  path.join('英雄联盟', 'LeagueClient'), // 国服简装
-  path.join('Tencent', '英雄联盟', 'LeagueClient'), // 国服腾讯路径变体
-  path.join('Riot Games', 'League of Legends'), // 国际服
-  path.join('Riot Games', 'League of Legends (PBE)'), // 测试服
+  path.join('WeGameApps', '英雄联盟', 'LeagueClient'),
+  path.join('英雄联盟', 'LeagueClient'),
+  path.join('Tencent', '英雄联盟', 'LeagueClient'),
+  path.join('Riot Games', 'League of Legends'),
+  path.join('Riot Games', 'League of Legends (PBE)'),
 ];
 
-// 枚举所有盘符下存在的候选 LeagueClient 目录（不只第一个）。
-// 客户端可能在任意盘符，且国际服/国服可能并存，全部尝试。
-function resolveClientDirs(): string[] {
-  const drives = ['C:', 'D:', 'E:', 'F:', 'G:'];
-  const dirs: string[] = [];
-  for (const drive of drives) {
-    for (const candidate of CANDIDATE_CLIENT_DIRS) {
-      const full = path.join(drive, candidate);
-      try {
-        if (fs.existsSync(full) && fs.statSync(full).isDirectory()) {
-          dirs.push(full);
-        }
-      } catch {
-        // 忽略权限/不存在错误
-      }
-    }
-  }
-  return dirs;
-}
-
-// 策略 1：读 lockfile（国际服主路径，国服通常为空）。
-// 返回 null = 文件不存在或为空；抛异常 = 格式错误（调用方捕获后继续尝试 log）。
 function readFromLockfile(clientDir: string): LcuCredentials | null {
   let content: string;
   try {
@@ -52,10 +25,9 @@ function readFromLockfile(clientDir: string): LcuCredentials | null {
   }
   if (!content) return null;
 
-  // 格式：LeagueClient:PID:APP_PORT:PASSWORD:https（冒号分隔 5 段）
   const parts = content.split(':');
   if (parts.length < 5) {
-    throw new Error(`lockfile 格式异常：期望 5 段，实际 ${parts.length} 段`);
+    throw new Error(`Invalid lockfile format: expected 5 parts, got ${parts.length}`);
   }
   return {
     pid: parts[1],
@@ -65,107 +37,106 @@ function readFromLockfile(clientDir: string): LcuCredentials | null {
   };
 }
 
-// 找最新的 LeagueClientUx.log（文件名：<ISO时间戳>_<PID>_LeagueClientUx.log）。
 function findLatestUxLog(clientDir: string): string | null {
-  let logs: string[];
   try {
-    logs = fs
+    const logs = fs
       .readdirSync(clientDir)
-      .filter((name) => name.endsWith('_LeagueClientUx.log'));
+      .filter((name) => name.endsWith('_LeagueClientUx.log'))
+      .sort();
+    return logs.length > 0 ? path.join(clientDir, logs[logs.length - 1]) : null;
   } catch {
     return null;
   }
-  if (logs.length === 0) return null;
-  // ISO 时间戳前缀天然可字符串排序，最新的在末尾。
-  logs.sort();
-  return path.join(clientDir, logs[logs.length - 1]);
 }
 
-// 策略 2：解析 LeagueClientUx.log（国服主路径）。
-// 日志 "Command line arguments:" 行含 --app-port 和 --remoting-auth-token。
-// token 在客户端单次运行期间稳定，只有重启才变（已实测验证）。
 function readFromUxLog(clientDir: string): LcuCredentials | null {
   const logPath = findLatestUxLog(clientDir);
   if (!logPath) return null;
 
-  let content: string;
   try {
-    // 日志可能很大，只读前 200KB 足够覆盖启动参数段。
     const fd = fs.openSync(logPath, 'r');
     const buf = Buffer.alloc(200 * 1024);
     const bytesRead = fs.readSync(fd, buf, 0, buf.length, 0);
     fs.closeSync(fd);
-    content = buf.subarray(0, bytesRead).toString('utf-8');
+    const content = buf.subarray(0, bytesRead).toString('utf-8');
+    const portMatch = content.match(/--app-port=(\d+)/);
+    const tokenMatch = content.match(/--remoting-auth-token=([A-Za-z0-9_-]+)/);
+    const pidMatch = content.match(/--app-pid=(\d+)/);
+    if (!portMatch || !tokenMatch) return null;
+    return {
+      pid: pidMatch ? pidMatch[1] : '',
+      port: portMatch[1],
+      token: tokenMatch[1],
+      protocol: 'https',
+    };
   } catch {
     return null;
   }
-
-  // 匹配 --app-port=<digits>（正则要求 -- 前缀，不会误匹配 --riotclient-app-port）。
-  const portMatch = content.match(/--app-port=(\d+)/);
-  const tokenMatch = content.match(/--remoting-auth-token=([A-Za-z0-9_-]+)/);
-  const pidMatch = content.match(/--app-pid=(\d+)/);
-
-  if (!portMatch || !tokenMatch) return null;
-
-  return {
-    pid: pidMatch ? pidMatch[1] : '',
-    port: portMatch[1],
-    token: tokenMatch[1],
-    protocol: 'https',
-  };
 }
 
-// 尝试从单个目录获取凭证：先 lockfile，失败则 log。
 function tryResolveFromDir(clientDir: string): LcuCredentials | null {
   try {
     const creds = readFromLockfile(clientDir);
     if (creds) return creds;
   } catch (err) {
-    console.warn(`[lcu] ${clientDir} lockfile 解析失败，尝试 log:`, err);
+    console.warn(`[lcu] failed to parse lockfile in ${clientDir}, trying log:`, err);
   }
   return readFromUxLog(clientDir);
 }
 
-// 获取 LCU 凭证。遍历所有候选 LeagueClient 目录，每个都尝试 lockfile + log，
-// 谁先返回有效凭证就用谁。返回 null = 所有目录都失败（客户端未运行）。
+function resolveClientDirs(): string[] {
+  const drives = ['C:', 'D:', 'E:', 'F:', 'G:'];
+  const dirs: string[] = [];
+  for (const drive of drives) {
+    for (const candidate of CANDIDATE_CLIENT_DIRS) {
+      const full = path.join(drive, candidate);
+      try {
+        if (fs.existsSync(full) && fs.statSync(full).isDirectory()) dirs.push(full);
+      } catch {
+        // Ignore inaccessible drives.
+      }
+    }
+  }
+  return dirs;
+}
+
 export function readLockfile(): LcuCredentials | null {
-  const dirs = resolveClientDirs();
-  for (const dir of dirs) {
+  for (const dir of resolveClientDirs()) {
     const creds = tryResolveFromDir(dir);
     if (creds) {
-      console.log(`[lcu] 从 ${dir} 获取到凭证（port=${creds.port}）`);
+      console.log(`[lcu] credentials resolved from ${dir} (port=${creds.port})`);
       return creds;
     }
   }
   return null;
 }
 
-// ===== 凭证缓存层 =====
-// 战绩查询等批量 LCU 请求会连续发多次，每次都扫盘读 log 是浪费。
-// token 在客户端单次运行期间稳定（仅重启才变），故加 TTL 缓存。
-// detect-client 仍用 readLockfile()（即时检测，不读缓存）；战绩服务用 getCachedCredentials()。
-const CREDS_CACHE_TTL = 30_000; // 30 秒
+export function readCredentialsForInstallRoot(rootPath?: string): LcuCredentials | null {
+  if (rootPath) {
+    const clientDir = path.join(rootPath, 'LeagueClient');
+    const creds = tryResolveFromDir(clientDir);
+    if (creds) {
+      console.log(`[lcu] credentials resolved from ${clientDir} (port=${creds.port})`);
+      return creds;
+    }
+  }
+  return readLockfile();
+}
+
+const CREDS_CACHE_TTL = 30_000;
 let cachedCreds: LcuCredentials | null = null;
 let cachedCredsAt = 0;
 
-// 带缓存的凭证获取。供战绩服务等批量请求场景复用。
-// 返回 null = 客户端未运行。
 export function getCachedCredentials(): LcuCredentials | null {
   const now = Date.now();
-  if (cachedCreds && now - cachedCredsAt < CREDS_CACHE_TTL) {
-    return cachedCreds;
-  }
+  if (cachedCreds && now - cachedCredsAt < CREDS_CACHE_TTL) return cachedCreds;
+
   const creds = readLockfile();
-  if (creds) {
-    cachedCreds = creds;
-    cachedCredsAt = now;
-  } else {
-    cachedCreds = null; // 客户端没了，清缓存
-  }
+  cachedCreds = creds;
+  cachedCredsAt = creds ? now : 0;
   return creds;
 }
 
-// 凭证失效（请求 401/403 时调用，强制下次重新读取）。
 export function invalidateCredentialsCache(): void {
   cachedCreds = null;
   cachedCredsAt = 0;
