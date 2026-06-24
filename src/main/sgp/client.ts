@@ -56,6 +56,57 @@ export class SgpClient {
     });
   }
 
+  // 发 POST 请求到 SGP。用于 challenges-client 等需要 POST 的端点。
+  // body 序列化为 JSON，params 作为 query string 拼接。
+  post<T = unknown>(
+    requestPath: string,
+    body?: unknown,
+    params?: Record<string, string | number>,
+  ): Promise<T> {
+    let fullPath = requestPath;
+    if (params) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
+      fullPath += `?${qs.toString()}`;
+    }
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(
+        {
+          hostname: this.extractHost(this.auth.region.matchHistory),
+          port: 21019,
+          path: fullPath,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.accessToken}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          rejectUnauthorized: false,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              if (!data) return resolve({} as T);
+              try {
+                resolve(JSON.parse(data) as T);
+              } catch {
+                reject(new Error(`SGP 返回非 JSON：${data.slice(0, 100)}`));
+              }
+            } else {
+              reject(new Error(`SGP 请求失败：HTTP ${res.statusCode}`));
+            }
+          });
+        },
+      );
+      req.on('error', reject);
+      req.end(payload);
+    });
+  }
+
   // 从 "https://hn10-k8s-sgp.lol.qq.com:21019" 提取 hostname "hn10-k8s-sgp.lol.qq.com"
   private extractHost(url: string): string {
     try {
