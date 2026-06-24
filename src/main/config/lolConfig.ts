@@ -6,7 +6,6 @@ import type {
   LolConfigApplyResult,
   LolConfigFileStatus,
   LolConfigProfileSummary,
-  LolHotkeyValues,
   LolConfigValues,
 } from '../../shared/api';
 import { LcuClient } from '../lcu/client';
@@ -16,10 +15,16 @@ import {
   type FileWritePlan,
 } from './fileTransaction';
 import {
-  coerceHotkeyValue,
   normalizeHotkeyValues,
   type LcuInputSettings,
 } from './hotkeyValues';
+import {
+  applyGameValuesToLcuSettings,
+  applyHotkeysToLcuInputSettings,
+  mergeLiveGameSettings,
+  mergeLiveInputSettings,
+  type LcuGameSettings,
+} from './lcuGameSettings';
 import {
   boolFlag,
   clamp,
@@ -439,7 +444,6 @@ function applyPersistedValuesToContent(content: string, values: LolConfigValues)
   return JSON.stringify(parsed, null, 4);
 }
 
-type LcuGameSettings = Record<string, Record<string, boolean | number | string>>;
 type LcuSettingData = Record<string, unknown>;
 
 interface LcuSettingEnvelope<T extends LcuSettingData = LcuSettingData> {
@@ -567,132 +571,6 @@ function findVoiceDeviceName(devices: LcuCaptureDevice[] | null, handle: string)
   return device?.name ?? handle;
 }
 
-function setLcuValue(
-  settings: LcuGameSettings,
-  section: string,
-  key: string,
-  value: boolean | number | string,
-): void {
-  if (!settings[section] || !(key in settings[section])) return;
-  settings[section][key] = value;
-}
-
-function readLcuGameValue(
-  settings: LcuGameSettings,
-  section: string,
-  key: string,
-): boolean | number | string | undefined {
-  return settings[section]?.[key];
-}
-
-function mergeLiveGameSettings(values: LolConfigValues, settings: LcuGameSettings): void {
-  const boolValue = (section: string, key: string, apply: (value: boolean) => void) => {
-    const value = readLcuGameValue(settings, section, key);
-    if (typeof value === 'boolean') apply(value);
-  };
-  const numberValue = (section: string, key: string, apply: (value: number) => void) => {
-    const value = readLcuGameValue(settings, section, key);
-    if (typeof value === 'number' && Number.isFinite(value)) apply(value);
-  };
-  const percentValue = (section: string, key: string, apply: (value: number) => void) => {
-    numberValue(section, key, (value) => apply(clamp(Math.round(value * 100), 0, 100)));
-  };
-
-  numberValue('General', 'GameMouseSpeed', (value) => { values.game.gameMouseSpeed = clamp(Math.round(value * 5), 0, 100); });
-  boolValue('General', 'SnapCameraOnRespawn', (value) => { values.game.snapCameraOnRespawn = value; });
-  boolValue('General', 'AutoAcquireTarget', (value) => { values.game.autoAcquireTarget = value; });
-  boolValue('General', 'EnableTargetedAttackMove', (value) => { values.game.enableTargetedAttackMove = value; });
-  boolValue('General', 'ShowTurretRangeIndicators', (value) => { values.game.showTurretRangeIndicators = value; });
-  boolValue('General', 'PredictMovement', (value) => { values.game.predictMovement = value; });
-  boolValue('General', 'RecommendJunglePaths', (value) => { values.game.recommendJunglePaths = value; });
-  boolValue('General', 'TargetChampionsOnlyAsToggle', (value) => { values.game.targetChampionsOnlyAsToggle = value; });
-  numberValue('General', 'WindowMode', (value) => { values.game.windowMode = String(value); });
-  boolValue('General', 'EnableAudio', (value) => { values.game.enableAudio = value; });
-  percentValue('General', 'CursorScale', (value) => { values.game.cursorScale = value; });
-  boolValue('General', 'WaitForVerticalSync', (value) => { values.game.waitForVerticalSync = value; });
-
-  percentValue('HUD', 'MapScrollSpeed', (value) => { values.game.mapScrollSpeed = value; });
-  percentValue('HUD', 'KeyboardScrollSpeed', (value) => { values.game.keyboardScrollSpeed = value; });
-  boolValue('HUD', 'ScrollSmoothingEnabled', (value) => { values.game.scrollSmoothingEnabled = value; });
-  boolValue('HUD', 'MiddleClickDragScrollEnabled', (value) => { values.game.middleClickDragScrollEnabled = value; });
-  numberValue('HUD', 'CameraLockMode', (value) => { values.game.cameraLockMode = value; });
-  boolValue('HUD', 'AutoDisplayTarget', (value) => { values.game.autoDisplayTarget = value; });
-  boolValue('HUD', 'ShowAttackRadius', (value) => { values.game.showAttackRadius = value; });
-  boolValue('HUD', 'DisableHudSpellClick', (value) => { values.game.disableHudSpellClick = value; });
-  percentValue('HUD', 'GlobalScale', (value) => { values.game.globalScale = value; });
-  numberValue('HUD', 'ChatScale', (value) => { values.game.chatScale = value; });
-  percentValue('HUD', 'MinimapScale', (value) => { values.game.minimapScale = value; });
-  boolValue('HUD', 'ShowFPSAndLatency', (value) => { values.game.showFpsAndLatency = value; });
-  boolValue('HUD', 'ShowTimestamps', (value) => { values.game.showTimestamps = value; });
-  boolValue('HUD', 'ShowAlliedChat', (value) => { values.game.showAlliedChat = value; });
-  boolValue('HUD', 'ShowAllChannelChat', (value) => { values.game.showAllChannelChat = value; });
-  boolValue('HUD', 'HidePlayerNames', (value) => {
-    values.game.hidePlayerNames = value;
-    values.client.hideAllPlayerNamesForMe = value;
-  });
-  boolValue('HUD', 'HideMyNameToOthers', (value) => { values.client.hideMyNameFromOthers = value; });
-  numberValue('HUD', 'ShowSummonerNames', (value) => { values.game.showSummonerNames = value; });
-  boolValue('HUD', 'FlashScreenWhenDamaged', (value) => { values.game.flashScreenWhenDamaged = value; });
-  boolValue('HUD', 'FlashScreenWhenStunned', (value) => { values.game.flashScreenWhenStunned = value; });
-  boolValue('HUD', 'ShowOffScreenPointsOfInterest', (value) => { values.game.showOffScreenPointsOfInterest = value; });
-  boolValue('HUD', 'EnableLineMissileVis', (value) => { values.game.enableLineMissileVis = value; });
-  boolValue('HUD', 'ShowSpellCosts', (value) => { values.game.showSpellCosts = value; });
-  boolValue('HUD', 'ShowSpellRecommendations', (value) => { values.game.showSpellRecommendations = value; });
-  boolValue('HUD', 'ShowPlayerStats', (value) => { values.game.showPlayerStats = value; });
-  boolValue('HUD', 'ShowNeutralCamps', (value) => { values.game.showNeutralCamps = value; });
-  numberValue('HUD', 'NumericCooldownFormat', (value) => { values.game.numericCooldownFormat = value; });
-
-  boolValue('Performance', 'EnableHUDAnimations', (value) => { values.game.enableHudAnimations = value; });
-  numberValue('Performance', 'ShadowQuality', (value) => { values.game.shadowQuality = value; });
-  numberValue('Performance', 'CharacterQuality', (value) => { values.game.characterQuality = value; });
-  numberValue('Performance', 'EffectsQuality', (value) => { values.game.effectsQuality = value; });
-  numberValue('Performance', 'EnvironmentQuality', (value) => { values.game.environmentQuality = value; });
-  numberValue('Performance', 'FrameCapType', (value) => { values.game.frameCapType = value; });
-  boolValue('Performance', 'EnableFXAA', (value) => { values.game.enableFxaa = value; });
-
-  percentValue('Volume', 'MasterVolume', (value) => { values.game.masterVolume = value; });
-  boolValue('Volume', 'MasterMute', (value) => { values.game.masterMute = value; });
-  percentValue('Volume', 'MusicVolume', (value) => { values.game.musicVolume = value; });
-  boolValue('Volume', 'MusicMute', (value) => { values.game.musicMute = value; });
-  percentValue('Volume', 'SfxVolume', (value) => { values.game.sfxVolume = value; });
-  boolValue('Volume', 'SfxMute', (value) => { values.game.sfxMute = value; });
-  percentValue('Volume', 'AmbienceVolume', (value) => { values.game.ambienceVolume = value; });
-  boolValue('Volume', 'AmbienceMute', (value) => { values.game.ambienceMute = value; });
-  percentValue('Volume', 'PingsVolume', (value) => { values.game.pingsVolume = value; });
-  boolValue('Volume', 'PingsMute', (value) => { values.game.pingsMute = value; });
-  percentValue('Volume', 'AnnouncerVolume', (value) => { values.game.announcerVolume = value; });
-  boolValue('Volume', 'AnnouncerMute', (value) => { values.game.announcerMute = value; });
-  percentValue('Volume', 'VoiceVolume', (value) => { values.game.voiceVolume = value; });
-  boolValue('Volume', 'VoiceMute', (value) => { values.game.voiceMute = value; });
-}
-
-function mergeLiveInputSettings(values: LolConfigValues, settings: LcuInputSettings): void {
-  const hotkeys: LolHotkeyValues = {};
-  for (const [section, bindings] of Object.entries(settings)) {
-    if (!bindings || typeof bindings !== 'object') continue;
-    const nextBindings: Record<string, string> = {};
-    for (const [key, value] of Object.entries(bindings)) {
-      nextBindings[key] = value == null ? 'null' : String(value);
-    }
-    if (Object.keys(nextBindings).length > 0) {
-      hotkeys[section] = nextBindings;
-    }
-  }
-  if (Object.keys(hotkeys).length > 0) {
-    values.hotkeys = hotkeys;
-  }
-}
-
-function applyHotkeysToLcuInputSettings(settings: LcuInputSettings, values: LolConfigValues): void {
-  for (const [section, bindings] of Object.entries(values.hotkeys ?? {})) {
-    settings[section] = settings[section] ?? {};
-    for (const [key, value] of Object.entries(bindings)) {
-      const currentValue = settings[section][key];
-      settings[section][key] = coerceHotkeyValue(value, currentValue);
-    }
-  }
-}
-
 const CONFIG_WRITE_BLOCKED_PHASES = new Set([
   'ChampSelect',
   'GameStart',
@@ -814,73 +692,7 @@ async function syncValuesToLcu(rootPath: string, values: LolConfigValues): Promi
   if (!client) return false;
 
   const settings = await client.get<LcuGameSettings>('/lol-game-settings/v1/game-settings');
-
-  setLcuValue(settings, 'General', 'LowSpecMachineAdaptation', values.client.lowSpecMode);
-  setLcuValue(settings, 'General', 'DisableInteractiveBackground', values.client.disableInteractiveBackground);
-  setLcuValue(settings, 'General', 'CloseClientDuringGame', values.client.closeClientDuringGame);
-  setLcuValue(settings, 'General', 'DisableChampionSkillText', values.client.disableChampionSkillText);
-  setLcuValue(settings, 'General', 'GameMouseSpeed', Math.round(clamp(values.game.gameMouseSpeed, 0, 100) / 5));
-  setLcuValue(settings, 'General', 'SnapCameraOnRespawn', values.game.snapCameraOnRespawn);
-  setLcuValue(settings, 'General', 'AutoAcquireTarget', values.game.autoAcquireTarget);
-  setLcuValue(settings, 'General', 'EnableTargetedAttackMove', values.game.enableTargetedAttackMove);
-  setLcuValue(settings, 'General', 'ShowTurretRangeIndicators', values.game.showTurretRangeIndicators);
-  setLcuValue(settings, 'General', 'PredictMovement', values.game.predictMovement);
-  setLcuValue(settings, 'General', 'RecommendJunglePaths', values.game.recommendJunglePaths);
-  setLcuValue(settings, 'General', 'TargetChampionsOnlyAsToggle', values.game.targetChampionsOnlyAsToggle);
-  setLcuValue(settings, 'General', 'WindowMode', Number(values.game.windowMode));
-  setLcuValue(settings, 'General', 'EnableAudio', values.game.enableAudio);
-  setLcuValue(settings, 'General', 'CursorScale', clamp(values.game.cursorScale, 0, 100) / 100);
-  setLcuValue(settings, 'General', 'WaitForVerticalSync', values.game.waitForVerticalSync);
-
-  setLcuValue(settings, 'HUD', 'MapScrollSpeed', clamp(values.game.mapScrollSpeed, 0, 100) / 100);
-  setLcuValue(settings, 'HUD', 'KeyboardScrollSpeed', clamp(values.game.keyboardScrollSpeed, 0, 100) / 100);
-  setLcuValue(settings, 'HUD', 'ScrollSmoothingEnabled', values.game.scrollSmoothingEnabled);
-  setLcuValue(settings, 'HUD', 'MiddleClickDragScrollEnabled', values.game.middleClickDragScrollEnabled);
-  setLcuValue(settings, 'HUD', 'CameraLockMode', values.game.cameraLockMode);
-  setLcuValue(settings, 'HUD', 'AutoDisplayTarget', values.game.autoDisplayTarget);
-  setLcuValue(settings, 'HUD', 'GlobalScale', clamp(values.game.globalScale, 0, 100) / 100);
-  setLcuValue(settings, 'HUD', 'ChatScale', values.game.chatScale);
-  setLcuValue(settings, 'HUD', 'MinimapScale', clamp(values.game.minimapScale, 0, 100) / 100);
-  setLcuValue(settings, 'HUD', 'ShowFPSAndLatency', values.game.showFpsAndLatency);
-  setLcuValue(settings, 'HUD', 'ShowTimestamps', values.game.showTimestamps);
-  setLcuValue(settings, 'HUD', 'ShowAlliedChat', values.game.showAlliedChat);
-  setLcuValue(settings, 'HUD', 'ShowAllChannelChat', values.game.showAllChannelChat);
-  setLcuValue(settings, 'HUD', 'HidePlayerNames', values.client.hideAllPlayerNamesForMe);
-  setLcuValue(settings, 'HUD', 'HideMyNameToOthers', values.client.hideMyNameFromOthers);
-  setLcuValue(settings, 'HUD', 'ShowSummonerNames', values.game.showSummonerNames);
-  setLcuValue(settings, 'HUD', 'FlashScreenWhenDamaged', values.game.flashScreenWhenDamaged);
-  setLcuValue(settings, 'HUD', 'FlashScreenWhenStunned', values.game.flashScreenWhenStunned);
-  setLcuValue(settings, 'HUD', 'ShowOffScreenPointsOfInterest', values.game.showOffScreenPointsOfInterest);
-  setLcuValue(settings, 'HUD', 'EnableLineMissileVis', values.game.enableLineMissileVis);
-  setLcuValue(settings, 'HUD', 'ShowSpellCosts', values.game.showSpellCosts);
-  setLcuValue(settings, 'HUD', 'ShowSpellRecommendations', values.game.showSpellRecommendations);
-  setLcuValue(settings, 'HUD', 'DisableHudSpellClick', values.game.disableHudSpellClick);
-  setLcuValue(settings, 'HUD', 'ShowPlayerStats', values.game.showPlayerStats);
-  setLcuValue(settings, 'HUD', 'ShowNeutralCamps', values.game.showNeutralCamps);
-  setLcuValue(settings, 'HUD', 'NumericCooldownFormat', values.game.numericCooldownFormat);
-
-  setLcuValue(settings, 'Performance', 'EnableHUDAnimations', values.game.enableHudAnimations);
-  setLcuValue(settings, 'Performance', 'ShadowQuality', values.game.shadowQuality);
-  setLcuValue(settings, 'Performance', 'CharacterQuality', values.game.characterQuality);
-  setLcuValue(settings, 'Performance', 'EffectsQuality', values.game.effectsQuality);
-  setLcuValue(settings, 'Performance', 'EnvironmentQuality', values.game.environmentQuality);
-  setLcuValue(settings, 'Performance', 'FrameCapType', values.game.frameCapType);
-  setLcuValue(settings, 'Performance', 'EnableFXAA', values.game.enableFxaa);
-
-  setLcuValue(settings, 'Volume', 'MasterVolume', clamp(values.game.masterVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'MasterMute', values.game.masterMute);
-  setLcuValue(settings, 'Volume', 'MusicVolume', clamp(values.game.musicVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'MusicMute', values.game.musicMute);
-  setLcuValue(settings, 'Volume', 'SfxVolume', clamp(values.game.sfxVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'SfxMute', values.game.sfxMute);
-  setLcuValue(settings, 'Volume', 'AmbienceVolume', clamp(values.game.ambienceVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'AmbienceMute', values.game.ambienceMute);
-  setLcuValue(settings, 'Volume', 'PingsVolume', clamp(values.game.pingsVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'PingsMute', values.game.pingsMute);
-  setLcuValue(settings, 'Volume', 'AnnouncerVolume', clamp(values.game.announcerVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'AnnouncerMute', values.game.announcerMute);
-  setLcuValue(settings, 'Volume', 'VoiceVolume', clamp(values.game.voiceVolume, 0, 100) / 100);
-  setLcuValue(settings, 'Volume', 'VoiceMute', values.game.voiceMute);
+  applyGameValuesToLcuSettings(settings, values);
 
   await client.patch('/lol-game-settings/v1/game-settings', settings);
 
