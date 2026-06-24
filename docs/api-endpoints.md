@@ -58,30 +58,57 @@
 
 **响应顶层**：`{ games: SgpGame[] }`，每个 `SgpGame = { metadata, json }`。
 
-#### game.json 顶层字段
+#### game.json 顶层字段（实测 18 个）
 | 字段 | 含义 | 状态 |
 |---|---|---|
 | `gameId` | 对局 ID | ✅ → `PlayerMatchDetail.gameId` |
 | `queueId` | 队列 ID（模式） | ✅ → `queueName`（经 `queueNames.ts` 转中文） |
 | `gameCreation` | 创建时间（毫秒戳） | ✅ |
 | `gameDuration` | 时长（秒） | ✅ |
-| `gameStartTimestamp` / `gameEndTimestamp` | 开始/结束时间 | ⚠️ |
+| `gameStartTimestamp` / `gameEndTimestamp` | 开始/结束时间（毫秒戳） | ⚠️ |
 | `gameMode` | 模式名（如 CLASSIC） | ⚠️ 声明未读 |
-| `gameVersion` | 客户端版本 | ⚠️ |
-| `mapId` | 地图 ID | ⚠️ |
+| `gameModeMutators` | 模式变体（数组，如某些特殊规则模式非空） | ⚠️ 实测多数为 `[]` |
+| `gameName` | 自定义房名 | ⚠️ |
+| `gameType` | 游戏类型（如 MATCHED_GAME） | ⚠️ |
+| `gameVersion` | 客户端版本（如 "15.x"） | ⚠️ |
+| `mapId` | 地图 ID（11=召唤师峡谷） | ⚠️ |
 | `seasonId` | 赛季 ID | ⚠️ |
+| `platformId` | 平台/大区 ID | ⚠️ |
+| `tournamentCode` | 赛事代码（自定义赛事用，正常空） | ⚠️ |
+| `endOfGameResult` | 结算状态（如 "GameComplete"） | ⚠️ |
 | `participants` | 10 人详情 | ✅（见下表） |
 | `teams` | 团队级数据 | ⚠️ **完全未挖掘**（见下） |
 
-#### ⚠️ teams[]（团队统计，未挖掘）
-`teams[].win`（哪队赢）、`teams[].objectives`（团队目标）含：
-- `baron.first` / `baron.kills`（首杀男爵/击杀数）
-- `dragon.first` / `dragon.kills`
-- `tower.first` / `tower.kills`
-- `inhibitor.first` / `inhibitor.kills`
-- `riftHerald` / `horizon` 等
+#### game.json.metadata（实测 3 个字段）
+| 字段 | 含义 | 状态 |
+|---|---|---|
+| `product` | 产品（"lol"） | ⚠️ |
+| `tags` | 标签数组（如 `["normal","q_2400"]`，可判断模式） | ⚠️ |
+| `participants` | 10 人 puuid 列表（按 participantId 顺序） | ⚠️（项目声明未读） |
 
-> 类型已声明于 `matchMapper.ts:92-96` `SgpTeam`，但 `extractMatchDetail` 从未读取。
+#### ⚠️ teams[]（团队统计，完全未挖掘）
+每个 team 含 4 个字段：
+
+| 字段 | 含义 | 状态 |
+|---|---|---|
+| `teamId` | 队伍（100/200） | ⚠️ |
+| `win` | 这队是否赢 | ⚠️ |
+| `bans[]` | ban 的英雄列表（竞技场/排位） | ⚠️ |
+| `objectives` | 团队目标统计（见下） | ⚠️ |
+
+**teams[].objectives 完整字段**（实测）：
+| 字段 | 含义 |
+|---|---|
+| `baron.first` / `baron.kills` | 首杀男爵 / 男爵击杀数 |
+| `dragon.first` / `dragon.kills` | 首龙 / 龙击杀数 |
+| `atakhan.first` / `atakhan.kills` | 阿塔坎（新史诗怪）首杀/击杀 |
+| `horde.first` / `horde.kills` | 虚空虫群首杀/击杀 |
+| `riftHerald.first` / `riftHerald.kills` | 峡谷先锋 |
+| `tower.first` / `tower.kills` | 首塔 / 塔击杀数 |
+| `inhibitor.first` / `inhibitor.kills` | 首水晶 / 水晶击杀数 |
+| `champion.first` / `champion.kills` | 首杀 / 击杀数 |
+
+> 类型声明于 `matchMapper.ts:92-96` `SgpTeam`，但 `extractMatchDetail` 从未读取。这些能做"团队资源控制统计""团队经济对比"。
 
 #### participant[] 字段（单人，150+ 个）
 
@@ -95,6 +122,7 @@
 | `riotIdGameName` / `riotIdTagline` | Riot ID 名/标签 | ✅ |
 | `profileIcon` | 头像 ID | ✅ |
 | `participantId` | 参与者序号 | ✅ |
+| `PlayerBehavior` | 玩家行为标记（如 `{PlayerBehavior_IsHeroInCombat:0}`） | ⚠️ |
 
 **英雄**
 | 字段 | 含义 | 状态 |
@@ -105,6 +133,8 @@
 | ~~`skinId` / `championSkinId` / `skinVariant`~~ | ❌ **不存在**（实测 SGP 响应无任何 skin 字段，`matchMapper.ts:210` 的类型声明无效，取值永远 undefined） | ❌ |
 | `teamId` | 队伍（100/200） | ✅ |
 | `teamPosition` / `role` / `lane` / `individualPosition` | 位置 | ✅（多级兜底取一个） |
+| `positionAssignedByMatchmaking` | 匹配系统分配的位置（如 "NONE"/"TOP"） | ⚠️ |
+| `selectedRolePreferences` | 选人时填的位置偏好（如 "TOP.JUNGLE.NONE.UNSELECTED"） | ⚠️ |
 
 > **⚠️ 重要：SGP 战绩不返回玩家用的皮肤信息。** 实测 participant 里没有任何 skin 字段，无法知道某局用了什么皮肤。`championSplashUrl`（战绩背景图）因此永远 fallback 到经典原画（`Alias_0.jpg`）。
 
@@ -125,12 +155,15 @@
 | 字段 | 含义 | 状态 |
 |---|---|---|
 | `totalDamageDealtToChampions` | 对英雄总伤害 | ✅ |
-| `totalDamageDealt` / `totalDamageTaken` | 总输出/总承伤 | ⚠️ |
+| `totalDamageDealt` | 总输出（含小兵/野怪/英雄） | ⚠️ |
+| `totalDamageTaken` | 总承伤 | ⚠️ |
 | `magicDamageDealtToChampions` / `physicalDamageDealtToChampions` / `trueDamageDealtToChampions` | 魔/物/真伤（对英雄） | ⚠️ |
+| `magicDamageDealt` / `physicalDamageDealt` / `trueDamageDealt` | 魔/物/真伤（总输出，含所有目标） | ⚠️ |
 | `magicDamageTaken` / `physicalDamageTaken` / `trueDamageTaken` | 魔/物/真承伤 | ⚠️ |
 | `damageSelfMitigated` | 自我减免伤害 | ⚠️ |
 | `totalDamageShieldedOnTeammates` | 对队友护盾量 | ⚠️ |
 | `damageDealtToBuildings` / `damageDealtToTurrets` / `damageDealtToObjectives` | 建筑/塔/目标伤害 | ⚠️ |
+| `damageDealtToEpicMonsters` | 对史诗野怪伤害（龙/男爵等） | ⚠️ |
 | `largestCriticalStrike` | 最大暴击伤害 | ⚠️ |
 
 **经济 / 装备**
@@ -196,6 +229,8 @@
 |---|---|---|
 | `win` | 是否获胜 | ✅ |
 | `gameEndedInEarlySurrender` / `gameEndedInSurrender` / `gameEndedInIGNBSurrender` | 重开/投降/IGNB 投降 | ⚠️ |
+| `teamEarlySurrendered` / `teamIGNBSurrendered` | 我队是否提前投降/IGNB 投降 | ⚠️ |
+| `causedGameEndFromIGNBSurrender` | 是否是这个玩家导致 IGNB 投降结束 | ⚠️ |
 | `wasSevereTransgressor` | 是否严重违规者 | ⚠️ |
 | `wasPremadeWithSevereTransgressor` | 是否和违规者组队 | ⚠️ |
 | `eligibleForProgression` | 是否计入段位进度 | ⚠️ |
@@ -203,6 +238,10 @@
 
 **Ping 信号（14 种，全未挖掘）**
 `allInPings` / `assistMePings` / `basicPings` / `commandPings` / `dangerPings` / `enemyMissingPings` / `enemyVisionPings` / `getBackPings` / `holdPings` / `needVisionPings` / `onMyWayPings` / `pushPings` / `retreatPings` / `visionClearedPings` —— 全 ⚠️。
+
+> **⚠️ 关于组队字段**：`matchMapper.ts:126-137` 声明并处理 `premadeId` / `premadeTeamId` / `premadeGroupId` / `partyId` / `groupId`（用于识别双排/组队），但**实测 SGP 响应里这 5 个字段全部不存在**，`normalizePremadeId` 取到的永远是 undefined。国服不暴露真实组队信息（隐私保护），双排识别功能实际无效。
+>
+> **字段总数**：participant 实测共 **155 个顶层字段**（不含 challenges 嵌套的 120 项）。
 
 #### ⚠️ participant.challenges（嵌套对象，120 项预计算统计，仅用 1 项）
 `challenges` 是 Riot 预计算的高级统计对象，含 120 个字段。项目仅用：
