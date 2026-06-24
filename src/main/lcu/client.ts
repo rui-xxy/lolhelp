@@ -1,6 +1,9 @@
 import https from 'node:https';
 import type { LcuCredentials } from './lockfile';
 
+const LCU_REQUEST_TIMEOUT_MS = 15_000;
+const LCU_MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
+
 export class LcuClient {
   constructor(private creds: LcuCredentials) {}
 
@@ -44,7 +47,16 @@ export class LcuClient {
         },
         (res) => {
           let data = '';
-          res.on('data', (chunk) => (data += chunk));
+          let responseBytes = 0;
+          res.on('error', reject);
+          res.on('data', (chunk: Buffer) => {
+            responseBytes += chunk.length;
+            if (responseBytes > LCU_MAX_RESPONSE_BYTES) {
+              res.destroy(new Error(`LCU response exceeded ${LCU_MAX_RESPONSE_BYTES} bytes`));
+              return;
+            }
+            data += chunk;
+          });
           res.on('end', () => {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               try {
@@ -58,6 +70,9 @@ export class LcuClient {
           });
         },
       );
+      req.setTimeout(LCU_REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`LCU ${method} ${requestPath} timed out`));
+      });
       req.on('error', reject);
       if (payload) req.write(payload);
       req.end();

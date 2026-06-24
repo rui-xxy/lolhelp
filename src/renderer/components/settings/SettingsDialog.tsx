@@ -28,6 +28,7 @@ import type {
   LolGameConfigValues,
   LolHotkeyValues,
 } from '../../../shared/api';
+import { DEFAULT_LOL_ROOT_PATH } from '../../../shared/constants';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -60,8 +61,6 @@ type HotkeyCategory = {
   defaultOpen?: boolean;
   bindings: HotkeyBinding[];
 };
-
-const DEFAULT_ROOT_PATH = 'D:\\WeGameApps\\英雄联盟';
 
 const WINDOW_MODES = [
   { value: '0', label: '全屏' },
@@ -586,7 +585,7 @@ function useSettingsScrollSpy<TSection extends string>(
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [tab, setTab] = useState<TabKey>('client');
-  const [rootPath, setRootPath] = useState(DEFAULT_ROOT_PATH);
+  const [rootPath, setRootPath] = useState(DEFAULT_LOL_ROOT_PATH);
   const [state, setState] = useState<LolConfigState | null>(null);
   const [draft, setDraft] = useState<LolConfigValues | null>(null);
   const [profileName, setProfileName] = useState('我的配置');
@@ -627,7 +626,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    void refresh(DEFAULT_ROOT_PATH);
+    void refresh(DEFAULT_LOL_ROOT_PATH);
   }, [open]);
 
   useEffect(() => {

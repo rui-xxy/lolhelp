@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { PanelLeft, Home, Swords, Radar, Users, Crosshair, Settings } from 'lucide-react';
+import { APP_LAYOUT } from '../../shared/constants';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches' | 'live' | 'scout';
-
-const LEGACY_WORKSPACE_WIDTH = 1280;
-const EXPANDED_SIDEBAR_WIDTH = 240;
-const COLLAPSED_SIDEBAR_WIDTH = 64;
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
@@ -44,8 +41,10 @@ export function AppShell({
   onOpenSettings,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const sidebarWidth = collapsed ? COLLAPSED_SIDEBAR_WIDTH : EXPANDED_SIDEBAR_WIDTH;
-  const workspaceWidth = LEGACY_WORKSPACE_WIDTH - sidebarWidth;
+  const sidebarWidth = collapsed
+    ? APP_LAYOUT.collapsedSidebarWidth
+    : APP_LAYOUT.expandedSidebarWidth;
+  const workspaceWidth = APP_LAYOUT.workspaceWidth - sidebarWidth;
 
   return (
     <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">

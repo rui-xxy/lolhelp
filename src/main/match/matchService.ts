@@ -320,12 +320,32 @@ async function fetchSummonerIdByPuuid(client: LcuClient, puuid: string): Promise
   return undefined;
 }
 
-const playerRankCache = new Map<string, PlayerRankSummary | null>();
+const PLAYER_RANK_CACHE_TTL_MS = 5 * 60 * 1000;
+const PLAYER_RANK_CACHE_MAX_ENTRIES = 500;
+const playerRankCache = new Map<
+  string,
+  { value: PlayerRankSummary | null; expiresAt: number }
+>();
+
+function cachePlayerRank(puuid: string, value: PlayerRankSummary | null): void {
+  if (playerRankCache.size >= PLAYER_RANK_CACHE_MAX_ENTRIES) {
+    const oldestKey = playerRankCache.keys().next().value as string | undefined;
+    if (oldestKey) playerRankCache.delete(oldestKey);
+  }
+  playerRankCache.set(puuid, {
+    value,
+    expiresAt: Date.now() + PLAYER_RANK_CACHE_TTL_MS,
+  });
+}
 
 export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
   if (!puuid) return null;
-  if (playerRankCache.has(puuid)) {
-    return playerRankCache.get(puuid) ?? null;
+  const cached = playerRankCache.get(puuid);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+  if (cached) {
+    playerRankCache.delete(puuid);
   }
 
   const creds = getCachedCredentials();
@@ -341,7 +361,7 @@ export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankS
       rank = await fetchRankByPuuid(client, '', summonerId);
     }
   }
-  playerRankCache.set(puuid, rank);
+  cachePlayerRank(puuid, rank);
   return rank;
 }
 

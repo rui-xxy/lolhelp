@@ -8,6 +8,7 @@ import {
 } from '../../scout/scoutEngine';
 import { fetchMatchesByPuuid, fetchPlayerRankByPuuid, resolvePuuid } from '../../match/matchService';
 import type { ScoutConfig, ScoutResult } from '../../../shared/api';
+import { validateScoutConfig } from '../validation';
 
 // 注册 scout 域 IPC 处理器：高手扩散搜索。
 //
@@ -18,16 +19,29 @@ import type { ScoutConfig, ScoutResult } from '../../../shared/api';
 // 取消标志：webContents.id → 是否已取消
 const cancelFlags = new Map<number, boolean>();
 const sessions = new Map<number, { key: string; session: ScoutSessionState }>();
+const cleanupRegistered = new Set<number>();
+
+function registerWebContentsCleanup(event: IpcMainInvokeEvent): void {
+  const wcId = event.sender.id;
+  if (cleanupRegistered.has(wcId)) return;
+  cleanupRegistered.add(wcId);
+  event.sender.once('destroyed', () => {
+    cleanupScoutForWebContents(wcId);
+    cleanupRegistered.delete(wcId);
+  });
+}
 
 export function registerScoutHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.SCOUT_FIND,
     async (event: IpcMainInvokeEvent, config: ScoutConfig): Promise<ScoutResult> => {
+      registerWebContentsCleanup(event);
+      const validatedConfig = validateScoutConfig(config);
       const wcId = event.sender.id;
       // 标记新一轮任务（清除上次的取消标志）
       cancelFlags.set(wcId, false);
-      const sessionKey = getScoutSessionKey(config);
-      const shouldContinue = (config.excludePuuids?.length ?? 0) > 0;
+      const sessionKey = getScoutSessionKey(validatedConfig);
+      const shouldContinue = (validatedConfig.excludePuuids?.length ?? 0) > 0;
       let entry = sessions.get(wcId);
       if (!shouldContinue || !entry || entry.key !== sessionKey) {
         entry = { key: sessionKey, session: createScoutSessionState() };
@@ -35,13 +49,13 @@ export function registerScoutHandlers(): void {
       }
 
       const result = await runScoutSession({
-        config,
+        config: validatedConfig,
         session: entry.session,
         now: Date.now(),
         deps: {
-          resolvePuuid: (seedId) => resolvePuuid(seedId, config.region),
+          resolvePuuid: (seedId) => resolvePuuid(seedId, validatedConfig.region),
           fetchMatches: (puuid, count, tag) =>
-            fetchMatchesByPuuid(puuid, count, tag, config.region),
+            fetchMatchesByPuuid(puuid, count, tag, validatedConfig.region),
           fetchRank: fetchPlayerRankByPuuid,
         },
         onProgress: (progress) => {

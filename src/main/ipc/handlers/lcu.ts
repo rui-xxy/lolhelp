@@ -9,7 +9,38 @@ import { getHeroByKey } from '../../lcu/heroData';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
+const ACTIVE_GAME_CHAMPION_CACHE_MAX_ENTRIES = 1000;
+const FRIEND_ENRICH_CONCURRENCY = 8;
 const activeGameChampionCache = new Map<string, { championId: number; expiresAt: number }>();
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+function pruneActiveGameChampionCache(now: number): void {
+  for (const [key, value] of activeGameChampionCache) {
+    if (value.expiresAt <= now) activeGameChampionCache.delete(key);
+  }
+  while (activeGameChampionCache.size > ACTIVE_GAME_CHAMPION_CACHE_MAX_ENTRIES) {
+    const oldestKey = activeGameChampionCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    activeGameChampionCache.delete(oldestKey);
+  }
+}
 
 function readStringField(source: Record<string, unknown>, keys: string[]): string | number {
   for (const key of keys) {
@@ -119,6 +150,7 @@ async function getActiveGameChampionId(
   if (friend.summonerId <= 0 && !friend.puuid && !friend.gameName) return 0;
 
   const now = Date.now();
+  pruneActiveGameChampionCache(now);
   const cacheKey = [friend.summonerId, friend.puuid, friend.gameName, friend.gameTag].join('|');
   const cached = activeGameChampionCache.get(cacheKey);
   if (cached && cached.expiresAt > now) return cached.championId;
@@ -235,7 +267,7 @@ export function registerLcuHandlers(): void {
         '/lol-chat/v1/friends',
       );
       if (!Array.isArray(raw)) return [];
-      return Promise.all(raw.map(async (f) => {
+      return mapWithConcurrency(raw, FRIEND_ENRICH_CONCURRENCY, async (f) => {
         const icon = Number(f.icon ?? 0);
         const iconUrls = buildProfileIconCandidates(icon);
         const rawLol = readLolPayload(f.lol);
@@ -287,7 +319,7 @@ export function registerLcuHandlers(): void {
           product: String(f.product ?? ''),
           lol,
         };
-      }));
+      });
     } catch {
       return [];
     }

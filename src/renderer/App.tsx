@@ -7,6 +7,7 @@ import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
+import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
@@ -16,43 +17,9 @@ const PAGE_TITLES: Record<View, string> = {
   scout: '高手雷达',
 };
 
-const EXPANDED_FRIEND_PANEL_WIDTH = 288;
-const HIDDEN_FRIEND_PANEL_WIDTH = 0;
-const FIXED_WORKSPACE_WIDTH = 1280;
-const EXPANDED_APP_WIDTH = FIXED_WORKSPACE_WIDTH + EXPANDED_FRIEND_PANEL_WIDTH;
-const HIDDEN_APP_WIDTH = FIXED_WORKSPACE_WIDTH + HIDDEN_FRIEND_PANEL_WIDTH;
+const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
+const HIDDEN_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
 const FRIEND_PANEL_ANIMATION_MS = 220;
-
-// 国服大区列表（与 src/main/sgp/region.ts 同步）
-const BASE_REGIONS = [
-  { key: 'HN1', name: '艾欧尼亚' },
-  { key: 'HN2', name: '祖安' },
-  { key: 'HN3', name: '诺克萨斯' },
-  { key: 'HN4', name: '班德尔城' },
-  { key: 'HN5', name: '皮尔特沃夫' },
-  { key: 'HN6', name: '战争学院' },
-  { key: 'HN7', name: '巨神峰' },
-  { key: 'HN8', name: '雷瑟守备' },
-  { key: 'HN9', name: '裁决之地' },
-  { key: 'HN10', name: '黑色玫瑰' },
-  { key: 'HN11', name: '暗影岛' },
-  { key: 'HN12', name: '钢铁烈阳' },
-  { key: 'HN13', name: '水晶之痕' },
-  { key: 'HN14', name: '均衡教派' },
-  { key: 'HN15', name: '扭曲丛林' },
-  { key: 'HN16', name: '教育网专区' },
-  { key: 'HN17', name: '蛮荒之地' },
-  { key: 'HN18', name: '恕瑞玛' },
-  { key: 'HN19', name: '皮城警备' },
-  { key: 'BGP1', name: '男爵领域' },
-  { key: 'BGP2', name: '峡谷之巅' },
-  { key: 'WT1', name: '网通一区' },
-  { key: 'NJ100', name: '联盟一区' },
-  { key: 'GZ100', name: '联盟二区' },
-  { key: 'CQ100', name: '联盟三区' },
-  { key: 'TJ100', name: '联盟四区' },
-  { key: 'TJ101', name: '联盟五区' },
-];
 
 export function App() {
   const [activeView, setActiveView] = useState<View>('home');
@@ -92,7 +59,7 @@ export function App() {
     };
   }, [activeView]);
 
-  const regions = [{ key: '', name: currentRegionName }, ...BASE_REGIONS];
+  const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
 
   // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (

@@ -22,7 +22,7 @@ const AVAILABILITY_COLOR: Record<string, string> = {
   offline: 'bg-gray-400',
 };
 
-const FRIEND_REFRESH_INTERVAL_MS = 3000;
+const FRIEND_REFRESH_INTERVAL_MS = 10_000;
 
 type FriendStatusKind =
   | 'ranked-solo'

@@ -5,8 +5,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from './ui/card';
+import { Button } from './ui/button';
 import type { LcuConnection } from '../../shared/api';
 
 // LCU 客户端检测卡：验证 LOL 客户端连通性。

@@ -4,13 +4,11 @@ import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
 // LCU game-data 预加载：启动后后台拉最新英雄/装备/技能/符文数据覆盖 datas.json 兜底
 import { preloadGameData } from './lcu/gameData';
+import { APP_LAYOUT } from '../shared/constants';
 
 const APP_WINDOW_TITLE = 'LOL助手';
-const PREVIOUS_WORKSPACE_WIDTH = 1280;
-const FRIEND_PANEL_WIDTH = 288;
-const HIDDEN_FRIEND_PANEL_WIDTH = 0;
-const DEFAULT_WINDOW_WIDTH = PREVIOUS_WORKSPACE_WIDTH + FRIEND_PANEL_WIDTH;
-const MIN_WINDOW_WIDTH = PREVIOUS_WORKSPACE_WIDTH + HIDDEN_FRIEND_PANEL_WIDTH;
+const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
+const MIN_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -28,7 +26,7 @@ function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
     const { width } = win.getBounds();
     const isLegacyDevFriendWindow =
       Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL) &&
-      width <= FRIEND_PANEL_WIDTH + 80 &&
+      width <= APP_LAYOUT.friendPanelWidth + 80 &&
       url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL);
     const isLegacyFriendWindow =
       win.getTitle() === '好友' ||
@@ -64,6 +62,8 @@ const createWindow = () => {
       // renderer 不能直接用 Node，只能通过 preload 暴露的 window.lolHelper 白名单。
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
@@ -78,6 +78,11 @@ const createWindow = () => {
 
   closeLegacyFriendWindows(mainWindow);
   mainWindow.webContents.once('did-finish-load', () => closeLegacyFriendWindows(mainWindow));
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const currentUrl = mainWindow.webContents.getURL();
+    if (url !== currentUrl) event.preventDefault();
+  });
 
   // 仅开发环境自动打开 DevTools；打包后（app.isPackaged === true）不再弹。
   // 用 'detach' 模式：DevTools 作为独立浮窗，不 dock 在应用窗口内（避免占用右侧/底部布局空间）。

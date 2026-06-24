@@ -6,11 +6,7 @@ export const IPC_CHANNELS = {
   APP_GET_STATUS: 'app:get-status',
   // lcu 域：客户端连接（后续阶段填充真实实现）
   LCU_DETECT_CLIENT: 'lcu:detect-client',
-  LCU_CONNECT: 'lcu:connect',
-  LCU_GET_CURRENT_SUMMONER: 'lcu:get-current-summoner',
   LCU_GET_CURRENT_REGION: 'lcu:get-current-region',
-  LCU_GET_LOBBY: 'lcu:get-lobby',
-  LCU_GET_CHAMP_SELECT_SESSION: 'lcu:get-champ-select-session',
   LCU_GET_FRIENDS: 'lcu:get-friends',
   // db 域：本地数据/设置（后续阶段填充真实实现）
   DB_GET_SETTINGS: 'db:get-settings',
@@ -24,7 +20,6 @@ export const IPC_CHANNELS = {
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
   // window 域：窗口控制
-  WINDOW_RESIZE: 'window:resize',
   WINDOW_SET_WIDTH: 'window:set-width',
   // live 域：实时对局
   LIVE_GET_BATTLE: 'live:get-battle',

@@ -11,7 +11,9 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "keywords": [],
   "author": {
@@ -41,7 +43,8 @@
     "eslint-plugin-import": "^2.32.0",
     "tailwindcss": "^4.3.1",
     "typescript": "~5.4",
-    "vite": "^5.4.21"
+    "vite": "^6.4.3",
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

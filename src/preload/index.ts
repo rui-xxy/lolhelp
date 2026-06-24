@@ -32,8 +32,6 @@ const lolHelper: LolHelper = {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
   },
   window: {
-    resize: (deltaWidth: number) =>
-      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, deltaWidth),
     setWidth: (width: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_WIDTH, width),
   },

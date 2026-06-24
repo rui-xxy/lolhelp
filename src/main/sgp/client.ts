@@ -1,6 +1,9 @@
 import https from 'node:https';
 import type { SgpAuth } from './auth';
 
+const SGP_REQUEST_TIMEOUT_MS = 30_000;
+const SGP_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
+
 // SGP（Service Gateway Platform）HTTPS 客户端。
 // 与 LcuClient 的区别：
 // - 认证：Bearer token（entitlements JWT），不是 Basic Auth
@@ -37,7 +40,16 @@ export class SgpClient {
         },
         (res) => {
           let data = '';
-          res.on('data', (chunk) => (data += chunk));
+          let responseBytes = 0;
+          res.on('error', reject);
+          res.on('data', (chunk: Buffer) => {
+            responseBytes += chunk.length;
+            if (responseBytes > SGP_MAX_RESPONSE_BYTES) {
+              res.destroy(new Error(`SGP response exceeded ${SGP_MAX_RESPONSE_BYTES} bytes`));
+              return;
+            }
+            data += chunk;
+          });
           res.on('end', () => {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               try {
@@ -51,6 +63,9 @@ export class SgpClient {
           });
         },
       );
+      req.setTimeout(SGP_REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`SGP GET ${requestPath} timed out`));
+      });
       req.on('error', reject);
       req.end();
     });
@@ -87,7 +102,16 @@ export class SgpClient {
         },
         (res) => {
           let data = '';
-          res.on('data', (chunk) => (data += chunk));
+          let responseBytes = 0;
+          res.on('error', reject);
+          res.on('data', (chunk: Buffer) => {
+            responseBytes += chunk.length;
+            if (responseBytes > SGP_MAX_RESPONSE_BYTES) {
+              res.destroy(new Error(`SGP response exceeded ${SGP_MAX_RESPONSE_BYTES} bytes`));
+              return;
+            }
+            data += chunk;
+          });
           res.on('end', () => {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               if (!data) return resolve({} as T);
@@ -102,6 +126,9 @@ export class SgpClient {
           });
         },
       );
+      req.setTimeout(SGP_REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`SGP POST ${requestPath} timed out`));
+      });
       req.on('error', reject);
       req.end(payload);
     });

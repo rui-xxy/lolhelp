@@ -5,8 +5,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from './ui/card';
+import { Button } from './ui/button';
 import { StatusOutput } from './StatusOutput';
 import type { AppStatus } from '../../shared/api';
 

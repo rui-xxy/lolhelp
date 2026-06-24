@@ -12,6 +12,17 @@ import type {
 } from '../../shared/api';
 import { LcuClient } from '../lcu/client';
 import { readCredentialsForInstallRoot } from '../lcu/lockfile';
+import {
+  atomicWriteText,
+  executeFileTransaction,
+  type FileWritePlan,
+} from './fileTransaction';
+import { DEFAULT_LOL_ROOT_PATH } from '../../shared/constants';
+import {
+  coerceHotkeyValue,
+  normalizeHotkeyValues,
+  type LcuInputSettings,
+} from './hotkeyValues';
 
 interface ConfigProfileSnapshots {
   gameCfg?: string;
@@ -55,7 +66,6 @@ interface GameField {
   getLcuValue?: (values: LolConfigValues) => boolean | number | string;
 }
 
-const DEFAULT_ROOT = 'D:\\WeGameApps\\英雄联盟';
 const PROFILE_FILE = 'lol-config-profiles.json';
 
 const DEFAULT_VALUES: LolConfigValues = {
@@ -222,23 +232,6 @@ function cloneDefaultValues(): LolConfigValues {
   return JSON.parse(JSON.stringify(DEFAULT_VALUES)) as LolConfigValues;
 }
 
-function normalizeHotkeyValues(hotkeys: unknown): LolHotkeyValues {
-  if (!hotkeys || typeof hotkeys !== 'object') return {};
-  const result: LolHotkeyValues = {};
-  for (const [section, bindings] of Object.entries(hotkeys as Record<string, unknown>)) {
-    if (!bindings || typeof bindings !== 'object') continue;
-    const normalizedBindings: Record<string, string> = {};
-    for (const [key, value] of Object.entries(bindings as Record<string, unknown>)) {
-      if (!key) continue;
-      normalizedBindings[key] = value == null ? 'null' : String(value);
-    }
-    if (Object.keys(normalizedBindings).length > 0) {
-      result[section] = normalizedBindings;
-    }
-  }
-  return result;
-}
-
 function normalizeValues(values: LolConfigValues): LolConfigValues {
   const defaults = cloneDefaultValues();
   return {
@@ -265,7 +258,7 @@ function profileStorePath(): string {
 
 function normalizeRootPath(rootPath?: string): string {
   const trimmed = (rootPath ?? '').trim().replace(/^["']|["']$/g, '');
-  return trimmed || DEFAULT_ROOT;
+  return trimmed || DEFAULT_LOL_ROOT_PATH;
 }
 
 function rootLooksValid(rootPath: string): boolean {
@@ -277,7 +270,7 @@ function resolveRootPath(rootPath?: string): string {
   const requested = normalizeRootPath(rootPath);
   if (rootLooksValid(requested)) return requested;
 
-  const candidates = new Set<string>([requested, DEFAULT_ROOT]);
+  const candidates = new Set<string>([requested, DEFAULT_LOL_ROOT_PATH]);
   for (const drive of ['C:', 'D:', 'E:', 'F:', 'G:']) {
     candidates.add(path.join(drive, 'WeGameApps', '英雄联盟'));
     candidates.add(path.join(drive, '英雄联盟'));
@@ -656,7 +649,6 @@ function applyPersistedValuesToContent(content: string, values: LolConfigValues)
 }
 
 type LcuGameSettings = Record<string, Record<string, boolean | number | string>>;
-type LcuInputSettings = Record<string, Record<string, boolean | number | string | null>>;
 type LcuSettingData = Record<string, unknown>;
 
 interface LcuSettingEnvelope<T extends LcuSettingData = LcuSettingData> {
@@ -904,8 +896,37 @@ function applyHotkeysToLcuInputSettings(settings: LcuInputSettings, values: LolC
   for (const [section, bindings] of Object.entries(values.hotkeys ?? {})) {
     settings[section] = settings[section] ?? {};
     for (const [key, value] of Object.entries(bindings)) {
-      settings[section][key] = value;
+      const currentValue = settings[section][key];
+      settings[section][key] = coerceHotkeyValue(value, currentValue);
     }
+  }
+}
+
+const CONFIG_WRITE_BLOCKED_PHASES = new Set([
+  'ChampSelect',
+  'GameStart',
+  'InProgress',
+  'Reconnect',
+]);
+
+async function assertConfigWriteAllowed(rootPath: string): Promise<void> {
+  const client = getLcuClientForRoot(rootPath);
+  if (!client) return;
+
+  let phase: string;
+  try {
+    phase = await client.get<string>('/lol-gameflow/v1/gameflow-phase');
+  } catch (error) {
+    throw new Error(
+      `无法确认当前游戏状态，已取消配置写入：${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  const normalizedPhase = String(phase).replace(/"/g, '');
+  if (CONFIG_WRITE_BLOCKED_PHASES.has(normalizedPhase)) {
+    throw new Error(`当前处于 ${normalizedPhase} 阶段，为避免配置损坏，禁止修改游戏配置`);
   }
 }
 
@@ -1221,74 +1242,91 @@ function markLeagueClientSettingsModified(content: string): string {
   return next;
 }
 
-function ensureDir(dirPath: string): void {
-  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-}
-
 function createBackupDir(): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(app.getPath('userData'), 'lol-config-backups', stamp);
-  ensureDir(backupDir);
   return backupDir;
 }
 
-function backupAndWrite(
-  rootPath: string,
-  filePath: string,
-  content: string,
-  backupDir: string,
-  filesWritten: string[],
-): void {
-  if (fs.existsSync(filePath)) {
-    const relativePath = path.relative(rootPath, filePath);
-    const backupPath = path.join(backupDir, relativePath);
-    ensureDir(path.dirname(backupPath));
-    fs.copyFileSync(filePath, backupPath);
+function buildClientWritePlans(rootPath: string, values: LolConfigValues): FileWritePlan[] {
+  const paths = getConfigPaths(rootPath);
+  const plans: FileWritePlan[] = [];
+
+  const localPrefs = readText(paths.lcuLocalPreferences);
+  if (localPrefs !== null) {
+    plans.push({
+      filePath: paths.lcuLocalPreferences,
+      content: applyLcuLocalValuesToContent(localPrefs, values),
+    });
   }
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, content, 'utf-8');
-  filesWritten.push(filePath);
+
+  const accountPrefs = readText(paths.lcuAccountPreferences);
+  if (accountPrefs !== null) {
+    plans.push({
+      filePath: paths.lcuAccountPreferences,
+      content: applyLcuAccountValuesToContent(accountPrefs, values),
+    });
+  }
+
+  const leagueClientSettings = readText(paths.leagueClientSettings);
+  if (leagueClientSettings !== null) {
+    plans.push({
+      filePath: paths.leagueClientSettings,
+      content: markLeagueClientSettingsModified(leagueClientSettings),
+    });
+  }
+
+  return plans;
 }
 
-function applyValuesToDisk(rootPath: string, values: LolConfigValues): LolConfigApplyResult {
+function buildValueWritePlans(
+  rootPath: string,
+  values: LolConfigValues,
+  snapshots: ConfigProfileSnapshots = {},
+): FileWritePlan[] {
   const paths = getConfigPaths(rootPath);
-  const backupDir = createBackupDir();
-  const filesWritten: string[] = [];
+  const plans: FileWritePlan[] = [];
 
-  const gameCfg = readText(paths.gameCfg);
+  const gameCfg = snapshots.gameCfg ?? readText(paths.gameCfg);
   if (gameCfg !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.gameCfg,
-      applyGameValuesToContent(gameCfg, values),
-      backupDir,
-      filesWritten,
-    );
+    plans.push({
+      filePath: paths.gameCfg,
+      content: applyGameValuesToContent(gameCfg, values),
+    });
   }
 
-  const inputIni = readText(paths.inputIni);
+  const inputIni = snapshots.inputIni ?? readText(paths.inputIni);
   if (inputIni !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.inputIni,
-      applyInputValuesToContent(inputIni, values),
-      backupDir,
-      filesWritten,
-    );
+    plans.push({
+      filePath: paths.inputIni,
+      content: applyInputValuesToContent(inputIni, values),
+    });
   }
 
-  const persistedSettings = readText(paths.persistedSettings);
+  const persistedSettings = snapshots.persistedSettings ?? readText(paths.persistedSettings);
   if (persistedSettings !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.persistedSettings,
-      applyPersistedValuesToContent(persistedSettings, values),
-      backupDir,
-      filesWritten,
-    );
+    plans.push({
+      filePath: paths.persistedSettings,
+      content: applyPersistedValuesToContent(persistedSettings, values),
+    });
   }
 
-  applyClientValuesToDisk(rootPath, values, backupDir, filesWritten);
+  return [...plans, ...buildClientWritePlans(rootPath, values)];
+}
+
+function applyValuesToDisk(
+  rootPath: string,
+  values: LolConfigValues,
+  snapshots: ConfigProfileSnapshots = {},
+): LolConfigApplyResult {
+  if (!rootLooksValid(rootPath)) {
+    throw new Error(`未找到英雄联盟配置目录：${rootPath}`);
+  }
+
+  // 所有转换（包括 JSON 解析）必须在任何磁盘写入之前完成。
+  const plans = buildValueWritePlans(rootPath, values, snapshots);
+  const backupDir = createBackupDir();
+  const filesWritten = executeFileTransaction(rootPath, backupDir, plans);
 
   return {
     rootPath,
@@ -1296,47 +1334,6 @@ function applyValuesToDisk(rootPath: string, values: LolConfigValues): LolConfig
     filesWritten,
     lcuSynced: false,
   };
-}
-
-function applyClientValuesToDisk(
-  rootPath: string,
-  values: LolConfigValues,
-  backupDir: string,
-  filesWritten: string[],
-): void {
-  const paths = getConfigPaths(rootPath);
-  const localPrefs = readText(paths.lcuLocalPreferences);
-  if (localPrefs !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.lcuLocalPreferences,
-      applyLcuLocalValuesToContent(localPrefs, values),
-      backupDir,
-      filesWritten,
-    );
-  }
-
-  const accountPrefs = readText(paths.lcuAccountPreferences);
-  if (accountPrefs !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.lcuAccountPreferences,
-      applyLcuAccountValuesToContent(accountPrefs, values),
-      backupDir,
-      filesWritten,
-    );
-  }
-
-  const leagueClientSettings = readText(paths.leagueClientSettings);
-  if (leagueClientSettings !== null) {
-    backupAndWrite(
-      rootPath,
-      paths.leagueClientSettings,
-      markLeagueClientSettingsModified(leagueClientSettings),
-      backupDir,
-      filesWritten,
-    );
-  }
 }
 
 function readProfileStore(): ProfileStore {
@@ -1369,8 +1366,7 @@ function isConfigProfile(profile: unknown): profile is ConfigProfile {
 
 function writeProfileStore(store: ProfileStore): void {
   const filePath = profileStorePath();
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 2), 'utf-8');
+  atomicWriteText(filePath, JSON.stringify(store, null, 2));
 }
 
 function summarizeProfile(profile: ConfigProfile): LolConfigProfileSummary {
@@ -1455,9 +1451,11 @@ export async function applyLeagueConfigValues(
   values: LolConfigValues,
 ): Promise<LolConfigApplyResult> {
   const resolvedRootPath = resolveRootPath(rootPath);
-  const result = applyValuesToDisk(resolvedRootPath, values);
+  await assertConfigWriteAllowed(resolvedRootPath);
+  const normalizedValues = normalizeValues(values);
+  const result = applyValuesToDisk(resolvedRootPath, normalizedValues);
   try {
-    result.lcuSynced = await syncValuesToLcu(resolvedRootPath, values);
+    result.lcuSynced = await syncValuesToLcu(resolvedRootPath, normalizedValues);
   } catch (err) {
     console.warn('[config] LCU sync failed:', err);
     result.lcuSynced = false;
@@ -1476,13 +1474,14 @@ export function saveLeagueConfigProfile(
   const trimmedName = name.trim() || '我的配置';
   const now = Date.now();
   const existing = store.profiles.find((profile) => profile.name === trimmedName);
+  const normalizedValues = normalizeValues(values);
 
   if (existing) {
     existing.updatedAt = now;
     existing.sourceRootPath = resolvedRootPath;
-    existing.values = values;
-    existing.snapshots = buildSnapshots(resolvedRootPath, values);
-    existing.gameResolution = gameResolution(values);
+    existing.values = normalizedValues;
+    existing.snapshots = buildSnapshots(resolvedRootPath, normalizedValues);
+    existing.gameResolution = gameResolution(normalizedValues);
   } else {
     store.profiles.push({
       id: crypto.randomUUID(),
@@ -1490,9 +1489,9 @@ export function saveLeagueConfigProfile(
       createdAt: now,
       updatedAt: now,
       sourceRootPath: resolvedRootPath,
-      gameResolution: gameResolution(values),
-      values,
-      snapshots: buildSnapshots(resolvedRootPath, values),
+      gameResolution: gameResolution(normalizedValues),
+      values: normalizedValues,
+      snapshots: buildSnapshots(resolvedRootPath, normalizedValues),
     });
   }
 
@@ -1511,66 +1510,14 @@ export async function applyLeagueConfigProfile(
   }
 
   const resolvedRootPath = resolveRootPath(rootPath);
-  const paths = getConfigPaths(resolvedRootPath);
-  const backupDir = createBackupDir();
-  const filesWritten: string[] = [];
-
-  if (profile.snapshots.gameCfg !== undefined) {
-    backupAndWrite(
-      resolvedRootPath,
-      paths.gameCfg,
-      applyGameValuesToContent(profile.snapshots.gameCfg, profile.values),
-      backupDir,
-      filesWritten,
-    );
-  }
-  if (profile.snapshots.inputIni !== undefined) {
-    backupAndWrite(
-      resolvedRootPath,
-      paths.inputIni,
-      applyInputValuesToContent(profile.snapshots.inputIni, profile.values),
-      backupDir,
-      filesWritten,
-    );
-  }
-  if (profile.snapshots.persistedSettings !== undefined) {
-    backupAndWrite(
-      resolvedRootPath,
-      paths.persistedSettings,
-      applyPersistedValuesToContent(profile.snapshots.persistedSettings, profile.values),
-      backupDir,
-      filesWritten,
-    );
-  }
-
-  if (
-    profile.snapshots.gameCfg === undefined ||
-    profile.snapshots.inputIni === undefined ||
-    profile.snapshots.persistedSettings === undefined
-  ) {
-    const valuesResult = applyValuesToDisk(resolvedRootPath, profile.values);
-    try {
-      valuesResult.lcuSynced = await syncValuesToLcu(resolvedRootPath, profile.values);
-    } catch (err) {
-      console.warn('[config] LCU sync failed:', err);
-      valuesResult.lcuSynced = false;
-      valuesResult.lcuError = err instanceof Error ? err.message : String(err);
-    }
-    return {
-      rootPath: resolvedRootPath,
-      backupDir: valuesResult.backupDir ?? backupDir,
-      filesWritten: [...filesWritten, ...valuesResult.filesWritten],
-      lcuSynced: valuesResult.lcuSynced,
-      lcuError: valuesResult.lcuError,
-    };
-  }
-
-  applyClientValuesToDisk(resolvedRootPath, profile.values, backupDir, filesWritten);
+  await assertConfigWriteAllowed(resolvedRootPath);
+  const normalizedValues = normalizeValues(profile.values);
+  const result = applyValuesToDisk(resolvedRootPath, normalizedValues, profile.snapshots);
 
   let lcuSynced = false;
   let lcuError: string | undefined;
   try {
-    lcuSynced = await syncValuesToLcu(resolvedRootPath, profile.values);
+    lcuSynced = await syncValuesToLcu(resolvedRootPath, normalizedValues);
   } catch (err) {
     console.warn('[config] LCU sync failed:', err);
     lcuError = err instanceof Error ? err.message : String(err);
@@ -1578,8 +1525,8 @@ export async function applyLeagueConfigProfile(
 
   return {
     rootPath: resolvedRootPath,
-    backupDir: filesWritten.length > 0 ? backupDir : null,
-    filesWritten,
+    backupDir: result.backupDir,
+    filesWritten: result.filesWritten,
     lcuSynced,
     lcuError,
   };

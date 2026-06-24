@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../../shared/channels';
 import { searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
 import type { ChampionSummary, PlayerLookupRequest, PlayerLookupResult } from '../../../shared/api';
+import { validatePlayerLookupRequest } from '../validation';
 
 // 注册 match 域 IPC 处理器。
 // - search：按召唤师名查战绩（列表 + 每场详情 + 汇总）。
@@ -11,7 +12,7 @@ export function registerMatchHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.MATCH_SEARCH,
     async (_event, req: PlayerLookupRequest): Promise<PlayerLookupResult> => {
-      return searchPlayer(req);
+      return searchPlayer(validatePlayerLookupRequest(req));
     },
   );
 
