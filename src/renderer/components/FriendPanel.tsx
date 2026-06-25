@@ -99,6 +99,30 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!actionFriendId) return undefined;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (
+        event.target instanceof Element
+        && event.target.closest('[data-friend-action-menu]')
+      ) {
+        return;
+      }
+      setActionFriendId('');
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActionFriendId('');
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [actionFriendId]);
+
   // 按分组归类
   const groups = new Map<string, FriendInfo[]>();
   for (const f of friends) {
@@ -129,6 +153,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
 
   const handleFriendClick = (friend: FriendInfo) => {
     if (!friend.gameName) return;
+    setActionFriendId('');
     const riotId = friend.gameTag ? `${friend.gameName}#${friend.gameTag}` : friend.gameName;
     onFriendClick(riotId);
   };
@@ -168,7 +193,10 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
       </div>
 
       {/* 好友列表 */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-1.5"
+        onScroll={() => setActionFriendId('')}
+      >
         {actionMessage && (
           <button
             type="button"
@@ -262,6 +290,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                           </button>
                           <button
                             type="button"
+                            data-friend-action-menu
                             onClick={() => setActionFriendId((current) =>
                               current === friend.id ? '' : friend.id)}
                             className="relative z-10 mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-app-subtle opacity-0 transition-opacity hover:bg-white/70 hover:text-app-text group-hover:opacity-100"
@@ -275,7 +304,10 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                             </span>
                           )}
                           {actionFriendId === friend.id && (
-                            <div className="absolute right-2 top-9 z-30 w-28 overflow-hidden rounded-sm border border-app-border bg-app-surface py-1 shadow-airbnb">
+                            <div
+                              data-friend-action-menu
+                              className="absolute right-2 top-9 z-30 w-28 overflow-hidden rounded-sm border border-app-border bg-app-surface py-1 shadow-airbnb"
+                            >
                               <button
                                 type="button"
                                 onClick={() => handleFriendClick(friend)}
