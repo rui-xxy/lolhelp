@@ -16,6 +16,9 @@ import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
 // 5. 并行 GET /lol-match-history/.../matches → 10 人最近 24 场战绩（算 KDA/胜率 + 前端分页）
 
 const RECENT_MATCH_COUNT = 24;
+const LIVE_BATTLE_CACHE_TTL_MS = 15_000;
+let liveBattleCache: { expiresAt: number; value: LiveBattleInfo } | null = null;
+let liveBattleInFlight: Promise<LiveBattleInfo> | null = null;
 
 function createLcuClient(): LcuClient {
   const creds = getCachedCredentials();
@@ -233,7 +236,7 @@ async function enrichPlayers(
 }
 
 // 主入口
-export async function getLiveBattle(): Promise<LiveBattleInfo> {
+async function loadLiveBattle(): Promise<LiveBattleInfo> {
   let client: LcuClient;
   try {
     client = createLcuClient();
@@ -320,4 +323,24 @@ export async function getLiveBattle(): Promise<LiveBattleInfo> {
     myTeam,
     enemyTeam,
   };
+}
+
+export async function getLiveBattle(): Promise<LiveBattleInfo> {
+  if (liveBattleCache && liveBattleCache.expiresAt > Date.now()) {
+    return structuredClone(liveBattleCache.value);
+  }
+  if (!liveBattleInFlight) {
+    liveBattleInFlight = loadLiveBattle()
+      .then((value) => {
+        liveBattleCache = {
+          expiresAt: Date.now() + LIVE_BATTLE_CACHE_TTL_MS,
+          value,
+        };
+        return value;
+      })
+      .finally(() => {
+        liveBattleInFlight = null;
+      });
+  }
+  return structuredClone(await liveBattleInFlight);
 }

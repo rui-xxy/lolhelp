@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords, Radar, Users, Crosshair, Settings } from 'lucide-react';
+import { PanelLeft, Home, Swords, Radar, Users, Crosshair, Settings, Sparkles } from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
-export type View = 'home' | 'matches' | 'live' | 'scout';
+export type View = 'home' | 'matches' | 'live' | 'scout' | 'assist';
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
@@ -125,6 +125,18 @@ export function AppShell({
           >
             <Crosshair className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">高手雷达</span>}
+          </a>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigate('assist');
+            }}
+            title={collapsed ? '辅助功能' : undefined}
+            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+          >
+            <Sparkles className="size-4 shrink-0" />
+            {!collapsed && <span className="truncate">辅助功能</span>}
           </a>
           {onOpenSettings && (
             <a

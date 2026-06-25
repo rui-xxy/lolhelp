@@ -4,6 +4,7 @@ import { getFriendStatusDisplay } from './friendStatus';
 
 function friend(lol: FriendInfo['lol']): FriendInfo {
   return {
+    id: 'friend-1',
     puuid: 'test',
     gameName: '玩家',
     gameTag: '1234',

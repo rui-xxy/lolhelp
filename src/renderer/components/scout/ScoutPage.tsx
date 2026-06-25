@@ -11,6 +11,7 @@ import type {
   ScoutHit,
   ScoutProgress,
 } from '../../../shared/api';
+import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
 
 interface ScoutPageProps {
   onPlayerSearch: (name: string) => void;
@@ -68,7 +69,12 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
 export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
   const [config, setConfig] = useState<ScoutConfig>(DEFAULT_CONFIG);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({ favoriteChampions: [], championPresets: [] });
+  const [settings, setSettings] = useState<AppSettings>({
+    favoriteChampions: [],
+    championPresets: [],
+    assist: DEFAULT_ASSIST_SETTINGS,
+    blacklist: [],
+  });
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
   const [championPresets, setChampionPresets] = useState<ChampionPreset[]>([]);
 
@@ -128,9 +134,15 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
   const persistSettings = useCallback(
     (next: AppSettings) => {
       setSettings(next);
-      void window.lolHelper.db.saveSettings(next).catch((err) => {
-        console.error('[scout] 保存设置失败:', err);
-      });
+      void window.lolHelper.db
+        .updateSettings({
+          favoriteChampions: next.favoriteChampions,
+          championPresets: next.championPresets,
+          scoutDefaults: next.scoutDefaults,
+        })
+        .catch((err) => {
+          console.error('[scout] 保存设置失败:', err);
+        });
     },
     [],
   );

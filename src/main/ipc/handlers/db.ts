@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
-import { getSettings, saveSettings } from '../../settings/store';
+import { getSettings, saveSettings, updateSettings } from '../../settings/store';
 import type { AppSettings } from '../../../shared/api';
 import { validateAppSettings } from '../validation';
 
@@ -15,6 +15,14 @@ export function registerDbHandlers(): void {
     IPC_CHANNELS.DB_SAVE_SETTINGS,
     async (_event, settings: AppSettings): Promise<void> => {
       saveSettings(validateAppSettings(settings));
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DB_UPDATE_SETTINGS,
+    async (_event, patch: Partial<AppSettings>): Promise<AppSettings> => {
+      if (!patch || typeof patch !== 'object') throw new Error('设置更新格式无效');
+      return updateSettings(patch);
     },
   );
 }

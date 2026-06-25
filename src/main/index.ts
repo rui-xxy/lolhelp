@@ -5,6 +5,11 @@ import { registerIpcHandlers } from './ipc';
 // LCU game-data 预加载：启动后后台拉最新英雄/装备/技能/符文数据覆盖 datas.json 兜底
 import { preloadGameData } from './lcu/gameData';
 import { APP_LAYOUT } from '../shared/constants';
+import { startAssistEngine, stopAssistEngine } from './assist/engine';
+import {
+  configureAssistWindows,
+  disposeAssistWindows,
+} from './assist/windows';
 
 const APP_WINDOW_TITLE = 'LOL助手';
 const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
@@ -76,6 +81,15 @@ const createWindow = () => {
     );
   }
 
+  configureAssistWindows(
+    {
+      preloadPath: path.join(__dirname, 'preload.js'),
+      devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
+      rendererDirectory: path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`),
+    },
+    mainWindow,
+  );
+
   closeLegacyFriendWindows(mainWindow);
   mainWindow.webContents.once('did-finish-load', () => closeLegacyFriendWindows(mainWindow));
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -105,7 +119,10 @@ setTimeout(() => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', () => {
+  createWindow();
+  startAssistEngine();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -114,6 +131,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  stopAssistEngine();
+  disposeAssistWindows();
 });
 
 app.on('activate', () => {

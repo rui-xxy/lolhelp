@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import type { CSSProperties } from 'react';
@@ -67,6 +67,8 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [actionFriendId, setActionFriendId] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const refreshingRef = useRef(false);
 
   const loadFriends = useCallback(async (showLoading = true) => {
@@ -131,6 +133,23 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
     onFriendClick(riotId);
   };
 
+  const handleSpectate = async (friend: FriendInfo) => {
+    const result = await window.lolHelper.lcu.spectateFriend(friend.puuid);
+    setActionMessage(result.message);
+    if (result.success) setActionFriendId('');
+  };
+
+  const handleDeleteFriend = async (friend: FriendInfo) => {
+    const displayName = friend.note || friend.gameName;
+    if (!window.confirm(`确定删除好友“${displayName}”吗？`)) return;
+    const result = await window.lolHelper.lcu.deleteFriend(friend.id);
+    setActionMessage(result.message);
+    if (result.success) {
+      setActionFriendId('');
+      await loadFriends(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-app-surface">
       {/* 头部 */}
@@ -150,6 +169,15 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
 
       {/* 好友列表 */}
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+        {actionMessage && (
+          <button
+            type="button"
+            onClick={() => setActionMessage('')}
+            className="mb-1 w-full rounded-sm bg-app-primary-soft px-2 py-1.5 text-left text-[11px] text-app-body"
+          >
+            {actionMessage}
+          </button>
+        )}
         {loading && friends.length === 0 ? (
           <div className="flex h-20 items-center justify-center text-xs text-app-subtle">加载中...</div>
         ) : friends.length === 0 ? (
@@ -190,15 +218,16 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                           ? formatGameDuration(friend.lol.timeStamp, currentTime)
                           : '';
                       return (
-                        <button
+                        <div
                           key={friend.puuid}
-                          onClick={() => handleFriendClick(friend)}
-                          className={`friend-row flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left ${
+                          className={`friend-row group flex w-full items-center rounded-sm text-left ${
                             championSplashBackground ? 'friend-row--has-skin' : ''
                           } ${
-                            gameDuration ? 'pr-14' : ''
+                            gameDuration ? 'pr-12' : ''
                           } ${
                             isOffline ? 'opacity-50' : ''
+                          } ${
+                            actionFriendId === friend.id ? 'z-20 overflow-visible' : ''
                           }`}
                           style={
                             championSplashBackground
@@ -206,33 +235,76 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                               : undefined
                           }
                         >
-                          {/* 头像 + 状态圆点 */}
-                          <div className="relative shrink-0">
-                            <ProfileIcon
-                              iconId={friend.icon}
-                              src={friend.iconUrl}
-                              srcs={friend.iconUrls}
-                              alt={friend.note || friend.gameName}
-                              size={32}
-                              className="border border-app-border"
-                            />
-                            <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border border-app-surface ${statusColor}`} />
-                          </div>
-                          {/* 名字 + 状态 */}
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-xs font-medium text-app-text">
-                              {friend.note || friend.gameName}
+                          <button
+                            type="button"
+                            onClick={() => handleFriendClick(friend)}
+                            className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+                          >
+                            <div className="relative shrink-0">
+                              <ProfileIcon
+                                iconId={friend.icon}
+                                src={friend.iconUrl}
+                                srcs={friend.iconUrls}
+                                alt={friend.note || friend.gameName}
+                                size={32}
+                                className="border border-app-border"
+                              />
+                              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border border-app-surface ${statusColor}`} />
                             </div>
-                            <span className={`friend-status ${FRIEND_STATUS_CLASS[status.kind]}`}>
-                              {status.text || '离线'}
-                            </span>
-                          </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-xs font-medium text-app-text">
+                                {friend.note || friend.gameName}
+                              </div>
+                              <span className={`friend-status ${FRIEND_STATUS_CLASS[status.kind]}`}>
+                                {status.text || '离线'}
+                              </span>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActionFriendId((current) =>
+                              current === friend.id ? '' : friend.id)}
+                            className="relative z-10 mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-app-subtle opacity-0 transition-opacity hover:bg-white/70 hover:text-app-text group-hover:opacity-100"
+                            title="好友操作"
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </button>
                           {gameDuration && (
                             <span className="friend-row-timer tabular-nums">
                               {gameDuration}
                             </span>
                           )}
-                        </button>
+                          {actionFriendId === friend.id && (
+                            <div className="absolute right-2 top-9 z-30 w-28 overflow-hidden rounded-sm border border-app-border bg-app-surface py-1 shadow-airbnb">
+                              <button
+                                type="button"
+                                onClick={() => handleFriendClick(friend)}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-body hover:bg-app-surface-soft"
+                              >
+                                <Search className="size-3.5" />
+                                查战绩
+                              </button>
+                              {friend.lol?.gameStatus === 'inGame' && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSpectate(friend)}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-body hover:bg-app-surface-soft"
+                                >
+                                  <Eye className="size-3.5" />
+                                  观战
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteFriend(friend)}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-danger hover:bg-red-50"
+                              >
+                                <Trash2 className="size-3.5" />
+                                删除好友
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

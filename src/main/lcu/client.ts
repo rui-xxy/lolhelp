@@ -23,8 +23,12 @@ export class LcuClient {
     return this.request<T>('POST', requestPath, body);
   }
 
+  delete<T = unknown>(requestPath: string, body?: unknown): Promise<T> {
+    return this.request<T>('DELETE', requestPath, body);
+  }
+
   private request<T = unknown>(
-    method: 'GET' | 'PUT' | 'PATCH' | 'POST',
+    method: 'GET' | 'PUT' | 'PATCH' | 'POST' | 'DELETE',
     requestPath: string,
     body?: unknown,
   ): Promise<T> {

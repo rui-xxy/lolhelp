@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   AppSettings,
+  AssistOverlayName,
+  AssistRecommendationRequest,
   LolConfigApplyProfileRequest,
   LolConfigApplyValuesRequest,
   LolConfigSaveProfileRequest,
@@ -22,6 +24,10 @@ const lolHelper: LolHelper = {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
     getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
     getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
+    spectateFriend: (puuid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_SPECTATE_FRIEND, puuid),
+    deleteFriend: (friendId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_DELETE_FRIEND, friendId),
   },
   match: {
     search: (req: PlayerLookupRequest) =>
@@ -39,6 +45,27 @@ const lolHelper: LolHelper = {
     getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_SETTINGS),
     saveSettings: (settings: AppSettings) =>
       ipcRenderer.invoke(IPC_CHANNELS.DB_SAVE_SETTINGS, settings),
+    updateSettings: (patch: Partial<AppSettings>) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DB_UPDATE_SETTINGS, patch),
+  },
+  assist: {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_STATUS),
+    getRecommendation: (request?: AssistRecommendationRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_RECOMMENDATION, request),
+    applyRecommendation: (request?: AssistRecommendationRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_APPLY_RECOMMENDATION, request),
+    getChampionGuide: (championId?: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_CHAMPION_GUIDE, championId),
+    getProfileIcons: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_PROFILE_ICONS),
+    lockCurrentChampion: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_LOCK_CURRENT_CHAMPION),
+    applyAccountSettings: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_APPLY_ACCOUNT_SETTINGS),
+    toggleOverlay: (name: AssistOverlayName) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY, name),
+    getLiveData: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_LIVE_DATA),
+    exportBlacklist: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_EXPORT_BLACKLIST),
   },
   config: {
     read: (rootPath?: string) =>

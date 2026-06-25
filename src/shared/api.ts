@@ -36,6 +36,7 @@ export interface LcuRegion {
 
 // 单个好友信息（来自 lol-chat/v1/friends）
 export interface FriendInfo {
+  id: string;
   puuid: string;
   gameName: string;
   gameTag: string;
@@ -67,11 +68,18 @@ export interface FriendInfo {
   };
 }
 
+export interface FriendActionResult {
+  success: boolean;
+  message: string;
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
   getFriends: () => Promise<FriendInfo[]>;
+  spectateFriend: (puuid: string) => Promise<FriendActionResult>;
+  deleteFriend: (friendId: string) => Promise<FriendActionResult>;
 }
 
 // 占位接口：后续阶段接入本地数据时填充
@@ -89,6 +97,205 @@ export interface AppSettings {
   championPresets?: ChampionPreset[];
   // 雷达默认参数（用户上次用过的配置，下次打开时回填）
   scoutDefaults?: Partial<ScoutConfig>;
+  // 对局辅助、自动化、快捷键与 Overlay 设置
+  assist: AssistSettings;
+  // 辅助功能使用的本地玩家黑名单
+  blacklist: AssistBlacklistEntry[];
+}
+
+export type AssistRole = 'top' | 'jungle' | 'middle' | 'bottom' | 'utility';
+
+export interface AssistChampionPreferences {
+  normal: number[];
+  aram: number[];
+  arena: number[];
+  byRole: Record<AssistRole, number[]>;
+  bans: Record<AssistRole, number> & { arena: number };
+  quickGameFirstPosition: string;
+  quickGameSecondPosition: string;
+}
+
+export interface AssistHotkeys {
+  mainWindow: string;
+  matchOverlay: string;
+  matchHelper: string;
+  spellOverlay: string;
+}
+
+export interface AssistSettings {
+  showRuneAssistant: boolean;
+  showPowerTrend: boolean;
+  globalHotkeysEnabled: boolean;
+  showMatchOverlay: boolean;
+  showSpellOverlay: boolean;
+
+  autoAccept: boolean;
+  autoAcceptDelayMs: number;
+  autoPlayAgain: boolean;
+  autoReturnLobby: boolean;
+  autoHonorTeammates: boolean;
+  autoHonorSummonerId: number;
+  autoHonorSummonerName: string;
+
+  showPositionMessage: boolean;
+  blacklistAlert: boolean;
+  blacklistAlertToClient: boolean;
+  highWinRateAlert: boolean;
+
+  autoChampionEnabled: boolean;
+  champions: AssistChampionPreferences;
+
+  autoWinRateItems: boolean;
+  autoPickRateItems: boolean;
+  sendItemsMessage: boolean;
+  autoWinRateRunes: boolean;
+  autoPickRateRunes: boolean;
+  sendRunesMessage: boolean;
+
+  playerTags: string[];
+  powerTitles: string[];
+  hotkeys: AssistHotkeys;
+
+  preferredPresence: string;
+  statusMessage: string;
+
+  spoofRankEnabled: boolean;
+  spoofRankQueue: string;
+  spoofRankTier: string;
+  spoofRankDivision: string;
+  profileIconId: number;
+  profileBackgroundChampionId: number;
+  removeTokens: boolean;
+  removePrestigeCrest: boolean;
+}
+
+export interface AssistBlacklistEntry {
+  id: string;
+  riotId: string;
+  region: string;
+  tags: string[];
+  description: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type AssistOverlayName = 'helper' | 'match' | 'spells';
+export type AssistRecommendationStrategy = 'winRate' | 'pickRate';
+
+export interface AssistRecommendationRequest {
+  championId?: number;
+  queueId?: number;
+  position?: string;
+  strategy?: AssistRecommendationStrategy;
+}
+
+export interface AssistRuneRecommendation {
+  name: string;
+  primaryStyleId: number;
+  subStyleId: number;
+  selectedPerkIds: number[];
+  play: number;
+  winRate: number;
+  pickRate: number;
+}
+
+export interface AssistAugmentRecommendation {
+  id: number;
+  name: string;
+  icon: string;
+  tier: number;
+  performance: number;
+  popularity: number;
+}
+
+export interface AssistItemBlock {
+  title: string;
+  itemIds: number[];
+}
+
+export interface AssistRecommendation {
+  championId: number;
+  queueId: number;
+  position: string;
+  mode: string;
+  source: string;
+  rune: AssistRuneRecommendation | null;
+  items: AssistItemBlock[];
+  augments: AssistAugmentRecommendation[];
+}
+
+export interface AssistChampionGuide {
+  championId: number;
+  name: string;
+  title: string;
+  stats: Array<{ label: string; base: number; perLevel?: number }>;
+  spells: Array<{
+    key: string;
+    name: string;
+    description: string;
+    cooldown: string;
+    cost: string;
+  }>;
+}
+
+export interface AssistProfileIcon {
+  id: number;
+  title: string;
+  icon: string;
+}
+
+export interface AssistRuntimeStatus {
+  connected: boolean;
+  phase: string;
+  queueId: number;
+  championId: number;
+  position: string;
+  lastAction: string;
+  lastError: string;
+  overlays: Record<AssistOverlayName, boolean>;
+}
+
+export interface AssistOperationResult {
+  key: string;
+  success: boolean;
+  message: string;
+}
+
+export interface AssistLivePlayer {
+  riotId: string;
+  championName: string;
+  team: string;
+  level: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  spellOne: string;
+  spellTwo: string;
+}
+
+export interface AssistLiveData {
+  active: boolean;
+  gameTime: number;
+  gameMode: string;
+  players: AssistLivePlayer[];
+  error?: string;
+}
+
+export interface AssistApi {
+  getStatus: () => Promise<AssistRuntimeStatus>;
+  getRecommendation: (
+    request?: AssistRecommendationRequest,
+  ) => Promise<AssistRecommendation>;
+  applyRecommendation: (
+    request?: AssistRecommendationRequest,
+  ) => Promise<AssistOperationResult[]>;
+  getChampionGuide: (championId?: number) => Promise<AssistChampionGuide>;
+  getProfileIcons: () => Promise<AssistProfileIcon[]>;
+  lockCurrentChampion: () => Promise<AssistOperationResult>;
+  applyAccountSettings: () => Promise<AssistOperationResult[]>;
+  toggleOverlay: (name: AssistOverlayName) => Promise<boolean>;
+  getLiveData: () => Promise<AssistLiveData>;
+  exportBlacklist: () => Promise<string | null>;
 }
 
 export interface ChampionPreset {
@@ -102,6 +309,7 @@ export interface ChampionPreset {
 export interface DbApi {
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<void>;
+  updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
 }
 
 // ============================================================================
@@ -295,6 +503,7 @@ export interface LolHelper {
   db: DbApi;
   scout: ScoutApi;
   config: LolConfigApi;
+  assist: AssistApi;
 }
 
 // ============================================================================

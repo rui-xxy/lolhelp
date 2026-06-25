@@ -174,5 +174,17 @@ export function validateAppSettings(value: unknown): AppSettings {
   if (settings.championPresets !== undefined && !Array.isArray(settings.championPresets)) {
     throw new Error('英雄方案格式无效');
   }
+  if (
+    settings.assist !== undefined &&
+    (!settings.assist || typeof settings.assist !== 'object')
+  ) {
+    throw new Error('辅助功能设置格式无效');
+  }
+  if (
+    settings.blacklist !== undefined &&
+    (!Array.isArray(settings.blacklist) || settings.blacklist.length > 5000)
+  ) {
+    throw new Error('黑名单格式无效');
+  }
   return value as AppSettings;
 }

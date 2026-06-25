@@ -3,7 +3,12 @@ import { IPC_CHANNELS } from '../../../shared/channels';
 import { readLockfile, getCachedCredentials } from '../../lcu/lockfile';
 import { LcuClient } from '../../lcu/client';
 import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
-import type { LcuConnection, LcuRegion, FriendInfo } from '../../../shared/api';
+import type {
+  FriendActionResult,
+  FriendInfo,
+  LcuConnection,
+  LcuRegion,
+} from '../../../shared/api';
 import {
   buildChampionSplashCandidatesByAlias,
   buildProfileIconCandidates,
@@ -146,6 +151,21 @@ function pickActiveGameChampionId(
     participants.find((p) => String(p.summonerName ?? '') === friend.gameName);
   const championId = Number(participant?.championId ?? 0);
   return Number.isFinite(championId) && championId > 0 ? championId : 0;
+}
+
+function findNestedValue(
+  value: unknown,
+  keys: Set<string>,
+): string | number | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (keys.has(key) && (typeof child === 'string' || typeof child === 'number')) {
+      return child;
+    }
+    const nested = findNestedValue(child, keys);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
 }
 
 async function getActiveGameChampionId(
@@ -328,6 +348,7 @@ export function registerLcuHandlers(): void {
         }
 
         return {
+          id: String(f.id ?? f.puuid ?? f.summonerId ?? ''),
           puuid,
           gameName,
           gameTag,
@@ -348,4 +369,64 @@ export function registerLcuHandlers(): void {
       return [];
     }
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_SPECTATE_FRIEND,
+    async (_event, puuid: string): Promise<FriendActionResult> => {
+      if (typeof puuid !== 'string' || !puuid.trim()) {
+        return { success: false, message: '好友信息无效' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) return { success: false, message: '英雄联盟客户端未连接' };
+      const client = new LcuClient(creds);
+      try {
+        const activeGame = await client.get<Record<string, unknown>>(
+          `/lol-spectator/v1/active-games/by-puuid/${encodeURIComponent(puuid)}`,
+        );
+        const spectatorKey = String(findNestedValue(
+          activeGame,
+          new Set(['spectatorsEncryptionKey', 'encryptionKey', 'observerEncryptionKey']),
+        ) ?? '');
+        const gameQueueType = String(findNestedValue(
+          activeGame,
+          new Set(['gameQueueType', 'queueType']),
+        ) ?? '');
+        await client.post('/lol-spectator/v1/spectate/launch', {
+          puuid,
+          spectatorKey,
+          gameQueueType,
+          allowObserveMode: 'ALL',
+          dropInSpectateGameId: '',
+        });
+        return { success: true, message: '正在启动观战' };
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : '观战失败',
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_DELETE_FRIEND,
+    async (_event, friendId: string): Promise<FriendActionResult> => {
+      if (typeof friendId !== 'string' || !friendId.trim()) {
+        return { success: false, message: '好友信息无效' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) return { success: false, message: '英雄联盟客户端未连接' };
+      try {
+        await new LcuClient(creds).delete(
+          `/lol-chat/v1/friends/${encodeURIComponent(friendId)}`,
+        );
+        return { success: true, message: '好友已删除' };
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : '删除失败',
+        };
+      }
+    },
+  );
 }

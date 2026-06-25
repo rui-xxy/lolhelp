@@ -7,13 +7,22 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppSettings } from '../../shared/api';
+import {
+  DEFAULT_ASSIST_SETTINGS,
+  normalizeAssistBlacklist,
+  normalizeAssistSettings,
+} from '../../shared/assist';
 
 const SETTINGS_FILE = 'lolhelper-settings.json';
 
 const DEFAULT_SETTINGS: AppSettings = {
   favoriteChampions: [],
   championPresets: [],
+  assist: DEFAULT_ASSIST_SETTINGS,
+  blacklist: [],
 };
+
+let settingsCache: AppSettings | null = null;
 
 function resolveSettingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
@@ -21,12 +30,17 @@ function resolveSettingsPath(): string {
 
 // 读设置。文件不存在/损坏时返回默认值（不抛错，保证 UI 永远拿得到值）。
 export function getSettings(): AppSettings {
+  if (settingsCache) return structuredClone(settingsCache);
+
   try {
     const filePath = resolveSettingsPath();
-    if (!fs.existsSync(filePath)) return { ...DEFAULT_SETTINGS };
+    if (!fs.existsSync(filePath)) {
+      settingsCache = structuredClone(DEFAULT_SETTINGS);
+      return structuredClone(settingsCache);
+    }
     const raw = fs.readFileSync(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return {
+    settingsCache = {
       favoriteChampions: Array.isArray(parsed.favoriteChampions)
         ? parsed.favoriteChampions.filter((x) => typeof x === 'number')
         : [],
@@ -44,24 +58,56 @@ export function getSettings(): AppSettings {
             .filter((preset) => preset.championIds.length > 0)
         : [],
       scoutDefaults: parsed.scoutDefaults ?? undefined,
+      assist: normalizeAssistSettings(parsed.assist),
+      blacklist: normalizeAssistBlacklist(parsed.blacklist),
     };
+    return structuredClone(settingsCache);
   } catch (err) {
     console.warn('[settings] 读取失败，用默认值:', err);
-    return { ...DEFAULT_SETTINGS };
+    settingsCache = structuredClone(DEFAULT_SETTINGS);
+    return structuredClone(settingsCache);
   }
 }
 
 // 写设置。原子写（先写临时文件再 rename，避免写一半崩溃损坏文件）。
 export function saveSettings(settings: AppSettings): void {
   try {
+    const normalized: AppSettings = {
+      favoriteChampions: Array.isArray(settings.favoriteChampions)
+        ? settings.favoriteChampions.filter((x) => typeof x === 'number').slice(0, 500)
+        : [],
+      championPresets: Array.isArray(settings.championPresets)
+        ? settings.championPresets
+        : [],
+      scoutDefaults: settings.scoutDefaults,
+      assist: normalizeAssistSettings(settings.assist),
+      blacklist: normalizeAssistBlacklist(settings.blacklist),
+    };
     const filePath = resolveSettingsPath();
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const tmp = filePath + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf-8');
+    fs.writeFileSync(tmp, JSON.stringify(normalized, null, 2), 'utf-8');
     fs.renameSync(tmp, filePath);
+    settingsCache = normalized;
   } catch (err) {
     console.error('[settings] 写入失败:', err);
     throw err;
   }
+}
+
+export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  const current = getSettings();
+  const next: AppSettings = {
+    ...current,
+    ...patch,
+    assist: patch.assist
+      ? normalizeAssistSettings(patch.assist)
+      : current.assist,
+    blacklist: patch.blacklist
+      ? normalizeAssistBlacklist(patch.blacklist)
+      : current.blacklist,
+  };
+  saveSettings(next);
+  return getSettings();
 }

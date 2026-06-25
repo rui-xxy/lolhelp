@@ -7,6 +7,7 @@ import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
+import { AssistPage } from './components/assist/AssistPage';
 import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
@@ -15,6 +16,7 @@ const PAGE_TITLES: Record<View, string> = {
   matches: '', // 战绩页标题栏放搜索框，标题留空
   live: '实时对局',
   scout: '高手雷达',
+  assist: '辅助功能',
 };
 
 const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
@@ -148,7 +150,7 @@ export function App() {
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout'}
+      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
@@ -181,6 +183,16 @@ export function App() {
         <ScoutPage
           onPlayerSearch={(name) => {
             setMatchSearchName(name);
+            setActiveView('matches');
+            setMatchSearchTrigger((n) => n + 1);
+          }}
+        />
+      </div>
+      <div className={activeView === 'assist' ? 'h-full' : 'hidden'}>
+        <AssistPage
+          onPlayerSearch={(riotId, region) => {
+            setMatchSearchName(riotId);
+            setMatchRegion(region ?? '');
             setActiveView('matches');
             setMatchSearchTrigger((n) => n + 1);
           }}
