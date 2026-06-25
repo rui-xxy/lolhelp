@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { PanelLeft, Home, Swords, Radar, Users, Crosshair, Settings, Sparkles } from 'lucide-react';
+import {
+  Crosshair,
+  Home,
+  MessageCircleMore,
+  PanelLeft,
+  Radar,
+  Settings,
+  Sparkles,
+  Swords,
+  Users,
+} from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
@@ -13,6 +23,8 @@ interface AppShellProps {
   headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
   friendPanelHidden?: boolean; // 好友栏是否隐藏
   onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
+  chatSessionsOpen?: boolean; // 会话管理窗口是否打开
+  onOpenChatSessions?: () => void; // 打开会话管理窗口
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
   onOpenSettings?: () => void; // 打开设置窗口
 }
@@ -37,6 +49,8 @@ export function AppShell({
   headerExtra,
   friendPanelHidden = false,
   onToggleFriendPanel,
+  chatSessionsOpen = false,
+  onOpenChatSessions,
   friendPanel,
   onOpenSettings,
 }: AppShellProps) {
@@ -176,19 +190,39 @@ export function AppShell({
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
-          {onToggleFriendPanel && (
-            <button
-              onClick={onToggleFriendPanel}
-              className={`ml-auto flex size-8 items-center justify-center rounded-sm transition-colors [-webkit-app-region:no-drag] ${
-                friendPanelHidden
-                  ? 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
-                  : 'bg-app-surface-soft text-app-primary hover:bg-app-nav-hover'
-              }`}
-              title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
-              aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
-            >
-              <Users className="size-4" />
-            </button>
+          {(onOpenChatSessions || onToggleFriendPanel) && (
+            <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
+              {onOpenChatSessions && (
+                <button
+                  type="button"
+                  onClick={onOpenChatSessions}
+                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
+                    chatSessionsOpen
+                      ? 'bg-app-surface-soft text-app-primary'
+                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                  }`}
+                  title="会话管理"
+                  aria-label="会话管理"
+                >
+                  <MessageCircleMore className="size-4" />
+                </button>
+              )}
+              {onToggleFriendPanel && (
+                <button
+                  type="button"
+                  onClick={onToggleFriendPanel}
+                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
+                    friendPanelHidden
+                      ? 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                      : 'bg-app-surface-soft text-app-primary hover:bg-app-nav-hover'
+                  }`}
+                  title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
+                  aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
+                >
+                  <Users className="size-4" />
+                </button>
+              )}
+            </div>
           )}
         </header>
 

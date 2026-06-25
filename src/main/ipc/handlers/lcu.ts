@@ -16,6 +16,7 @@ import {
 import { getHeroByKey } from '../../lcu/heroData';
 import { resolveChampionSkinId } from '../../lcu/championSkins';
 import { getQueueCatalog, getQueueDisplayName } from '../../lcu/queueCatalog';
+import { getChatConversations } from '../../lcu/chatSessions';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -368,6 +369,14 @@ export function registerLcuHandlers(): void {
     } catch {
       return [];
     }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, async () => {
+    const creds = getCachedCredentials();
+    if (!creds) {
+      throw new Error('英雄联盟客户端未连接');
+    }
+    return getChatConversations(new LcuClient(creds));
   });
 
   ipcMain.handle(

@@ -8,6 +8,7 @@ import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { AssistPage } from './components/assist/AssistPage';
+import { ChatSessionDialog } from './components/chat/ChatSessionDialog';
 import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
@@ -31,6 +32,7 @@ export function App() {
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
   const [friendPanelHidden, setFriendPanelHidden] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatSessionsOpen, setChatSessionsOpen] = useState(false);
   const friendPanelTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -154,7 +156,15 @@ export function App() {
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
-      onOpenSettings={() => setSettingsOpen(true)}
+      chatSessionsOpen={chatSessionsOpen}
+      onOpenChatSessions={() => {
+        setSettingsOpen(false);
+        setChatSessionsOpen(true);
+      }}
+      onOpenSettings={() => {
+        setChatSessionsOpen(false);
+        setSettingsOpen(true);
+      }}
       friendPanel={
         <FriendPanel
           onFriendClick={handleFriendClick}
@@ -198,6 +208,10 @@ export function App() {
           }}
         />
       </div>
+      <ChatSessionDialog
+        open={chatSessionsOpen}
+        onClose={() => setChatSessionsOpen(false)}
+      />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AppShell>
   );

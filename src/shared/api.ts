@@ -73,11 +73,37 @@ export interface FriendActionResult {
   message: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  body: string;
+  type: string;
+  timestamp: string;
+  fromSelf: boolean;
+  senderRiotId: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  type: string;
+  gameName: string;
+  gameTag: string;
+  riotId: string;
+  puuid: string;
+  icon: number;
+  iconUrl: string;
+  iconUrls: string[];
+  unreadMessageCount: number;
+  lastMessage: string;
+  lastMessageAt: string;
+  messages: ChatMessage[];
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
   getFriends: () => Promise<FriendInfo[]>;
+  getChatConversations: () => Promise<ChatConversation[]>;
   spectateFriend: (puuid: string) => Promise<FriendActionResult>;
   deleteFriend: (friendId: string) => Promise<FriendActionResult>;
 }
