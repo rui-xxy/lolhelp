@@ -3,6 +3,7 @@ import {
   RefreshCw,
   Search,
   SendHorizontal,
+  Smile,
   X,
 } from 'lucide-react';
 import {
@@ -16,6 +17,14 @@ import type { ChatConversation, ChatMessage } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 
 const CHAT_REFRESH_INTERVAL_MS = 5_000;
+const EMOJI_OPTIONS = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣',
+  '😊', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😋',
+  '😎', '🤔', '🫡', '🤗', '🤭', '😴', '😭', '🥺',
+  '😤', '😡', '🤯', '😱', '👍', '👎', '👌', '✌️',
+  '🤝', '🙏', '👏', '💪', '❤️', '💔', '🔥', '✨',
+  '🎉', '🎮', '🏆', '💯', '👀', '🐱', '🐶', '🌹',
+];
 
 function timestampValue(value: string): number {
   const numeric = Number(value);
@@ -133,13 +142,17 @@ export function ChatSessionDialog({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const loadingRef = useRef(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const closeDialog = useCallback(() => {
     setSearch('');
     setDraft('');
     setSendError('');
+    setEmojiOpen(false);
     onClose();
   }, [onClose]);
 
@@ -187,6 +200,20 @@ export function ChatSessionDialog({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [closeDialog, open]);
 
+  useEffect(() => {
+    if (!emojiOpen) return undefined;
+    const closeEmojiPicker = (event: MouseEvent) => {
+      if (
+        event.target instanceof Node
+        && !emojiPickerRef.current?.contains(event.target)
+      ) {
+        setEmojiOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeEmojiPicker);
+    return () => document.removeEventListener('mousedown', closeEmojiPicker);
+  }, [emojiOpen]);
+
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return conversations;
@@ -225,6 +252,28 @@ export function ChatSessionDialog({
       setSending(false);
     }
   }, [draft, loadConversations, selectedConversation, sending]);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    const textarea = textareaRef.current;
+    const selectionStart = textarea?.selectionStart ?? draft.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    const nextDraft =
+      draft.slice(0, selectionStart)
+      + emoji
+      + draft.slice(selectionEnd);
+    if (nextDraft.length > 1000) return;
+
+    setDraft(nextDraft);
+    setEmojiOpen(false);
+    const nextCursorPosition = selectionStart + emoji.length;
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(
+        nextCursorPosition,
+        nextCursorPosition,
+      );
+    });
+  }, [draft]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -298,7 +347,12 @@ export function ChatSessionDialog({
                 <button
                   key={conversation.id}
                   type="button"
-                  onClick={() => setSelectedId(conversation.id)}
+                  onClick={() => {
+                    setSelectedId(conversation.id);
+                    setDraft('');
+                    setSendError('');
+                    setEmojiOpen(false);
+                  }}
                   className={`flex w-full items-center gap-3 border-b border-app-border/70 px-3 py-3 text-left transition-colors ${
                     selectedId === conversation.id
                       ? 'bg-app-surface'
@@ -395,8 +449,9 @@ export function ChatSessionDialog({
                   {sendError && (
                     <div className="mb-2 text-xs text-app-danger">{sendError}</div>
                   )}
-                  <div className="flex items-end gap-3">
+                  <div className="rounded-md border border-app-border bg-app-bg-soft transition-colors focus-within:border-app-primary">
                     <textarea
+                      ref={textareaRef}
                       value={draft}
                       maxLength={1000}
                       rows={3}
@@ -416,21 +471,62 @@ export function ChatSessionDialog({
                           void submitMessage();
                         }
                       }}
-                      className="min-h-20 flex-1 resize-none rounded-sm border border-app-border bg-app-bg-soft px-3 py-2 text-sm leading-5 text-app-text outline-none placeholder:text-app-subtle focus:border-app-primary disabled:opacity-60"
+                      className="block min-h-24 w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm leading-5 text-app-text outline-none placeholder:text-app-subtle disabled:opacity-60"
                     />
-                    <button
-                      type="button"
-                      onClick={() => void submitMessage()}
-                      disabled={!draft.trim() || sending}
-                      className="flex h-10 shrink-0 items-center gap-2 rounded-sm bg-app-primary px-4 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      <SendHorizontal className="size-4" />
-                      {sending ? '发送中' : '发送'}
-                    </button>
-                  </div>
-                  <div className="mt-1.5 flex justify-between text-[10px] text-app-subtle">
-                    <span>Enter 发送 · Shift+Enter 换行</span>
-                    <span>{draft.length}/1000</span>
+                    <div className="flex items-center gap-2 px-2 pb-2">
+                      <div ref={emojiPickerRef} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setEmojiOpen((current) => !current)}
+                          title="选择表情"
+                          aria-label="选择表情"
+                          aria-expanded={emojiOpen}
+                          className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
+                            emojiOpen
+                              ? 'bg-app-primary-soft text-app-primary'
+                              : 'text-app-muted hover:bg-app-surface hover:text-app-text'
+                          }`}
+                        >
+                          <Smile className="size-[18px]" />
+                        </button>
+                        {emojiOpen && (
+                          <div className="absolute bottom-10 left-0 z-40 w-[304px] rounded-md border border-app-border bg-app-surface p-2 shadow-airbnb">
+                            <div className="mb-2 px-1 text-[11px] font-medium text-app-muted">
+                              常用表情
+                            </div>
+                            <div className="grid grid-cols-8 gap-1">
+                              {EMOJI_OPTIONS.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => insertEmoji(emoji)}
+                                  className="flex size-8 items-center justify-center rounded-sm text-xl transition-colors hover:bg-app-nav-hover"
+                                  title={emoji}
+                                  aria-label={`插入表情 ${emoji}`}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-app-subtle">
+                        Enter 发送 · Shift+Enter 换行
+                      </span>
+                      <span className="ml-auto text-[10px] text-app-subtle">
+                        {draft.length}/1000
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void submitMessage()}
+                        disabled={!draft.trim() || sending}
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-app-primary px-3 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:bg-app-nav-hover disabled:text-app-subtle"
+                      >
+                        <SendHorizontal className="size-3.5" />
+                        {sending ? '发送中' : '发送'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
