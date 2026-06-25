@@ -26,6 +26,12 @@ const lolHelper: LolHelper = {
     getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
     getChatConversations: () =>
       ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS),
+    sendChatMessage: (conversationId: string, body: string) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.LCU_SEND_CHAT_MESSAGE,
+        conversationId,
+        body,
+      ),
     spectateFriend: (puuid: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.LCU_SPECTATE_FRIEND, puuid),
     deleteFriend: (friendId: string) =>

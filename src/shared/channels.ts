@@ -9,6 +9,7 @@ export const IPC_CHANNELS = {
   LCU_GET_CURRENT_REGION: 'lcu:get-current-region',
   LCU_GET_FRIENDS: 'lcu:get-friends',
   LCU_GET_CHAT_CONVERSATIONS: 'lcu:get-chat-conversations',
+  LCU_SEND_CHAT_MESSAGE: 'lcu:send-chat-message',
   LCU_SPECTATE_FRIEND: 'lcu:spectate-friend',
   LCU_DELETE_FRIEND: 'lcu:delete-friend',
   // db 域：本地数据/设置（后续阶段填充真实实现）

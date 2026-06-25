@@ -2,6 +2,7 @@ import {
   MessageCircleMore,
   RefreshCw,
   Search,
+  SendHorizontal,
   X,
 } from 'lucide-react';
 import {
@@ -129,11 +130,16 @@ export function ChatSessionDialog({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const loadingRef = useRef(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
 
   const closeDialog = useCallback(() => {
     setSearch('');
+    setDraft('');
+    setSendError('');
     onClose();
   }, [onClose]);
 
@@ -194,6 +200,31 @@ export function ChatSessionDialog({
   const selectedConversation = conversations.find(
     (conversation) => conversation.id === selectedId,
   ) ?? null;
+
+  const submitMessage = useCallback(async () => {
+    const body = draft.trim();
+    if (!selectedConversation || !body || sending) return;
+    setSending(true);
+    setSendError('');
+    try {
+      const result = await window.lolHelper.lcu.sendChatMessage(
+        selectedConversation.id,
+        body,
+      );
+      if (!result.success) {
+        setSendError(result.message);
+        return;
+      }
+      setDraft('');
+      await loadConversations(false);
+    } catch (sendFailure) {
+      setSendError(
+        sendFailure instanceof Error ? sendFailure.message : String(sendFailure),
+      );
+    } finally {
+      setSending(false);
+    }
+  }, [draft, loadConversations, selectedConversation, sending]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -346,18 +377,64 @@ export function ChatSessionDialog({
           </header>
 
           {selectedConversation ? (
-            <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg-soft px-6 py-5">
-              <div className="mx-auto max-w-[680px] space-y-4">
-                {selectedConversation.messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    conversation={selectedConversation}
-                  />
-                ))}
-                <div ref={messageEndRef} />
+            <>
+              <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg-soft px-6 py-5">
+                <div className="mx-auto max-w-[680px] space-y-4">
+                  {selectedConversation.messages.map((message) => (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      conversation={selectedConversation}
+                    />
+                  ))}
+                  <div ref={messageEndRef} />
+                </div>
               </div>
-            </div>
+              <div className="shrink-0 border-t border-app-border bg-app-surface p-4">
+                <div className="mx-auto max-w-[680px]">
+                  {sendError && (
+                    <div className="mb-2 text-xs text-app-danger">{sendError}</div>
+                  )}
+                  <div className="flex items-end gap-3">
+                    <textarea
+                      value={draft}
+                      maxLength={1000}
+                      rows={3}
+                      disabled={sending}
+                      placeholder={`发送给 ${selectedConversation.riotId}`}
+                      onChange={(event) => {
+                        setDraft(event.target.value);
+                        if (sendError) setSendError('');
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === 'Enter'
+                          && !event.shiftKey
+                          && !event.nativeEvent.isComposing
+                        ) {
+                          event.preventDefault();
+                          void submitMessage();
+                        }
+                      }}
+                      className="min-h-20 flex-1 resize-none rounded-sm border border-app-border bg-app-bg-soft px-3 py-2 text-sm leading-5 text-app-text outline-none placeholder:text-app-subtle focus:border-app-primary disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void submitMessage()}
+                      disabled={!draft.trim() || sending}
+                      className="flex h-10 shrink-0 items-center gap-2 rounded-sm bg-app-primary px-4 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <SendHorizontal className="size-4" />
+                      {sending ? '发送中' : '发送'}
+                    </button>
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-[10px] text-app-subtle">
+                    <span>Enter 发送 · Shift+Enter 换行</span>
+                    <span>{draft.length}/1000</span>
+                  </div>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
               <div className="flex size-14 items-center justify-center rounded-full bg-app-bg-soft">

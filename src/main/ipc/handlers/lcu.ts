@@ -16,7 +16,10 @@ import {
 import { getHeroByKey } from '../../lcu/heroData';
 import { resolveChampionSkinId } from '../../lcu/championSkins';
 import { getQueueCatalog, getQueueDisplayName } from '../../lcu/queueCatalog';
-import { getChatConversations } from '../../lcu/chatSessions';
+import {
+  getChatConversations,
+  sendChatMessage,
+} from '../../lcu/chatSessions';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -378,6 +381,24 @@ export function registerLcuHandlers(): void {
     }
     return getChatConversations(new LcuClient(creds));
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_SEND_CHAT_MESSAGE,
+    async (
+      _event,
+      conversationId: string,
+      body: string,
+    ): Promise<FriendActionResult> => {
+      if (typeof conversationId !== 'string' || typeof body !== 'string') {
+        return { success: false, message: '消息参数无效' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) {
+        return { success: false, message: '英雄联盟客户端未连接' };
+      }
+      return sendChatMessage(new LcuClient(creds), conversationId, body);
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.LCU_SPECTATE_FRIEND,

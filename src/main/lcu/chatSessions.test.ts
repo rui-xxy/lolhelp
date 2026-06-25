@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildChatConversations } from './chatSessions';
+import {
+  buildChatConversations,
+  CHAT_MESSAGE_MAX_LENGTH,
+  sendChatMessage,
+} from './chatSessions';
 
 describe('chat sessions', () => {
   it('keeps direct conversations with actual messages and resolves the friend', () => {
@@ -95,5 +99,44 @@ describe('chat sessions', () => {
       'newer',
       'older',
     ]);
+  });
+
+  it('sends a trimmed chat message to the selected conversation', async () => {
+    const calls: Array<{ path: string; body: unknown }> = [];
+    const result = await sendChatMessage(
+      {
+        post: async (path, body) => {
+          calls.push({ path, body });
+          return undefined;
+        },
+      },
+      'conversation/id',
+      '  你好  ',
+    );
+
+    expect(result).toEqual({ success: true, message: '消息已发送' });
+    expect(calls).toEqual([{
+      path: '/lol-chat/v1/conversations/conversation%2Fid/messages',
+      body: { body: '你好', type: 'chat' },
+    }]);
+  });
+
+  it('rejects empty and oversized chat messages', async () => {
+    const client = {
+      post: async () => undefined,
+    };
+
+    await expect(sendChatMessage(client, 'conversation', '   ')).resolves.toMatchObject({
+      success: false,
+    });
+    await expect(
+      sendChatMessage(
+        client,
+        'conversation',
+        'a'.repeat(CHAT_MESSAGE_MAX_LENGTH + 1),
+      ),
+    ).resolves.toMatchObject({
+      success: false,
+    });
   });
 });

@@ -1,6 +1,7 @@
 import type {
   ChatConversation,
   ChatMessage,
+  FriendActionResult,
 } from '../../shared/api';
 import { buildProfileIconCandidates } from '../../shared/gameAssets';
 import { LcuClient } from './client';
@@ -8,6 +9,11 @@ import { LcuClient } from './client';
 type RawRecord = Record<string, unknown>;
 
 const CHAT_MESSAGE_CONCURRENCY = 6;
+export const CHAT_MESSAGE_MAX_LENGTH = 1000;
+
+interface ChatPostClient {
+  post(requestPath: string, body: unknown): Promise<unknown>;
+}
 
 function asRecord(value: unknown): RawRecord {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -323,4 +329,43 @@ export async function getChatConversations(
     conversations: directConversations,
     messagesByConversation: new Map(messageEntries.filter(([id]) => Boolean(id))),
   });
+}
+
+export async function sendChatMessage(
+  client: ChatPostClient,
+  conversationId: string,
+  body: string,
+): Promise<FriendActionResult> {
+  const normalizedConversationId = conversationId.trim();
+  const normalizedBody = body.trim();
+  if (!normalizedConversationId) {
+    return { success: false, message: '会话信息无效' };
+  }
+  if (!normalizedBody) {
+    return { success: false, message: '请输入消息内容' };
+  }
+  if (normalizedBody.length > CHAT_MESSAGE_MAX_LENGTH) {
+    return {
+      success: false,
+      message: `消息最多 ${CHAT_MESSAGE_MAX_LENGTH} 个字符`,
+    };
+  }
+
+  try {
+    await client.post(
+      `/lol-chat/v1/conversations/${encodeURIComponent(
+        normalizedConversationId,
+      )}/messages`,
+      {
+        body: normalizedBody,
+        type: 'chat',
+      },
+    );
+    return { success: true, message: '消息已发送' };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : '消息发送失败',
+    };
+  }
 }

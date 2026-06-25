@@ -104,6 +104,10 @@ export interface LcuApi {
   getCurrentRegion: () => Promise<LcuRegion>;
   getFriends: () => Promise<FriendInfo[]>;
   getChatConversations: () => Promise<ChatConversation[]>;
+  sendChatMessage: (
+    conversationId: string,
+    body: string,
+  ) => Promise<FriendActionResult>;
   spectateFriend: (puuid: string) => Promise<FriendActionResult>;
   deleteFriend: (friendId: string) => Promise<FriendActionResult>;
 }
