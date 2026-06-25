@@ -68,6 +68,17 @@ export function buildChampionSplashByAlias(
   return `${DDRAGON_CHAMPION_SPLASH_BASE}${championAlias}_${skinNumber}.jpg`;
 }
 
+export function buildChampionSplashCandidatesByAlias(
+  alias: number | string | null | undefined,
+  championId?: number | string | null,
+  skinId?: number | string | null,
+): string[] {
+  return uniqueUrls([
+    buildChampionSplashByAlias(alias, championId, skinId),
+    buildChampionSplashByAlias(alias, championId, 0),
+  ]);
+}
+
 export function buildChampionSplashFromAvatar(
   avatarUrl: string | null | undefined,
   championId?: number | string | null,

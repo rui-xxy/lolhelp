@@ -22,7 +22,7 @@ const AVAILABILITY_COLOR: Record<string, string> = {
   offline: 'bg-gray-400',
 };
 
-const FRIEND_REFRESH_INTERVAL_MS = 10_000;
+const FRIEND_REFRESH_INTERVAL_MS = 5_000;
 
 type FriendStatusKind =
   | 'ranked-solo'
@@ -212,7 +212,14 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                       const statusKind = getFriendStatusKind(friend);
                       const statusText = getGameStatus(friend);
                       const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-gray-400';
-                      const championSplashUrl = friend.lol?.championSplashUrl ?? '';
+                      const championSplashUrls = friend.lol?.championSplashUrls?.length
+                        ? friend.lol.championSplashUrls
+                        : friend.lol?.championSplashUrl
+                          ? [friend.lol.championSplashUrl]
+                          : [];
+                      const championSplashBackground = championSplashUrls
+                        .map((url) => `url("${url}")`)
+                        .join(', ');
                       const gameDuration =
                         friend.lol?.gameStatus === 'inGame'
                           ? formatGameDuration(friend.lol.timeStamp, currentTime)
@@ -222,15 +229,15 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                           key={friend.puuid}
                           onClick={() => handleFriendClick(friend)}
                           className={`friend-row flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left ${
-                            championSplashUrl ? 'friend-row--has-skin' : ''
+                            championSplashBackground ? 'friend-row--has-skin' : ''
                           } ${
                             gameDuration ? 'pr-14' : ''
                           } ${
                             isOffline ? 'opacity-50' : ''
                           }`}
                           style={
-                            championSplashUrl
-                              ? ({ '--friend-skin-bg': `url("${championSplashUrl}")` } as CSSProperties)
+                            championSplashBackground
+                              ? ({ '--friend-skin-bg': championSplashBackground } as CSSProperties)
                               : undefined
                           }
                         >

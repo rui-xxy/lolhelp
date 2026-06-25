@@ -55,6 +55,7 @@ export interface FriendInfo {
     gameQueueType?: string; // RANKED_SOLO_5x5 等
     championId?: number; // 当前英雄
     championSplashUrl?: string; // 当前英雄/皮肤背景
+    championSplashUrls?: string[]; // 当前皮肤优先，默认原画兜底
     timeStamp?: string | number; // 游戏开始时间戳（LCU 好友状态）
     gameId?: number; // 当前对局 ID
     rankedLeagueTier?: string; // 段位

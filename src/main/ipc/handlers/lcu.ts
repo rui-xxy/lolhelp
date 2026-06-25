@@ -4,7 +4,10 @@ import { readLockfile, getCachedCredentials } from '../../lcu/lockfile';
 import { LcuClient } from '../../lcu/client';
 import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
 import type { LcuConnection, LcuRegion, FriendInfo } from '../../../shared/api';
-import { buildChampionSplashByAlias, buildProfileIconCandidates } from '../../../shared/gameAssets';
+import {
+  buildChampionSplashCandidatesByAlias,
+  buildProfileIconCandidates,
+} from '../../../shared/gameAssets';
 import { getHeroByKey } from '../../lcu/heroData';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
@@ -294,13 +297,18 @@ export function registerLcuHandlers(): void {
         ]);
         const hero = championId > 0 ? getHeroByKey(championId) : null;
         const lol = Object.keys(rawLol).length > 0 ? (rawLol as FriendInfo['lol']) : undefined;
-        if (lol && hero?.alias) {
-          lol.championId = championId;
-          lol.championSplashUrl = buildChampionSplashByAlias(
-            hero.alias,
+        const championAlias =
+          hero?.alias ||
+          String(readStringField(rawLol, ['skinname', 'championName', 'championAlias']));
+        if (lol && championId > 0 && championAlias) {
+          const championSplashUrls = buildChampionSplashCandidatesByAlias(
+            championAlias,
             championId,
             championSkinId as string | number,
           );
+          lol.championId = championId;
+          lol.championSplashUrl = championSplashUrls[0] ?? '';
+          lol.championSplashUrls = championSplashUrls;
         }
 
         return {
