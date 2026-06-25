@@ -468,7 +468,14 @@ export function AssistPage({
       )}
 
       {profileIconPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-8">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-8"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setProfileIconPickerOpen(false);
+            }
+          }}
+        >
           <div className="flex max-h-[78vh] w-[720px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
             <div className="flex items-center gap-3 border-b border-app-border p-4">
               <div className="text-sm font-semibold text-app-text">选择玩家头像</div>

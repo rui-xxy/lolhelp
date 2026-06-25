@@ -40,7 +40,10 @@ export function ChampionPickerDialog({
         {/* 遮罩 */}
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in" />
         {/* 弹窗主体：居中 */}
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-app-border bg-app-surface shadow-airbnb">
+        <Dialog.Content
+          onPointerDownOutside={() => onOpenChange(false)}
+          className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-app-border bg-app-surface shadow-airbnb"
+        >
           {/* 标题栏 */}
           <div className="flex items-center justify-between border-b border-app-border px-5 py-3">
             <Dialog.Title className="flex items-center gap-2 text-sm font-semibold text-app-text">

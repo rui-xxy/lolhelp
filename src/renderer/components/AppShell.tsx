@@ -138,6 +138,10 @@ export function AppShell({
             <Sparkles className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">辅助功能</span>}
           </a>
+        </nav>
+
+        {/* 底部：设置入口与状态区 */}
+        <div className="shrink-0 border-t border-app-border p-2">
           {onOpenSettings && (
             <a
               href="#"
@@ -146,17 +150,17 @@ export function AppShell({
                 onOpenSettings();
               }}
               title={collapsed ? '设置' : undefined}
-              className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
             >
               <Settings className="size-4 shrink-0" />
               {!collapsed && <span className="truncate">设置</span>}
             </a>
           )}
-        </nav>
-
-        {/* 底部：状态占位区 */}
-        <div className="shrink-0 border-t border-app-border p-3">
-          {!collapsed && <p className="text-xs text-app-subtle">状态 · 待填充</p>}
+          {!collapsed && (
+            <p className="mt-2 border-t border-app-border px-3 pt-2 text-xs text-app-subtle">
+              状态 · 待填充
+            </p>
+          )}
         </div>
       </aside>
 

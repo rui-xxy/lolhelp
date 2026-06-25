@@ -240,7 +240,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section className="flex h-[640px] w-[980px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
           <div className="flex size-8 items-center justify-center rounded-sm bg-app-surface-soft text-app-primary">
@@ -737,7 +742,12 @@ function HotkeyCaptureDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35">
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <div className="w-[360px] rounded-md border border-app-border bg-app-surface p-4 shadow-airbnb">
         <h3 className="text-base font-semibold text-app-text">修改键位</h3>
         <p className="mt-1 text-sm text-app-muted">{target.label}</p>
