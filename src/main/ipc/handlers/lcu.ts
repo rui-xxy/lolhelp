@@ -9,6 +9,7 @@ import {
   buildProfileIconCandidates,
 } from '../../../shared/gameAssets';
 import { getHeroByKey } from '../../lcu/heroData';
+import { resolveChampionSkinId } from '../../lcu/championSkins';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -301,10 +302,15 @@ export function registerLcuHandlers(): void {
           hero?.alias ||
           String(readStringField(rawLol, ['skinname', 'championName', 'championAlias']));
         if (lol && championId > 0 && championAlias) {
+          const resolvedSkinId = await resolveChampionSkinId(
+            client,
+            championId,
+            championSkinId,
+          );
           const championSplashUrls = buildChampionSplashCandidatesByAlias(
             championAlias,
             championId,
-            championSkinId as string | number,
+            resolvedSkinId,
           );
           lol.championId = championId;
           lol.championSplashUrl = championSplashUrls[0] ?? '';
