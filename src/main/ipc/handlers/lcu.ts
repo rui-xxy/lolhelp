@@ -10,6 +10,7 @@ import {
 } from '../../../shared/gameAssets';
 import { getHeroByKey } from '../../lcu/heroData';
 import { resolveChampionSkinId } from '../../lcu/championSkins';
+import { getQueueCatalog, getQueueDisplayName } from '../../lcu/queueCatalog';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -271,6 +272,7 @@ export function registerLcuHandlers(): void {
         '/lol-chat/v1/friends',
       );
       if (!Array.isArray(raw)) return [];
+      const queueCatalog = await getQueueCatalog(client);
       return mapWithConcurrency(raw, FRIEND_ENRICH_CONCURRENCY, async (f) => {
         const icon = Number(f.icon ?? 0);
         const iconUrls = buildProfileIconCandidates(icon);
@@ -298,6 +300,14 @@ export function registerLcuHandlers(): void {
         ]);
         const hero = championId > 0 ? getHeroByKey(championId) : null;
         const lol = Object.keys(rawLol).length > 0 ? (rawLol as FriendInfo['lol']) : undefined;
+        const queueId = Number(rawLol.queueId ?? 0);
+        const queue = queueCatalog.get(queueId);
+        if (lol && queue) {
+          lol.queueId = queueId;
+          lol.mapId = Number(rawLol.mapId ?? 0);
+          lol.gameQueueName = getQueueDisplayName(queue);
+          lol.gameQueueRanked = queue.isRanked;
+        }
         const championAlias =
           hero?.alias ||
           String(readStringField(rawLol, ['skinname', 'championName', 'championAlias']));

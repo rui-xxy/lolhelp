@@ -3,6 +3,10 @@ import { RefreshCw } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import type { CSSProperties } from 'react';
+import {
+  getFriendStatusDisplay,
+  type FriendStatusKind,
+} from './friendStatus';
 
 // 好友列表面板（内联侧栏，不是弹窗）。
 // 分组显示好友、在线状态、备注，点击好友查战绩。
@@ -24,57 +28,19 @@ const AVAILABILITY_COLOR: Record<string, string> = {
 
 const FRIEND_REFRESH_INTERVAL_MS = 5_000;
 
-type FriendStatusKind =
-  | 'ranked-solo'
-  | 'ranked-flex'
-  | 'normal-game'
-  | 'aram'
-  | 'queue'
-  | 'champ-select'
-  | 'lobby'
-  | 'online'
-  | 'offline';
-
 const FRIEND_STATUS_CLASS: Record<FriendStatusKind, string> = {
   'ranked-solo': 'friend-status--ranked-solo',
   'ranked-flex': 'friend-status--ranked-flex',
   'normal-game': 'friend-status--normal-game',
   aram: 'friend-status--aram',
+  arena: 'friend-status--arena',
+  tft: 'friend-status--tft',
   queue: 'friend-status--queue',
   'champ-select': 'friend-status--champ-select',
   lobby: 'friend-status--lobby',
   online: 'friend-status--online',
   offline: 'friend-status--offline',
 };
-
-function getFriendStatusKind(friend: FriendInfo): FriendStatusKind {
-  if (friend.availability === 'offline') return 'offline';
-  const lol = friend.lol;
-  if (!lol) return 'online';
-  if (lol.gameStatus === 'inGame') {
-    if (lol.gameQueueType === 'RANKED_SOLO_5x5') return 'ranked-solo';
-    if (lol.gameQueueType === 'RANKED_FLEX_SR') return 'ranked-flex';
-    if (lol.gameMode === 'ARAM') return 'aram';
-    return 'normal-game';
-  }
-  if (lol.gameStatus === 'inQueue') return 'queue';
-  if (lol.gameStatus === 'championSelect') return 'champ-select';
-  return 'lobby';
-}
-
-function getGameStatus(friend: FriendInfo): string {
-  if (friend.availability === 'offline') return '';
-  const lol = friend.lol;
-  if (!lol) return '在线';
-  if (lol.gameStatus === 'inGame') {
-    return lol.gameQueueType === 'RANKED_SOLO_5x5' ? '排位中'
-      : lol.gameQueueType === 'RANKED_FLEX_SR' ? '灵活排位中'
-      : lol.gameMode === 'ARAM' ? '大乱斗' : '游戏中';
-  }
-  if (lol.gameStatus === 'inQueue') return '排队中';
-  if (lol.gameStatus === 'championSelect') return '选人中';
-  return '大厅';
-}
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -209,8 +175,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                   <div>
                     {list.map((friend) => {
                       const isOffline = friend.availability === 'offline';
-                      const statusKind = getFriendStatusKind(friend);
-                      const statusText = getGameStatus(friend);
+                      const status = getFriendStatusDisplay(friend);
                       const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-gray-400';
                       const championSplashUrls = friend.lol?.championSplashUrls?.length
                         ? friend.lol.championSplashUrls
@@ -258,8 +223,8 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                             <div className="truncate text-xs font-medium text-app-text">
                               {friend.note || friend.gameName}
                             </div>
-                            <span className={`friend-status ${FRIEND_STATUS_CLASS[statusKind]}`}>
-                              {statusText || '离线'}
+                            <span className={`friend-status ${FRIEND_STATUS_CLASS[status.kind]}`}>
+                              {status.text || '离线'}
                             </span>
                           </div>
                           {gameDuration && (

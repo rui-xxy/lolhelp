@@ -260,6 +260,16 @@
     color: #08738f;
   }
 
+  .friend-status--arena {
+    background: rgba(190, 97, 255, 0.13);
+    color: #823bb1;
+  }
+
+  .friend-status--tft {
+    background: rgba(0, 170, 150, 0.13);
+    color: #087b70;
+  }
+
   .friend-status--queue {
     background: rgba(239, 124, 26, 0.14);
     color: #996111;

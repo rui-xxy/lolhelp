@@ -53,6 +53,10 @@ export interface FriendInfo {
     gameStatus?: string; // inGame / outOfGame / inQueue
     gameMode?: string; // CLASSIC / ARAM / TUTORIAL
     gameQueueType?: string; // RANKED_SOLO_5x5 等
+    queueId?: number; // 当前队列 ID
+    mapId?: number; // 当前地图 ID
+    gameQueueName?: string; // 客户端队列目录中的正式模式名
+    gameQueueRanked?: boolean; // 当前队列是否为排位
     championId?: number; // 当前英雄
     championSplashUrl?: string; // 当前英雄/皮肤背景
     championSplashUrls?: string[]; // 当前皮肤优先，默认原画兜底
