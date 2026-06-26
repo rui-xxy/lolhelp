@@ -9,6 +9,7 @@ import type {
 import type { RecurringMate } from './MatchList';
 
 type DetailTab = 'scoreboard' | 'stats' | 'charts';
+type LinkTone = 'amber' | 'cyan' | 'violet' | 'rose' | 'emerald';
 
 interface MatchDetailProps {
   match: PlayerMatchDetail;
@@ -145,8 +146,26 @@ const POSITION_ORDER: Record<string, number> = {
   SUPPORT: 4,
 };
 
+const LINK_TONES: LinkTone[] = ['amber', 'cyan', 'violet', 'rose', 'emerald'];
+
 function shouldShowPosition(queueId: number): boolean {
   return queueId === 420 || queueId === 440;
+}
+
+function buildPremadeToneMap(players: MatchParticipantSummary[], reserveAmber: boolean): Map<string, LinkTone> {
+  const counts = new Map<string, number>();
+  for (const player of players) {
+    if (!player.premadeId) continue;
+    counts.set(player.premadeId, (counts.get(player.premadeId) ?? 0) + 1);
+  }
+
+  const tones = reserveAmber ? LINK_TONES.filter((tone) => tone !== 'amber') : LINK_TONES;
+  const toneById = new Map<string, LinkTone>();
+  for (const [premadeId, count] of counts) {
+    if (count < 2) continue;
+    toneById.set(premadeId, tones[toneById.size % tones.length]);
+  }
+  return toneById;
 }
 
 function stat(participant: MatchParticipantSummary, key: keyof MatchParticipantStats): number {
@@ -356,6 +375,10 @@ function ScoreboardTeam({
   const totals = teamTotals(players);
   const tone = teamTone(teamId);
   const won = players[0]?.win ?? false;
+  const hasRecurringMate = players.some(
+    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
+  );
+  const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
 
   return (
     <section className={`lol-score-team lol-score-team--${tone}`}>
@@ -374,16 +397,27 @@ function ScoreboardTeam({
         <span>KDA</span>
         <span>伤害</span>
       </div>
-      {players.map((player) => (
-        <ScoreboardRow
-          key={`${player.puuid}-${player.championId}`}
-          participant={player}
-          isTarget={player.puuid === targetPuuid}
-          isRecurring={player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid))}
-          onPlayerSearch={onPlayerSearch}
-          showPosition={showPosition}
-        />
-      ))}
+      {players.map((player) => {
+        const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
+        const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
+        const linkTone = isLinkedByHistory
+          ? 'amber'
+          : player.premadeId
+            ? premadeToneById.get(player.premadeId)
+            : undefined;
+
+        return (
+          <ScoreboardRow
+            key={`${player.puuid}-${player.championId}`}
+            participant={player}
+            isTarget={player.puuid === targetPuuid}
+            isRecurring={isRecurring}
+            onPlayerSearch={onPlayerSearch}
+            showPosition={showPosition}
+            linkTone={linkTone}
+          />
+        );
+      })}
     </section>
   );
 }
@@ -394,12 +428,14 @@ function ScoreboardRow({
   isRecurring,
   onPlayerSearch,
   showPosition,
+  linkTone,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
   showPosition: boolean;
+  linkTone?: LinkTone;
 }) {
   const slots = itemSlots(participant);
   const enhancements = visibleEnhancements(participant);
@@ -431,7 +467,9 @@ function ScoreboardRow({
         <div className="lol-score-player-copy">
           <button
             type="button"
-            className="lol-score-player-name"
+            className={`lol-score-player-name ${
+              linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
+            }`}
             title={name}
             onClick={() => onPlayerSearch?.(name)}
           >

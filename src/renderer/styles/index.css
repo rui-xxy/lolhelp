@@ -2267,6 +2267,37 @@
   .lol-score-number {
     font-size: 12px;
   }
+
+  .lol-score-player-name--linked {
+    color: var(--lol-score-link-color);
+    font-weight: 800;
+    text-shadow: 0 0 10px var(--lol-score-link-glow);
+  }
+
+  .lol-score-player-name--linked-amber {
+    --lol-score-link-color: #b7791f;
+    --lol-score-link-glow: rgba(245, 158, 11, 0.22);
+  }
+
+  .lol-score-player-name--linked-cyan {
+    --lol-score-link-color: #0584a2;
+    --lol-score-link-glow: rgba(6, 182, 212, 0.2);
+  }
+
+  .lol-score-player-name--linked-violet {
+    --lol-score-link-color: #7652c7;
+    --lol-score-link-glow: rgba(139, 92, 246, 0.2);
+  }
+
+  .lol-score-player-name--linked-rose {
+    --lol-score-link-color: #be4564;
+    --lol-score-link-glow: rgba(244, 63, 94, 0.18);
+  }
+
+  .lol-score-player-name--linked-emerald {
+    --lol-score-link-color: #087f5b;
+    --lol-score-link-glow: rgba(16, 185, 129, 0.2);
+  }
 }
 
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
