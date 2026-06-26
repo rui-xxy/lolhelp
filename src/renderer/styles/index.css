@@ -1495,6 +1495,293 @@
   }
 }
 
+/* 战绩详情：保留新版排版，但视觉回到项目原本的浅色 app 风格。 */
+@layer components {
+  .lol-postgame {
+    --lol-line: var(--color-app-border);
+    --lol-gold: var(--color-app-primary);
+    --lol-gold-bright: var(--color-app-primary);
+    --lol-blue: var(--color-app-link);
+    --lol-red: #c13515;
+    --lol-text: var(--color-app-text);
+    --lol-muted: var(--color-app-muted);
+    border: 1px solid var(--color-app-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-app-surface);
+    color: var(--color-app-text);
+    box-shadow: none;
+  }
+
+  .lol-postgame-empty {
+    color: var(--color-app-muted);
+  }
+
+  .lol-postgame-hero {
+    min-height: 74px;
+    border-bottom: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+  }
+
+  .lol-postgame-result-mark {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--color-app-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-app-surface-soft);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .lol-postgame-result-mark > * {
+    transform: none;
+  }
+
+  .lol-postgame-result {
+    color: var(--color-app-link);
+    font-size: 24px;
+  }
+
+  .lol-postgame--loss .lol-postgame-result {
+    color: var(--color-app-primary);
+  }
+
+  .lol-postgame-meta {
+    color: var(--color-app-muted);
+  }
+
+  .lol-postgame-meta span + span::before {
+    color: var(--color-app-border-strong);
+  }
+
+  .lol-postgame-tabs {
+    border-bottom: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+  }
+
+  .lol-postgame-tab {
+    color: var(--color-app-body);
+  }
+
+  .lol-postgame-tab:hover,
+  .lol-postgame-tab--active {
+    color: var(--color-app-primary);
+  }
+
+  .lol-postgame-tab--active::after {
+    background: var(--color-app-primary);
+  }
+
+  .lol-postgame-content {
+    background: var(--color-app-surface);
+  }
+
+  .lol-score-team,
+  .lol-overview-team,
+  .lol-overview-card,
+  .lol-runes-row {
+    border: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+  }
+
+  .lol-score-team-bar {
+    border-bottom: 1px solid var(--color-app-border);
+    background: var(--color-app-surface-soft);
+    color: var(--color-app-muted);
+  }
+
+  .lol-score-team-title {
+    color: var(--color-app-body);
+  }
+
+  .lol-score-team-result {
+    color: var(--color-app-subtle);
+  }
+
+  .lol-score-grid--head {
+    border-bottom: 1px solid var(--color-app-border);
+    color: var(--color-app-subtle);
+  }
+
+  .lol-score-row {
+    border-bottom: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+  }
+
+  .lol-score-row:hover {
+    background: rgba(255, 255, 255, 0.64);
+  }
+
+  .lol-score-row--target {
+    background:
+      linear-gradient(90deg, rgba(255, 56, 92, 0.08), transparent 55%),
+      var(--color-app-surface);
+    box-shadow: inset 3px 0 0 var(--color-app-primary);
+  }
+
+  .lol-score-row--recurring {
+    box-shadow: inset 3px 0 0 var(--color-app-link);
+  }
+
+  .lol-score-champion img,
+  .lol-score-champion > span:first-child {
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: rgba(0, 0, 0, 0.05) 0 0 0 1px;
+  }
+
+  .lol-score-champion > span:last-child {
+    border: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+    color: var(--color-app-text);
+  }
+
+  .lol-score-player-name,
+  .lol-score-kda strong,
+  .lol-score-number,
+  .lol-overview-team-grid strong,
+  .lol-overview-card strong,
+  .lol-runes-player button {
+    color: var(--color-app-text);
+  }
+
+  .lol-score-player-name:hover,
+  .lol-runes-player button:hover {
+    color: var(--color-app-link);
+  }
+
+  .lol-score-player-copy span,
+  .lol-score-kda span,
+  .lol-score-empty,
+  .lol-overview-team-head,
+  .lol-overview-team-grid span,
+  .lol-overview-card span,
+  .lol-chart-row > span {
+    color: var(--color-app-muted);
+  }
+
+  .lol-score-runes img,
+  .lol-runes-main img,
+  .lol-runes-all img {
+    border: 1px solid var(--color-app-border);
+    background: var(--color-app-surface);
+  }
+
+  .lol-score-item-empty {
+    border: 1px solid var(--color-app-border);
+    background: var(--color-app-surface-soft);
+  }
+
+  .lol-overview-team-head strong,
+  .lol-overview-card small {
+    color: var(--color-app-link);
+  }
+
+  .lol-overview-team--red .lol-overview-team-head strong {
+    color: var(--color-app-primary);
+  }
+
+  .lol-overview-team-grid div {
+    background: var(--color-app-surface-soft);
+  }
+
+  .lol-overview-card--target {
+    box-shadow: inset 0 0 0 1px rgba(255, 56, 92, 0.28);
+  }
+
+  .lol-stats-grid--icons {
+    border-bottom: 1px solid var(--color-app-border);
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  .lol-stats-grid--icons img {
+    border: 2px solid var(--color-app-link);
+  }
+
+  .lol-stats-grid--icons .lol-stats-avatar--red {
+    border-color: var(--color-app-primary);
+  }
+
+  .lol-stats-group-title {
+    border-top: 1px solid var(--color-app-border);
+    border-bottom: 1px solid var(--color-app-border);
+    background: var(--color-app-surface-soft);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-row {
+    border-bottom: 1px solid var(--color-app-border);
+  }
+
+  .lol-stats-label {
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-value {
+    color: var(--color-app-muted);
+  }
+
+  .lol-stats-value--target {
+    color: var(--color-app-primary);
+  }
+
+  .lol-chart-picker {
+    border-right: 1px solid var(--color-app-border);
+  }
+
+  .lol-chart-option {
+    color: var(--color-app-body);
+  }
+
+  .lol-chart-option:hover,
+  .lol-chart-option--active,
+  .lol-chart-title {
+    color: var(--color-app-primary);
+  }
+
+  .lol-chart-checkbox {
+    border: 1px solid var(--color-app-border-strong);
+    background: var(--color-app-surface);
+  }
+
+  .lol-chart-option--active .lol-chart-checkbox {
+    border-color: var(--color-app-primary);
+    background:
+      linear-gradient(135deg, transparent 42%, var(--color-app-surface) 42%, var(--color-app-surface) 56%, transparent 56%),
+      var(--color-app-primary);
+  }
+
+  .lol-chart-track {
+    border-left: 1px solid rgba(66, 139, 255, 0.26);
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(66, 139, 255, 0.12) 0,
+        rgba(66, 139, 255, 0.12) 1px,
+        transparent 1px,
+        transparent 12.5%
+      ),
+      var(--color-app-surface-soft);
+  }
+
+  .lol-chart-bar--blue {
+    background: var(--color-app-link);
+  }
+
+  .lol-chart-bar--red {
+    background: var(--color-app-primary);
+  }
+
+  .lol-chart-bar--target {
+    box-shadow:
+      0 0 0 1px rgba(255, 56, 92, 0.28),
+      0 0 12px rgba(255, 56, 92, 0.12);
+  }
+
+  .lol-runes-row--target {
+    border-color: rgba(255, 56, 92, 0.28);
+    background: rgba(255, 56, 92, 0.06);
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */
