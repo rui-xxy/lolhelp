@@ -355,16 +355,13 @@ function ScoreboardTeam({
           <span className="lol-score-team-result">{won ? 'WIN' : 'LOSE'}</span>
         </div>
         <div className="lol-score-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
-        <div className="lol-score-team-total">{formatInteger(totals.gold)}</div>
       </div>
       <div className="lol-score-grid lol-score-grid--head">
         <span>玩家</span>
         <span>符文 / 强化</span>
         <span>装备</span>
         <span>KDA</span>
-        <span>经济</span>
         <span>伤害</span>
-        <span>补刀</span>
       </div>
       {players.map((player) => (
         <ScoreboardRow
@@ -462,9 +459,7 @@ function ScoreboardRow({
       <div className="lol-score-kda">
         <strong>{`${participant.kills} / ${participant.deaths} / ${participant.assists}`}</strong>
       </div>
-      <span className="lol-score-number">{formatCompact(participant.gold)}</span>
       <span className="lol-score-number">{formatCompact(participant.damage)}</span>
-      <span className="lol-score-number">{participant.cs}</span>
     </div>
   );
 }
