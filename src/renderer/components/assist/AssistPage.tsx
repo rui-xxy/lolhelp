@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Bell,
   Bot,
-  Gamepad2,
-  Keyboard,
   ShieldAlert,
   Sparkles,
   UserRoundCog,
@@ -14,7 +11,6 @@ import type {
   AppSettings,
   AssistBlacklistEntry,
   AssistOperationResult,
-  AssistOverlayName,
   AssistProfileIcon,
   AssistRole,
   AssistSettings,
@@ -28,9 +24,7 @@ import {
   BlacklistSection,
 } from './AssistAccountSections';
 import {
-  AlertsSection,
   AutomationSection,
-  MatchSection,
 } from './AssistBasicSections';
 import {
   BuildsSection,
@@ -39,16 +33,12 @@ import {
 import { TextInput } from './AssistControls';
 import {
   FriendsSection,
-  PersonalSection,
 } from './AssistSocialSections';
 
 type SectionKey =
-  | 'match'
   | 'automation'
-  | 'alerts'
   | 'champions'
   | 'builds'
-  | 'personal'
   | 'friends'
   | 'account'
   | 'blacklist';
@@ -58,19 +48,13 @@ const sections: Array<{
   label: string;
   icon: typeof Sparkles;
 }> = [
-  { key: 'match', label: '对局设置', icon: Gamepad2 },
   { key: 'automation', label: '自动操作', icon: Bot },
-  { key: 'alerts', label: '游戏提示', icon: Bell },
   { key: 'champions', label: '英雄禁选', icon: WandSparkles },
   { key: 'builds', label: '符文装备', icon: Sparkles },
-  { key: 'personal', label: '个性设置', icon: Keyboard },
   { key: 'friends', label: '好友管理', icon: Users },
   { key: 'account', label: '账号展示', icon: UserRoundCog },
   { key: 'blacklist', label: '黑名单', icon: ShieldAlert },
 ];
-
-const hiddenSections = new Set<SectionKey>(['match', 'alerts', 'personal']);
-const visibleSections = sections.filter((section) => !hiddenSections.has(section.key));
 
 const emptySettings: AppSettings = {
   favoriteChampions: [],
@@ -234,15 +218,6 @@ export function AssistPage({
     }
   };
 
-  const toggleOverlay = async (name: AssistOverlayName) => {
-    try {
-      const visible = await window.lolHelper.assist.toggleOverlay(name);
-      setOperationState(`${visible ? '已打开' : '已关闭'}${name === 'helper' ? '对局助手' : name === 'match' ? '战绩卡片' : '技能计时'}`);
-    } catch (error) {
-      setOperationState(`浮窗操作失败：${String(error)}`);
-    }
-  };
-
   const addBlacklistEntry = () => {
     const riotId = blacklistDraft.riotId.trim();
     if (!riotId) {
@@ -327,7 +302,7 @@ export function AssistPage({
           <div className="mt-1 text-[11px] text-app-muted">{saveState}</div>
         </div>
         <nav className="space-y-1">
-          {visibleSections.map((section) => {
+          {sections.map((section) => {
             const Icon = section.icon;
             return (
               <button
@@ -370,23 +345,12 @@ export function AssistPage({
             </div>
           )}
 
-          {activeSection === 'match' && (
-            <MatchSection
-              assist={assist}
-              updateAssist={updateAssist}
-              updateBoolean={updateBoolean}
-              toggleOverlay={toggleOverlay}
-            />
-          )}
           {activeSection === 'automation' && (
             <AutomationSection
               assist={assist}
               updateAssist={updateAssist}
               updateBoolean={updateBoolean}
             />
-          )}
-          {activeSection === 'alerts' && (
-            <AlertsSection assist={assist} updateBoolean={updateBoolean} />
           )}
           {activeSection === 'champions' && (
             <ChampionsSection
@@ -407,9 +371,6 @@ export function AssistPage({
               updateBoolean={updateBoolean}
               runOperation={runOperation}
             />
-          )}
-          {activeSection === 'personal' && (
-            <PersonalSection assist={assist} updateAssist={updateAssist} />
           )}
           {activeSection === 'friends' && (
             <FriendsSection

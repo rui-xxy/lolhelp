@@ -5,91 +5,12 @@ import type {
 } from '../../../shared/api';
 import {
   ActionButton,
-  HotkeyInput,
   SelectInput,
   SettingCard,
   TextInput,
 } from './AssistControls';
 
 type UpdateAssist = (updater: (assist: AssistSettings) => AssistSettings) => void;
-
-const playerTagOptions = [
-  '胜率',
-  '连胜/连败',
-  'KDA',
-  '伤害占比',
-  '组排关系',
-  '常用位置',
-  '首次使用英雄',
-  '黑名单',
-];
-
-export function PersonalSection({
-  assist,
-  updateAssist,
-}: {
-  assist: AssistSettings;
-  updateAssist: UpdateAssist;
-}) {
-  return (
-    <>
-      <SettingCard title="对局玩家标签">
-        <div className="grid grid-cols-2 gap-2">
-          {playerTagOptions.map((tag) => (
-            <label key={tag} className="flex items-center gap-2 text-sm text-app-body">
-              <input
-                type="checkbox"
-                checked={assist.playerTags.includes(tag)}
-                onChange={(event) => updateAssist((next) => ({
-                  ...next,
-                  playerTags: event.target.checked
-                    ? [...next.playerTags, tag]
-                    : next.playerTags.filter((value) => value !== tag),
-                }))}
-              />
-              {tag}
-            </label>
-          ))}
-        </div>
-      </SettingCard>
-
-      <SettingCard title="战力称号">
-        <div className="grid grid-cols-5 gap-2">
-          {assist.powerTitles.map((title, index) => (
-            <TextInput
-              key={index}
-              value={title}
-              onChange={(value) => updateAssist((next) => {
-                next.powerTitles[index] = value;
-                return next;
-              })}
-            />
-          ))}
-        </div>
-      </SettingCard>
-
-      <SettingCard
-        title="主窗口快捷键"
-        description="格式示例：CTRL+ALT+Y。游戏内浮窗先用对局设置里的按钮手动打开。"
-      >
-        {([
-          ['mainWindow', '主窗口'],
-        ] as const).map(([key, label]) => (
-          <div key={key} className="grid grid-cols-[120px_1fr] items-center gap-3">
-            <span className="text-sm text-app-body">{label}</span>
-            <HotkeyInput
-              value={assist.hotkeys[key]}
-              onChange={(value) => updateAssist((next) => {
-                next.hotkeys[key] = value;
-                return next;
-              })}
-            />
-          </div>
-        ))}
-      </SettingCard>
-    </>
-  );
-}
 
 export function FriendsSection({
   assist,
@@ -130,7 +51,7 @@ export function FriendsSection({
               ['auto', '跟随客户端'],
               ['chat', '在线'],
               ['away', '离开'],
-              ['dnd', '游戏中/请勿打扰'],
+              ['dnd', '游戏中 / 请勿打扰'],
               ['offline', '离线'],
             ]}
             onChange={(value) => updateAssist((next) => ({

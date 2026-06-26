@@ -144,15 +144,6 @@ export function syncAssistGlobalShortcuts(
         mainWindow.focus();
       }
     }],
-    [hotkeys.matchOverlay, () => {
-      void toggleAssistOverlay('match');
-    }],
-    [hotkeys.matchHelper, () => {
-      void toggleAssistOverlay('helper');
-    }],
-    [hotkeys.spellOverlay, () => {
-      void toggleAssistOverlay('spells');
-    }],
   ];
 
   for (const [raw, handler] of entries) {

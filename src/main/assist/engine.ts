@@ -1,4 +1,3 @@
-import { Notification } from 'electron';
 import { getSettings } from '../settings/store';
 import { LcuClient } from '../lcu/client';
 import { getCachedCredentials } from '../lcu/lockfile';
@@ -18,11 +17,8 @@ import {
   updateAssistRuntimeStatus,
 } from './runtime';
 import {
-  hideAssistOverlay,
-  showAssistOverlay,
   syncAssistGlobalShortcuts,
 } from './windows';
-import { getLiveBattle } from '../live/liveBattle';
 
 interface ChampSelectSession {
   actions?: ChampSelectAction[][];
@@ -69,16 +65,7 @@ const completedActionIds = new Set<number>();
 let lastBenchSwapKey = '';
 let lastRecommendationKey = '';
 let lastRecommendationAt = 0;
-let currentAlertGameId = 0;
-let positionMessageSent = false;
-let blacklistAlertSent = false;
-let highWinRateAlertSent = false;
 let lastPositionPreferencesKey = '';
-let liveOverlayCycleKey = '';
-let spellOverlayOpenedForKey = '';
-let matchOverlayOpenedForKey = '';
-let spellOverlayTimer: NodeJS.Timeout | null = null;
-let matchOverlayTimer: NodeJS.Timeout | null = null;
 
 async function sendLobbyMessage(client: LcuClient, body: string): Promise<void> {
   const conversations = await client.get<Array<{ id?: string }>>('/lol-chat/v1/conversations');
@@ -90,77 +77,8 @@ async function sendLobbyMessage(client: LcuClient, body: string): Promise<void> 
   });
 }
 
-function playerRiotId(player: ChampSelectPlayer): string {
-  const source = player as ChampSelectPlayer & {
-    gameName?: string;
-    tagLine?: string;
-    summonerName?: string;
-  };
-  if (source.gameName && source.tagLine) return `${source.gameName}#${source.tagLine}`;
-  return source.summonerName || source.gameName || '';
-}
-
 function normalizeRiotId(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '');
-}
-
-async function handleChampSelectAlerts(
-  client: LcuClient,
-  session: ChampSelectSession,
-  gameId: number,
-): Promise<void> {
-  if (!gameId) return;
-  if (gameId !== currentAlertGameId) {
-    currentAlertGameId = gameId;
-    positionMessageSent = false;
-    blacklistAlertSent = false;
-    highWinRateAlertSent = false;
-  }
-  const { assist, blacklist } = getSettings();
-  if (!assist.blacklistAlert && !assist.showPositionMessage && !assist.highWinRateAlert) return;
-
-  const fallbackIds = [...(session.myTeam ?? []), ...(session.theirTeam ?? [])]
-    .map(playerRiotId)
-    .filter(Boolean);
-  const battle = await getLiveBattle().catch(() => null);
-  const visiblePlayers = battle
-    ? [...battle.myTeam, ...battle.enemyTeam].map((player) => player.riotId)
-    : fallbackIds;
-  const blacklistIds = new Set(blacklist.map((entry) => normalizeRiotId(entry.riotId)));
-  const blocked = visiblePlayers.filter((riotId) => blacklistIds.has(normalizeRiotId(riotId)));
-
-  if (assist.blacklistAlert && !blacklistAlertSent && blocked.length > 0) {
-    blacklistAlertSent = true;
-    const message = `黑名单预警：本局遇到 ${blocked.join('、')}`;
-    if (Notification.isSupported()) {
-      new Notification({ title: 'LOL助手黑名单预警', body: message }).show();
-    }
-    reportAssistAction(message);
-    if (assist.blacklistAlertToClient) {
-      await sendLobbyMessage(client, message).catch(() => undefined);
-    }
-  }
-
-  if (assist.showPositionMessage && !positionMessageSent) {
-    positionMessageSent = true;
-    const localCellId = Number(session.localPlayerCellId ?? -1);
-    const side = localCellId >= 0 && localCellId <= 4 ? '蓝色方' : '红色方';
-    await sendLobbyMessage(client, `本局你在${side}。— 来自 LOL助手`).catch(() => undefined);
-  }
-
-  if (assist.highWinRateAlert && !highWinRateAlertSent) {
-    const highWinPlayers = (battle?.enemyTeam ?? []).filter(
-      (player) => player.matchCount >= 6 && player.winRate >= 70,
-    );
-    if (highWinPlayers.length >= 3) {
-      highWinRateAlertSent = true;
-      const message = `高胜率队预警：敌方有 ${highWinPlayers.length} 名玩家近期胜率超过 70%`;
-      if (Notification.isSupported()) {
-        new Notification({ title: 'LOL助手高胜率队预警', body: message }).show();
-      }
-      reportAssistAction(message);
-    }
-  }
 }
 
 async function applyPositionPreferences(client: LcuClient): Promise<void> {
@@ -214,63 +132,6 @@ async function handleAutomaticRecommendation(
 function clearAcceptTimer(): void {
   if (acceptTimer) clearTimeout(acceptTimer);
   acceptTimer = null;
-}
-
-function clearOverlayTimers(): void {
-  if (spellOverlayTimer) clearTimeout(spellOverlayTimer);
-  if (matchOverlayTimer) clearTimeout(matchOverlayTimer);
-  spellOverlayTimer = null;
-  matchOverlayTimer = null;
-}
-
-function isLivePhase(phase: string): boolean {
-  return ['GameStart', 'InProgress', 'Reconnect'].includes(phase);
-}
-
-function currentLiveOverlayKey(gameId: number): string {
-  if (gameId) {
-    liveOverlayCycleKey = String(gameId);
-    return liveOverlayCycleKey;
-  }
-  if (!liveOverlayCycleKey) liveOverlayCycleKey = `live-${Date.now()}`;
-  return liveOverlayCycleKey;
-}
-
-function scheduleOverlayOpen(
-  name: 'match' | 'spells',
-  delayMs = 12_000,
-): NodeJS.Timeout {
-  return setTimeout(() => {
-    void showAssistOverlay(name);
-  }, delayMs);
-}
-
-function syncInGameOverlays(
-  phase: string,
-  gameId: number,
-): void {
-  const settings = getSettings().assist;
-  if (!isLivePhase(phase)) {
-    liveOverlayCycleKey = '';
-    spellOverlayOpenedForKey = '';
-    matchOverlayOpenedForKey = '';
-    clearOverlayTimers();
-    hideAssistOverlay('spells');
-    if (settings.showMatchOverlay) hideAssistOverlay('match');
-    return;
-  }
-
-  const key = currentLiveOverlayKey(gameId);
-  if (settings.showSpellOverlay && spellOverlayOpenedForKey !== key) {
-    spellOverlayOpenedForKey = key;
-    if (spellOverlayTimer) clearTimeout(spellOverlayTimer);
-    spellOverlayTimer = scheduleOverlayOpen('spells');
-  }
-  if (settings.showMatchOverlay && matchOverlayOpenedForKey !== key) {
-    matchOverlayOpenedForKey = key;
-    if (matchOverlayTimer) clearTimeout(matchOverlayTimer);
-    matchOverlayTimer = scheduleOverlayOpen('match');
-  }
 }
 
 async function acceptReadyCheck(client: LcuClient, delayMs: number): Promise<void> {
@@ -337,7 +198,6 @@ async function handleChampionSelect(client: LcuClient): Promise<void> {
   const preferred = getPreferredPicks(settings.champions, gameflow.queueId, role);
   const championId = Number(localPlayer?.championId ?? 0);
 
-  await handleChampSelectAlerts(client, session, gameflow.gameId);
   await handleAutomaticRecommendation(
     client,
     championId,
@@ -462,7 +322,6 @@ async function pollAssist(): Promise<void> {
     if (!creds) {
       clearAcceptTimer();
       previousPhase = '';
-      syncInGameOverlays('', 0);
       return;
     }
 
@@ -475,7 +334,6 @@ async function pollAssist(): Promise<void> {
       queueId: gameflow.queueId,
       lastError: '',
     });
-    syncInGameOverlays(phase, gameflow.gameId);
 
     if (phase === 'ReadyCheck' && settings.autoAccept) {
       await acceptReadyCheck(client, settings.autoAcceptDelayMs);
@@ -490,10 +348,6 @@ async function pollAssist(): Promise<void> {
       lastBenchSwapKey = '';
       lastRecommendationKey = '';
       lastRecommendationAt = 0;
-      currentAlertGameId = 0;
-      positionMessageSent = false;
-      blacklistAlertSent = false;
-      highWinRateAlertSent = false;
     }
 
     if (phase === 'Lobby') {
@@ -513,7 +367,6 @@ async function pollAssist(): Promise<void> {
   } catch (error) {
     clearAcceptTimer();
     updateAssistRuntimeStatus({ connected: false });
-    syncInGameOverlays('', 0);
     reportAssistError(error);
   } finally {
     polling = false;
@@ -530,7 +383,6 @@ export function startAssistEngine(): void {
 
 export function stopAssistEngine(): void {
   clearAcceptTimer();
-  clearOverlayTimers();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
 }
