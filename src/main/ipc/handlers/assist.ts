@@ -1,9 +1,6 @@
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
-import type {
-  AssistOverlayName,
-  AssistRecommendationRequest,
-} from '../../../shared/api';
+import type { AssistRecommendationRequest } from '../../../shared/api';
 import { IPC_CHANNELS } from '../../../shared/channels';
 import { applyAssistAccountSettings } from '../../assist/account';
 import { getAssistLiveData } from '../../assist/liveClient';
@@ -17,10 +14,7 @@ import {
   getAssistRecommendation,
 } from '../../assist/recommendations';
 import { getAssistRuntimeStatus } from '../../assist/runtime';
-import { toggleAssistOverlay } from '../../assist/windows';
 import { getSettings } from '../../settings/store';
-
-const OVERLAY_NAMES: AssistOverlayName[] = ['helper', 'match', 'spells'];
 
 export function registerAssistHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ASSIST_GET_STATUS, () => getAssistRuntimeStatus());
@@ -53,9 +47,8 @@ export function registerAssistHandlers(): void {
   );
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY,
-    (_event, name: AssistOverlayName) => {
-      if (!OVERLAY_NAMES.includes(name)) throw new Error('悬浮窗类型无效');
-      return toggleAssistOverlay(name);
+    () => {
+      throw new Error('游戏内悬浮窗已撤下');
     },
   );
   ipcMain.handle(IPC_CHANNELS.ASSIST_GET_LIVE_DATA, () => getAssistLiveData());

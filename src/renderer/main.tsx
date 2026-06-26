@@ -1,8 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { AssistOverlayApp } from './components/assist/AssistOverlayApp';
-import type { AssistOverlayName } from '../shared/api';
 import './styles/index.css';
 
 // React 入口：把 <App /> 挂到 index.html 的 <div id="app">。
@@ -12,10 +10,8 @@ if (!rootElement) {
   throw new Error('找不到 #app 挂载点，检查 index.html');
 }
 
-const overlay = new URLSearchParams(window.location.search).get('overlay') as AssistOverlayName | null;
-
 createRoot(rootElement).render(
   <StrictMode>
-    {overlay ? <AssistOverlayApp name={overlay} /> : <App />}
+    <App />
   </StrictMode>,
 );

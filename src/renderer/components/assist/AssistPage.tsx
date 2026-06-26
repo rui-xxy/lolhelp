@@ -14,7 +14,6 @@ import type {
   AppSettings,
   AssistBlacklistEntry,
   AssistOperationResult,
-  AssistOverlayName,
   AssistProfileIcon,
   AssistRole,
   AssistSettings,
@@ -231,15 +230,6 @@ export function AssistPage({
     }
   };
 
-  const toggleOverlay = async (name: AssistOverlayName) => {
-    try {
-      const visible = await window.lolHelper.assist.toggleOverlay(name);
-      setOperationState(`${visible ? '已打开' : '已关闭'}悬浮窗`);
-    } catch (error) {
-      setOperationState(`悬浮窗操作失败：${String(error)}`);
-    }
-  };
-
   const addBlacklistEntry = () => {
     const riotId = blacklistDraft.riotId.trim();
     if (!riotId) {
@@ -371,7 +361,6 @@ export function AssistPage({
             <MatchSection
               assist={assist}
               updateBoolean={updateBoolean}
-              toggleOverlay={toggleOverlay}
             />
           )}
           {activeSection === 'automation' && (

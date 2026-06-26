@@ -80,9 +80,9 @@ export const DEFAULT_ASSIST_SETTINGS: AssistSettings = {
   powerTitles: ['牛马', '混子', '中等马', '上等马', '通天代'],
   hotkeys: {
     mainWindow: 'CTRL+ALT+Y',
-    matchOverlay: 'SHIFT+TAB',
-    matchHelper: 'F6',
-    spellOverlay: 'F9',
+    matchOverlay: '',
+    matchHelper: '',
+    spellOverlay: '',
   },
 
   preferredPresence: 'auto',
@@ -136,11 +136,11 @@ export function normalizeAssistSettings(value: unknown): AssistSettings {
 
   return {
     ...DEFAULT_ASSIST_SETTINGS,
-    showRuneAssistant: boolValue(source.showRuneAssistant, false),
-    showPowerTrend: boolValue(source.showPowerTrend, false),
+    showRuneAssistant: false,
+    showPowerTrend: false,
     globalHotkeysEnabled: boolValue(source.globalHotkeysEnabled, false),
-    showMatchOverlay: boolValue(source.showMatchOverlay, false),
-    showSpellOverlay: boolValue(source.showSpellOverlay, false),
+    showMatchOverlay: false,
+    showSpellOverlay: false,
     autoAccept: boolValue(source.autoAccept, false),
     autoAcceptDelayMs: finiteNumber(source.autoAcceptDelayMs, 0, 0, 5000),
     autoPlayAgain: boolValue(source.autoPlayAgain, false),
@@ -200,9 +200,9 @@ export function normalizeAssistSettings(value: unknown): AssistSettings {
       : [...DEFAULT_ASSIST_SETTINGS.powerTitles],
     hotkeys: {
       mainWindow: stringValue(hotkeySource.mainWindow, 'CTRL+ALT+Y', 50),
-      matchOverlay: stringValue(hotkeySource.matchOverlay, 'SHIFT+TAB', 50),
-      matchHelper: stringValue(hotkeySource.matchHelper, 'F6', 50),
-      spellOverlay: stringValue(hotkeySource.spellOverlay, 'F9', 50),
+      matchOverlay: '',
+      matchHelper: '',
+      spellOverlay: '',
     },
     preferredPresence: stringValue(source.preferredPresence, 'auto', 20),
     statusMessage: stringValue(source.statusMessage, '', 100),

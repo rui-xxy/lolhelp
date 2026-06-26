@@ -68,12 +68,12 @@ export function PersonalSection({
         </div>
       </SettingCard>
 
-      <SettingCard title="全局快捷键" description="格式示例：CTRL+ALT+Y、SHIFT+TAB、F6">
+      <SettingCard
+        title="主窗口快捷键"
+        description="格式示例：CTRL+ALT+Y。游戏内悬浮窗快捷键已撤下。"
+      >
         {([
           ['mainWindow', '主窗口'],
-          ['matchOverlay', '战绩面板'],
-          ['matchHelper', '对局助手'],
-          ['spellOverlay', '技能计时'],
         ] as const).map(([key, label]) => (
           <div key={key} className="grid grid-cols-[120px_1fr] items-center gap-3">
             <span className="text-sm text-app-body">{label}</span>

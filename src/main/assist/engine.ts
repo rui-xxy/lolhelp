@@ -18,8 +18,6 @@ import {
   updateAssistRuntimeStatus,
 } from './runtime';
 import {
-  hideAssistOverlay,
-  showAssistOverlay,
   syncAssistGlobalShortcuts,
 } from './windows';
 import { getLiveBattle } from '../live/liveBattle';
@@ -419,7 +417,6 @@ async function pollAssist(): Promise<void> {
     }
 
     if (phase === 'ChampSelect') {
-      if (settings.showRuneAssistant) void showAssistOverlay('helper');
       await handleChampionSelect(client);
     } else if (previousPhase === 'ChampSelect') {
       completedActionIds.clear();
@@ -430,21 +427,12 @@ async function pollAssist(): Promise<void> {
       positionMessageSent = false;
       blacklistAlertSent = false;
       highWinRateAlertSent = false;
-      hideAssistOverlay('helper');
     }
 
     if (phase === 'Lobby') {
       await applyPositionPreferences(client).catch(reportAssistError);
     } else if (previousPhase === 'Lobby') {
       lastPositionPreferencesKey = '';
-    }
-
-    if (['InProgress', 'GameStart'].includes(phase)) {
-      if (settings.showMatchOverlay) void showAssistOverlay('match');
-      if (settings.showSpellOverlay) void showAssistOverlay('spells');
-    } else if (previousPhase === 'InProgress' || previousPhase === 'GameStart') {
-      hideAssistOverlay('match');
-      hideAssistOverlay('spells');
     }
 
     if (

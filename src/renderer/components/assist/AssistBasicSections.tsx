@@ -1,9 +1,5 @@
-import type {
-  AssistOverlayName,
-  AssistSettings,
-} from '../../../shared/api';
+import type { AssistSettings } from '../../../shared/api';
 import {
-  ActionButton,
   SettingCard,
   TextInput,
   ToggleRow,
@@ -15,46 +11,21 @@ type UpdateBoolean = (key: keyof AssistSettings, value: boolean) => void;
 export function MatchSection({
   assist,
   updateBoolean,
-  toggleOverlay,
 }: {
   assist: AssistSettings;
   updateBoolean: UpdateBoolean;
-  toggleOverlay: (name: AssistOverlayName) => Promise<void>;
 }) {
   return (
-    <SettingCard title="选人和游戏内面板" description="需要时自动显示，也可以立即打开测试。">
+    <SettingCard
+      title="对局设置"
+      description="游戏内悬浮窗已撤下，避免挡住客户端或残留在屏幕上。"
+    >
       <ToggleRow
-        label="显示符文助手"
-        description="进入选人阶段后显示英雄推荐、符文和装备。"
-        checked={assist.showRuneAssistant}
-        onChange={(value) => updateBoolean('showRuneAssistant', value)}
-      />
-      <ToggleRow
-        label="显示战力趋势"
-        checked={assist.showPowerTrend}
-        onChange={(value) => updateBoolean('showPowerTrend', value)}
-      />
-      <ToggleRow
-        label="开启全局快捷键"
-        description="即使主窗口不在前台，也可以呼出面板。"
+        label="开启主窗口快捷键"
+        description="只用于呼出或隐藏主窗口，不再打开游戏内悬浮窗。"
         checked={assist.globalHotkeysEnabled}
         onChange={(value) => updateBoolean('globalHotkeysEnabled', value)}
       />
-      <ToggleRow
-        label="显示游戏内战绩面板"
-        checked={assist.showMatchOverlay}
-        onChange={(value) => updateBoolean('showMatchOverlay', value)}
-      />
-      <ToggleRow
-        label="显示技能计时"
-        checked={assist.showSpellOverlay}
-        onChange={(value) => updateBoolean('showSpellOverlay', value)}
-      />
-      <div className="flex flex-wrap gap-2 pt-2">
-        <ActionButton onClick={() => void toggleOverlay('helper')}>对局助手</ActionButton>
-        <ActionButton onClick={() => void toggleOverlay('match')}>战绩面板</ActionButton>
-        <ActionButton onClick={() => void toggleOverlay('spells')}>技能计时</ActionButton>
-      </div>
     </SettingCard>
   );
 }

@@ -21,4 +21,26 @@ describe('assist settings', () => {
     expect('showTftOverlay' in normalized).toBe(false);
     expect('tftOverlay' in normalized.hotkeys).toBe(false);
   });
+
+  it('retires in-game overlay settings from older settings', () => {
+    const normalized = normalizeAssistSettings({
+      showRuneAssistant: true,
+      showPowerTrend: true,
+      showMatchOverlay: true,
+      showSpellOverlay: true,
+      hotkeys: {
+        matchOverlay: 'SHIFT+TAB',
+        matchHelper: 'F6',
+        spellOverlay: 'F9',
+      },
+    });
+
+    expect(normalized.showRuneAssistant).toBe(false);
+    expect(normalized.showPowerTrend).toBe(false);
+    expect(normalized.showMatchOverlay).toBe(false);
+    expect(normalized.showSpellOverlay).toBe(false);
+    expect(normalized.hotkeys.matchOverlay).toBe('');
+    expect(normalized.hotkeys.matchHelper).toBe('');
+    expect(normalized.hotkeys.spellOverlay).toBe('');
+  });
 });
