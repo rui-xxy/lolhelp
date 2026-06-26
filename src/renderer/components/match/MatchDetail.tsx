@@ -217,7 +217,7 @@ function renderEnhancementIcon(enhancement: PlayerRuneSummary): ReactNode {
       src={enhancement.icon}
       alt={enhancement.name}
       title={enhancement.name}
-      size={18}
+      size={22}
     />
   );
 }
@@ -404,7 +404,7 @@ function ScoreboardRow({
       <div className="lol-score-player">
         <div className="lol-score-spells">
           {participant.spells.map((spell) => (
-            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={15} />
+            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={17} />
           ))}
         </div>
         <div className="lol-score-champion">
@@ -412,7 +412,7 @@ function ScoreboardRow({
             src={participant.championAvatar}
             alt={participant.championName}
             title={`${participant.championName} Lv.${participant.champLevel}`}
-            size={30}
+            size={34}
             rounded
           />
           <span>{participant.champLevel}</span>
@@ -452,7 +452,7 @@ function ScoreboardRow({
               src={item.icon}
               alt={item.name}
               title={item.name}
-              size={18}
+              size={22}
             />
           ) : (
             <span key={`${participant.puuid}-${slot}`} className="lol-score-item-empty" />
