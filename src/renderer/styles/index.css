@@ -1782,6 +1782,211 @@
   }
 }
 
+/* 战绩详情尺寸适配：去掉内部滚动条，压缩到右侧战绩面板宽度内。 */
+@layer components {
+  .lol-postgame {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .lol-postgame-tabs {
+    gap: 18px;
+    padding: 0 10px;
+  }
+
+  .lol-postgame-tab {
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .lol-postgame-content {
+    max-height: none;
+    overflow: visible;
+    padding: 8px 10px 10px;
+  }
+
+  .lol-scoreboard,
+  .lol-overview,
+  .lol-stats,
+  .lol-charts,
+  .lol-runes-panel {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .lol-score-team + .lol-score-team {
+    margin-top: 8px;
+  }
+
+  .lol-score-team-bar {
+    grid-template-columns: minmax(150px, 1fr) 116px 74px;
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .lol-score-grid {
+    grid-template-columns: minmax(148px, 1.3fr) 78px minmax(126px, 1fr) 66px 48px 54px 34px;
+    gap: 6px;
+  }
+
+  .lol-score-grid--head {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .lol-score-row {
+    min-height: 42px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .lol-score-player {
+    gap: 6px;
+  }
+
+  .lol-score-spells {
+    gap: 1px;
+  }
+
+  .lol-score-champion {
+    width: 32px;
+    height: 32px;
+  }
+
+  .lol-score-champion > span:last-child {
+    right: -2px;
+    bottom: -2px;
+    min-width: 15px;
+    height: 15px;
+    font-size: 9px;
+  }
+
+  .lol-score-player-name {
+    max-width: 92px;
+    font-size: 11px;
+  }
+
+  .lol-score-player-copy span,
+  .lol-score-kda span {
+    margin-top: 0;
+    font-size: 9px;
+  }
+
+  .lol-score-runes,
+  .lol-runes-spells,
+  .lol-runes-main,
+  .lol-runes-all {
+    gap: 2px;
+  }
+
+  .lol-score-items {
+    grid-template-columns: repeat(7, 18px);
+    gap: 2px;
+  }
+
+  .lol-score-item-empty {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lol-score-kda strong,
+  .lol-score-number {
+    font-size: 11px;
+  }
+
+  .lol-overview-teams {
+    gap: 8px;
+  }
+
+  .lol-overview-team {
+    padding: 9px;
+  }
+
+  .lol-overview-team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .lol-overview-team-grid div,
+  .lol-overview-card {
+    padding: 8px;
+  }
+
+  .lol-overview-leaders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .lol-stats {
+    overflow: visible;
+  }
+
+  .lol-stats-grid--icons {
+    min-height: 34px;
+  }
+
+  .lol-stats-group-title {
+    margin-top: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .lol-stats-row {
+    min-height: 24px;
+    font-size: 10px;
+  }
+
+  .lol-stats-label {
+    padding-left: 8px;
+  }
+
+  .lol-stats-value {
+    font-size: 10px;
+  }
+
+  .lol-charts {
+    grid-template-columns: 148px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .lol-chart-picker {
+    max-height: none;
+    overflow: visible;
+    padding-right: 8px;
+  }
+
+  .lol-chart-option {
+    min-height: 23px;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .lol-chart-row {
+    grid-template-columns: 28px minmax(0, 1fr) 58px;
+    gap: 6px;
+    min-height: 34px;
+  }
+
+  .lol-chart-track {
+    height: 20px;
+  }
+
+  .lol-runes-panel {
+    gap: 6px;
+  }
+
+  .lol-runes-row {
+    grid-template-columns: minmax(128px, 1.1fr) 48px 82px minmax(120px, 1.2fr);
+    gap: 7px;
+    min-height: 42px;
+    padding: 6px 8px;
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */

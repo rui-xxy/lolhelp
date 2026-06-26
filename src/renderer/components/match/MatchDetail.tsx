@@ -152,21 +152,6 @@ function formatCompact(value: number): string {
   return String(Math.round(value));
 }
 
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor((seconds || 0) / 60);
-  const rest = Math.floor((seconds || 0) % 60);
-  return `${minutes}:${String(rest).padStart(2, '0')}`;
-}
-
-function formatDate(timestamp: number): string {
-  if (!timestamp) return '';
-  return new Date(timestamp).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
 function teamLabel(teamId: number): string {
   return teamId === 100 ? '蓝色方' : '红色方';
 }
@@ -238,22 +223,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
 
   return (
     <div className={`lol-postgame lol-postgame--${target.win ? 'win' : 'loss'}`}>
-      <div className="lol-postgame-hero">
-        <div className="lol-postgame-result-mark" aria-hidden="true">
-          <GameIcon src={target.championAvatar} alt={target.championName} size={42} rounded />
-        </div>
-        <div className="min-w-0">
-          <div className="lol-postgame-result">{target.win ? '胜利' : '失败'}</div>
-          <div className="lol-postgame-meta">
-            <span>{target.championName}</span>
-            <span>{match.queueName}</span>
-            <span>{formatDuration(match.gameDuration)}</span>
-            <span>{formatDate(match.gameCreation)}</span>
-            <span>游戏ID {match.gameId}</span>
-          </div>
-        </div>
-      </div>
-
       <div className="lol-postgame-tabs" role="tablist" aria-label="战绩详情标签">
         {DETAIL_TABS.map((tab) => (
           <button
@@ -402,7 +371,7 @@ function ScoreboardRow({
       <div className="lol-score-player">
         <div className="lol-score-spells">
           {participant.spells.map((spell) => (
-            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={18} />
+            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={15} />
           ))}
         </div>
         <div className="lol-score-champion">
@@ -410,7 +379,7 @@ function ScoreboardRow({
             src={participant.championAvatar}
             alt={participant.championName}
             title={`${participant.championName} Lv.${participant.champLevel}`}
-            size={38}
+            size={30}
             rounded
           />
           <span>{participant.champLevel}</span>
@@ -430,7 +399,7 @@ function ScoreboardRow({
       <div className="lol-score-runes">
         {runes.length > 0 ? (
           runes.map((rune) => (
-            <GameIcon key={`${participant.puuid}-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={22} rounded />
+            <GameIcon key={`${participant.puuid}-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={18} rounded />
           ))
         ) : (
           <span className="lol-score-empty">—</span>
@@ -444,7 +413,7 @@ function ScoreboardRow({
               src={item.icon}
               alt={item.name}
               title={item.name}
-              size={24}
+              size={18}
             />
           ) : (
             <span key={`${participant.puuid}-${slot}`} className="lol-score-item-empty" />
@@ -554,7 +523,7 @@ function StatsTab({
   targetPuuid: string;
 }) {
   const gridStyle = {
-    gridTemplateColumns: `180px repeat(${participants.length}, minmax(74px, 1fr))`,
+    gridTemplateColumns: `118px repeat(${participants.length}, minmax(40px, 1fr))`,
   } as CSSProperties;
 
   return (
@@ -567,7 +536,7 @@ function StatsTab({
             src={player.championAvatar}
             alt={player.championName}
             title={playerName(player)}
-            size={32}
+            size={24}
             rounded
             className={player.teamId === 100 ? 'lol-stats-avatar--blue' : 'lol-stats-avatar--red'}
           />
@@ -636,7 +605,7 @@ function ChartsTab({
                 src={player.championAvatar}
                 alt={player.championName}
                 title={playerName(player)}
-                size={28}
+                size={24}
                 rounded
               />
               <div className="lol-chart-track">
@@ -676,22 +645,22 @@ function RunesTab({
             className={`lol-runes-row ${player.puuid === targetPuuid ? 'lol-runes-row--target' : ''}`}
           >
             <div className="lol-runes-player">
-              <GameIcon src={player.championAvatar} alt={player.championName} title={player.championName} size={34} rounded />
+              <GameIcon src={player.championAvatar} alt={player.championName} title={player.championName} size={28} rounded />
               <button type="button" onClick={() => onPlayerSearch?.(name)}>{name}</button>
             </div>
             <div className="lol-runes-spells">
               {player.spells.map((spell) => (
-                <GameIcon key={`${player.puuid}-rune-spell-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={22} />
+                <GameIcon key={`${player.puuid}-rune-spell-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={18} />
               ))}
             </div>
             <div className="lol-runes-main">
               {player.primaryRune ? (
-                <GameIcon src={player.primaryRune.icon} alt={player.primaryRune.name} title={`主符文：${player.primaryRune.name}`} size={26} rounded />
+                <GameIcon src={player.primaryRune.icon} alt={player.primaryRune.name} title={`主符文：${player.primaryRune.name}`} size={22} rounded />
               ) : (
                 <span className="lol-score-empty">主符文 —</span>
               )}
               {player.secondaryRune ? (
-                <GameIcon src={player.secondaryRune.icon} alt={player.secondaryRune.name} title={`副符文：${player.secondaryRune.name}`} size={22} rounded />
+                <GameIcon src={player.secondaryRune.icon} alt={player.secondaryRune.name} title={`副符文：${player.secondaryRune.name}`} size={18} rounded />
               ) : (
                 <span className="lol-score-empty">副符文 —</span>
               )}
@@ -699,7 +668,7 @@ function RunesTab({
             <div className="lol-runes-all">
               {runes.length > 0 ? (
                 runes.map((rune) => (
-                  <GameIcon key={`${player.puuid}-rune-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={22} rounded />
+                  <GameIcon key={`${player.puuid}-rune-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={18} rounded />
                 ))
               ) : (
                 <span className="lol-score-empty">暂无符文数据</span>
