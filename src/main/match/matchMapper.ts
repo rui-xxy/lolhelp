@@ -11,6 +11,7 @@ import type {
   PlayerItemSummary,
   PlayerSpellSummary,
   PlayerRuneSummary,
+  MatchParticipantStats,
   MatchParticipantSummary,
   PlayerMatchDetail,
   PlayerLookupSummary,
@@ -28,6 +29,7 @@ import type {
 
 // SGP 原始 participant（字段扁平，只声明用到的）
 interface SgpParticipant {
+  [key: string]: unknown;
   puuid: string;
   riotIdGameName: string;
   riotIdTagline: string;
@@ -55,6 +57,26 @@ interface SgpParticipant {
   assists: number;
   win: boolean;
   totalDamageDealtToChampions: number;
+  physicalDamageDealtToChampions?: number;
+  magicDamageDealtToChampions?: number;
+  trueDamageDealtToChampions?: number;
+  totalDamageDealt?: number;
+  physicalDamageDealt?: number;
+  magicDamageDealt?: number;
+  trueDamageDealt?: number;
+  totalDamageTaken?: number;
+  physicalDamageTaken?: number;
+  magicDamageTaken?: number;
+  trueDamageTaken?: number;
+  damageSelfMitigated?: number;
+  totalHeal?: number;
+  totalHealsOnTeammates?: number;
+  totalDamageShieldedOnTeammates?: number;
+  goldSpent?: number;
+  wardsKilled?: number;
+  detectorWardsPlaced?: number;
+  timeCCingOthers?: number;
+  largestCriticalStrike?: number;
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
   goldEarned: number;
@@ -123,6 +145,49 @@ function calcCs(p: SgpParticipant): number {
   return (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0);
 }
 
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildParticipantStats(p?: Partial<SgpParticipant>): MatchParticipantStats {
+  const value = (key: string) => toNumber(p?.[key]);
+  return {
+    totalDamageDealtToChampions: value('totalDamageDealtToChampions'),
+    physicalDamageDealtToChampions: value('physicalDamageDealtToChampions'),
+    magicDamageDealtToChampions: value('magicDamageDealtToChampions'),
+    trueDamageDealtToChampions: value('trueDamageDealtToChampions'),
+    totalDamageDealt: value('totalDamageDealt'),
+    physicalDamageDealt: value('physicalDamageDealt'),
+    magicDamageDealt: value('magicDamageDealt'),
+    trueDamageDealt: value('trueDamageDealt'),
+    totalDamageTaken: value('totalDamageTaken'),
+    physicalDamageTaken: value('physicalDamageTaken'),
+    magicDamageTaken: value('magicDamageTaken'),
+    trueDamageTaken: value('trueDamageTaken'),
+    damageSelfMitigated: value('damageSelfMitigated'),
+    totalHeal: value('totalHeal'),
+    totalHealsOnTeammates: value('totalHealsOnTeammates'),
+    totalDamageShieldedOnTeammates: value('totalDamageShieldedOnTeammates'),
+    goldEarned: value('goldEarned'),
+    goldSpent: value('goldSpent'),
+    totalMinionsKilled: value('totalMinionsKilled'),
+    neutralMinionsKilled: value('neutralMinionsKilled'),
+    visionScore: value('visionScore'),
+    wardsPlaced: value('wardsPlaced'),
+    wardsKilled: value('wardsKilled'),
+    detectorWardsPlaced: value('detectorWardsPlaced'),
+    timeCCingOthers: value('timeCCingOthers'),
+    largestCriticalStrike: value('largestCriticalStrike'),
+    largestMultiKill: value('largestMultiKill'),
+    largestKillingSpree: value('largestKillingSpree'),
+    doubleKills: value('doubleKills'),
+    tripleKills: value('tripleKills'),
+    quadraKills: value('quadraKills'),
+    pentaKills: value('pentaKills'),
+  };
+}
+
 function normalizePremadeId(p: SgpParticipant): string | undefined {
   const raw =
     p.premadeId ??
@@ -175,30 +240,51 @@ function collectSpells(p: SgpParticipant): PlayerSpellSummary[] {
 function collectRunes(p: SgpParticipant): {
   primary: PlayerRuneSummary | null;
   secondary: PlayerRuneSummary | null;
+  all: PlayerRuneSummary[];
 } {
   let primary: PlayerRuneSummary | null = null;
   let secondary: PlayerRuneSummary | null = null;
+  const all: PlayerRuneSummary[] = [];
+  const seen = new Set<number>();
+
+  const makeRune = (id: number): PlayerRuneSummary | null => {
+    if (!id) return null;
+    const meta = getRuneById(id);
+    return meta ? { id, name: meta.name, icon: meta.icon } : null;
+  };
+
+  const pushRune = (rune: PlayerRuneSummary | null): void => {
+    if (!rune || seen.has(rune.id)) return;
+    seen.add(rune.id);
+    all.push(rune);
+  };
 
   const styles = p.perks?.styles ?? [];
   for (const style of styles) {
+    for (const selection of style.selections ?? []) {
+      pushRune(makeRune(selection.perk));
+    }
     // primaryStyle 的第一个 selection 是基石符文
     if (style.description === 'primaryStyle') {
       const keystoneId = style.selections?.[0]?.perk ?? style.style;
       if (keystoneId) {
-        const meta = getRuneById(keystoneId) ?? getRuneById(style.style);
-        if (meta) primary = { id: keystoneId, name: meta.name, icon: meta.icon };
+        primary = makeRune(keystoneId) ?? makeRune(style.style);
       }
     } else if (style.description === 'subStyle') {
       // 副系：用第一个具体符文 perk（style 是系别ID如8300=启迪，不在datas.json里）
       const subPerkId = style.selections?.[0]?.perk ?? style.style;
       if (subPerkId) {
-        const meta = getRuneById(subPerkId) ?? getRuneById(style.style);
-        if (meta) secondary = { id: subPerkId, name: meta.name, icon: meta.icon };
+        secondary = makeRune(subPerkId) ?? makeRune(style.style);
       }
     }
   }
 
-  return { primary, secondary };
+  if (all.length === 0) {
+    pushRune(primary);
+    pushRune(secondary);
+  }
+
+  return { primary, secondary, all };
 }
 
 // 映射单个 participant
@@ -212,7 +298,8 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
   );
   const items = collectItems(p);
   const spells = collectSpells(p);
-  const { primary, secondary } = collectRunes(p);
+  const { primary, secondary, all: runes } = collectRunes(p);
+  const stats = buildParticipantStats(p);
   const riotId = p.riotIdGameName
     ? `${p.riotIdGameName}${p.riotIdTagline ? '#' + p.riotIdTagline : ''}`
     : p.summonerName ?? '';
@@ -238,16 +325,21 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
     assists: p.assists,
     kda: calcKda(p.kills, p.deaths, p.assists),
     win: p.win,
-    damage: p.totalDamageDealtToChampions,
-    cs: calcCs(p),
-    gold: p.goldEarned,
+    damage: stats.totalDamageDealtToChampions,
+    cs: stats.totalMinionsKilled + stats.neutralMinionsKilled,
+    gold: stats.goldEarned,
     items,
     spells,
     primaryRune: primary,
     secondaryRune: secondary,
-    visionScore: p.visionScore,
-    largestMultiKill: p.largestMultiKill,
-    largestKillingSpree: p.largestKillingSpree,
+    runes,
+    stats,
+    visionScore: stats.visionScore,
+    largestMultiKill: stats.largestMultiKill,
+    largestKillingSpree: stats.largestKillingSpree,
+    tripleKills: stats.tripleKills,
+    quadraKills: stats.quadraKills,
+    pentaKills: stats.pentaKills,
     teamDamagePercentage: p.challenges?.teamDamagePercentage,
   };
 }
@@ -272,7 +364,10 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
   const target = targetP ?? json.participants[0];
   const items = target ? collectItems(target) : [];
   const spells = target ? collectSpells(target) : [];
-  const { primary, secondary } = target ? collectRunes(target) : { primary: null, secondary: null };
+  const { primary, secondary, all: runes } = target
+    ? collectRunes(target)
+    : { primary: null, secondary: null, all: [] };
+  const stats = buildParticipantStats(target);
 
   return {
     gameId: json.gameId,
@@ -290,19 +385,21 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
     assists: target?.assists ?? 0,
     kda: target ? calcKda(target.kills, target.deaths, target.assists) : 0,
     win: target?.win ?? false,
-    damage: target?.totalDamageDealtToChampions ?? 0,
+    damage: stats.totalDamageDealtToChampions,
     cs: target ? calcCs(target) : 0,
-    gold: target?.goldEarned ?? 0,
+    gold: stats.goldEarned,
     items,
     spells,
     flashKey: spells.find((s) => s.isFlash)?.slot ?? null,
     primaryRune: primary,
     secondaryRune: secondary,
+    runes,
+    stats,
     participants,
-    tripleKills: target?.tripleKills ?? 0,
-    quadraKills: target?.quadraKills ?? 0,
-    pentaKills: target?.pentaKills ?? 0,
-    largestKillingSpree: target?.largestKillingSpree ?? 0,
+    tripleKills: stats.tripleKills,
+    quadraKills: stats.quadraKills,
+    pentaKills: stats.pentaKills,
+    largestKillingSpree: stats.largestKillingSpree,
   };
 }
 

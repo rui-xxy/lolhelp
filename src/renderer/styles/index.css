@@ -829,6 +829,672 @@
   }
 }
 
+@layer components {
+  .lol-postgame {
+    --lol-bg: #061723;
+    --lol-bg-2: #071e2c;
+    --lol-line: rgba(163, 130, 70, 0.36);
+    --lol-gold: #c8aa6e;
+    --lol-gold-bright: #f0d28a;
+    --lol-blue: #27b7c7;
+    --lol-red: #f01f4d;
+    --lol-text: #d6d0c4;
+    --lol-muted: #8d9aa5;
+    overflow: hidden;
+    border: 1px solid rgba(196, 164, 95, 0.28);
+    border-radius: 16px;
+    background:
+      radial-gradient(circle at 72% 16%, rgba(17, 105, 130, 0.36), transparent 36%),
+      radial-gradient(circle at 8% 22%, rgba(7, 41, 62, 0.92), transparent 28%),
+      linear-gradient(135deg, var(--lol-bg) 0%, var(--lol-bg-2) 48%, #031018 100%);
+    color: var(--lol-text);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 16px 42px rgba(0, 0, 0, 0.16);
+  }
+
+  .lol-postgame-empty {
+    padding: 28px;
+    text-align: center;
+    color: var(--lol-muted);
+  }
+
+  .lol-postgame-hero {
+    display: flex;
+    min-height: 86px;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--lol-line);
+    padding: 16px 18px;
+    background:
+      linear-gradient(90deg, rgba(1, 10, 19, 0.7), rgba(6, 37, 54, 0.45)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent);
+  }
+
+  .lol-postgame-result-mark {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(200, 170, 110, 0.7);
+    border-radius: 14px;
+    background: rgba(1, 10, 19, 0.56);
+    box-shadow: inset 0 0 18px rgba(200, 170, 110, 0.12);
+    transform: rotate(-45deg);
+  }
+
+  .lol-postgame-result-mark > * {
+    transform: rotate(45deg);
+  }
+
+  .lol-postgame-result {
+    color: var(--lol-gold-bright);
+    font-size: 27px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+
+  .lol-postgame--loss .lol-postgame-result {
+    color: #ff8ca5;
+  }
+
+  .lol-postgame-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    color: var(--lol-muted);
+    font-size: 12px;
+  }
+
+  .lol-postgame-meta span + span::before {
+    padding-right: 8px;
+    color: rgba(200, 170, 110, 0.42);
+    content: "·";
+  }
+
+  .lol-postgame-tabs {
+    display: flex;
+    gap: 24px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.2);
+    padding: 0 18px;
+    background: rgba(1, 10, 19, 0.34);
+  }
+
+  .lol-postgame-tab {
+    position: relative;
+    height: 38px;
+    color: var(--lol-text);
+    font-size: 13px;
+    transition:
+      color 140ms ease,
+      opacity 140ms ease;
+  }
+
+  .lol-postgame-tab:hover {
+    color: #fff6d6;
+  }
+
+  .lol-postgame-tab--active {
+    color: var(--lol-gold-bright);
+  }
+
+  .lol-postgame-tab--active::after {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--lol-gold-bright), transparent);
+    content: "";
+  }
+
+  .lol-postgame-content {
+    max-height: min(62vh, 660px);
+    overflow: auto;
+    padding: 14px 18px 18px;
+  }
+
+  .lol-scoreboard,
+  .lol-overview,
+  .lol-stats,
+  .lol-charts,
+  .lol-runes-panel {
+    min-width: 760px;
+  }
+
+  .lol-score-team + .lol-score-team {
+    margin-top: 12px;
+  }
+
+  .lol-score-team {
+    overflow: hidden;
+    border: 1px solid rgba(200, 170, 110, 0.18);
+    border-radius: 10px;
+    background: rgba(1, 10, 19, 0.28);
+  }
+
+  .lol-score-team-bar {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 170px 100px;
+    align-items: center;
+    min-height: 32px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.18);
+    padding: 0 12px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--lol-muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .lol-score-team-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--lol-text);
+  }
+
+  .lol-score-team-line {
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+  }
+
+  .lol-score-team--blue .lol-score-team-line {
+    background: var(--lol-blue);
+  }
+
+  .lol-score-team--red .lol-score-team-line {
+    background: var(--lol-red);
+  }
+
+  .lol-score-team-result {
+    color: var(--lol-gold-bright);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .lol-score-team-total {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-score-grid {
+    display: grid;
+    grid-template-columns: minmax(214px, 1.35fr) 116px minmax(178px, 1fr) 86px 66px 70px 46px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .lol-score-grid--head {
+    min-height: 28px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.14);
+    padding: 0 12px;
+    color: rgba(214, 208, 196, 0.62);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .lol-score-grid--head span:nth-child(n+2) {
+    text-align: center;
+  }
+
+  .lol-score-row {
+    min-height: 57px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.1);
+    padding: 8px 12px;
+    font-size: 12px;
+    transition:
+      background-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .lol-score-row:hover {
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .lol-score-row--target {
+    background: linear-gradient(90deg, rgba(240, 210, 138, 0.16), rgba(240, 210, 138, 0.035));
+    box-shadow: inset 3px 0 0 var(--lol-gold-bright);
+  }
+
+  .lol-score-row--recurring {
+    box-shadow: inset 3px 0 0 rgba(83, 219, 255, 0.76);
+  }
+
+  .lol-score-player {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lol-score-spells {
+    display: grid;
+    gap: 2px;
+  }
+
+  .lol-score-champion {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+  }
+
+  .lol-score-champion img,
+  .lol-score-champion > span:first-child {
+    border: 1px solid rgba(200, 170, 110, 0.56);
+  }
+
+  .lol-score-champion > span:last-child {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    display: grid;
+    min-width: 18px;
+    height: 18px;
+    place-items: center;
+    border: 1px solid rgba(200, 170, 110, 0.72);
+    border-radius: 999px;
+    background: #010a13;
+    color: var(--lol-gold-bright);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .lol-score-player-copy {
+    min-width: 0;
+  }
+
+  .lol-score-player-name {
+    display: block;
+    max-width: 132px;
+    overflow: hidden;
+    color: #e7dfcf;
+    font-weight: 700;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-score-player-name:hover {
+    color: var(--lol-gold-bright);
+    text-decoration: underline;
+  }
+
+  .lol-score-player-copy span {
+    display: block;
+    margin-top: 2px;
+    color: rgba(214, 208, 196, 0.58);
+    font-size: 11px;
+  }
+
+  .lol-score-runes,
+  .lol-score-items,
+  .lol-runes-spells,
+  .lol-runes-main,
+  .lol-runes-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .lol-score-runes img,
+  .lol-runes-main img,
+  .lol-runes-all img {
+    border: 1px solid rgba(200, 170, 110, 0.4);
+    background: #010a13;
+  }
+
+  .lol-score-items {
+    display: grid;
+    grid-template-columns: repeat(7, 24px);
+  }
+
+  .lol-score-item-empty {
+    display: block;
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(200, 170, 110, 0.22);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .lol-score-empty {
+    color: rgba(214, 208, 196, 0.46);
+    font-size: 11px;
+  }
+
+  .lol-score-kda {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-score-kda strong {
+    display: block;
+    color: #f4efe2;
+    font-weight: 800;
+  }
+
+  .lol-score-kda span {
+    display: block;
+    margin-top: 2px;
+    color: rgba(214, 208, 196, 0.56);
+    font-size: 10px;
+  }
+
+  .lol-score-number {
+    color: #e7dfcf;
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-overview-teams {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .lol-overview-team,
+  .lol-overview-card {
+    border: 1px solid rgba(200, 170, 110, 0.22);
+    border-radius: 12px;
+    background: rgba(1, 10, 19, 0.32);
+  }
+
+  .lol-overview-team {
+    padding: 14px;
+  }
+
+  .lol-overview-team-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--lol-muted);
+    font-size: 12px;
+  }
+
+  .lol-overview-team-head strong {
+    color: var(--lol-gold-bright);
+    font-size: 16px;
+  }
+
+  .lol-overview-team--red .lol-overview-team-head strong {
+    color: #ff8ca5;
+  }
+
+  .lol-overview-team-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .lol-overview-team-grid div {
+    border-radius: 9px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .lol-overview-team-grid span,
+  .lol-overview-card span {
+    display: block;
+    color: var(--lol-muted);
+    font-size: 11px;
+  }
+
+  .lol-overview-team-grid strong {
+    display: block;
+    margin-top: 5px;
+    color: #f4efe2;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-overview-leaders {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .lol-overview-card {
+    padding: 12px;
+  }
+
+  .lol-overview-card > div {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    margin-top: 9px;
+  }
+
+  .lol-overview-card strong {
+    display: block;
+    overflow: hidden;
+    color: #f4efe2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-overview-card small {
+    color: var(--lol-gold-bright);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .lol-overview-card--target {
+    box-shadow: inset 0 0 0 1px rgba(240, 210, 138, 0.48);
+  }
+
+  .lol-stats {
+    overflow-x: auto;
+  }
+
+  .lol-stats-grid {
+    display: grid;
+    align-items: center;
+    gap: 0;
+  }
+
+  .lol-stats-grid--icons {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    min-height: 44px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.24);
+    background: rgba(1, 10, 19, 0.88);
+  }
+
+  .lol-stats-grid--icons img {
+    justify-self: center;
+    border: 2px solid rgba(39, 183, 199, 0.66);
+  }
+
+  .lol-stats-grid--icons .lol-stats-avatar--red {
+    border-color: rgba(240, 31, 77, 0.72);
+  }
+
+  .lol-stats-group-title {
+    margin-top: 10px;
+    border-top: 1px solid rgba(200, 170, 110, 0.16);
+    border-bottom: 1px solid rgba(200, 170, 110, 0.12);
+    padding: 7px 10px;
+    background: rgba(255, 255, 255, 0.055);
+    color: var(--lol-gold-bright);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .lol-stats-row {
+    min-height: 29px;
+    border-bottom: 1px solid rgba(200, 170, 110, 0.08);
+    font-size: 12px;
+  }
+
+  .lol-stats-label {
+    padding-left: 12px;
+    color: var(--lol-text);
+  }
+
+  .lol-stats-value {
+    text-align: center;
+    color: rgba(214, 208, 196, 0.8);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-stats-value--target {
+    color: #ffd000;
+    font-weight: 900;
+  }
+
+  .lol-charts {
+    display: grid;
+    grid-template-columns: 215px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .lol-chart-picker {
+    max-height: 430px;
+    overflow: auto;
+    border-right: 1px solid rgba(200, 170, 110, 0.24);
+    padding-right: 14px;
+  }
+
+  .lol-chart-option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+    min-height: 27px;
+    color: var(--lol-text);
+    font-size: 12px;
+    text-align: left;
+  }
+
+  .lol-chart-option:hover,
+  .lol-chart-option--active {
+    color: var(--lol-gold-bright);
+  }
+
+  .lol-chart-checkbox {
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(200, 170, 110, 0.62);
+    background: rgba(1, 10, 19, 0.5);
+  }
+
+  .lol-chart-option--active .lol-chart-checkbox {
+    background:
+      linear-gradient(135deg, transparent 42%, #010a13 42%, #010a13 56%, transparent 56%),
+      var(--lol-gold-bright);
+  }
+
+  .lol-chart-title {
+    margin-bottom: 10px;
+    color: var(--lol-gold-bright);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .lol-chart-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 78px;
+    align-items: center;
+    gap: 8px;
+    min-height: 43px;
+  }
+
+  .lol-chart-track {
+    height: 27px;
+    border-left: 1px solid rgba(39, 183, 199, 0.24);
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(39, 183, 199, 0.18) 0,
+      rgba(39, 183, 199, 0.18) 1px,
+      transparent 1px,
+      transparent 12.5%
+    );
+  }
+
+  .lol-chart-bar {
+    height: 100%;
+    min-width: 4px;
+  }
+
+  .lol-chart-bar--blue {
+    background: var(--lol-blue);
+  }
+
+  .lol-chart-bar--red {
+    background: var(--lol-red);
+  }
+
+  .lol-chart-bar--target {
+    box-shadow: 0 0 0 1px rgba(255, 208, 0, 0.72), 0 0 18px rgba(255, 208, 0, 0.22);
+  }
+
+  .lol-chart-row > span {
+    color: rgba(214, 208, 196, 0.72);
+    text-align: right;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-runes-panel {
+    display: grid;
+    gap: 8px;
+  }
+
+  .lol-runes-row {
+    display: grid;
+    grid-template-columns: minmax(210px, 1fr) 70px 108px minmax(220px, 1.4fr);
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    border: 1px solid rgba(200, 170, 110, 0.14);
+    border-radius: 10px;
+    padding: 9px 12px;
+    background: rgba(1, 10, 19, 0.28);
+  }
+
+  .lol-runes-row--target {
+    border-color: rgba(240, 210, 138, 0.52);
+    background: rgba(240, 210, 138, 0.08);
+  }
+
+  .lol-runes-player {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .lol-runes-player button {
+    overflow: hidden;
+    color: #f4efe2;
+    font-weight: 700;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-runes-player button:hover {
+    color: var(--lol-gold-bright);
+    text-decoration: underline;
+  }
+
+  .lol-runes-all {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */

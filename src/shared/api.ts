@@ -630,6 +630,43 @@ export interface PlayerRuneSummary {
   name: string;
 }
 
+// 单个玩家的赛后统计明细（用于“统计 / 图表”标签）。
+// 字段尽量贴近 LOL 客户端赛后面板，缺失时后端会填 0。
+export interface MatchParticipantStats {
+  totalDamageDealtToChampions: number;
+  physicalDamageDealtToChampions: number;
+  magicDamageDealtToChampions: number;
+  trueDamageDealtToChampions: number;
+  totalDamageDealt: number;
+  physicalDamageDealt: number;
+  magicDamageDealt: number;
+  trueDamageDealt: number;
+  totalDamageTaken: number;
+  physicalDamageTaken: number;
+  magicDamageTaken: number;
+  trueDamageTaken: number;
+  damageSelfMitigated: number;
+  totalHeal: number;
+  totalHealsOnTeammates: number;
+  totalDamageShieldedOnTeammates: number;
+  goldEarned: number;
+  goldSpent: number;
+  totalMinionsKilled: number;
+  neutralMinionsKilled: number;
+  visionScore: number;
+  wardsPlaced: number;
+  wardsKilled: number;
+  detectorWardsPlaced: number;
+  timeCCingOthers: number;
+  largestCriticalStrike: number;
+  largestMultiKill: number;
+  largestKillingSpree: number;
+  doubleKills: number;
+  tripleKills: number;
+  quadraKills: number;
+  pentaKills: number;
+}
+
 // 单个玩家在对局中的完整数据（10 人各一行）
 export interface MatchParticipantSummary {
   puuid: string;
@@ -659,6 +696,8 @@ export interface MatchParticipantSummary {
   spells: PlayerSpellSummary[];
   primaryRune: PlayerRuneSummary | null;
   secondaryRune: PlayerRuneSummary | null;
+  runes: PlayerRuneSummary[];
+  stats: MatchParticipantStats;
   visionScore?: number;
   largestMultiKill?: number;
   largestKillingSpree?: number; // 最大连杀（≥7 = 超神）
@@ -693,6 +732,8 @@ export interface PlayerMatchDetail {
   flashKey: SummonerSpellSlot | null;
   primaryRune: PlayerRuneSummary | null;
   secondaryRune: PlayerRuneSummary | null;
+  runes: PlayerRuneSummary[];
+  stats: MatchParticipantStats;
   participants: MatchParticipantSummary[];
   tripleKills?: number;
   quadraKills?: number;
