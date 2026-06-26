@@ -48,6 +48,8 @@ export interface FriendInfo {
   groupName: string; // 分组名
   note: string; // 备注
   statusMessage: string; // 状态消息
+  friendSince?: string | number | null;
+  friendSinceTimestamp?: number | null;
   lastSeenOnlineTimestamp: number | null;
   product: string; // 当前在哪个产品（空=LOL 客户端大厅）
   lol?: {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Clock, Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import type { CSSProperties } from 'react';
@@ -62,10 +62,42 @@ function formatGameDuration(startedAt: string | number | undefined, now: number)
   return `${minutes}:${pad2(seconds)}`;
 }
 
+function timestampValue(value: string | number | null | undefined): number {
+  if (value === undefined || value === null || value === '') return 0;
+  if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
+    let timestamp = Number(value);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return 0;
+    if (timestamp < 1_000_000_000_000) timestamp *= 1000;
+    return timestamp;
+  }
+
+  const timestamp = Date.parse(String(value));
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : 0;
+}
+
+function friendAddedTimestamp(friend: FriendInfo): number {
+  return friend.friendSinceTimestamp ?? timestampValue(friend.friendSince);
+}
+
+function formatFriendAddedTime(friend: FriendInfo): string {
+  const timestamp = friendAddedTimestamp(friend);
+  if (!timestamp) return '添加时间未知';
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+}
+
 export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [sortByAddedAt, setSortByAddedAt] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [actionFriendId, setActionFriendId] = useState('');
   const [actionMessage, setActionMessage] = useState('');
@@ -133,6 +165,11 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
   }
   for (const [, list] of groups) {
     list.sort((a, b) => {
+      if (sortByAddedAt) {
+        const addedDiff = friendAddedTimestamp(b) - friendAddedTimestamp(a);
+        if (addedDiff !== 0) return addedDiff;
+        return a.gameName.localeCompare(b.gameName);
+      }
       const aOnline = a.availability !== 'offline' ? 0 : 1;
       const bOnline = b.availability !== 'offline' ? 0 : 1;
       if (aOnline !== bOnline) return aOnline - bOnline;
@@ -218,14 +255,30 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
             const groupOnline = list.filter((f) => f.availability !== 'offline').length;
             const displayName = groupName === '**Default' ? '默认分组' : groupName;
             return (
-              <div key={groupName} className="mb-1">
+              <div key={groupName} className="relative mb-1">
                 <button
                   onClick={() => toggleGroup(groupName)}
-                  className="flex w-full items-center gap-1 px-1 py-1 text-[11px] font-medium text-app-muted hover:text-app-text"
+                  className="flex w-full items-center gap-1 px-1 py-1 pr-7 text-[11px] font-medium text-app-muted hover:text-app-text"
                 >
                   <span className="text-app-subtle">{collapsed ? '▶' : '▼'}</span>
                   <span>{displayName}</span>
                   <span className="text-app-subtle">（{groupOnline}/{list.length}）</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSortByAddedAt((value) => !value);
+                  }}
+                  className={`absolute right-1 top-0.5 z-10 flex size-5 items-center justify-center rounded-xs transition-colors ${
+                    sortByAddedAt
+                      ? 'bg-app-primary-soft text-app-primary'
+                      : 'text-app-subtle hover:bg-app-surface-soft hover:text-app-text'
+                  }`}
+                  title={sortByAddedAt ? '恢复默认好友排序' : '按添加好友时间排序'}
+                  aria-label={sortByAddedAt ? '恢复默认好友排序' : '按添加好友时间排序'}
+                >
+                  <Clock className="size-3.5" />
                 </button>
                 {!collapsed && (
                   <div>
@@ -245,6 +298,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                         friend.lol?.gameStatus === 'inGame'
                           ? formatGameDuration(friend.lol.timeStamp, currentTime)
                           : '';
+                      const addedTime = sortByAddedAt ? formatFriendAddedTime(friend) : '';
                       return (
                         <div
                           key={friend.puuid}
@@ -286,6 +340,11 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                               <span className={`friend-status ${FRIEND_STATUS_CLASS[status.kind]}`}>
                                 {status.text || '离线'}
                               </span>
+                              {addedTime && (
+                                <span className="friend-added-time" title={addedTime}>
+                                  添加：{addedTime}
+                                </span>
+                              )}
                             </div>
                           </button>
                           <button

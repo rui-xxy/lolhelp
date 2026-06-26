@@ -240,6 +240,18 @@
     vertical-align: top;
   }
 
+  .friend-added-time {
+    display: block;
+    max-width: 100%;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 10px;
+    line-height: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .friend-status--ranked-solo {
     background: rgba(66, 139, 255, 0.13);
     color: #1f5fbf;

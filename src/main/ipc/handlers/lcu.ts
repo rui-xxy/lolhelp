@@ -90,6 +90,19 @@ function readNumberField(source: Record<string, unknown>, keys: string[]): numbe
   return 0;
 }
 
+function normalizeTimestamp(value: string | number | null | undefined): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
+    let timestamp = Number(value);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+    if (timestamp < 1_000_000_000_000) timestamp *= 1000;
+    return timestamp;
+  }
+
+  const timestamp = Date.parse(String(value));
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
+
 function getFriendChampionId(rawLol: Record<string, unknown>): number {
   const explicit = readNumberField(rawLol, [
     'championId',
@@ -305,6 +318,18 @@ export function registerLcuHandlers(): void {
         const puuid = String(f.puuid ?? '');
         const gameName = String(f.gameName ?? '');
         const gameTag = String(f.gameTag ?? '');
+        const friendSinceRaw = readStringField(f, [
+          'friendSince',
+          'friendSinceTimestamp',
+          'createdAt',
+          'created',
+          'addedAt',
+          'dateAdded',
+          'time',
+          'timestamp',
+        ]);
+        const friendSince = friendSinceRaw === '' ? null : friendSinceRaw;
+        const friendSinceTimestamp = normalizeTimestamp(friendSince);
         let championId = getFriendChampionId(rawLol);
         if ((!Number.isFinite(championId) || championId <= 0) && isFriendInGame(rawLol)) {
           championId = await getActiveGameChampionId(client, {
@@ -364,6 +389,8 @@ export function registerLcuHandlers(): void {
           groupName: String(f.groupName ?? '**Default'),
           note: String(f.note ?? ''),
           statusMessage: String(f.statusMessage ?? ''),
+          friendSince,
+          friendSinceTimestamp,
           lastSeenOnlineTimestamp: (f.lastSeenOnlineTimestamp as number) ?? null,
           product: String(f.product ?? ''),
           lol,
