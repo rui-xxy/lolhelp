@@ -17,14 +17,70 @@ import type { ChatConversation, ChatMessage } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 
 const CHAT_REFRESH_INTERVAL_MS = 5_000;
-const EMOJI_OPTIONS = [
-  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣',
-  '😊', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😋',
-  '😎', '🤔', '🫡', '🤗', '🤭', '😴', '😭', '🥺',
-  '😤', '😡', '🤯', '😱', '👍', '👎', '👌', '✌️',
-  '🤝', '🙏', '👏', '💪', '❤️', '💔', '🔥', '✨',
-  '🎉', '🎮', '🏆', '💯', '👀', '🐱', '🐶', '🌹',
+const EMOJI_PAGES = [
+  {
+    label: '笑脸',
+    title: '😀 笑脸与情感',
+    groups: [
+      {
+        title: '😀 笑脸与情感',
+        emojis: [
+          '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+          '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
+          '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛',
+          '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
+          '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
+          '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷',
+          '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴',
+          '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕',
+          '😟', '😒', '😣', '😞', '😟', '😢', '😭', '😤',
+          '😠', '😡', '🤬', '🥺', '😨', '😰', '😱', '😖',
+          '😞', '😓', '😩', '😫', '🥱', '😵', '😲', '😳',
+          '🤔', '🫡', '😴', '💤', '😬', '🙄', '😏', '😬',
+          '🤥', '😌', '😔', '😋',
+        ],
+      },
+    ],
+  },
+  {
+    label: '更多',
+    title: '❤️ 心形 / 👋 手势 / 🔢 数字',
+    groups: [
+      {
+        title: '❤️ 心形与情感符号',
+        emojis: [
+          '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+          '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖',
+          '💘', '💝', '💟', '♥️', '💋', '💌', '😘', '😍',
+          '🥰', '💑', '👩‍❤️‍👨', '💏', '💆', '💇', '🧖', '🧖‍♀️',
+          '🧖‍♂️', '🫂', '🤝', '🤗',
+        ],
+      },
+      {
+        title: '👋 手势与肢体',
+        emojis: [
+          '👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏',
+          '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆',
+          '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛',
+          '🤜', '👏', '🙌', '👐', '🤲', '🙏', '✍️', '💅',
+          '🤝', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '👃',
+          '🧠', '🦷', '🦴', '👀', '👁', '👅', '👄',
+        ],
+      },
+      {
+        title: '🔢 数字表情',
+        emojis: [
+          '#️⃣', '*️⃣', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣',
+          '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '🔢',
+        ],
+      },
+    ],
+  },
 ];
+
+function uniqueEmojis(emojis: string[]): string[] {
+  return Array.from(new Set(emojis));
+}
 
 function timestampValue(value: string): number {
   const numeric = Number(value);
@@ -143,6 +199,7 @@ export function ChatSessionDialog({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiPageIndex, setEmojiPageIndex] = useState(0);
   const loadingRef = useRef(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -153,6 +210,7 @@ export function ChatSessionDialog({
     setDraft('');
     setSendError('');
     setEmojiOpen(false);
+    setEmojiPageIndex(0);
     onClose();
   }, [onClose]);
 
@@ -227,6 +285,7 @@ export function ChatSessionDialog({
   const selectedConversation = conversations.find(
     (conversation) => conversation.id === selectedId,
   ) ?? null;
+  const activeEmojiPage = EMOJI_PAGES[emojiPageIndex] ?? EMOJI_PAGES[0];
 
   const submitMessage = useCallback(async () => {
     const body = draft.trim();
@@ -352,6 +411,7 @@ export function ChatSessionDialog({
                     setDraft('');
                     setSendError('');
                     setEmojiOpen(false);
+                    setEmojiPageIndex(0);
                   }}
                   className={`flex w-full items-center gap-3 border-b border-app-border/70 px-3 py-3 text-left transition-colors ${
                     selectedId === conversation.id
@@ -490,22 +550,49 @@ export function ChatSessionDialog({
                           <Smile className="size-[18px]" />
                         </button>
                         {emojiOpen && (
-                          <div className="absolute bottom-10 left-0 z-40 w-[304px] rounded-md border border-app-border bg-app-surface p-2 shadow-airbnb">
-                            <div className="mb-2 px-1 text-[11px] font-medium text-app-muted">
-                              常用表情
+                          <div className="absolute bottom-10 left-0 z-40 w-[356px] rounded-md border border-app-border bg-app-surface p-2 shadow-airbnb">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div className="min-w-0 truncate px-1 text-[11px] font-medium text-app-muted">
+                                {activeEmojiPage.title}
+                              </div>
+                              <div className="flex shrink-0 rounded-sm bg-app-bg-soft p-0.5">
+                                {EMOJI_PAGES.map((page, index) => (
+                                  <button
+                                    key={page.label}
+                                    type="button"
+                                    onClick={() => setEmojiPageIndex(index)}
+                                    className={`h-6 rounded-xs px-2 text-[10px] font-medium transition-colors ${
+                                      emojiPageIndex === index
+                                        ? 'bg-app-surface text-app-primary shadow-sm'
+                                        : 'text-app-muted hover:text-app-text'
+                                    }`}
+                                  >
+                                    {index + 1} {page.label}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-8 gap-1">
-                              {EMOJI_OPTIONS.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  onClick={() => insertEmoji(emoji)}
-                                  className="flex size-8 items-center justify-center rounded-sm text-xl transition-colors hover:bg-app-nav-hover"
-                                  title={emoji}
-                                  aria-label={`插入表情 ${emoji}`}
-                                >
-                                  {emoji}
-                                </button>
+                            <div className="max-h-[304px] space-y-3 overflow-y-auto pr-1">
+                              {activeEmojiPage.groups.map((group) => (
+                                <div key={group.title}>
+                                  <div className="mb-1 px-1 text-[10px] font-medium text-app-subtle">
+                                    {group.title}
+                                  </div>
+                                  <div className="grid grid-cols-9 gap-1">
+                                    {uniqueEmojis(group.emojis).map((emoji) => (
+                                      <button
+                                        key={`${group.title}-${emoji}`}
+                                        type="button"
+                                        onClick={() => insertEmoji(emoji)}
+                                        className="flex size-8 items-center justify-center rounded-sm text-xl transition-colors hover:bg-app-nav-hover"
+                                        title={emoji}
+                                        aria-label={`插入表情 ${emoji}`}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           </div>
