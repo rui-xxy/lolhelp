@@ -291,16 +291,28 @@ export interface AssistOperationResult {
   message: string;
 }
 
+export interface AssistLiveSpell {
+  id: number;
+  name: string;
+  icon: string;
+  cooldown: number;
+}
+
 export interface AssistLivePlayer {
   riotId: string;
   championName: string;
+  championId: number;
+  championIcon: string;
   team: string;
+  isLocalPlayer: boolean;
+  isEnemy: boolean;
   level: number;
   kills: number;
   deaths: number;
   assists: number;
-  spellOne: string;
-  spellTwo: string;
+  items: number[];
+  spellOne: AssistLiveSpell | null;
+  spellTwo: AssistLiveSpell | null;
 }
 
 export interface AssistLiveData {
@@ -324,6 +336,7 @@ export interface AssistApi {
   lockCurrentChampion: () => Promise<AssistOperationResult>;
   applyAccountSettings: () => Promise<AssistOperationResult[]>;
   toggleOverlay: (name: AssistOverlayName) => Promise<boolean>;
+  setOverlayPinned: (name: AssistOverlayName, pinned: boolean) => Promise<boolean>;
   getLiveData: () => Promise<AssistLiveData>;
   exportBlacklist: () => Promise<string | null>;
 }

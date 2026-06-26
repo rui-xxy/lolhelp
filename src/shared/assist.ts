@@ -40,9 +40,9 @@ const DEFAULT_CHAMPION_PREFERENCES: AssistChampionPreferences = {
 export const DEFAULT_ASSIST_SETTINGS: AssistSettings = {
   showRuneAssistant: false,
   showPowerTrend: false,
-  globalHotkeysEnabled: false,
+  globalHotkeysEnabled: true,
   showMatchOverlay: false,
-  showSpellOverlay: false,
+  showSpellOverlay: true,
 
   autoAccept: false,
   autoAcceptDelayMs: 0,
@@ -80,9 +80,9 @@ export const DEFAULT_ASSIST_SETTINGS: AssistSettings = {
   powerTitles: ['牛马', '混子', '中等马', '上等马', '通天代'],
   hotkeys: {
     mainWindow: 'CTRL+ALT+Y',
-    matchOverlay: '',
-    matchHelper: '',
-    spellOverlay: '',
+    matchOverlay: 'SHIFT+TAB',
+    matchHelper: 'SHIFT+F5',
+    spellOverlay: 'SHIFT+F6',
   },
 
   preferredPresence: 'auto',
@@ -138,9 +138,15 @@ export function normalizeAssistSettings(value: unknown): AssistSettings {
     ...DEFAULT_ASSIST_SETTINGS,
     showRuneAssistant: false,
     showPowerTrend: false,
-    globalHotkeysEnabled: boolValue(source.globalHotkeysEnabled, false),
+    globalHotkeysEnabled: boolValue(
+      source.globalHotkeysEnabled,
+      DEFAULT_ASSIST_SETTINGS.globalHotkeysEnabled,
+    ),
     showMatchOverlay: false,
-    showSpellOverlay: false,
+    showSpellOverlay: boolValue(
+      source.showSpellOverlay,
+      DEFAULT_ASSIST_SETTINGS.showSpellOverlay,
+    ),
     autoAccept: boolValue(source.autoAccept, false),
     autoAcceptDelayMs: finiteNumber(source.autoAcceptDelayMs, 0, 0, 5000),
     autoPlayAgain: boolValue(source.autoPlayAgain, false),
@@ -200,9 +206,9 @@ export function normalizeAssistSettings(value: unknown): AssistSettings {
       : [...DEFAULT_ASSIST_SETTINGS.powerTitles],
     hotkeys: {
       mainWindow: stringValue(hotkeySource.mainWindow, 'CTRL+ALT+Y', 50),
-      matchOverlay: '',
-      matchHelper: '',
-      spellOverlay: '',
+      matchOverlay: stringValue(hotkeySource.matchOverlay, 'SHIFT+TAB', 50),
+      matchHelper: stringValue(hotkeySource.matchHelper, 'SHIFT+F5', 50),
+      spellOverlay: stringValue(hotkeySource.spellOverlay, 'SHIFT+F6', 50),
     },
     preferredPresence: stringValue(source.preferredPresence, 'auto', 20),
     statusMessage: stringValue(source.statusMessage, '', 100),

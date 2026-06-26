@@ -17,7 +17,10 @@ import {
   getAssistRecommendation,
 } from '../../assist/recommendations';
 import { getAssistRuntimeStatus } from '../../assist/runtime';
-import { toggleAssistOverlay } from '../../assist/windows';
+import {
+  setAssistOverlayPinned,
+  toggleAssistOverlay,
+} from '../../assist/windows';
 import { getSettings } from '../../settings/store';
 
 const OVERLAY_NAMES: AssistOverlayName[] = ['helper', 'match', 'spells'];
@@ -56,6 +59,13 @@ export function registerAssistHandlers(): void {
     (_event, name: AssistOverlayName) => {
       if (!OVERLAY_NAMES.includes(name)) throw new Error('悬浮窗类型无效');
       return toggleAssistOverlay(name);
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ASSIST_SET_OVERLAY_PINNED,
+    (_event, name: AssistOverlayName, pinned: boolean) => {
+      if (!OVERLAY_NAMES.includes(name)) throw new Error('无效的悬浮窗类型');
+      return setAssistOverlayPinned(name, Boolean(pinned));
     },
   );
   ipcMain.handle(IPC_CHANNELS.ASSIST_GET_LIVE_DATA, () => getAssistLiveData());

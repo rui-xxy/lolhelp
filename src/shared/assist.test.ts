@@ -22,7 +22,7 @@ describe('assist settings', () => {
     expect('tftOverlay' in normalized.hotkeys).toBe(false);
   });
 
-  it('retires in-game overlay settings from older settings', () => {
+  it('keeps Yuumi-style in-game spell timer settings', () => {
     const normalized = normalizeAssistSettings({
       showRuneAssistant: true,
       showPowerTrend: true,
@@ -38,9 +38,17 @@ describe('assist settings', () => {
     expect(normalized.showRuneAssistant).toBe(false);
     expect(normalized.showPowerTrend).toBe(false);
     expect(normalized.showMatchOverlay).toBe(false);
-    expect(normalized.showSpellOverlay).toBe(false);
-    expect(normalized.hotkeys.matchOverlay).toBe('');
-    expect(normalized.hotkeys.matchHelper).toBe('');
-    expect(normalized.hotkeys.spellOverlay).toBe('');
+    expect(normalized.showSpellOverlay).toBe(true);
+    expect(normalized.hotkeys.matchOverlay).toBe('SHIFT+TAB');
+    expect(normalized.hotkeys.matchHelper).toBe('F6');
+    expect(normalized.hotkeys.spellOverlay).toBe('F9');
+  });
+
+  it('defaults spell timer to Shift+F6', () => {
+    const normalized = normalizeAssistSettings({});
+
+    expect(normalized.globalHotkeysEnabled).toBe(true);
+    expect(normalized.showSpellOverlay).toBe(true);
+    expect(normalized.hotkeys.spellOverlay).toBe('SHIFT+F6');
   });
 });

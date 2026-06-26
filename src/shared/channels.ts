@@ -24,6 +24,7 @@ export const IPC_CHANNELS = {
   ASSIST_LOCK_CURRENT_CHAMPION: 'assist:lock-current-champion',
   ASSIST_APPLY_ACCOUNT_SETTINGS: 'assist:apply-account-settings',
   ASSIST_TOGGLE_OVERLAY: 'assist:toggle-overlay',
+  ASSIST_SET_OVERLAY_PINNED: 'assist:set-overlay-pinned',
   ASSIST_GET_LIVE_DATA: 'assist:get-live-data',
   ASSIST_EXPORT_BLACKLIST: 'assist:export-blacklist',
   // config 域：League 客户端/游戏内配置读取、保存和一键应用

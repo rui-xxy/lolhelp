@@ -18,6 +18,8 @@ import {
   updateAssistRuntimeStatus,
 } from './runtime';
 import {
+  hideAssistOverlay,
+  showAssistOverlay,
   syncAssistGlobalShortcuts,
 } from './windows';
 import { getLiveBattle } from '../live/liveBattle';
@@ -72,6 +74,11 @@ let positionMessageSent = false;
 let blacklistAlertSent = false;
 let highWinRateAlertSent = false;
 let lastPositionPreferencesKey = '';
+let liveOverlayCycleKey = '';
+let spellOverlayOpenedForKey = '';
+let matchOverlayOpenedForKey = '';
+let spellOverlayTimer: NodeJS.Timeout | null = null;
+let matchOverlayTimer: NodeJS.Timeout | null = null;
 
 async function sendLobbyMessage(client: LcuClient, body: string): Promise<void> {
   const conversations = await client.get<Array<{ id?: string }>>('/lol-chat/v1/conversations');
@@ -207,6 +214,63 @@ async function handleAutomaticRecommendation(
 function clearAcceptTimer(): void {
   if (acceptTimer) clearTimeout(acceptTimer);
   acceptTimer = null;
+}
+
+function clearOverlayTimers(): void {
+  if (spellOverlayTimer) clearTimeout(spellOverlayTimer);
+  if (matchOverlayTimer) clearTimeout(matchOverlayTimer);
+  spellOverlayTimer = null;
+  matchOverlayTimer = null;
+}
+
+function isLivePhase(phase: string): boolean {
+  return ['GameStart', 'InProgress', 'Reconnect'].includes(phase);
+}
+
+function currentLiveOverlayKey(gameId: number): string {
+  if (gameId) {
+    liveOverlayCycleKey = String(gameId);
+    return liveOverlayCycleKey;
+  }
+  if (!liveOverlayCycleKey) liveOverlayCycleKey = `live-${Date.now()}`;
+  return liveOverlayCycleKey;
+}
+
+function scheduleOverlayOpen(
+  name: 'match' | 'spells',
+  delayMs = 12_000,
+): NodeJS.Timeout {
+  return setTimeout(() => {
+    void showAssistOverlay(name);
+  }, delayMs);
+}
+
+function syncInGameOverlays(
+  phase: string,
+  gameId: number,
+): void {
+  const settings = getSettings().assist;
+  if (!isLivePhase(phase)) {
+    liveOverlayCycleKey = '';
+    spellOverlayOpenedForKey = '';
+    matchOverlayOpenedForKey = '';
+    clearOverlayTimers();
+    hideAssistOverlay('spells');
+    if (settings.showMatchOverlay) hideAssistOverlay('match');
+    return;
+  }
+
+  const key = currentLiveOverlayKey(gameId);
+  if (settings.showSpellOverlay && spellOverlayOpenedForKey !== key) {
+    spellOverlayOpenedForKey = key;
+    if (spellOverlayTimer) clearTimeout(spellOverlayTimer);
+    spellOverlayTimer = scheduleOverlayOpen('spells');
+  }
+  if (settings.showMatchOverlay && matchOverlayOpenedForKey !== key) {
+    matchOverlayOpenedForKey = key;
+    if (matchOverlayTimer) clearTimeout(matchOverlayTimer);
+    matchOverlayTimer = scheduleOverlayOpen('match');
+  }
 }
 
 async function acceptReadyCheck(client: LcuClient, delayMs: number): Promise<void> {
@@ -391,17 +455,19 @@ async function pollAssist(): Promise<void> {
   if (polling) return;
   polling = true;
   try {
+    const settings = getSettings().assist;
+    syncAssistGlobalShortcuts(settings.globalHotkeysEnabled, settings.hotkeys);
+
     const creds = getCachedCredentials();
     if (!creds) {
       clearAcceptTimer();
       previousPhase = '';
+      syncInGameOverlays('', 0);
       return;
     }
 
     const client = new LcuClient(creds);
     const phase = await client.get<string>('/lol-gameflow/v1/gameflow-phase');
-    const settings = getSettings().assist;
-    syncAssistGlobalShortcuts(settings.globalHotkeysEnabled, settings.hotkeys);
     const gameflow = await getQueueId(client);
     updateAssistRuntimeStatus({
       connected: true,
@@ -409,6 +475,7 @@ async function pollAssist(): Promise<void> {
       queueId: gameflow.queueId,
       lastError: '',
     });
+    syncInGameOverlays(phase, gameflow.gameId);
 
     if (phase === 'ReadyCheck' && settings.autoAccept) {
       await acceptReadyCheck(client, settings.autoAcceptDelayMs);
@@ -446,6 +513,7 @@ async function pollAssist(): Promise<void> {
   } catch (error) {
     clearAcceptTimer();
     updateAssistRuntimeStatus({ connected: false });
+    syncInGameOverlays('', 0);
     reportAssistError(error);
   } finally {
     polling = false;
@@ -462,6 +530,7 @@ export function startAssistEngine(): void {
 
 export function stopAssistEngine(): void {
   clearAcceptTimer();
+  clearOverlayTimers();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
 }

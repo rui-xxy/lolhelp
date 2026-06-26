@@ -1,13 +1,20 @@
 import {
   Activity,
+  CheckCircle2,
+  Clock3,
   GripHorizontal,
+  MousePointerClick,
+  Pause,
+  Pin,
   RefreshCw,
+  RotateCcw,
   Swords,
   Timer,
   Wand2,
   X,
 } from 'lucide-react';
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -17,6 +24,8 @@ import type {
   AppSettings,
   AssistChampionGuide,
   AssistLiveData,
+  AssistLivePlayer,
+  AssistLiveSpell,
   AssistOverlayName,
   AssistRecommendation,
   AssistRuntimeStatus,
@@ -27,11 +36,12 @@ import type {
 const overlayMeta: Record<AssistOverlayName, {
   title: string;
   eyebrow: string;
+  hotkey: string;
   icon: typeof Swords;
 }> = {
-  helper: { title: '对局助手', eyebrow: 'Champion Helper', icon: Wand2 },
-  match: { title: '战绩卡片', eyebrow: 'Match Scout', icon: Swords },
-  spells: { title: '技能计时', eyebrow: 'Spell Timer', icon: Timer },
+  helper: { title: '对局助手', eyebrow: 'Champion Helper', hotkey: 'Shift+F5', icon: Wand2 },
+  match: { title: '战绩卡片', eyebrow: 'Match Scout', hotkey: 'Shift+Tab', icon: Swords },
+  spells: { title: '技能计时', eyebrow: 'Spell Timer', hotkey: 'Shift+F6', icon: Timer },
 };
 
 function useOverlayClose(name: AssistOverlayName) {
@@ -49,17 +59,19 @@ function useOverlayClose(name: AssistOverlayName) {
 function OverlayFrame({
   name,
   children,
+  actions,
 }: {
   name: AssistOverlayName;
   children: ReactNode;
+  actions?: ReactNode;
 }) {
   useOverlayClose(name);
   const meta = overlayMeta[name];
   const Icon = meta.icon;
 
   return (
-    <div className="h-screen overflow-hidden rounded-2xl border border-white/75 bg-gradient-to-br from-white/[0.96] via-sky-50/[0.94] to-violet-50/[0.92] text-slate-800 shadow-[0_20px_55px_rgba(71,85,105,.22)] backdrop-blur-2xl">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/70 px-3 [-webkit-app-region:drag]">
+    <div className="h-screen overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-white/[0.97] via-sky-50/[0.94] to-violet-50/[0.92] text-slate-800 shadow-[0_18px_48px_rgba(15,23,42,.18)] backdrop-blur-2xl">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200/70 bg-white/72 px-3 [-webkit-app-region:drag]">
         <div className="flex size-8 items-center justify-center rounded-xl border border-white bg-gradient-to-br from-sky-100 to-violet-100 shadow-sm">
           <Icon className="size-4 text-sky-600" />
         </div>
@@ -67,13 +79,19 @@ function OverlayFrame({
           <div className="truncate text-[10px] font-semibold tracking-[0.18em] text-slate-400 uppercase">
             {meta.eyebrow}
           </div>
-          <div className="truncate text-sm font-semibold text-slate-800">{meta.title}</div>
+          <div className="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+            <span>{meta.title}</span>
+            <kbd className="rounded-md border border-slate-200 bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+              {meta.hotkey}
+            </kbd>
+          </div>
         </div>
+        {actions}
         <GripHorizontal className="size-4 text-slate-300" />
         <button
           type="button"
           title="关闭"
-          aria-label="关闭浮窗"
+          aria-label="关闭悬浮窗"
           onClick={() => void window.lolHelper.assist.toggleOverlay(name)}
           className="flex size-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-500 [-webkit-app-region:no-drag]"
         >
@@ -87,6 +105,33 @@ function OverlayFrame({
   );
 }
 
+function HeaderIconButton({
+  title,
+  active = false,
+  onClick,
+  children,
+}: {
+  title: string;
+  active?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={`flex size-8 items-center justify-center rounded-xl transition-colors [-webkit-app-region:no-drag] ${
+        active
+          ? 'bg-sky-100 text-sky-600'
+          : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Card({
   children,
   className = '',
@@ -95,7 +140,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-white/80 bg-white/75 p-3 shadow-[0_10px_26px_rgba(71,85,105,.10)] ${className}`}>
+    <section className={`rounded-2xl border border-white/80 bg-white/76 p-3 shadow-[0_10px_26px_rgba(71,85,105,.10)] ${className}`}>
       {children}
     </section>
   );
@@ -117,13 +162,14 @@ function StatusPill({
   tone = 'neutral',
 }: {
   children: ReactNode;
-  tone?: 'neutral' | 'good' | 'danger' | 'warn';
+  tone?: 'neutral' | 'good' | 'danger' | 'warn' | 'info';
 }) {
   const colors = {
     neutral: 'border border-slate-200 bg-slate-100/80 text-slate-500',
     good: 'border border-emerald-100 bg-emerald-50 text-emerald-600',
     danger: 'border border-rose-100 bg-rose-50 text-rose-600',
     warn: 'border border-amber-100 bg-amber-50 text-amber-700',
+    info: 'border border-sky-100 bg-sky-50 text-sky-600',
   };
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${colors[tone]}`}>
@@ -181,7 +227,7 @@ function HelperOverlay() {
       <EmptyState>
         进入选人阶段并选中英雄后，这里会显示英雄资料、符文和装备推荐。
         <br />
-        这个窗口可以拖动，Esc 或右上角都能关闭。
+        窗口可以拖动，Esc 或右上角都能关闭。
       </EmptyState>
     );
   }
@@ -252,23 +298,6 @@ function HelperOverlay() {
                     <div className="text-[10px] text-slate-400">{block.title}</div>
                     <div className="mt-1 text-xs text-slate-700">{block.itemIds.join(' → ')}</div>
                   </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-
-          {guide?.spells.length ? (
-            <Card>
-              <div className="mb-2 text-xs font-semibold text-slate-500">技能信息</div>
-              <div className="space-y-1.5">
-                {guide.spells.map((spell) => (
-                  <details key={spell.key} className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-2 py-1.5">
-                    <summary className="cursor-pointer text-[11px] font-medium">
-                      {spell.key} · {spell.name}
-                      <span className="ml-2 text-slate-400">CD {spell.cooldown}</span>
-                    </summary>
-                    <p className="mt-1 text-[10px] leading-4 text-slate-500">{spell.description}</p>
-                  </details>
                 ))}
               </div>
             </Card>
@@ -369,22 +398,6 @@ function MatchOverlay() {
       tags.push({ text: `胜率 ${player.winRate}%`, tone: player.winRate >= 60 ? 'good' : undefined });
     }
     if (activeTags.includes('KDA') && player.matchCount > 0) tags.push({ text: `KDA ${player.kda.toFixed(1)}` });
-    if (activeTags.includes('连胜/连败')) {
-      const first = player.history[0]?.win;
-      let streak = 0;
-      for (const game of player.history) {
-        if (game.win !== first) break;
-        streak += 1;
-      }
-      if (streak >= 2) tags.push({ text: `${streak}连${first ? '胜' : '败'}`, tone: first ? 'good' : 'warn' });
-    }
-    if (
-      activeTags.includes('首次使用英雄') &&
-      player.history.length > 0 &&
-      !player.history.some((game) => game.championId === player.championId)
-    ) {
-      tags.push({ text: '近期首玩', tone: 'warn' });
-    }
     if (
       activeTags.includes('黑名单') &&
       normalizedBlacklist.has(normalizeRiotId(player.riotId))
@@ -456,122 +469,464 @@ function MatchOverlay() {
   );
 }
 
-const SPELL_COOLDOWNS: Array<[RegExp, number]> = [
-  [/闪现|flash/i, 300],
-  [/传送|teleport/i, 360],
-  [/点燃|ignite|dot/i, 180],
-  [/治疗|heal/i, 240],
-  [/屏障|barrier/i, 180],
-  [/虚弱|exhaust/i, 240],
-  [/净化|cleanse|boost/i, 210],
-  [/疾跑|ghost|haste/i, 210],
-  [/惩戒|smite/i, 90],
-];
+type TimerState = {
+  endsAt: number;
+  cooldown: number;
+  paused: boolean;
+  pausedRemaining: number;
+};
 
-function spellCooldown(name: string): number {
-  return SPELL_COOLDOWNS.find(([pattern]) => pattern.test(name))?.[1] ?? 180;
+type PlayerAdjustments = {
+  boots?: boolean;
+  cosmic?: boolean;
+};
+
+function formatGameTime(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function adjustedCooldown(baseCooldown: number, withBoots: boolean, withCosmic: boolean): number {
+  const haste = (withBoots ? 10 : 0) + (withCosmic ? 18 : 0);
+  if (haste <= 0) return Math.max(1, Math.round(baseCooldown));
+  return Math.max(1, Math.round(baseCooldown * (100 / (100 + haste))));
+}
+
+function spellKey(player: AssistLivePlayer, slot: number): string {
+  return `${player.riotId}:${player.championName}:${slot}`;
+}
+
+function playerKey(player: AssistLivePlayer): string {
+  return `${player.riotId}:${player.championName}`;
+}
+
+function timerRemaining(timer: TimerState | undefined, gameTime: number): number {
+  if (!timer) return 0;
+  if (timer.paused) return timer.pausedRemaining;
+  return Math.max(0, Math.ceil(timer.endsAt - gameTime));
+}
+
+function SpellButton({
+  spell,
+  timer,
+  gameTime,
+  withBoots,
+  withCosmic,
+  onStart,
+  onTogglePause,
+  onReset,
+}: {
+  spell: AssistLiveSpell | null;
+  timer?: TimerState;
+  gameTime: number;
+  withBoots: boolean;
+  withCosmic: boolean;
+  onStart: () => void;
+  onTogglePause: () => void;
+  onReset: () => void;
+}) {
+  const remaining = timerRemaining(timer, gameTime);
+  const running = Boolean(timer && remaining > 0);
+  const cooldown = spell
+    ? adjustedCooldown(spell.cooldown, withBoots, withCosmic)
+    : 0;
+
+  if (!spell) {
+    return (
+      <div className="flex size-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-100/80 text-xs text-slate-300">
+        -
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={running ? '点击暂停/继续，双击或右键清除' : `点击开始 ${cooldown} 秒计时`}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (running) onTogglePause();
+        else onStart();
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onReset();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onReset();
+      }}
+      className={`relative size-12 overflow-hidden rounded-xl border shadow-sm transition-transform hover:scale-[1.03] ${
+        running
+          ? 'border-rose-200 bg-rose-50'
+          : 'border-white bg-white/90'
+      }`}
+    >
+      {spell.icon ? (
+        <img
+          src={spell.icon}
+          alt={spell.name}
+          className={`size-full object-cover ${running ? 'opacity-95' : 'opacity-55 grayscale-[.15]'}`}
+        />
+      ) : (
+        <span className="flex size-full items-center justify-center text-[11px] font-semibold text-slate-500">
+          {spell.name.slice(0, 2)}
+        </span>
+      )}
+      {running ? (
+        <span className="absolute inset-0 grid place-items-center bg-slate-900/44 text-base font-black text-white">
+          {remaining}
+        </span>
+      ) : (
+        <span className="absolute bottom-0 left-0 right-0 bg-white/82 py-0.5 text-[9px] font-semibold text-slate-500">
+          {cooldown}s
+        </span>
+      )}
+      {timer?.paused && (
+        <span className="absolute right-0.5 top-0.5 rounded-full bg-amber-400 p-0.5 text-white">
+          <Pause className="size-2.5" />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function LivePlayerCard({
+  player,
+  data,
+  timers,
+  adjustments,
+  onStart,
+  onTogglePause,
+  onReset,
+  onToggleAdjustment,
+}: {
+  player: AssistLivePlayer;
+  data: AssistLiveData;
+  timers: Record<string, TimerState>;
+  adjustments: PlayerAdjustments;
+  onStart: (key: string, cooldown: number) => void;
+  onTogglePause: (key: string) => void;
+  onReset: (key: string) => void;
+  onToggleAdjustment: (field: keyof PlayerAdjustments, value: boolean) => void;
+}) {
+  const baseHasBoots = player.items.includes(3158);
+  const withBoots = adjustments.boots ?? baseHasBoots;
+  const withCosmic = adjustments.cosmic ?? false;
+  const spells = [player.spellOne, player.spellTwo];
+  const activeTimers = spells
+    .map((_, index) => timers[spellKey(player, index)])
+    .filter(Boolean);
+  const nextReady = activeTimers
+    .map((timer) => timer.paused
+      ? data.gameTime + timer.pausedRemaining
+      : timer.endsAt)
+    .sort((a, b) => a - b)[0];
+
+  return (
+    <Card className="p-2.5">
+      <div className="flex items-center gap-2">
+        <div className="relative size-10 shrink-0 overflow-hidden rounded-xl border border-white bg-slate-100 shadow-sm">
+          {player.championIcon ? (
+            <img src={player.championIcon} alt={player.championName} className="size-full object-cover" />
+          ) : (
+            <div className="grid size-full place-items-center text-xs text-slate-400">?</div>
+          )}
+          <span className="absolute bottom-0 right-0 rounded-tl-md bg-white/90 px-1 text-[9px] font-bold text-slate-500">
+            {player.level || '-'}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <div className="truncate text-xs font-semibold text-slate-800">{player.riotId}</div>
+            {player.isEnemy ? <StatusPill tone="danger">敌方</StatusPill> : null}
+          </div>
+          <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+            <span className="truncate">{player.championName}</span>
+            <span>{player.kills}/{player.deaths}/{player.assists}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex gap-1.5">
+          {spells.map((spell, index) => {
+            const key = spellKey(player, index);
+            const timer = timers[key];
+            const cooldown = spell
+              ? adjustedCooldown(spell.cooldown, withBoots, withCosmic)
+              : 0;
+            return (
+              <SpellButton
+                key={key}
+                spell={spell}
+                timer={timer}
+                gameTime={data.gameTime}
+                withBoots={withBoots}
+                withCosmic={withCosmic}
+                onStart={() => spell && onStart(key, cooldown)}
+                onTogglePause={() => onTogglePause(key)}
+                onReset={() => onReset(key)}
+              />
+            );
+          })}
+        </div>
+        <div className="ml-auto flex flex-col gap-1">
+          <button
+            type="button"
+            title="明朗之靴：召唤师技能急速 +10"
+            onClick={() => onToggleAdjustment('boots', !withBoots)}
+            className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors ${
+              withBoots
+                ? 'border-sky-200 bg-sky-50 text-sky-600'
+                : 'border-slate-200 bg-white/70 text-slate-400'
+            }`}
+          >
+            CD鞋
+          </button>
+          <button
+            type="button"
+            title="星界洞悉：召唤师技能急速 +18"
+            onClick={() => onToggleAdjustment('cosmic', !withCosmic)}
+            className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors ${
+              withCosmic
+                ? 'border-violet-200 bg-violet-50 text-violet-600'
+                : 'border-slate-200 bg-white/70 text-slate-400'
+            }`}
+          >
+            洞悉
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+        <span>{nextReady ? `最近转好 ${formatGameTime(nextReady)}` : '点技能图标开始计时'}</span>
+        <span>{withBoots || withCosmic ? '已按急速修正' : '基础冷却'}</span>
+      </div>
+    </Card>
+  );
 }
 
 function LiveClientOverlay() {
   const [data, setData] = useState<AssistLiveData | null>(null);
-  const [timers, setTimers] = useState<Record<string, number>>({});
-  const [now, setNow] = useState(Date.now());
+  const [timers, setTimers] = useState<Record<string, TimerState>>({});
+  const [adjustments, setAdjustments] = useState<Record<string, PlayerAdjustments>>({});
+  const [message, setMessage] = useState('');
+  const [pinned, setPinned] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const value = await window.lolHelper.assist.getLiveData();
+      setData(value);
+      setMessage(value.active ? '' : value.error || '等待对局中');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     let stopped = false;
-    const refresh = () => {
-      void window.lolHelper.assist.getLiveData().then((value) => {
-        if (!stopped) setData(value);
-      });
+    const safeRefresh = async () => {
+      const value = await window.lolHelper.assist.getLiveData();
+      if (!stopped) {
+        setData(value);
+        if (!value.active) setMessage(value.error || '等待对局中');
+      }
     };
-    refresh();
-    const timer = window.setInterval(refresh, 1000);
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    void safeRefresh();
+    const timer = window.setInterval(() => void safeRefresh(), 1000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
-      window.clearInterval(clock);
     };
   }, []);
 
-  if (!data?.active) {
-    return (
-      <EmptyState>
-        游戏进程启动后读取 2999 实时数据。
-        <br />
-        {data?.error || '等待对局中'}
-      </EmptyState>
-    );
-  }
+  useEffect(() => {
+    if (!data?.active) return;
+    setTimers((current) => Object.fromEntries(
+      Object.entries(current).filter(([, timer]) =>
+        timer.paused || timer.endsAt - data.gameTime > -3),
+    ));
+  }, [data?.active, data?.gameTime]);
 
-  const startTimer = (key: string, spellName: string) => {
+  const enemyPlayers = useMemo(
+    () => data?.players.filter((player) => player.isEnemy) ?? [],
+    [data?.players],
+  );
+  const displayPlayers = enemyPlayers.length > 0 ? enemyPlayers : data?.players ?? [];
+
+  const startTimer = (key: string, cooldown: number) => {
+    if (!data) return;
     setTimers((current) => ({
       ...current,
-      [key]: Date.now() + spellCooldown(spellName) * 1000,
+      [key]: {
+        endsAt: data.gameTime + cooldown,
+        cooldown,
+        paused: false,
+        pausedRemaining: cooldown,
+      },
     }));
   };
 
-  const remaining = (key: string) =>
-    Math.max(0, Math.ceil(((timers[key] ?? 0) - now) / 1000));
+  const togglePause = (key: string) => {
+    if (!data) return;
+    setTimers((current) => {
+      const timer = current[key];
+      if (!timer) return current;
+      const remaining = timerRemaining(timer, data.gameTime);
+      return {
+        ...current,
+        [key]: timer.paused
+          ? {
+            ...timer,
+            endsAt: data.gameTime + timer.pausedRemaining,
+            paused: false,
+          }
+          : {
+            ...timer,
+            paused: true,
+            pausedRemaining: remaining,
+          },
+      };
+    });
+  };
+
+  const resetTimer = (key: string) => {
+    setTimers((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const resetAll = () => {
+    setTimers({});
+  };
+
+  const togglePinned = () => {
+    const next = !pinned;
+    setPinned(next);
+    void window.lolHelper.assist.setOverlayPinned('spells', next);
+  };
+
+  const actions = (
+    <>
+      <HeaderIconButton title="刷新数据" onClick={() => void refresh()}>
+        <RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+      </HeaderIconButton>
+      <HeaderIconButton title={pinned ? '取消置顶' : '置顶'} active={pinned} onClick={togglePinned}>
+        <Pin className={`size-4 ${pinned ? '-rotate-45' : ''}`} />
+      </HeaderIconButton>
+    </>
+  );
+
+  if (!data?.active) {
+    return (
+      <OverlayFrame name="spells" actions={actions}>
+        <EmptyState>
+          游戏载入后会读取 2999 实时数据。
+          <br />
+          {message || '等待对局中…'}
+        </EmptyState>
+      </OverlayFrame>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      <Card>
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>{data.gameMode || '实时对局'}</span>
-          <span>
-            {Math.floor(data.gameTime / 60)}
-            :
-            {String(Math.floor(data.gameTime % 60)).padStart(2, '0')}
-          </span>
+    <OverlayFrame name="spells" actions={actions}>
+      <div className="space-y-3">
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400 uppercase">
+                Live Game
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Clock3 className="size-4 text-sky-500" />
+                {formatGameTime(data.gameTime)}
+              </div>
+            </div>
+            <div className="text-right">
+              <StatusPill tone={enemyPlayers.length ? 'danger' : 'info'}>
+                {enemyPlayers.length ? `敌方 ${enemyPlayers.length} 人` : '显示全部玩家'}
+              </StatusPill>
+              <div className="mt-1 text-[10px] text-slate-400">{data.gameMode || '实时对局'}</div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-slate-500">
+            <div className="flex items-center gap-1 rounded-xl bg-slate-50/80 px-2 py-1.5">
+              <MousePointerClick className="size-3.5 text-sky-500" />
+              单击计时
+            </div>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-50/80 px-2 py-1.5">
+              <Pause className="size-3.5 text-amber-500" />
+              再点暂停
+            </div>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-50/80 px-2 py-1.5">
+              <RotateCcw className="size-3.5 text-rose-500" />
+              右键清除
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-2">
+          {displayPlayers.map((player) => (
+            <LivePlayerCard
+              key={playerKey(player)}
+              player={player}
+              data={data}
+              timers={timers}
+              adjustments={adjustments[playerKey(player)] ?? {}}
+              onStart={startTimer}
+              onTogglePause={togglePause}
+              onReset={resetTimer}
+              onToggleAdjustment={(field, value) => {
+                setAdjustments((current) => ({
+                  ...current,
+                  [playerKey(player)]: {
+                    ...(current[playerKey(player)] ?? {}),
+                    [field]: value,
+                  },
+                }));
+              }}
+            />
+          ))}
         </div>
-      </Card>
-      <div className="space-y-2">
-        {data.players.map((player) => (
-          <Card key={`${player.riotId}-${player.championName}`} className="p-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="min-w-0 flex-1 truncate font-semibold">{player.riotId}</span>
-              <StatusPill>Lv.{player.level}</StatusPill>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-              <span>{player.championName}</span>
-              <span>{player.kills}/{player.deaths}/{player.assists}</span>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
-              {[player.spellOne, player.spellTwo].map((spell, index) => {
-                const key = `${player.riotId}:${index}`;
-                const seconds = remaining(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={!spell}
-                    onClick={() => startTimer(key, spell)}
-                    className={`rounded-xl px-2 py-1.5 text-[10px] font-medium transition-colors ${
-                      seconds > 0
-                        ? 'border border-rose-100 bg-rose-50 text-rose-600'
-                        : 'border border-slate-200 bg-white/80 text-slate-600 hover:bg-sky-50 hover:text-sky-700'
-                    } disabled:opacity-40`}
-                    title="点击开始计时，再次点击可重置"
-                  >
-                    {spell || '-'} {seconds > 0 ? `${seconds}s` : ''}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={resetAll}
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-500"
+          >
+            <RotateCcw className="size-3.5" />
+            清空计时
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-sky-500 to-violet-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            <CheckCircle2 className="size-3.5" />
+            刷新数据
+          </button>
+        </div>
       </div>
-    </div>
+    </OverlayFrame>
   );
 }
 
 export function AssistOverlayApp({ name }: { name: AssistOverlayName }) {
+  if (name === 'spells') return <LiveClientOverlay />;
+
   return (
     <OverlayFrame name={name}>
       {name === 'helper' && <HelperOverlay />}
       {name === 'match' && <MatchOverlay />}
-      {name === 'spells' && <LiveClientOverlay />}
     </OverlayFrame>
   );
 }

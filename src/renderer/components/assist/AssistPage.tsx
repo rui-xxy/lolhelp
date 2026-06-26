@@ -370,6 +370,7 @@ export function AssistPage({
           {activeSection === 'match' && (
             <MatchSection
               assist={assist}
+              updateAssist={updateAssist}
               updateBoolean={updateBoolean}
               toggleOverlay={toggleOverlay}
             />

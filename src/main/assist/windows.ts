@@ -97,6 +97,17 @@ export async function showAssistOverlay(name: AssistOverlayName): Promise<void> 
   if (!win.isVisible()) win.showInactive();
 }
 
+export async function setAssistOverlayPinned(
+  name: AssistOverlayName,
+  pinned: boolean,
+): Promise<boolean> {
+  let win = windows.get(name);
+  if (!win || win.isDestroyed()) win = createOverlay(name);
+  if (pinned) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+  return pinned;
+}
+
 export function hideAssistOverlay(name: AssistOverlayName): void {
   const win = windows.get(name);
   if (win && !win.isDestroyed() && win.isVisible()) win.hide();
@@ -132,6 +143,15 @@ export function syncAssistGlobalShortcuts(
         mainWindow.show();
         mainWindow.focus();
       }
+    }],
+    [hotkeys.matchOverlay, () => {
+      void toggleAssistOverlay('match');
+    }],
+    [hotkeys.matchHelper, () => {
+      void toggleAssistOverlay('helper');
+    }],
+    [hotkeys.spellOverlay, () => {
+      void toggleAssistOverlay('spells');
     }],
   ];
 

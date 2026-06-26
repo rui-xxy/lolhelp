@@ -72,6 +72,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_APPLY_ACCOUNT_SETTINGS),
     toggleOverlay: (name: AssistOverlayName) =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY, name),
+    setOverlayPinned: (name: AssistOverlayName, pinned: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_SET_OVERLAY_PINNED, name, pinned),
     getLiveData: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_LIVE_DATA),
     exportBlacklist: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_EXPORT_BLACKLIST),
   },
