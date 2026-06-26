@@ -69,6 +69,9 @@ const sections: Array<{
   { key: 'blacklist', label: '黑名单', icon: ShieldAlert },
 ];
 
+const hiddenSections = new Set<SectionKey>(['match', 'alerts', 'personal']);
+const visibleSections = sections.filter((section) => !hiddenSections.has(section.key));
+
 const emptySettings: AppSettings = {
   favoriteChampions: [],
   championPresets: [],
@@ -81,7 +84,7 @@ export function AssistPage({
 }: {
   onPlayerSearch?: (riotId: string, region?: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<SectionKey>('match');
+  const [activeSection, setActiveSection] = useState<SectionKey>('automation');
   const [settings, setSettings] = useState<AppSettings>(emptySettings);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,7 +327,7 @@ export function AssistPage({
           <div className="mt-1 text-[11px] text-app-muted">{saveState}</div>
         </div>
         <nav className="space-y-1">
-          {sections.map((section) => {
+          {visibleSections.map((section) => {
             const Icon = section.icon;
             return (
               <button
