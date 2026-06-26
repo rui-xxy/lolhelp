@@ -2192,7 +2192,7 @@
   }
 
   .lol-score-grid {
-    grid-template-columns: minmax(184px, 1.35fr) 136px minmax(178px, 1.15fr) 82px 72px;
+    grid-template-columns: minmax(184px, 1.35fr) 130px minmax(178px, 1.15fr) 82px 72px;
     gap: 10px;
   }
 
@@ -2239,18 +2239,18 @@
   }
 
   .lol-score-enhancement {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
   .lol-score-enhancement-glyph {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
 
   .lol-score-enhancement--rune img {
-    width: 28px !important;
-    height: 28px !important;
+    width: 26px !important;
+    height: 26px !important;
   }
 
   .lol-score-items {
