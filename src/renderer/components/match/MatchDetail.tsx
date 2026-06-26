@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { GameIcon } from './GameIcon';
 import type {
   MatchParticipantStats,
@@ -199,6 +199,29 @@ function enhancementClass(enhancement: PlayerRuneSummary): string {
   return `lol-score-enhancement--augment lol-score-enhancement--${rarity}`;
 }
 
+function renderEnhancementIcon(enhancement: PlayerRuneSummary): ReactNode {
+  if (enhancement.kind === 'augment' && enhancement.icon) {
+    return (
+      <span
+        className="lol-score-enhancement-glyph"
+        style={{
+          WebkitMaskImage: `url("${enhancement.icon}")`,
+          maskImage: `url("${enhancement.icon}")`,
+        }}
+      />
+    );
+  }
+
+  return (
+    <GameIcon
+      src={enhancement.icon}
+      alt={enhancement.name}
+      title={enhancement.name}
+      size={18}
+    />
+  );
+}
+
 function teamTotals(players: MatchParticipantSummary[]) {
   return players.reduce(
     (acc, player) => {
@@ -369,6 +392,7 @@ function ScoreboardRow({
 }) {
   const slots = itemSlots(participant);
   const enhancements = visibleEnhancements(participant);
+  const enhancementSlots = Array.from({ length: 4 }, (_, index) => enhancements[index]);
   const name = playerName(participant);
 
   return (
@@ -406,24 +430,18 @@ function ScoreboardRow({
         </div>
       </div>
       <div className="lol-score-runes">
-        {enhancements.length > 0 ? (
-          enhancements.map((enhancement) => (
+        {enhancementSlots.map((enhancement, index) =>
+          enhancement ? (
             <span
               key={`${participant.puuid}-${enhancement.id}`}
               className={`lol-score-enhancement ${enhancementClass(enhancement)}`}
               title={enhancement.name}
             >
-              <GameIcon
-                src={enhancement.icon}
-                alt={enhancement.name}
-                title={enhancement.name}
-                size={enhancement.kind === 'augment' ? 14 : 18}
-                rounded
-              />
+              {renderEnhancementIcon(enhancement)}
             </span>
-          ))
-        ) : (
-          <span className="lol-score-empty">—</span>
+          ) : (
+            <span key={`${participant.puuid}-empty-enhancement-${index}`} className="lol-score-enhancement lol-score-enhancement--empty" />
+          ),
         )}
       </div>
       <div className="lol-score-items">

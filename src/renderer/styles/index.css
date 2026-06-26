@@ -2073,50 +2073,110 @@
 
   .lol-score-enhancement {
     display: inline-flex;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+    border: 1px solid rgba(84, 90, 96, 0.9);
+    border-radius: 0;
+    background: #15191e;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
   }
 
   .lol-score-enhancement--augment {
-    border-radius: 999px;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.34),
-      rgba(0, 0, 0, 0.16) 0 1px 2px;
+    border-color: rgba(92, 73, 126, 0.85);
+    background:
+      radial-gradient(circle at 50% 45%, rgba(70, 50, 96, 0.78), rgba(12, 14, 18, 0.96) 72%),
+      #11151a;
   }
 
-  .lol-score-enhancement--augment img {
+  .lol-score-enhancement--rune img {
+    width: 18px !important;
+    height: 18px !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .lol-score-enhancement-glyph {
+    display: block;
+    width: 15px;
+    height: 15px;
+    background: #c48bff;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
     filter:
-      drop-shadow(0 1px 0 rgba(0, 0, 0, 0.2))
-      drop-shadow(0 0 3px rgba(255, 255, 255, 0.38));
+      drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45))
+      drop-shadow(0 0 2px currentColor);
   }
 
   .lol-score-enhancement--kgold {
+    border-color: rgba(177, 137, 58, 0.92);
     background:
-      radial-gradient(circle at 35% 25%, #fff4bb 0%, #d8a329 42%, #7d4b00 100%);
+      radial-gradient(circle at 50% 45%, rgba(102, 79, 31, 0.82), rgba(16, 14, 11, 0.96) 72%),
+      #15130d;
+  }
+
+  .lol-score-enhancement--kgold .lol-score-enhancement-glyph {
+    background: #d8aa43;
   }
 
   .lol-score-enhancement--kprismatic {
+    border-color: rgba(165, 94, 255, 0.9);
     background:
-      radial-gradient(circle at 30% 20%, #f5eeff 0%, #b36cff 34%, #3c7bff 70%, #25215f 100%);
+      radial-gradient(circle at 36% 28%, rgba(129, 68, 218, 0.86), transparent 36%),
+      radial-gradient(circle at 68% 72%, rgba(57, 113, 231, 0.7), transparent 42%),
+      #121320;
+  }
+
+  .lol-score-enhancement--kprismatic .lol-score-enhancement-glyph {
+    background: #b985ff;
   }
 
   .lol-score-enhancement--ksilver {
+    border-color: rgba(153, 163, 177, 0.92);
     background:
-      radial-gradient(circle at 35% 22%, #ffffff 0%, #cfd5de 46%, #6b7280 100%);
+      radial-gradient(circle at 50% 45%, rgba(92, 101, 115, 0.8), rgba(13, 15, 19, 0.96) 72%),
+      #11151a;
+  }
+
+  .lol-score-enhancement--ksilver .lol-score-enhancement-glyph {
+    background: #cfd5df;
   }
 
   .lol-score-enhancement--kbronze {
+    border-color: rgba(150, 92, 44, 0.9);
     background:
-      radial-gradient(circle at 35% 22%, #ffd9a4 0%, #b46d2a 45%, #63310e 100%);
+      radial-gradient(circle at 50% 45%, rgba(102, 56, 28, 0.82), rgba(17, 12, 9, 0.96) 72%),
+      #15110d;
+  }
+
+  .lol-score-enhancement--kbronze .lol-score-enhancement-glyph {
+    background: #ba7a3d;
   }
 
   .lol-score-enhancement--keventchoice,
   .lol-score-enhancement--unknown {
+    border-color: rgba(82, 149, 160, 0.9);
     background:
-      radial-gradient(circle at 35% 22%, #eaffff 0%, #45d3d8 42%, #186175 100%);
+      radial-gradient(circle at 50% 45%, rgba(37, 101, 115, 0.82), rgba(10, 16, 19, 0.96) 72%),
+      #10171a;
+  }
+
+  .lol-score-enhancement--keventchoice .lol-score-enhancement-glyph,
+  .lol-score-enhancement--unknown .lol-score-enhancement-glyph {
+    background: #65d5e3;
+  }
+
+  .lol-score-enhancement--empty {
+    border-color: rgba(170, 170, 170, 0.46);
+    background: rgba(0, 0, 0, 0.04);
+    box-shadow: none;
   }
 }
 
