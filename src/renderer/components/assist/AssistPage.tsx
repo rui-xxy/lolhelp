@@ -14,6 +14,7 @@ import type {
   AppSettings,
   AssistBlacklistEntry,
   AssistOperationResult,
+  AssistOverlayName,
   AssistProfileIcon,
   AssistRole,
   AssistSettings,
@@ -230,6 +231,15 @@ export function AssistPage({
     }
   };
 
+  const toggleOverlay = async (name: AssistOverlayName) => {
+    try {
+      const visible = await window.lolHelper.assist.toggleOverlay(name);
+      setOperationState(`${visible ? '已打开' : '已关闭'}${name === 'helper' ? '对局助手' : name === 'match' ? '战绩卡片' : '技能计时'}`);
+    } catch (error) {
+      setOperationState(`浮窗操作失败：${String(error)}`);
+    }
+  };
+
   const addBlacklistEntry = () => {
     const riotId = blacklistDraft.riotId.trim();
     if (!riotId) {
@@ -361,6 +371,7 @@ export function AssistPage({
             <MatchSection
               assist={assist}
               updateBoolean={updateBoolean}
+              toggleOverlay={toggleOverlay}
             />
           )}
           {activeSection === 'automation' && (

@@ -70,7 +70,7 @@ export function PersonalSection({
 
       <SettingCard
         title="主窗口快捷键"
-        description="格式示例：CTRL+ALT+Y。游戏内悬浮窗快捷键已撤下。"
+        description="格式示例：CTRL+ALT+Y。游戏内浮窗先用对局设置里的按钮手动打开。"
       >
         {([
           ['mainWindow', '主窗口'],

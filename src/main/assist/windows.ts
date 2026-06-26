@@ -10,9 +10,9 @@ interface OverlayEnvironment {
 }
 
 const dimensions: Record<AssistOverlayName, { width: number; height: number }> = {
-  helper: { width: 380, height: 720 },
-  match: { width: 920, height: 640 },
-  spells: { width: 420, height: 560 },
+  helper: { width: 420, height: 620 },
+  match: { width: 760, height: 540 },
+  spells: { width: 360, height: 520 },
 };
 
 const windows = new Map<AssistOverlayName, BrowserWindow>();
@@ -56,6 +56,8 @@ function createOverlay(name: AssistOverlayName): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
+    movable: true,
+    minimizable: false,
     show: false,
     webPreferences: {
       preload: environment.preloadPath,

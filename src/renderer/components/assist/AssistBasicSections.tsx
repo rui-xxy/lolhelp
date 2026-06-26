@@ -1,5 +1,9 @@
-import type { AssistSettings } from '../../../shared/api';
+import type {
+  AssistOverlayName,
+  AssistSettings,
+} from '../../../shared/api';
 import {
+  ActionButton,
   SettingCard,
   TextInput,
   ToggleRow,
@@ -11,18 +15,56 @@ type UpdateBoolean = (key: keyof AssistSettings, value: boolean) => void;
 export function MatchSection({
   assist,
   updateBoolean,
+  toggleOverlay,
 }: {
   assist: AssistSettings;
   updateBoolean: UpdateBoolean;
+  toggleOverlay: (name: AssistOverlayName) => Promise<void>;
 }) {
   return (
     <SettingCard
-      title="对局设置"
-      description="游戏内悬浮窗已撤下，避免挡住客户端或残留在屏幕上。"
+      title="游戏内工具卡片"
+      description="新版浮窗默认不自动弹出。需要时手动打开，标题栏可拖动，右上角可关闭。"
     >
+      <div className="grid gap-3 md:grid-cols-3">
+        {([
+          {
+            name: 'helper',
+            title: '对局助手',
+            description: '选人阶段查看当前英雄、推荐符文和出装。',
+          },
+          {
+            name: 'match',
+            title: '战绩卡片',
+            description: '查看双方近期胜率、KDA、黑名单等标签。',
+          },
+          {
+            name: 'spells',
+            title: '技能计时',
+            description: '游戏中读取 2999 实时数据，手动点击开始冷却计时。',
+          },
+        ] as Array<{
+          name: AssistOverlayName;
+          title: string;
+          description: string;
+        }>).map((item) => (
+          <div
+            key={item.name}
+            className="rounded-sm border border-app-border bg-app-bg-soft p-3"
+          >
+            <div className="text-sm font-semibold text-app-text">{item.title}</div>
+            <p className="mt-1 min-h-10 text-xs leading-5 text-app-muted">
+              {item.description}
+            </p>
+            <ActionButton onClick={() => void toggleOverlay(item.name)}>
+              打开 / 关闭
+            </ActionButton>
+          </div>
+        ))}
+      </div>
       <ToggleRow
         label="开启主窗口快捷键"
-        description="只用于呼出或隐藏主窗口，不再打开游戏内悬浮窗。"
+        description="只用于呼出或隐藏主窗口；浮窗先用上面的按钮打开。"
         checked={assist.globalHotkeysEnabled}
         onChange={(value) => updateBoolean('globalHotkeysEnabled', value)}
       />
