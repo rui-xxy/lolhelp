@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/api';
 import type { RecurringMate } from './MatchList';
 
-type DetailTab = 'scoreboard' | 'overview' | 'stats' | 'charts' | 'runes';
+type DetailTab = 'scoreboard' | 'stats' | 'charts';
 
 interface MatchDetailProps {
   match: PlayerMatchDetail;
@@ -37,10 +37,8 @@ interface StatsGroup {
 
 const DETAIL_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'scoreboard', label: '计分板' },
-  { key: 'overview', label: '总览' },
   { key: 'stats', label: '统计' },
   { key: 'charts', label: '图表' },
-  { key: 'runes', label: '符文' },
 ];
 
 const CHART_METRICS: ChartMetric[] = [
@@ -137,6 +135,16 @@ const POSITION_LABELS: Record<string, string> = {
   SUPPORT: '辅助',
 };
 
+const POSITION_ORDER: Record<string, number> = {
+  TOP: 0,
+  JUNGLE: 1,
+  MIDDLE: 2,
+  MID: 2,
+  BOTTOM: 3,
+  UTILITY: 4,
+  SUPPORT: 4,
+};
+
 function stat(participant: MatchParticipantSummary, key: keyof MatchParticipantStats): number {
   const value = participant.stats?.[key] ?? 0;
   return Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -168,13 +176,19 @@ function positionLabel(position: string): string {
   return (POSITION_LABELS[position.toUpperCase()] ?? position) || '—';
 }
 
+function positionOrder(participant: MatchParticipantSummary): number {
+  return POSITION_ORDER[participant.teamPosition.toUpperCase()] ?? 99;
+}
+
 function itemSlots(participant: MatchParticipantSummary): Array<MatchParticipantSummary['items'][number] | undefined> {
   return Array.from({ length: 7 }, (_, slot) => participant.items.find((item) => item.slot === slot));
 }
 
-function visibleRunes(participant: MatchParticipantSummary, limit = 4): PlayerRuneSummary[] {
-  const runes = participant.runes?.length
-    ? participant.runes
+function visibleEnhancements(participant: MatchParticipantSummary, limit = 4): PlayerRuneSummary[] {
+  const runes = participant.augments?.length
+    ? participant.augments
+    : participant.runes?.length
+      ? participant.runes
     : [participant.primaryRune, participant.secondaryRune].filter((rune): rune is PlayerRuneSummary => Boolean(rune));
   return runes.slice(0, limit);
 }
@@ -195,22 +209,19 @@ function teamTotals(players: MatchParticipantSummary[]) {
   );
 }
 
-function maxBy(
-  players: MatchParticipantSummary[],
-  getter: (participant: MatchParticipantSummary) => number,
-): MatchParticipantSummary | null {
-  return players.reduce<MatchParticipantSummary | null>((best, player) => {
-    if (!best) return player;
-    return getter(player) > getter(best) ? player : best;
-  }, null);
-}
-
 export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('scoreboard');
   const [chartMetricKey, setChartMetricKey] = useState(CHART_METRICS[0].key);
 
   const participants = useMemo(
-    () => [...match.participants].sort((a, b) => a.teamId - b.teamId || b.kills - a.kills),
+    () => match.participants
+      .map((participant, index) => ({ participant, index }))
+      .sort((a, b) =>
+        a.participant.teamId - b.participant.teamId ||
+        positionOrder(a.participant) - positionOrder(b.participant) ||
+        a.index - b.index,
+      )
+      .map(({ participant }) => participant),
     [match.participants],
   );
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
@@ -247,7 +258,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
             onPlayerSearch={onPlayerSearch}
           />
         )}
-        {activeTab === 'overview' && <OverviewTab participants={participants} targetPuuid={targetPuuid} />}
         {activeTab === 'stats' && <StatsTab participants={participants} targetPuuid={targetPuuid} />}
         {activeTab === 'charts' && (
           <ChartsTab
@@ -256,13 +266,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
             selectedMetric={selectedChartMetric}
             selectedMetricKey={chartMetricKey}
             onSelectMetric={setChartMetricKey}
-          />
-        )}
-        {activeTab === 'runes' && (
-          <RunesTab
-            participants={participants}
-            targetPuuid={targetPuuid}
-            onPlayerSearch={onPlayerSearch}
           />
         )}
       </div>
@@ -359,7 +362,7 @@ function ScoreboardRow({
   onPlayerSearch?: (riotId: string) => void;
 }) {
   const slots = itemSlots(participant);
-  const runes = visibleRunes(participant);
+  const enhancements = visibleEnhancements(participant);
   const name = playerName(participant);
 
   return (
@@ -397,8 +400,8 @@ function ScoreboardRow({
         </div>
       </div>
       <div className="lol-score-runes">
-        {runes.length > 0 ? (
-          runes.map((rune) => (
+        {enhancements.length > 0 ? (
+          enhancements.map((rune) => (
             <GameIcon key={`${participant.puuid}-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={18} rounded />
           ))
         ) : (
@@ -422,96 +425,11 @@ function ScoreboardRow({
       </div>
       <div className="lol-score-kda">
         <strong>{`${participant.kills} / ${participant.deaths} / ${participant.assists}`}</strong>
-        <span>{participant.kda.toFixed(2)} KDA</span>
       </div>
       <span className="lol-score-number">{formatCompact(participant.gold)}</span>
       <span className="lol-score-number">{formatCompact(participant.damage)}</span>
       <span className="lol-score-number">{participant.cs}</span>
     </div>
-  );
-}
-
-function OverviewTab({
-  participants,
-  targetPuuid,
-}: {
-  participants: MatchParticipantSummary[];
-  targetPuuid: string;
-}) {
-  const blue = participants.filter((player) => player.teamId === 100);
-  const red = participants.filter((player) => player.teamId === 200);
-  const leaders = [
-    { label: '最高伤害', player: maxBy(participants, (p) => p.damage), value: (p: MatchParticipantSummary) => formatInteger(p.damage) },
-    { label: '最高经济', player: maxBy(participants, (p) => p.gold), value: (p: MatchParticipantSummary) => formatInteger(p.gold) },
-    { label: '最高视野', player: maxBy(participants, (p) => stat(p, 'visionScore')), value: (p: MatchParticipantSummary) => formatInteger(stat(p, 'visionScore')) },
-    { label: '最佳 KDA', player: maxBy(participants, (p) => p.kda), value: (p: MatchParticipantSummary) => p.kda.toFixed(2) },
-  ];
-
-  return (
-    <div className="lol-overview">
-      <div className="lol-overview-teams">
-        <TeamOverviewCard teamId={100} players={blue} />
-        <TeamOverviewCard teamId={200} players={red} />
-      </div>
-      <div className="lol-overview-leaders">
-        {leaders.map((leader) =>
-          leader.player ? (
-            <div
-              key={leader.label}
-              className={`lol-overview-card ${leader.player.puuid === targetPuuid ? 'lol-overview-card--target' : ''}`}
-            >
-              <span>{leader.label}</span>
-              <div>
-                <GameIcon
-                  src={leader.player.championAvatar}
-                  alt={leader.player.championName}
-                  title={leader.player.championName}
-                  size={34}
-                  rounded
-                />
-                <div className="min-w-0">
-                  <strong>{playerName(leader.player)}</strong>
-                  <small>{leader.value(leader.player)}</small>
-                </div>
-              </div>
-            </div>
-          ) : null,
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TeamOverviewCard({ teamId, players }: { teamId: number; players: MatchParticipantSummary[] }) {
-  const totals = teamTotals(players);
-  const tone = teamTone(teamId);
-  const won = players[0]?.win ?? false;
-
-  return (
-    <section className={`lol-overview-team lol-overview-team--${tone}`}>
-      <div className="lol-overview-team-head">
-        <span>{teamLabel(teamId)}</span>
-        <strong>{won ? '胜利' : '失败'}</strong>
-      </div>
-      <div className="lol-overview-team-grid">
-        <div>
-          <span>K / D / A</span>
-          <strong>{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</strong>
-        </div>
-        <div>
-          <span>总经济</span>
-          <strong>{formatInteger(totals.gold)}</strong>
-        </div>
-        <div>
-          <span>总伤害</span>
-          <strong>{formatInteger(totals.damage)}</strong>
-        </div>
-        <div>
-          <span>总补刀</span>
-          <strong>{formatInteger(totals.cs)}</strong>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -621,62 +539,6 @@ function ChartsTab({
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function RunesTab({
-  participants,
-  targetPuuid,
-  onPlayerSearch,
-}: {
-  participants: MatchParticipantSummary[];
-  targetPuuid: string;
-  onPlayerSearch?: (riotId: string) => void;
-}) {
-  return (
-    <div className="lol-runes-panel">
-      {participants.map((player) => {
-        const runes = visibleRunes(player, 8);
-        const name = playerName(player);
-        return (
-          <div
-            key={`${player.puuid}-runes`}
-            className={`lol-runes-row ${player.puuid === targetPuuid ? 'lol-runes-row--target' : ''}`}
-          >
-            <div className="lol-runes-player">
-              <GameIcon src={player.championAvatar} alt={player.championName} title={player.championName} size={28} rounded />
-              <button type="button" onClick={() => onPlayerSearch?.(name)}>{name}</button>
-            </div>
-            <div className="lol-runes-spells">
-              {player.spells.map((spell) => (
-                <GameIcon key={`${player.puuid}-rune-spell-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={18} />
-              ))}
-            </div>
-            <div className="lol-runes-main">
-              {player.primaryRune ? (
-                <GameIcon src={player.primaryRune.icon} alt={player.primaryRune.name} title={`主符文：${player.primaryRune.name}`} size={22} rounded />
-              ) : (
-                <span className="lol-score-empty">主符文 —</span>
-              )}
-              {player.secondaryRune ? (
-                <GameIcon src={player.secondaryRune.icon} alt={player.secondaryRune.name} title={`副符文：${player.secondaryRune.name}`} size={18} rounded />
-              ) : (
-                <span className="lol-score-empty">副符文 —</span>
-              )}
-            </div>
-            <div className="lol-runes-all">
-              {runes.length > 0 ? (
-                runes.map((rune) => (
-                  <GameIcon key={`${player.puuid}-rune-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={18} rounded />
-                ))
-              ) : (
-                <span className="lol-score-empty">暂无符文数据</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }

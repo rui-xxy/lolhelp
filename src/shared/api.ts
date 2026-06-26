@@ -697,6 +697,7 @@ export interface MatchParticipantSummary {
   primaryRune: PlayerRuneSummary | null;
   secondaryRune: PlayerRuneSummary | null;
   runes: PlayerRuneSummary[];
+  augments: PlayerRuneSummary[];
   stats: MatchParticipantStats;
   visionScore?: number;
   largestMultiKill?: number;
@@ -733,6 +734,7 @@ export interface PlayerMatchDetail {
   primaryRune: PlayerRuneSummary | null;
   secondaryRune: PlayerRuneSummary | null;
   runes: PlayerRuneSummary[];
+  augments: PlayerRuneSummary[];
   stats: MatchParticipantStats;
   participants: MatchParticipantSummary[];
   tripleKills?: number;

@@ -32,6 +32,12 @@ export interface RuneSummary {
   icon: string;
 }
 
+export interface AugmentSummary {
+  id: number;
+  name: string;
+  icon: string;
+}
+
 interface DatasJson {
   version?: string;
   lol?: {
@@ -49,6 +55,7 @@ let heroList: HeroSummary[] | null = null;
 let itemCache: Record<number, ItemSummary> | null = null;
 let spellCache: Record<number, SummonerSpellSummary> | null = null;
 let runeCache: Record<number, RuneSummary> | null = null;
+let augmentCache: Record<number, AugmentSummary> | null = null;
 let dataDragonVersion = 'latest';
 let dataLoaded = false;
 
@@ -93,6 +100,7 @@ function loadFromFile(): {
   items: Record<number, ItemSummary>;
   spells: Record<number, SummonerSpellSummary>;
   runes: Record<number, RuneSummary>;
+  augments: Record<number, AugmentSummary>;
   version: string;
 } {
   const filePath = resolveDataPath();
@@ -108,6 +116,7 @@ function loadFromFile(): {
   const itemEntries: Record<number, ItemSummary> = {};
   const spellEntries: Record<number, SummonerSpellSummary> = {};
   const runeEntries: Record<number, RuneSummary> = {};
+  const augmentEntries: Record<number, AugmentSummary> = {};
 
   for (const key of Object.keys(champions)) {
     const champ = (champions[key] ?? {}) as Record<string, unknown>;
@@ -167,7 +176,15 @@ function loadFromFile(): {
     };
   }
 
-  return { map: entries, list, items: itemEntries, spells: spellEntries, runes: runeEntries, version };
+  return {
+    map: entries,
+    list,
+    items: itemEntries,
+    spells: spellEntries,
+    runes: runeEntries,
+    augments: augmentEntries,
+    version,
+  };
 }
 
 export function ensureHeroDataLoaded(): void {
@@ -178,6 +195,7 @@ export function ensureHeroDataLoaded(): void {
     itemCache = data.items;
     spellCache = data.spells;
     runeCache = data.runes;
+    augmentCache = data.augments;
     dataDragonVersion = data.version || 'latest';
     dataLoaded = true;
   }
@@ -211,6 +229,12 @@ export function getRuneById(id: number | string): RuneSummary | null {
   return Number.isFinite(numericId) ? runeCache?.[numericId] ?? null : null;
 }
 
+export function getAugmentById(id: number | string): AugmentSummary | null {
+  ensureHeroDataLoaded();
+  const numericId = Number(id);
+  return Number.isFinite(numericId) ? augmentCache?.[numericId] ?? null : null;
+}
+
 export function getDataDragonVersion(): string {
   ensureHeroDataLoaded();
   return dataDragonVersion;
@@ -222,6 +246,7 @@ interface LcuRefreshData {
   items: { id: number; name: string; icon: string }[];
   spells: { id: number; name: string; icon: string }[];
   runes: { id: number; name: string; icon: string }[];
+  augments?: { id: number; name: string; icon: string }[];
 }
 
 // 用 LCU 拉取的最新数据覆盖刷新模块级缓存（由 gameData.preloadGameData 调用）。
@@ -272,6 +297,14 @@ export function refreshFromLcu(data: LcuRefreshData): void {
       runeEntries[r.id] = { id: r.id, name: r.name, icon: r.icon };
     }
     runeCache = runeEntries;
+  }
+  // 海克斯强化 / 斗魂竞技场强化 / 大乱斗强化
+  if ((data.augments ?? []).length > 0) {
+    const augmentEntries: Record<number, AugmentSummary> = {};
+    for (const augment of data.augments ?? []) {
+      augmentEntries[augment.id] = { id: augment.id, name: augment.name, icon: augment.icon };
+    }
+    augmentCache = augmentEntries;
   }
   dataLoaded = true;
 }

@@ -1987,6 +1987,91 @@
   }
 }
 
+/* 战绩详情视觉收口：去掉卡片套框感，融入右侧面板背景。 */
+@layer components {
+  .lol-postgame {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .lol-postgame-tabs {
+    border-bottom: 0;
+    padding-inline: 0;
+  }
+
+  .lol-postgame-content {
+    padding-inline: 0;
+    background: transparent;
+  }
+
+  .lol-score-team,
+  .lol-overview-team,
+  .lol-overview-card,
+  .lol-runes-row {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .lol-score-team-bar {
+    border-bottom: 0;
+    background: transparent;
+    padding-inline: 0;
+  }
+
+  .lol-score-grid--head {
+    border-bottom: 0;
+    padding-inline: 0;
+  }
+
+  .lol-score-row {
+    border-bottom: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding-inline: 0;
+  }
+
+  .lol-score-row:hover {
+    background: rgba(255, 255, 255, 0.48);
+  }
+
+  .lol-score-row--target {
+    background:
+      linear-gradient(90deg, rgba(255, 56, 92, 0.08), transparent 58%),
+      transparent;
+    box-shadow: none;
+  }
+
+  .lol-score-row--recurring {
+    box-shadow: none;
+  }
+
+  .lol-score-runes img,
+  .lol-runes-main img,
+  .lol-runes-all img,
+  .lol-score-item-empty {
+    border-color: transparent;
+    background: rgba(0, 0, 0, 0.035);
+  }
+
+  .lol-stats-grid--icons,
+  .lol-stats-group-title,
+  .lol-stats-row,
+  .lol-chart-picker {
+    border: 0;
+  }
+
+  .lol-stats-group-title {
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.035);
+  }
+
+  .lol-chart-track {
+    border-left: 0;
+  }
+}
+
 /* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
    系统只有这一个 shadow 定义，其余表面全部 flat。
    用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */

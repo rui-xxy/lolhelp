@@ -70,6 +70,14 @@ export function buildRuneIcon(iconPath?: string): string {
   return `${CDRAGON_BASE}${rel}`;
 }
 
+function buildGameDataAsset(iconPath?: string): string {
+  if (!iconPath) return '';
+  const normalized = iconPath
+    .replace(/^\/lol-game-data\/assets\//i, '')
+    .toLowerCase();
+  return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/${normalized}`;
+}
+
 // ---------- LCU game-data 端点响应类型 ----------
 
 interface LcuChampionSummary {
@@ -95,6 +103,14 @@ interface LcuPerk {
   id: number;
   name: string;
   iconPath?: string;
+}
+
+interface LcuAugment {
+  id: number;
+  name?: string;
+  nameTRA?: string;
+  iconPath?: string;
+  augmentSmallIconPath?: string;
 }
 
 // 把小写 role（如 "mage"）转成首字母大写（如 "Mage"），匹配 datas.json 的 tags 格式
@@ -126,12 +142,14 @@ export async function preloadGameData(): Promise<void> {
   }
 
   try {
-    // 并行拉 4 类数据（互不依赖）
-    const [champions, items, spells, perks] = await Promise.all([
+    // 并行拉 game-data 数据（互不依赖）
+    const [champions, items, spells, perks, augments] = await Promise.all([
       client.get<LcuChampionSummary[]>('/lol-game-data/assets/v1/champion-summary.json'),
       client.get<Record<string, LcuItem>>('/lol-game-data/assets/v1/items.json'),
       client.get<Record<string, LcuSummonerSpell>>('/lol-game-data/assets/v1/summoner-spells.json'),
       client.get<LcuPerk[]>('/lol-game-data/assets/v1/perks.json'),
+      client.get<LcuAugment[]>('/lol-game-data/assets/v1/cherry-augments.json')
+        .catch(() => [] as LcuAugment[]),
     ]);
 
     // 英雄映射（关键：description→真名→title，roles→capitalize→tags）
@@ -173,6 +191,14 @@ export async function preloadGameData(): Promise<void> {
         icon: buildRuneIcon(p.iconPath),
       }));
 
+    const augmentList = (augments ?? [])
+      .filter((augment) => augment && typeof augment.id === 'number')
+      .map((augment) => ({
+        id: augment.id,
+        name: augment.nameTRA || augment.name || `强化 ${augment.id}`,
+        icon: buildGameDataAsset(augment.augmentSmallIconPath || augment.iconPath),
+      }));
+
     if (heroList.length === 0) {
       console.warn('[gameData] 英雄列表为空，保持 datas.json 兜底');
       return;
@@ -183,9 +209,10 @@ export async function preloadGameData(): Promise<void> {
       items: itemList,
       spells: spellList,
       runes: perkList,
+      augments: augmentList,
     });
     console.log(
-      `[gameData] 预加载完成：${heroList.length} 英雄 / ${itemList.length} 装备 / ${spellList.length} 技能 / ${perkList.length} 符文`,
+      `[gameData] 预加载完成：${heroList.length} 英雄 / ${itemList.length} 装备 / ${spellList.length} 技能 / ${perkList.length} 符文 / ${augmentList.length} 强化`,
     );
   } catch (err) {
     console.warn('[gameData] 预加载失败，用 datas.json 兜底:', err);

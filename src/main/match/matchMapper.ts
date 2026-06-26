@@ -3,6 +3,7 @@ import {
   getItemById,
   getSummonerSpellById,
   getRuneById,
+  getAugmentById,
 } from '../lcu/heroData';
 import { buildProfileIcon } from '../lcu/gameData';
 import { buildChampionSplashByAlias } from '../../shared/gameAssets';
@@ -287,6 +288,39 @@ function collectRunes(p: SgpParticipant): {
   return { primary, secondary, all };
 }
 
+function collectAugments(p: SgpParticipant): PlayerRuneSummary[] {
+  const ids: number[] = [];
+  const seen = new Set<number>();
+
+  const pushId = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(pushId);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      const objectValue = value as Record<string, unknown>;
+      pushId(objectValue.id ?? objectValue.augmentId ?? objectValue.perkId);
+      return;
+    }
+    const id = Number(value ?? 0);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+
+  for (const [key, value] of Object.entries(p)) {
+    if (!/(augment|cherry)/i.test(key)) continue;
+    pushId(value);
+  }
+
+  return ids
+    .map((id) => {
+      const meta = getAugmentById(id);
+      return meta ? { id, name: meta.name, icon: meta.icon } : null;
+    })
+    .filter((augment): augment is PlayerRuneSummary => Boolean(augment));
+}
+
 // 映射单个 participant
 function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
   const hero = getHeroByKey(p.championId);
@@ -299,6 +333,7 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
   const items = collectItems(p);
   const spells = collectSpells(p);
   const { primary, secondary, all: runes } = collectRunes(p);
+  const augments = collectAugments(p);
   const stats = buildParticipantStats(p);
   const riotId = p.riotIdGameName
     ? `${p.riotIdGameName}${p.riotIdTagline ? '#' + p.riotIdTagline : ''}`
@@ -333,6 +368,7 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
     primaryRune: primary,
     secondaryRune: secondary,
     runes,
+    augments,
     stats,
     visionScore: stats.visionScore,
     largestMultiKill: stats.largestMultiKill,
@@ -367,6 +403,7 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
   const { primary, secondary, all: runes } = target
     ? collectRunes(target)
     : { primary: null, secondary: null, all: [] };
+  const augments = target ? collectAugments(target) : [];
   const stats = buildParticipantStats(target);
 
   return {
@@ -394,6 +431,7 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
     primaryRune: primary,
     secondaryRune: secondary,
     runes,
+    augments,
     stats,
     participants,
     tripleKills: stats.tripleKills,
