@@ -72,10 +72,13 @@ export function buildRuneIcon(iconPath?: string): string {
 
 function buildGameDataAsset(iconPath?: string): string {
   if (!iconPath) return '';
-  const normalized = iconPath
+  if (/^https?:\/\//i.test(iconPath)) return iconPath;
+  let rel = iconPath.trim()
     .replace(/^\/lol-game-data\/assets\//i, '')
-    .toLowerCase();
-  return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/${normalized}`;
+    .replace(/^\/lol-game-data\//i, '')
+    .replace(/^\/+/, '');
+  rel = rel.toLowerCase();
+  return `${CDRAGON_BASE}${rel}`;
 }
 
 // ---------- LCU game-data 端点响应类型 ----------
