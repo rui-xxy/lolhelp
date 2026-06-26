@@ -58,24 +58,24 @@ function OverlayFrame({
   const Icon = meta.icon;
 
   return (
-    <div className="h-screen overflow-hidden rounded-2xl border border-white/[0.12] bg-[#090d16]/[0.88] text-white shadow-[0_22px_60px_rgba(0,0,0,.45)] backdrop-blur-2xl">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-white/[0.045] px-3 [-webkit-app-region:drag]">
-        <div className="flex size-8 items-center justify-center rounded-xl border border-white/10 bg-white/10">
-          <Icon className="size-4 text-cyan-200" />
+    <div className="h-screen overflow-hidden rounded-2xl border border-white/75 bg-gradient-to-br from-white/[0.96] via-sky-50/[0.94] to-violet-50/[0.92] text-slate-800 shadow-[0_20px_55px_rgba(71,85,105,.22)] backdrop-blur-2xl">
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/70 px-3 [-webkit-app-region:drag]">
+        <div className="flex size-8 items-center justify-center rounded-xl border border-white bg-gradient-to-br from-sky-100 to-violet-100 shadow-sm">
+          <Icon className="size-4 text-sky-600" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] font-semibold tracking-[0.18em] text-white/40 uppercase">
+          <div className="truncate text-[10px] font-semibold tracking-[0.18em] text-slate-400 uppercase">
             {meta.eyebrow}
           </div>
-          <div className="truncate text-sm font-semibold text-white/90">{meta.title}</div>
+          <div className="truncate text-sm font-semibold text-slate-800">{meta.title}</div>
         </div>
-        <GripHorizontal className="size-4 text-white/25" />
+        <GripHorizontal className="size-4 text-slate-300" />
         <button
           type="button"
           title="关闭"
           aria-label="关闭浮窗"
           onClick={() => void window.lolHelper.assist.toggleOverlay(name)}
-          className="flex size-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white [-webkit-app-region:no-drag]"
+          className="flex size-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-500 [-webkit-app-region:no-drag]"
         >
           <X className="size-4" />
         </button>
@@ -95,7 +95,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-white/10 bg-white/[0.055] p-3 ${className}`}>
+    <section className={`rounded-2xl border border-white/80 bg-white/75 p-3 shadow-[0_10px_26px_rgba(71,85,105,.10)] ${className}`}>
       {children}
     </section>
   );
@@ -103,9 +103,9 @@ function Card({
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center text-sm leading-6 text-white/55">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.055]">
-        <Activity className="size-5 text-cyan-200/80" />
+    <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center text-sm leading-6 text-slate-500">
+      <div className="flex size-12 items-center justify-center rounded-2xl border border-white bg-white/80 shadow-sm">
+        <Activity className="size-5 text-sky-500" />
       </div>
       <div>{children}</div>
     </div>
@@ -120,10 +120,10 @@ function StatusPill({
   tone?: 'neutral' | 'good' | 'danger' | 'warn';
 }) {
   const colors = {
-    neutral: 'bg-white/8 text-white/60',
-    good: 'bg-emerald-400/15 text-emerald-100',
-    danger: 'bg-rose-400/15 text-rose-100',
-    warn: 'bg-amber-400/15 text-amber-100',
+    neutral: 'border border-slate-200 bg-slate-100/80 text-slate-500',
+    good: 'border border-emerald-100 bg-emerald-50 text-emerald-600',
+    danger: 'border border-rose-100 bg-rose-50 text-rose-600',
+    warn: 'border border-amber-100 bg-amber-50 text-amber-700',
   };
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${colors[tone]}`}>
@@ -191,7 +191,7 @@ function HelperOverlay() {
       <Card>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] font-semibold tracking-[0.16em] text-white/35 uppercase">
+            <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400 uppercase">
               Current Pick
             </div>
             <div className="mt-1 text-base font-semibold">
@@ -203,16 +203,16 @@ function HelperOverlay() {
           </StatusPill>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-black/20 px-2 py-2">
-            <div className="text-[10px] text-white/40">位置</div>
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-2 py-2">
+            <div className="text-[10px] text-slate-400">位置</div>
             <div className="mt-1 text-xs font-semibold">{status.position || '未知'}</div>
           </div>
-          <div className="rounded-xl bg-black/20 px-2 py-2">
-            <div className="text-[10px] text-white/40">队列</div>
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-2 py-2">
+            <div className="text-[10px] text-slate-400">队列</div>
             <div className="mt-1 text-xs font-semibold">{status.queueId || '--'}</div>
           </div>
-          <div className="rounded-xl bg-black/20 px-2 py-2">
-            <div className="text-[10px] text-white/40">英雄 ID</div>
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-2 py-2">
+            <div className="text-[10px] text-slate-400">英雄 ID</div>
             <div className="mt-1 text-xs font-semibold">{status.championId}</div>
           </div>
         </div>
@@ -220,7 +220,7 @@ function HelperOverlay() {
 
       {loading ? (
         <Card>
-          <div className="flex items-center gap-2 text-sm text-white/55">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
             <RefreshCw className="size-4 animate-spin" />
             正在读取推荐…
           </div>
@@ -230,7 +230,7 @@ function HelperOverlay() {
           <Card>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs text-white/45">推荐符文</div>
+                <div className="text-xs text-slate-400">推荐符文</div>
                 <div className="mt-1 text-sm font-semibold">
                   {recommendation?.rune?.name || '暂无推荐'}
                 </div>
@@ -245,12 +245,12 @@ function HelperOverlay() {
 
           {recommendation?.items.length ? (
             <Card>
-              <div className="mb-2 text-xs font-semibold text-white/55">装备路线</div>
+              <div className="mb-2 text-xs font-semibold text-slate-500">装备路线</div>
               <div className="space-y-2">
                 {recommendation.items.map((block) => (
-                  <div key={block.title} className="rounded-xl bg-black/20 p-2">
-                    <div className="text-[10px] text-white/40">{block.title}</div>
-                    <div className="mt-1 text-xs text-white/80">{block.itemIds.join(' → ')}</div>
+                  <div key={block.title} className="rounded-xl border border-slate-200/70 bg-slate-50/80 p-2">
+                    <div className="text-[10px] text-slate-400">{block.title}</div>
+                    <div className="mt-1 text-xs text-slate-700">{block.itemIds.join(' → ')}</div>
                   </div>
                 ))}
               </div>
@@ -259,15 +259,15 @@ function HelperOverlay() {
 
           {guide?.spells.length ? (
             <Card>
-              <div className="mb-2 text-xs font-semibold text-white/55">技能信息</div>
+              <div className="mb-2 text-xs font-semibold text-slate-500">技能信息</div>
               <div className="space-y-1.5">
                 {guide.spells.map((spell) => (
-                  <details key={spell.key} className="rounded-xl bg-black/20 px-2 py-1.5">
+                  <details key={spell.key} className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-2 py-1.5">
                     <summary className="cursor-pointer text-[11px] font-medium">
                       {spell.key} · {spell.name}
-                      <span className="ml-2 text-white/35">CD {spell.cooldown}</span>
+                      <span className="ml-2 text-slate-400">CD {spell.cooldown}</span>
                     </summary>
-                    <p className="mt-1 text-[10px] leading-4 text-white/55">{spell.description}</p>
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">{spell.description}</p>
                   </details>
                 ))}
               </div>
@@ -284,7 +284,7 @@ function HelperOverlay() {
             void window.lolHelper.assist.lockCurrentChampion()
               .then((result) => setMessage(result.message));
           }}
-          className="rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2 text-xs font-semibold text-white/75 transition-colors hover:bg-white/[0.12]"
+          className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-sky-50 hover:text-sky-700"
         >
           锁定英雄
         </button>
@@ -296,12 +296,12 @@ function HelperOverlay() {
               .then((results) => setMessage(results.map((item) => item.message).join('；')))
               .catch((error) => setMessage(String(error)));
           }}
-          className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
+          className="rounded-xl bg-gradient-to-r from-sky-500 to-violet-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
         >
           应用推荐
         </button>
       </div>
-      {message && <div className="rounded-xl bg-black/20 px-3 py-2 text-xs text-white/60">{message}</div>}
+      {message && <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-500 shadow-sm">{message}</div>}
     </div>
   );
 }
@@ -409,15 +409,15 @@ function MatchOverlay() {
       </div>
       <div className="space-y-2">
         {players.map((player) => (
-          <div key={player.puuid || player.riotId} className="rounded-xl bg-black/22 p-2">
+          <div key={player.puuid || player.riotId} className="rounded-xl border border-slate-200/70 bg-slate-50/80 p-2">
             <div className="flex items-center gap-2">
               <span className={`size-2 rounded-full ${accent}`} />
               <div className="min-w-0 flex-1 truncate text-xs font-semibold">{player.riotId}</div>
               {titleForPlayer(player) && (
-                <span className="shrink-0 text-[10px] text-cyan-200">{titleForPlayer(player)}</span>
+                <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-600">{titleForPlayer(player)}</span>
               )}
             </div>
-            <div className="mt-1 flex justify-between text-[11px] text-white/45">
+            <div className="mt-1 flex justify-between text-[11px] text-slate-400">
               <span>{player.championName || '未知英雄'}</span>
               <span>{player.matchCount ? `${player.matchCount} 场样本` : '暂无样本'}</span>
             </div>
@@ -435,21 +435,21 @@ function MatchOverlay() {
   return (
     <div className="space-y-3">
       <Card>
-        <div className="mb-2 flex justify-between text-xs text-white/60">
+        <div className="mb-2 flex justify-between text-xs text-slate-500">
           <span>我方近期胜率 {myRate || '--'}%</span>
           <span>敌方近期胜率 {enemyRate || '--'}%</span>
         </div>
-        <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="bg-cyan-300"
+            className="bg-sky-400"
             style={{ width: `${totalRate > 0 ? (myRate / totalRate) * 100 : 50}%` }}
           />
           <div className="flex-1 bg-rose-300" />
         </div>
-        <div className="mt-2 text-[10px] text-white/35">每 5 秒自动刷新一次</div>
+        <div className="mt-2 text-[10px] text-slate-400">每 5 秒自动刷新一次</div>
       </Card>
       <div className="grid grid-cols-2 gap-3">
-        {renderTeam('我方', battle.myTeam, 'bg-cyan-300')}
+        {renderTeam('我方', battle.myTeam, 'bg-sky-400')}
         {renderTeam('敌方', battle.enemyTeam, 'bg-rose-300')}
       </div>
     </div>
@@ -517,7 +517,7 @@ function LiveClientOverlay() {
   return (
     <div className="space-y-3">
       <Card>
-        <div className="flex items-center justify-between text-xs text-white/60">
+        <div className="flex items-center justify-between text-xs text-slate-500">
           <span>{data.gameMode || '实时对局'}</span>
           <span>
             {Math.floor(data.gameTime / 60)}
@@ -533,7 +533,7 @@ function LiveClientOverlay() {
               <span className="min-w-0 flex-1 truncate font-semibold">{player.riotId}</span>
               <StatusPill>Lv.{player.level}</StatusPill>
             </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-white/45">
+            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
               <span>{player.championName}</span>
               <span>{player.kills}/{player.deaths}/{player.assists}</span>
             </div>
@@ -549,8 +549,8 @@ function LiveClientOverlay() {
                     onClick={() => startTimer(key, spell)}
                     className={`rounded-xl px-2 py-1.5 text-[10px] font-medium transition-colors ${
                       seconds > 0
-                        ? 'bg-rose-400/18 text-rose-100'
-                        : 'bg-white/8 text-white/65 hover:bg-white/[0.14]'
+                        ? 'border border-rose-100 bg-rose-50 text-rose-600'
+                        : 'border border-slate-200 bg-white/80 text-slate-600 hover:bg-sky-50 hover:text-sky-700'
                     } disabled:opacity-40`}
                     title="点击开始计时，再次点击可重置"
                   >
