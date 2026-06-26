@@ -628,6 +628,8 @@ export interface PlayerRuneSummary {
   id: number;
   icon: string;
   name: string;
+  kind?: 'rune' | 'augment';
+  rarity?: string;
 }
 
 // 单个玩家的赛后统计明细（用于“统计 / 图表”标签）。

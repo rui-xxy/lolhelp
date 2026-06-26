@@ -251,7 +251,7 @@ function collectRunes(p: SgpParticipant): {
   const makeRune = (id: number): PlayerRuneSummary | null => {
     if (!id) return null;
     const meta = getRuneById(id);
-    return meta ? { id, name: meta.name, icon: meta.icon } : null;
+    return meta ? { id, name: meta.name, icon: meta.icon, kind: 'rune' } : null;
   };
 
   const pushRune = (rune: PlayerRuneSummary | null): void => {
@@ -313,12 +313,19 @@ function collectAugments(p: SgpParticipant): PlayerRuneSummary[] {
     pushId(value);
   }
 
-  return ids
-    .map((id) => {
-      const meta = getAugmentById(id);
-      return meta ? { id, name: meta.name, icon: meta.icon } : null;
-    })
-    .filter((augment): augment is PlayerRuneSummary => Boolean(augment));
+  const augments: PlayerRuneSummary[] = [];
+  for (const id of ids) {
+    const meta = getAugmentById(id);
+    if (!meta) continue;
+    augments.push({
+      id,
+      name: meta.name,
+      icon: meta.icon,
+      kind: 'augment',
+      rarity: meta.rarity,
+    });
+  }
+  return augments;
 }
 
 // 映射单个 participant

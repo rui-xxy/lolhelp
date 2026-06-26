@@ -193,6 +193,12 @@ function visibleEnhancements(participant: MatchParticipantSummary, limit = 4): P
   return runes.slice(0, limit);
 }
 
+function enhancementClass(enhancement: PlayerRuneSummary): string {
+  if (enhancement.kind !== 'augment') return 'lol-score-enhancement--rune';
+  const rarity = (enhancement.rarity || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return `lol-score-enhancement--augment lol-score-enhancement--${rarity}`;
+}
+
 function teamTotals(players: MatchParticipantSummary[]) {
   return players.reduce(
     (acc, player) => {
@@ -401,8 +407,20 @@ function ScoreboardRow({
       </div>
       <div className="lol-score-runes">
         {enhancements.length > 0 ? (
-          enhancements.map((rune) => (
-            <GameIcon key={`${participant.puuid}-${rune.id}`} src={rune.icon} alt={rune.name} title={rune.name} size={18} rounded />
+          enhancements.map((enhancement) => (
+            <span
+              key={`${participant.puuid}-${enhancement.id}`}
+              className={`lol-score-enhancement ${enhancementClass(enhancement)}`}
+              title={enhancement.name}
+            >
+              <GameIcon
+                src={enhancement.icon}
+                alt={enhancement.name}
+                title={enhancement.name}
+                size={enhancement.kind === 'augment' ? 14 : 18}
+                rounded
+              />
+            </span>
           ))
         ) : (
           <span className="lol-score-empty">—</span>

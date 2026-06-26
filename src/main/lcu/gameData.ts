@@ -114,6 +114,7 @@ interface LcuAugment {
   nameTRA?: string;
   iconPath?: string;
   augmentSmallIconPath?: string;
+  rarity?: string;
 }
 
 // 把小写 role（如 "mage"）转成首字母大写（如 "Mage"），匹配 datas.json 的 tags 格式
@@ -200,6 +201,7 @@ export async function preloadGameData(): Promise<void> {
         id: augment.id,
         name: augment.nameTRA || augment.name || `强化 ${augment.id}`,
         icon: buildGameDataAsset(augment.augmentSmallIconPath || augment.iconPath),
+        rarity: augment.rarity,
       }));
 
     if (heroList.length === 0) {

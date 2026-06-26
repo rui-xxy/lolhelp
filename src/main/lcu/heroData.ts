@@ -36,6 +36,7 @@ export interface AugmentSummary {
   id: number;
   name: string;
   icon: string;
+  rarity?: string;
 }
 
 interface DatasJson {
@@ -246,7 +247,7 @@ interface LcuRefreshData {
   items: { id: number; name: string; icon: string }[];
   spells: { id: number; name: string; icon: string }[];
   runes: { id: number; name: string; icon: string }[];
-  augments?: { id: number; name: string; icon: string }[];
+  augments?: { id: number; name: string; icon: string; rarity?: string }[];
 }
 
 // 用 LCU 拉取的最新数据覆盖刷新模块级缓存（由 gameData.preloadGameData 调用）。
@@ -302,7 +303,12 @@ export function refreshFromLcu(data: LcuRefreshData): void {
   if ((data.augments ?? []).length > 0) {
     const augmentEntries: Record<number, AugmentSummary> = {};
     for (const augment of data.augments ?? []) {
-      augmentEntries[augment.id] = { id: augment.id, name: augment.name, icon: augment.icon };
+      augmentEntries[augment.id] = {
+        id: augment.id,
+        name: augment.name,
+        icon: augment.icon,
+        rarity: augment.rarity,
+      };
     }
     augmentCache = augmentEntries;
   }
