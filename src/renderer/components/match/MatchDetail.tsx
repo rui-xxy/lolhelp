@@ -145,6 +145,10 @@ const POSITION_ORDER: Record<string, number> = {
   SUPPORT: 4,
 };
 
+function shouldShowPosition(queueId: number): boolean {
+  return queueId === 420 || queueId === 440;
+}
+
 function stat(participant: MatchParticipantSummary, key: keyof MatchParticipantStats): number {
   const value = participant.stats?.[key] ?? 0;
   return Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -254,6 +258,7 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
     [match.participants],
   );
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
+  const showPosition = shouldShowPosition(match.queueId);
   const selectedChartMetric =
     CHART_METRICS.find((metric) => metric.key === chartMetricKey) ?? CHART_METRICS[0];
 
@@ -285,6 +290,7 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
             targetPuuid={targetPuuid}
             recurringMates={recurringMates}
             onPlayerSearch={onPlayerSearch}
+            showPosition={showPosition}
           />
         )}
         {activeTab === 'stats' && <StatsTab participants={participants} targetPuuid={targetPuuid} />}
@@ -307,11 +313,13 @@ function ScoreboardTab({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
+  showPosition,
 }: {
   participants: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
 }) {
   return (
     <div className="lol-scoreboard">
@@ -323,6 +331,7 @@ function ScoreboardTab({
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
           onPlayerSearch={onPlayerSearch}
+          showPosition={showPosition}
         />
       ))}
     </div>
@@ -335,12 +344,14 @@ function ScoreboardTeam({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
+  showPosition,
 }: {
   teamId: number;
   players: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
 }) {
   const totals = teamTotals(players);
   const tone = teamTone(teamId);
@@ -370,6 +381,7 @@ function ScoreboardTeam({
           isTarget={player.puuid === targetPuuid}
           isRecurring={player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid))}
           onPlayerSearch={onPlayerSearch}
+          showPosition={showPosition}
         />
       ))}
     </section>
@@ -381,11 +393,13 @@ function ScoreboardRow({
   isTarget,
   isRecurring,
   onPlayerSearch,
+  showPosition,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
 }) {
   const slots = itemSlots(participant);
   const enhancements = visibleEnhancements(participant);
@@ -423,7 +437,7 @@ function ScoreboardRow({
           >
             {name}
           </button>
-          <span>{positionLabel(participant.teamPosition)}</span>
+          {showPosition && <span>{positionLabel(participant.teamPosition)}</span>}
         </div>
       </div>
       <div className="lol-score-runes">
