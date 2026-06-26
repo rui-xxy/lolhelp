@@ -103,6 +103,21 @@ function normalizeTimestamp(value: string | number | null | undefined): number |
   return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
 }
 
+function readFriendSince(source: Record<string, unknown>): string | number | null {
+  const value = readStringField(source, [
+    'friendsSince',
+    'friendSince',
+    'friendSinceTimestamp',
+    'createdAt',
+    'created',
+    'addedAt',
+    'dateAdded',
+    'time',
+    'timestamp',
+  ]);
+  return value === '' ? null : value;
+}
+
 function getFriendChampionId(rawLol: Record<string, unknown>): number {
   const explicit = readNumberField(rawLol, [
     'championId',
@@ -310,6 +325,23 @@ export function registerLcuHandlers(): void {
       );
       if (!Array.isArray(raw)) return [];
       const queueCatalog = await getQueueCatalog(client);
+      const friendSinceBySummonerId = new Map<number, string | number>();
+      try {
+        const giftableFriends = await client.get<Record<string, unknown>[]>(
+          '/lol-store/v1/giftablefriends',
+        );
+        if (Array.isArray(giftableFriends)) {
+          for (const friend of giftableFriends) {
+            const summonerId = Number(friend.summonerId ?? 0);
+            const friendsSince = readFriendSince(friend);
+            if (summonerId > 0 && friendsSince !== null) {
+              friendSinceBySummonerId.set(summonerId, friendsSince);
+            }
+          }
+        }
+      } catch {
+        // Some clients/regions may reject the store endpoint. Friend list still works without it.
+      }
       return mapWithConcurrency(raw, FRIEND_ENRICH_CONCURRENCY, async (f) => {
         const icon = Number(f.icon ?? 0);
         const iconUrls = buildProfileIconCandidates(icon);
@@ -318,17 +350,7 @@ export function registerLcuHandlers(): void {
         const puuid = String(f.puuid ?? '');
         const gameName = String(f.gameName ?? '');
         const gameTag = String(f.gameTag ?? '');
-        const friendSinceRaw = readStringField(f, [
-          'friendSince',
-          'friendSinceTimestamp',
-          'createdAt',
-          'created',
-          'addedAt',
-          'dateAdded',
-          'time',
-          'timestamp',
-        ]);
-        const friendSince = friendSinceRaw === '' ? null : friendSinceRaw;
+        const friendSince = friendSinceBySummonerId.get(summonerId) ?? readFriendSince(f);
         const friendSinceTimestamp = normalizeTimestamp(friendSince);
         let championId = getFriendChampionId(rawLol);
         if ((!Number.isFinite(championId) || championId <= 0) && isFriendInGame(rawLol)) {

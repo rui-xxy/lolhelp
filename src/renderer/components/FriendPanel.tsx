@@ -79,10 +79,26 @@ function friendAddedTimestamp(friend: FriendInfo): number {
   return friend.friendSinceTimestamp ?? timestampValue(friend.friendSince);
 }
 
-function formatFriendAddedTime(friend: FriendInfo): string {
+function formatFriendAddedAgo(timestamp: number, now: number): string {
+  const diff = Math.max(0, now - timestamp);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diff < minute) return '刚刚';
+  if (diff < hour) return `${Math.floor(diff / minute)}分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)}小时前`;
+  if (diff < month) return `${Math.floor(diff / day)}天前`;
+  if (diff < year) return `${Math.floor(diff / month)}个月前`;
+  return `${Math.floor(diff / year)}年前`;
+}
+
+function formatFriendAddedTime(friend: FriendInfo, now: number): string {
   const timestamp = friendAddedTimestamp(friend);
   if (!timestamp) return '添加时间未知';
-  return new Date(timestamp).toLocaleString('zh-CN', {
+  const exact = new Date(timestamp).toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -91,6 +107,7 @@ function formatFriendAddedTime(friend: FriendInfo): string {
     second: '2-digit',
     hour12: false,
   });
+  return `${exact}（${formatFriendAddedAgo(timestamp, now)}）`;
 }
 
 export function FriendPanel({ onFriendClick }: FriendPanelProps) {
@@ -298,7 +315,7 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                         friend.lol?.gameStatus === 'inGame'
                           ? formatGameDuration(friend.lol.timeStamp, currentTime)
                           : '';
-                      const addedTime = sortByAddedAt ? formatFriendAddedTime(friend) : '';
+                      const addedTime = sortByAddedAt ? formatFriendAddedTime(friend, currentTime) : '';
                       return (
                         <div
                           key={friend.puuid}
