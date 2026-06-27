@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Crown, Flame, Shield, Sparkles, Swords, Trophy } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { RankEmblem } from '../RankEmblem';
+import badgeLegendary from '../../assets/match-badges/legendary.png';
+import badgeMaxAssist from '../../assets/match-badges/max-assist.png';
+import badgeMaxDamage from '../../assets/match-badges/max-damage.png';
+import badgeMaxDeaths from '../../assets/match-badges/max-deaths.png';
+import badgeMaxGold from '../../assets/match-badges/max-gold.png';
+import badgeMaxHeal from '../../assets/match-badges/max-heal.png';
+import badgeMaxKill from '../../assets/match-badges/max-kill.png';
+import badgeMaxTaken from '../../assets/match-badges/max-taken.png';
+import badgeMvp from '../../assets/match-badges/mvp.png';
+import badgePenta from '../../assets/match-badges/penta.png';
+import badgeQuadra from '../../assets/match-badges/quadra.png';
+import badgeSvp from '../../assets/match-badges/svp.png';
+import badgeTriple from '../../assets/match-badges/triple.png';
 import type {
   MatchParticipantStats,
   MatchParticipantSummary,
@@ -284,10 +296,9 @@ function teamTotals(players: MatchParticipantSummary[]) {
 
 interface RiftBadge {
   key: string;
-  label: string;
   title: string;
-  tone: 'gold' | 'red' | 'violet' | 'blue' | 'green';
-  icon: ReactNode;
+  src: string;
+  wide?: boolean;
 }
 
 function performanceScore(player: MatchParticipantSummary, teamKills: number): number {
@@ -305,7 +316,12 @@ function performanceScore(player: MatchParticipantSummary, teamKills: number): n
 
 function buildRiftBadges(participants: MatchParticipantSummary[]): Map<string, RiftBadge[]> {
   const badges = new Map<string, RiftBadge[]>();
+  const maxKills = Math.max(0, ...participants.map((player) => player.kills));
+  const maxDeaths = Math.max(0, ...participants.map((player) => player.deaths));
+  const maxAssists = Math.max(0, ...participants.map((player) => player.assists));
+  const maxGold = Math.max(0, ...participants.map((player) => player.gold));
   const maxDamage = Math.max(0, ...participants.map((player) => player.damage));
+  const maxHeal = Math.max(0, ...participants.map((player) => stat(player, 'totalHeal')));
   const maxTaken = Math.max(0, ...participants.map((player) => stat(player, 'totalDamageTaken')));
   const totalsByTeam = new Map<number, ReturnType<typeof teamTotals>>();
   for (const teamId of [100, 200]) {
@@ -326,38 +342,46 @@ function buildRiftBadges(participants: MatchParticipantSummary[]): Map<string, R
   for (const player of participants) {
     const next: RiftBadge[] = [];
     if (player.puuid === winnerBest) {
-      next.push({ key: 'mvp', label: 'MVP', title: '本队综合表现最佳', tone: 'gold', icon: <Trophy /> });
+      next.push({ key: 'mvp', title: '胜方综合表现最佳', src: badgeMvp, wide: true });
     } else if (player.puuid === loserBest) {
-      next.push({ key: 'svp', label: 'SVP', title: '败方综合表现最佳', tone: 'violet', icon: <Sparkles /> });
+      next.push({ key: 'svp', title: '败方综合表现最佳', src: badgeSvp, wide: true });
     }
 
-    if (player.pentaKills && player.pentaKills > 0) {
-      next.push({ key: 'penta', label: '五杀', title: '本局拿到五杀', tone: 'red', icon: <Flame /> });
-    } else if (player.quadraKills && player.quadraKills > 0) {
-      next.push({ key: 'quadra', label: '四杀', title: '本局拿到四杀', tone: 'red', icon: <Flame /> });
-    } else if (player.tripleKills && player.tripleKills > 0) {
-      next.push({ key: 'triple', label: '三杀', title: '本局拿到三杀', tone: 'red', icon: <Flame /> });
-    } else if ((player.largestMultiKill ?? 0) >= 3) {
-      next.push({
-        key: 'multi',
-        label: `${player.largestMultiKill}杀`,
-        title: '本局最高多杀',
-        tone: 'red',
-        icon: <Flame />,
-      });
+    if (player.kills === maxKills && maxKills > 0) {
+      next.push({ key: 'max-kill', title: '击杀最多', src: badgeMaxKill });
     }
-
+    if (player.deaths === maxDeaths && maxDeaths > 0) {
+      next.push({ key: 'max-deaths', title: '死亡最多', src: badgeMaxDeaths });
+    }
+    if (player.assists === maxAssists && maxAssists > 0) {
+      next.push({ key: 'max-assist', title: '助攻最多', src: badgeMaxAssist });
+    }
+    if (player.gold === maxGold && maxGold > 0) {
+      next.push({ key: 'max-gold', title: '金钱最多', src: badgeMaxGold });
+    }
     if (player.damage === maxDamage && maxDamage > 0) {
-      next.push({ key: 'damage', label: '伤害最多', title: '全场对英雄伤害最高', tone: 'red', icon: <Swords /> });
+      next.push({ key: 'max-damage', title: '伤害最多', src: badgeMaxDamage });
+    }
+    if (stat(player, 'totalHeal') === maxHeal && maxHeal > 0) {
+      next.push({ key: 'max-heal', title: '治疗量最多', src: badgeMaxHeal });
     }
     if (stat(player, 'totalDamageTaken') === maxTaken && maxTaken > 0) {
-      next.push({ key: 'taken', label: '承伤最多', title: '全场承受伤害最高', tone: 'blue', icon: <Shield /> });
+      next.push({ key: 'max-taken', title: '承伤最多', src: badgeMaxTaken });
+    }
+    if ((player.tripleKills ?? 0) > 0) {
+      next.push({ key: 'triple', title: '三杀', src: badgeTriple });
+    }
+    if ((player.quadraKills ?? 0) > 0) {
+      next.push({ key: 'quadra', title: '四杀', src: badgeQuadra });
+    }
+    if ((player.pentaKills ?? 0) > 0) {
+      next.push({ key: 'penta', title: '五杀', src: badgePenta, wide: true });
     }
     if ((player.largestKillingSpree ?? 0) >= 7) {
-      next.push({ key: 'legendary', label: '超神', title: '最高连杀达到超神', tone: 'green', icon: <Crown /> });
+      next.push({ key: 'legendary', title: '超神', src: badgeLegendary });
     }
 
-    badges.set(player.puuid, next.slice(0, 4));
+    badges.set(player.puuid, next);
   }
 
   return badges;
@@ -730,14 +754,13 @@ function RiftScoreboardRow({
             <span className="lol-rift-role-badge">{positionLabel(participant.teamPosition)}</span>
           )}
           {badges.map((badge) => (
-            <span
+            <img
               key={badge.key}
-              className={`lol-rift-badge lol-rift-badge--${badge.tone}`}
+              className={`lol-rift-badge ${badge.wide ? 'lol-rift-badge--wide' : ''}`}
+              src={badge.src}
+              alt={badge.title}
               title={badge.title}
-            >
-              <span className="lol-rift-badge-icon">{badge.icon}</span>
-              <span>{badge.label}</span>
-            </span>
+            />
           ))}
         </div>
       </div>
