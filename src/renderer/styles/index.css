@@ -2666,7 +2666,7 @@
 
 @layer components {
   .lol-rift-scoreboard {
-    gap: 14px;
+    gap: 6px;
     padding: 0;
   }
 
@@ -2675,13 +2675,23 @@
   }
 
   .lol-rift-team + .lol-rift-team {
-    margin-top: 14px;
+    margin-top: 6px;
   }
 
   .lol-rift-team-bar {
-    min-height: 30px;
+    min-height: 17px;
     padding-inline: 0;
     color: #64748b;
+    font-size: 10px;
+    line-height: 17px;
+  }
+
+  .lol-rift-team-title {
+    gap: 4px;
+  }
+
+  .lol-rift-team-title .lol-score-team-line {
+    width: 12px;
   }
 
   .lol-rift-grid,
@@ -2691,15 +2701,16 @@
   }
 
   .lol-rift-grid--head {
-    min-height: 28px;
+    min-height: 18px;
     padding-inline: 0;
+    font-size: 10px;
   }
 
   .lol-rift-row,
   .lol-rift-team--blue .lol-rift-row,
   .lol-rift-team--red .lol-rift-row {
-    min-height: 52px;
-    padding: 7px 0;
+    min-height: 46px;
+    padding: 4px 0;
     font-size: 12px;
   }
 

@@ -625,9 +625,8 @@ function RiftScoreboardTeam({
   return (
     <section className={`lol-rift-team lol-rift-team--${tone}`}>
       <div className="lol-rift-team-bar">
-        <div className="lol-rift-team-title">
+        <div className="lol-rift-team-title" aria-label={`${teamLabel(teamId)} ${won ? 'WIN' : 'LOSE'}`}>
           <span className="lol-score-team-line" />
-          <span>{teamLabel(teamId)}</span>
           <span className="lol-score-team-result">{won ? 'WIN' : 'LOSE'}</span>
         </div>
         <div className="lol-rift-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
