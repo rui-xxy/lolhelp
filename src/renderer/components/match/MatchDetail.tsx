@@ -614,9 +614,7 @@ function RiftScoreboardTeam({
   rankByPuuid: Record<string, PlayerRankSummary[]>;
   badgesByPuuid: Map<string, RiftBadge[]>;
 }) {
-  const totals = teamTotals(players);
   const tone = teamTone(teamId);
-  const won = players[0]?.win ?? false;
   const hasRecurringMate = players.some(
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
@@ -624,13 +622,6 @@ function RiftScoreboardTeam({
 
   return (
     <section className={`lol-rift-team lol-rift-team--${tone}`}>
-      <div className="lol-rift-team-bar">
-        <div className="lol-rift-team-title" aria-label={`${teamLabel(teamId)} ${won ? 'WIN' : 'LOSE'}`}>
-          <span className="lol-score-team-line" />
-          <span className="lol-score-team-result">{won ? 'WIN' : 'LOSE'}</span>
-        </div>
-        <div className="lol-rift-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
-      </div>
       <div className="lol-rift-grid lol-rift-grid--head">
         <span>玩家</span>
         <span>装备</span>
@@ -706,7 +697,7 @@ function RiftScoreboardRow({
             src={participant.championAvatar}
             alt={participant.championName}
             title={`${participant.championName} Lv.${participant.champLevel}`}
-            size={36}
+            size={40}
             rounded
           />
           <span>{participant.champLevel}</span>
@@ -718,7 +709,7 @@ function RiftScoreboardRow({
               src={spell.icon}
               alt={spell.name}
               title={spell.name}
-              size={17}
+              size={18}
             />
           ))}
         </div>
@@ -731,7 +722,7 @@ function RiftScoreboardRow({
                 src={rune.icon}
                 alt={rune.name}
                 title={rune.name}
-                size={17}
+                size={18}
               />
             ))}
         </div>
@@ -765,7 +756,7 @@ function RiftScoreboardRow({
       </div>
 
       <div className="lol-rift-rank" title={rank?.displayText ?? '未定级'}>
-        {rank ? <RankEmblem rank={rank} size={22} variant="mini" /> : <span className="lol-rift-rank-empty" />}
+        {rank ? <RankEmblem rank={rank} size={24} variant="mini" /> : <span className="lol-rift-rank-empty" />}
         <span>{rankDisplay(rank)}</span>
       </div>
       </div>
@@ -777,7 +768,7 @@ function RiftScoreboardRow({
               src={item.icon}
               alt={item.name}
               title={item.name}
-              size={22}
+              size={24}
             />
           ) : (
             <span key={`${participant.puuid}-${slot}`} className="lol-score-item-empty" />
