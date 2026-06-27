@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Crown, Flame, Shield, Sparkles, Swords, Trophy } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { RankEmblem } from '../RankEmblem';
 import type {
@@ -286,7 +287,7 @@ interface RiftBadge {
   label: string;
   title: string;
   tone: 'gold' | 'red' | 'violet' | 'blue' | 'green';
-  icon: string;
+  icon: ReactNode;
 }
 
 function performanceScore(player: MatchParticipantSummary, teamKills: number): number {
@@ -325,35 +326,35 @@ function buildRiftBadges(participants: MatchParticipantSummary[]): Map<string, R
   for (const player of participants) {
     const next: RiftBadge[] = [];
     if (player.puuid === winnerBest) {
-      next.push({ key: 'mvp', label: 'MVP', title: '本队综合表现最佳', tone: 'gold', icon: '★' });
+      next.push({ key: 'mvp', label: 'MVP', title: '本队综合表现最佳', tone: 'gold', icon: <Trophy /> });
     } else if (player.puuid === loserBest) {
-      next.push({ key: 'svp', label: 'SVP', title: '败方综合表现最佳', tone: 'violet', icon: '◆' });
+      next.push({ key: 'svp', label: 'SVP', title: '败方综合表现最佳', tone: 'violet', icon: <Sparkles /> });
     }
 
     if (player.pentaKills && player.pentaKills > 0) {
-      next.push({ key: 'penta', label: '五杀', title: '本局拿到五杀', tone: 'red', icon: 'Ⅴ' });
+      next.push({ key: 'penta', label: '五杀', title: '本局拿到五杀', tone: 'red', icon: <Flame /> });
     } else if (player.quadraKills && player.quadraKills > 0) {
-      next.push({ key: 'quadra', label: '四杀', title: '本局拿到四杀', tone: 'red', icon: 'Ⅳ' });
+      next.push({ key: 'quadra', label: '四杀', title: '本局拿到四杀', tone: 'red', icon: <Flame /> });
     } else if (player.tripleKills && player.tripleKills > 0) {
-      next.push({ key: 'triple', label: '三杀', title: '本局拿到三杀', tone: 'red', icon: 'Ⅲ' });
+      next.push({ key: 'triple', label: '三杀', title: '本局拿到三杀', tone: 'red', icon: <Flame /> });
     } else if ((player.largestMultiKill ?? 0) >= 3) {
       next.push({
         key: 'multi',
         label: `${player.largestMultiKill}杀`,
         title: '本局最高多杀',
         tone: 'red',
-        icon: '✦',
+        icon: <Flame />,
       });
     }
 
     if (player.damage === maxDamage && maxDamage > 0) {
-      next.push({ key: 'damage', label: '伤害最多', title: '全场对英雄伤害最高', tone: 'red', icon: '⚔' });
+      next.push({ key: 'damage', label: '伤害最多', title: '全场对英雄伤害最高', tone: 'red', icon: <Swords /> });
     }
     if (stat(player, 'totalDamageTaken') === maxTaken && maxTaken > 0) {
-      next.push({ key: 'taken', label: '承伤最多', title: '全场承受伤害最高', tone: 'blue', icon: '盾' });
+      next.push({ key: 'taken', label: '承伤最多', title: '全场承受伤害最高', tone: 'blue', icon: <Shield /> });
     }
     if ((player.largestKillingSpree ?? 0) >= 7) {
-      next.push({ key: 'legendary', label: '超神', title: '最高连杀达到超神', tone: 'green', icon: '↑' });
+      next.push({ key: 'legendary', label: '超神', title: '最高连杀达到超神', tone: 'green', icon: <Crown /> });
     }
 
     badges.set(player.puuid, next.slice(0, 4));
@@ -607,6 +608,12 @@ function RiftScoreboardTeam({
         </div>
         <div className="lol-rift-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
       </div>
+      <div className="lol-rift-grid lol-rift-grid--head">
+        <span>玩家</span>
+        <span>装备</span>
+        <span>KDA</span>
+        <span>伤害</span>
+      </div>
 
       <div className="lol-rift-team-rows">
         {players.map((player) => {
@@ -661,6 +668,7 @@ function RiftScoreboardRow({
 }) {
   const name = playerName(participant);
   const rank = rankForQueue(participant, queueId, rankByPuuid);
+  const slots = itemSlots(participant);
 
   return (
     <div
@@ -668,7 +676,8 @@ function RiftScoreboardRow({
         isRecurring ? 'lol-rift-row--recurring' : ''
       }`}
     >
-      <div className="lol-rift-loadout">
+      <div className="lol-rift-player-cell">
+        <div className="lol-rift-loadout">
         <div className="lol-rift-champion">
           <GameIcon
             src={participant.championAvatar}
@@ -734,9 +743,29 @@ function RiftScoreboardRow({
       </div>
 
       <div className="lol-rift-rank" title={rank?.displayText ?? '未定级'}>
-        {rank ? <RankEmblem rank={rank} size={34} variant="mini" /> : <span className="lol-rift-rank-empty" />}
+        {rank ? <RankEmblem rank={rank} size={24} variant="mini" /> : <span className="lol-rift-rank-empty" />}
         <span>{rankDisplay(rank)}</span>
       </div>
+      </div>
+      <div className="lol-rift-items">
+        {slots.map((item, slot) =>
+          item ? (
+            <GameIcon
+              key={`${participant.puuid}-${slot}-${item.id}`}
+              src={item.icon}
+              alt={item.name}
+              title={item.name}
+              size={22}
+            />
+          ) : (
+            <span key={`${participant.puuid}-${slot}`} className="lol-score-item-empty" />
+          ),
+        )}
+      </div>
+      <div className="lol-rift-kda">
+        <strong>{`${participant.kills} / ${participant.deaths} / ${participant.assists}`}</strong>
+      </div>
+      <span className="lol-rift-damage">{formatCompact(participant.damage)}</span>
     </div>
   );
 }

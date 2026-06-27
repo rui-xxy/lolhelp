@@ -2527,6 +2527,12 @@
     line-height: 1;
   }
 
+  .lol-rift-badge-icon svg {
+    width: 11px;
+    height: 11px;
+    stroke-width: 2.4;
+  }
+
   .lol-rift-badge--gold {
     color: #8a5c00;
     background: linear-gradient(135deg, rgba(255, 225, 122, 0.95), rgba(255, 247, 204, 0.92));
@@ -2576,5 +2582,115 @@
     height: 34px;
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.12);
+  }
+}
+
+@layer components {
+  .lol-rift-grid,
+  .lol-rift-row {
+    display: grid;
+    grid-template-columns: minmax(330px, 1.35fr) minmax(158px, 0.8fr) 78px 72px;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .lol-rift-grid--head {
+    min-height: 21px;
+    padding: 0 4px;
+    border-bottom: 0;
+    color: #858b95;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .lol-rift-grid--head span:nth-child(n+2) {
+    text-align: center;
+  }
+
+  .lol-rift-team-rows {
+    gap: 4px;
+  }
+
+  .lol-rift-row,
+  .lol-rift-team--blue .lol-rift-row,
+  .lol-rift-team--red .lol-rift-row {
+    min-height: 52px;
+    padding: 4px 4px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .lol-rift-row:hover {
+    background: rgba(255, 255, 255, 0.48);
+  }
+
+  .lol-rift-row--target,
+  .lol-rift-team--blue .lol-rift-row--target,
+  .lol-rift-team--red .lol-rift-row--target {
+    background:
+      linear-gradient(90deg, rgba(255, 56, 92, 0.08), transparent 58%),
+      transparent !important;
+    box-shadow: none;
+  }
+
+  .lol-rift-row--recurring {
+    box-shadow: none;
+  }
+
+  .lol-rift-player-cell {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 92px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 42px 21px 21px;
+  }
+
+  .lol-rift-identity {
+    align-content: center;
+  }
+
+  .lol-rift-rank {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 4px;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .lol-rift-rank-empty {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-rift-items {
+    display: grid;
+    grid-template-columns: repeat(7, 22px);
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .lol-rift-items img {
+    border-radius: 4px;
+  }
+
+  .lol-rift-kda,
+  .lol-rift-damage {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-rift-damage {
+    color: #111827;
   }
 }
