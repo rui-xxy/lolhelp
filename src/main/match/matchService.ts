@@ -324,10 +324,10 @@ const PLAYER_RANK_CACHE_TTL_MS = 5 * 60 * 1000;
 const PLAYER_RANK_CACHE_MAX_ENTRIES = 500;
 const playerRankCache = new Map<
   string,
-  { value: PlayerRankSummary | null; expiresAt: number }
+  { value: PlayerRankSummary[]; expiresAt: number }
 >();
 
-function cachePlayerRank(puuid: string, value: PlayerRankSummary | null): void {
+function cachePlayerRanks(puuid: string, value: PlayerRankSummary[]): void {
   if (playerRankCache.size >= PLAYER_RANK_CACHE_MAX_ENTRIES) {
     const oldestKey = playerRankCache.keys().next().value as string | undefined;
     if (oldestKey) playerRankCache.delete(oldestKey);
@@ -338,8 +338,8 @@ function cachePlayerRank(puuid: string, value: PlayerRankSummary | null): void {
   });
 }
 
-export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
-  if (!puuid) return null;
+export async function fetchPlayerRanksByPuuid(puuid: string): Promise<PlayerRankSummary[]> {
+  if (!puuid) return [];
   const cached = playerRankCache.get(puuid);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value;
@@ -350,19 +350,29 @@ export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankS
 
   const creds = getCachedCredentials();
   if (!creds) {
-    return null;
+    return [];
   }
 
   const client = new LcuClient(creds);
-  let rank = await fetchRankByPuuid(client, puuid);
-  if (!rank) {
+  let ranks = await fetchRanksByPuuid(client, puuid);
+  if (ranks.length === 0) {
     const summonerId = await fetchSummonerIdByPuuid(client, puuid);
     if (summonerId) {
-      rank = await fetchRankByPuuid(client, '', summonerId);
+      ranks = await fetchRanksByPuuid(client, '', summonerId);
     }
   }
-  cachePlayerRank(puuid, rank);
-  return rank;
+  cachePlayerRanks(puuid, ranks);
+  return ranks;
+}
+
+export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
+  const ranks = await fetchPlayerRanksByPuuid(puuid);
+  const preferred = pickPreferredRank(ranks);
+  if (preferred || !puuid) return preferred;
+
+  const creds = getCachedCredentials();
+  if (!creds) return null;
+  return fetchRankByPuuid(new LcuClient(creds), puuid);
 }
 
 // 按 Riot ID（名字#数字）查 puuid。

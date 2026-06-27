@@ -1,8 +1,13 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
-import { searchPlayer } from '../../match/matchService';
+import { fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
-import type { ChampionSummary, PlayerLookupRequest, PlayerLookupResult } from '../../../shared/api';
+import type {
+  ChampionSummary,
+  PlayerLookupRequest,
+  PlayerLookupResult,
+  PlayerRankSummary,
+} from '../../../shared/api';
 import { validatePlayerLookupRequest } from '../validation';
 
 // 注册 match 域 IPC 处理器。
@@ -13,6 +18,13 @@ export function registerMatchHandlers(): void {
     IPC_CHANNELS.MATCH_SEARCH,
     async (_event, req: PlayerLookupRequest): Promise<PlayerLookupResult> => {
       return searchPlayer(validatePlayerLookupRequest(req));
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MATCH_GET_PLAYER_RANKS,
+    async (_event, puuid: string): Promise<PlayerRankSummary[]> => {
+      return fetchPlayerRanksByPuuid(String(puuid ?? ''));
     },
   );
 

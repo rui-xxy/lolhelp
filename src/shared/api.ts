@@ -761,6 +761,8 @@ export interface MatchParticipantSummary {
   tripleKills?: number;
   quadraKills?: number;
   pentaKills?: number;
+  rank?: PlayerRankSummary | null;
+  ranks?: PlayerRankSummary[];
   teamDamagePercentage?: number; // 伤害占团队比例（0~1，MVP 综合分用）
 }
 
@@ -855,6 +857,7 @@ export interface PlayerLookupResult {
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
+  getPlayerRanks: (puuid: string) => Promise<PlayerRankSummary[]>;
   // 返回英雄列表（给前端英雄选择器用）
   getChampions: () => Promise<ChampionSummary[]>;
 }

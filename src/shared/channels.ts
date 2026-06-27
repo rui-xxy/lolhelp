@@ -40,6 +40,7 @@ export const IPC_CHANNELS = {
   CONFIG_DELETE_PROFILE: 'config:delete-profile',
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
+  MATCH_GET_PLAYER_RANKS: 'match:get-player-ranks',
   // window 域：窗口控制
   WINDOW_SET_WIDTH: 'window:set-width',
   // live 域：实时对局

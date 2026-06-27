@@ -1,9 +1,11 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { GameIcon } from './GameIcon';
+import { RankEmblem } from '../RankEmblem';
 import type {
   MatchParticipantStats,
   MatchParticipantSummary,
   PlayerMatchDetail,
+  PlayerRankSummary,
   PlayerRuneSummary,
 } from '../../../shared/api';
 import type { RecurringMate } from './MatchList';
@@ -147,9 +149,27 @@ const POSITION_ORDER: Record<string, number> = {
 };
 
 const LINK_TONES: LinkTone[] = ['amber', 'cyan', 'violet', 'rose', 'emerald'];
+const RIFT_SCOREBOARD_QUEUE_IDS = new Set([400, 420, 430, 440, 490]);
+
+const RANK_TIER_NAMES: Record<string, string> = {
+  CHALLENGER: '王者',
+  GRANDMASTER: '宗师',
+  MASTER: '大师',
+  DIAMOND: '钻石',
+  EMERALD: '翡翠',
+  PLATINUM: '铂金',
+  GOLD: '黄金',
+  SILVER: '白银',
+  BRONZE: '青铜',
+  IRON: '黑铁',
+};
 
 function shouldShowPosition(queueId: number): boolean {
   return queueId === 420 || queueId === 440;
+}
+
+function shouldUseRiftScoreboard(queueId: number): boolean {
+  return RIFT_SCOREBOARD_QUEUE_IDS.has(queueId);
 }
 
 function buildPremadeToneMap(players: MatchParticipantSummary[], reserveAmber: boolean): Map<string, LinkTone> {
@@ -261,9 +281,117 @@ function teamTotals(players: MatchParticipantSummary[]) {
   );
 }
 
+interface RiftBadge {
+  key: string;
+  label: string;
+  title: string;
+  tone: 'gold' | 'red' | 'violet' | 'blue' | 'green';
+  icon: string;
+}
+
+function performanceScore(player: MatchParticipantSummary, teamKills: number): number {
+  const killParticipation = teamKills > 0 ? (player.kills + player.assists) / teamKills : 0;
+  return (
+    player.kills * 3 +
+    player.assists * 1.35 -
+    player.deaths * 1.8 +
+    player.damage / 1200 +
+    stat(player, 'totalDamageTaken') / 1800 +
+    stat(player, 'visionScore') * 0.12 +
+    killParticipation * 8
+  );
+}
+
+function buildRiftBadges(participants: MatchParticipantSummary[]): Map<string, RiftBadge[]> {
+  const badges = new Map<string, RiftBadge[]>();
+  const maxDamage = Math.max(0, ...participants.map((player) => player.damage));
+  const maxTaken = Math.max(0, ...participants.map((player) => stat(player, 'totalDamageTaken')));
+  const totalsByTeam = new Map<number, ReturnType<typeof teamTotals>>();
+  for (const teamId of [100, 200]) {
+    totalsByTeam.set(teamId, teamTotals(participants.filter((player) => player.teamId === teamId)));
+  }
+
+  const scoreEntries = participants.map((player) => ({
+    player,
+    score: performanceScore(player, totalsByTeam.get(player.teamId)?.kills ?? 0),
+  }));
+  const winnerBest = scoreEntries
+    .filter(({ player }) => player.win)
+    .sort((a, b) => b.score - a.score)[0]?.player.puuid;
+  const loserBest = scoreEntries
+    .filter(({ player }) => !player.win)
+    .sort((a, b) => b.score - a.score)[0]?.player.puuid;
+
+  for (const player of participants) {
+    const next: RiftBadge[] = [];
+    if (player.puuid === winnerBest) {
+      next.push({ key: 'mvp', label: 'MVP', title: '本队综合表现最佳', tone: 'gold', icon: '★' });
+    } else if (player.puuid === loserBest) {
+      next.push({ key: 'svp', label: 'SVP', title: '败方综合表现最佳', tone: 'violet', icon: '◆' });
+    }
+
+    if (player.pentaKills && player.pentaKills > 0) {
+      next.push({ key: 'penta', label: '五杀', title: '本局拿到五杀', tone: 'red', icon: 'Ⅴ' });
+    } else if (player.quadraKills && player.quadraKills > 0) {
+      next.push({ key: 'quadra', label: '四杀', title: '本局拿到四杀', tone: 'red', icon: 'Ⅳ' });
+    } else if (player.tripleKills && player.tripleKills > 0) {
+      next.push({ key: 'triple', label: '三杀', title: '本局拿到三杀', tone: 'red', icon: 'Ⅲ' });
+    } else if ((player.largestMultiKill ?? 0) >= 3) {
+      next.push({
+        key: 'multi',
+        label: `${player.largestMultiKill}杀`,
+        title: '本局最高多杀',
+        tone: 'red',
+        icon: '✦',
+      });
+    }
+
+    if (player.damage === maxDamage && maxDamage > 0) {
+      next.push({ key: 'damage', label: '伤害最多', title: '全场对英雄伤害最高', tone: 'red', icon: '⚔' });
+    }
+    if (stat(player, 'totalDamageTaken') === maxTaken && maxTaken > 0) {
+      next.push({ key: 'taken', label: '承伤最多', title: '全场承受伤害最高', tone: 'blue', icon: '盾' });
+    }
+    if ((player.largestKillingSpree ?? 0) >= 7) {
+      next.push({ key: 'legendary', label: '超神', title: '最高连杀达到超神', tone: 'green', icon: '↑' });
+    }
+
+    badges.set(player.puuid, next.slice(0, 4));
+  }
+
+  return badges;
+}
+
+function rankForQueue(
+  participant: MatchParticipantSummary,
+  queueId: number,
+  rankOverrides?: Record<string, PlayerRankSummary[]>,
+): PlayerRankSummary | null {
+  const ranks = rankOverrides?.[participant.puuid] ?? participant.ranks ?? (participant.rank ? [participant.rank] : []);
+  if (ranks.length === 0) return null;
+  const preferredQueue = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
+  return (
+    ranks.find((rank) => rank.queueType === preferredQueue) ??
+    ranks.find((rank) => rank.queueType === 'RANKED_SOLO_5x5') ??
+    ranks.find((rank) => rank.queueType === 'RANKED_FLEX_SR') ??
+    ranks[0] ??
+    null
+  );
+}
+
+function rankDisplay(rank: PlayerRankSummary | null): string {
+  if (!rank) return '未定级';
+  const tier = RANK_TIER_NAMES[rank.tier] ?? rank.tier;
+  const division = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(rank.tier) ? '' : rank.division;
+  const points = rank.leaguePoints > 0 ? String(rank.leaguePoints) : '';
+  return [tier, division, points].filter(Boolean).join(' ');
+}
+
 export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('scoreboard');
   const [chartMetricKey, setChartMetricKey] = useState(CHART_METRICS[0].key);
+  const [rankByPuuid, setRankByPuuid] = useState<Record<string, PlayerRankSummary[]>>({});
+  const useRiftScoreboard = shouldUseRiftScoreboard(match.queueId);
 
   const participants = useMemo(
     () => match.participants
@@ -276,6 +404,38 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
       .map(({ participant }) => participant),
     [match.participants],
   );
+
+  useEffect(() => {
+    if (!useRiftScoreboard) return;
+    const puuids = Array.from(new Set(participants.map((participant) => participant.puuid).filter(Boolean)));
+    if (puuids.length === 0) return;
+
+    let cancelled = false;
+    void Promise.all(
+      puuids.map(async (puuid) => {
+        try {
+          const ranks = await window.lolHelper.match.getPlayerRanks(puuid);
+          return [puuid, ranks] as const;
+        } catch {
+          return [puuid, [] as PlayerRankSummary[]] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setRankByPuuid((prev) => {
+        const next = { ...prev };
+        for (const [puuid, ranks] of entries) {
+          next[puuid] = ranks;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [match.gameId, participants, useRiftScoreboard]);
+
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
   const showPosition = shouldShowPosition(match.queueId);
   const selectedChartMetric =
@@ -304,13 +464,25 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
 
       <div className="lol-postgame-content">
         {activeTab === 'scoreboard' && (
-          <ScoreboardTab
-            participants={participants}
-            targetPuuid={targetPuuid}
-            recurringMates={recurringMates}
-            onPlayerSearch={onPlayerSearch}
-            showPosition={showPosition}
-          />
+          useRiftScoreboard ? (
+            <RiftScoreboardTab
+              participants={participants}
+              targetPuuid={targetPuuid}
+              recurringMates={recurringMates}
+              onPlayerSearch={onPlayerSearch}
+              showPosition={showPosition}
+              queueId={match.queueId}
+              rankByPuuid={rankByPuuid}
+            />
+          ) : (
+            <ScoreboardTab
+              participants={participants}
+              targetPuuid={targetPuuid}
+              recurringMates={recurringMates}
+              onPlayerSearch={onPlayerSearch}
+              showPosition={showPosition}
+            />
+          )
         )}
         {activeTab === 'stats' && <StatsTab participants={participants} targetPuuid={targetPuuid} />}
         {activeTab === 'charts' && (
@@ -353,6 +525,218 @@ function ScoreboardTab({
           showPosition={showPosition}
         />
       ))}
+    </div>
+  );
+}
+
+function RiftScoreboardTab({
+  participants,
+  targetPuuid,
+  recurringMates,
+  onPlayerSearch,
+  showPosition,
+  queueId,
+  rankByPuuid,
+}: {
+  participants: MatchParticipantSummary[];
+  targetPuuid: string;
+  recurringMates?: Map<string, RecurringMate>;
+  onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
+  queueId: number;
+  rankByPuuid: Record<string, PlayerRankSummary[]>;
+}) {
+  const badgesByPuuid = useMemo(() => buildRiftBadges(participants), [participants]);
+
+  return (
+    <div className="lol-rift-scoreboard">
+      {[100, 200].map((id) => (
+        <RiftScoreboardTeam
+          key={id}
+          teamId={id}
+          players={participants.filter((player) => player.teamId === id)}
+          targetPuuid={targetPuuid}
+          recurringMates={recurringMates}
+          onPlayerSearch={onPlayerSearch}
+          showPosition={showPosition}
+          queueId={queueId}
+          rankByPuuid={rankByPuuid}
+          badgesByPuuid={badgesByPuuid}
+        />
+      ))}
+    </div>
+  );
+}
+
+function RiftScoreboardTeam({
+  teamId,
+  players,
+  targetPuuid,
+  recurringMates,
+  onPlayerSearch,
+  showPosition,
+  queueId,
+  rankByPuuid,
+  badgesByPuuid,
+}: {
+  teamId: number;
+  players: MatchParticipantSummary[];
+  targetPuuid: string;
+  recurringMates?: Map<string, RecurringMate>;
+  onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
+  queueId: number;
+  rankByPuuid: Record<string, PlayerRankSummary[]>;
+  badgesByPuuid: Map<string, RiftBadge[]>;
+}) {
+  const totals = teamTotals(players);
+  const tone = teamTone(teamId);
+  const won = players[0]?.win ?? false;
+  const hasRecurringMate = players.some(
+    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
+  );
+  const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+
+  return (
+    <section className={`lol-rift-team lol-rift-team--${tone}`}>
+      <div className="lol-rift-team-bar">
+        <div className="lol-rift-team-title">
+          <span className="lol-score-team-line" />
+          <span>{teamLabel(teamId)}</span>
+          <span className="lol-score-team-result">{won ? 'WIN' : 'LOSE'}</span>
+        </div>
+        <div className="lol-rift-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
+      </div>
+
+      <div className="lol-rift-team-rows">
+        {players.map((player) => {
+          const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
+          const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
+          const linkTone = isLinkedByHistory
+            ? 'amber'
+            : player.premadeId
+              ? premadeToneById.get(player.premadeId)
+              : undefined;
+
+          return (
+            <RiftScoreboardRow
+              key={`${player.puuid}-${player.championId}`}
+              participant={player}
+              isTarget={player.puuid === targetPuuid}
+              isRecurring={isRecurring}
+              onPlayerSearch={onPlayerSearch}
+              showPosition={showPosition}
+              linkTone={linkTone}
+              queueId={queueId}
+              rankByPuuid={rankByPuuid}
+              badges={badgesByPuuid.get(player.puuid) ?? []}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function RiftScoreboardRow({
+  participant,
+  isTarget,
+  isRecurring,
+  onPlayerSearch,
+  showPosition,
+  linkTone,
+  queueId,
+  rankByPuuid,
+  badges,
+}: {
+  participant: MatchParticipantSummary;
+  isTarget: boolean;
+  isRecurring: boolean;
+  onPlayerSearch?: (riotId: string) => void;
+  showPosition: boolean;
+  linkTone?: LinkTone;
+  queueId: number;
+  rankByPuuid: Record<string, PlayerRankSummary[]>;
+  badges: RiftBadge[];
+}) {
+  const name = playerName(participant);
+  const rank = rankForQueue(participant, queueId, rankByPuuid);
+
+  return (
+    <div
+      className={`lol-rift-row ${isTarget ? 'lol-rift-row--target' : ''} ${
+        isRecurring ? 'lol-rift-row--recurring' : ''
+      }`}
+    >
+      <div className="lol-rift-loadout">
+        <div className="lol-rift-champion">
+          <GameIcon
+            src={participant.championAvatar}
+            alt={participant.championName}
+            title={`${participant.championName} Lv.${participant.champLevel}`}
+            size={42}
+            rounded
+          />
+          <span>{participant.champLevel}</span>
+        </div>
+        <div className="lol-rift-spells">
+          {participant.spells.map((spell) => (
+            <GameIcon
+              key={`${participant.puuid}-${spell.id}`}
+              src={spell.icon}
+              alt={spell.name}
+              title={spell.name}
+              size={19}
+            />
+          ))}
+        </div>
+        <div className="lol-rift-runes">
+          {[participant.primaryRune, participant.secondaryRune]
+            .filter((rune): rune is PlayerRuneSummary => Boolean(rune))
+            .map((rune) => (
+              <GameIcon
+                key={`${participant.puuid}-${rune.id}`}
+                src={rune.icon}
+                alt={rune.name}
+                title={rune.name}
+                size={19}
+              />
+            ))}
+        </div>
+      </div>
+
+      <div className="lol-rift-identity">
+        <button
+          type="button"
+          className={`lol-rift-player-name ${
+            linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
+          }`}
+          title={name}
+          onClick={() => onPlayerSearch?.(name)}
+        >
+          {name}
+        </button>
+        <div className="lol-rift-badges">
+          {showPosition && (
+            <span className="lol-rift-role-badge">{positionLabel(participant.teamPosition)}</span>
+          )}
+          {badges.map((badge) => (
+            <span
+              key={badge.key}
+              className={`lol-rift-badge lol-rift-badge--${badge.tone}`}
+              title={badge.title}
+            >
+              <span className="lol-rift-badge-icon">{badge.icon}</span>
+              <span>{badge.label}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="lol-rift-rank" title={rank?.displayText ?? '未定级'}>
+        {rank ? <RankEmblem rank={rank} size={34} variant="mini" /> : <span className="lol-rift-rank-empty" />}
+        <span>{rankDisplay(rank)}</span>
+      </div>
     </div>
   );
 }
