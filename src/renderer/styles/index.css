@@ -2476,25 +2476,6 @@
     overflow: hidden;
   }
 
-  .lol-rift-role-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    height: 17px;
-    max-width: 82px;
-    padding: 0 5px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 17px;
-    white-space: nowrap;
-  }
-
-  .lol-rift-role-badge {
-    color: #64748b;
-    background: rgba(100, 116, 139, 0.1);
-  }
-
   .lol-rift-badge {
     display: block;
     flex: 0 0 auto;
@@ -2742,14 +2723,6 @@
   .lol-rift-badges {
     gap: 3px;
     min-height: 16px;
-  }
-
-  .lol-rift-role-badge {
-    height: 16px;
-    max-width: 68px;
-    padding-inline: 4px;
-    font-size: 10px;
-    line-height: 16px;
   }
 
   .lol-rift-badge {

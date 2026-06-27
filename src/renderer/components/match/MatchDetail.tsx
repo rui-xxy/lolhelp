@@ -141,16 +141,6 @@ const STATS_GROUPS: StatsGroup[] = [
   },
 ];
 
-const POSITION_LABELS: Record<string, string> = {
-  TOP: '上路',
-  JUNGLE: '打野',
-  MIDDLE: '中路',
-  MID: '中路',
-  BOTTOM: '下路',
-  UTILITY: '辅助',
-  SUPPORT: '辅助',
-};
-
 const POSITION_ORDER: Record<string, number> = {
   TOP: 0,
   JUNGLE: 1,
@@ -176,10 +166,6 @@ const RANK_TIER_NAMES: Record<string, string> = {
   BRONZE: '青铜',
   IRON: '黑铁',
 };
-
-function shouldShowPosition(queueId: number): boolean {
-  return queueId === 420 || queueId === 440;
-}
 
 function shouldUseRiftScoreboard(queueId: number): boolean {
   return RIFT_SCOREBOARD_QUEUE_IDS.has(queueId);
@@ -226,10 +212,6 @@ function teamTone(teamId: number): string {
 
 function playerName(participant: MatchParticipantSummary): string {
   return participant.riotId || participant.summonerName || '未知玩家';
-}
-
-function positionLabel(position: string): string {
-  return (POSITION_LABELS[position.toUpperCase()] ?? position) || '—';
 }
 
 function positionOrder(participant: MatchParticipantSummary): number {
@@ -462,7 +444,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
   }, [match.gameId, participants, useRiftScoreboard]);
 
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
-  const showPosition = shouldShowPosition(match.queueId);
   const selectedChartMetric =
     CHART_METRICS.find((metric) => metric.key === chartMetricKey) ?? CHART_METRICS[0];
 
@@ -495,7 +476,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
               targetPuuid={targetPuuid}
               recurringMates={recurringMates}
               onPlayerSearch={onPlayerSearch}
-              showPosition={showPosition}
               queueId={match.queueId}
               rankByPuuid={rankByPuuid}
             />
@@ -505,7 +485,6 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
               targetPuuid={targetPuuid}
               recurringMates={recurringMates}
               onPlayerSearch={onPlayerSearch}
-              showPosition={showPosition}
             />
           )
         )}
@@ -529,13 +508,11 @@ function ScoreboardTab({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
-  showPosition,
 }: {
   participants: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
 }) {
   return (
     <div className="lol-scoreboard">
@@ -547,7 +524,6 @@ function ScoreboardTab({
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
           onPlayerSearch={onPlayerSearch}
-          showPosition={showPosition}
         />
       ))}
     </div>
@@ -559,7 +535,6 @@ function RiftScoreboardTab({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
-  showPosition,
   queueId,
   rankByPuuid,
 }: {
@@ -567,7 +542,6 @@ function RiftScoreboardTab({
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
 }) {
@@ -583,7 +557,6 @@ function RiftScoreboardTab({
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
           onPlayerSearch={onPlayerSearch}
-          showPosition={showPosition}
           queueId={queueId}
           rankByPuuid={rankByPuuid}
           badgesByPuuid={badgesByPuuid}
@@ -599,7 +572,6 @@ function RiftScoreboardTeam({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
-  showPosition,
   queueId,
   rankByPuuid,
   badgesByPuuid,
@@ -609,7 +581,6 @@ function RiftScoreboardTeam({
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
   badgesByPuuid: Map<string, RiftBadge[]>;
@@ -646,7 +617,6 @@ function RiftScoreboardTeam({
               isTarget={player.puuid === targetPuuid}
               isRecurring={isRecurring}
               onPlayerSearch={onPlayerSearch}
-              showPosition={showPosition}
               linkTone={linkTone}
               queueId={queueId}
               rankByPuuid={rankByPuuid}
@@ -664,7 +634,6 @@ function RiftScoreboardRow({
   isTarget,
   isRecurring,
   onPlayerSearch,
-  showPosition,
   linkTone,
   queueId,
   rankByPuuid,
@@ -674,7 +643,6 @@ function RiftScoreboardRow({
   isTarget: boolean;
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
   linkTone?: LinkTone;
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
@@ -739,9 +707,6 @@ function RiftScoreboardRow({
           {name}
         </button>
         <div className="lol-rift-badges">
-          {showPosition && (
-            <span className="lol-rift-role-badge">{positionLabel(participant.teamPosition)}</span>
-          )}
           {badges.map((badge) => (
             <img
               key={badge.key}
@@ -788,14 +753,12 @@ function ScoreboardTeam({
   targetPuuid,
   recurringMates,
   onPlayerSearch,
-  showPosition,
 }: {
   teamId: number;
   players: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
 }) {
   const totals = teamTotals(players);
   const tone = teamTone(teamId);
@@ -838,7 +801,6 @@ function ScoreboardTeam({
             isTarget={player.puuid === targetPuuid}
             isRecurring={isRecurring}
             onPlayerSearch={onPlayerSearch}
-            showPosition={showPosition}
             linkTone={linkTone}
           />
         );
@@ -852,14 +814,12 @@ function ScoreboardRow({
   isTarget,
   isRecurring,
   onPlayerSearch,
-  showPosition,
   linkTone,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
-  showPosition: boolean;
   linkTone?: LinkTone;
 }) {
   const slots = itemSlots(participant);
@@ -900,7 +860,6 @@ function ScoreboardRow({
           >
             {name}
           </button>
-          {showPosition && <span>{positionLabel(participant.teamPosition)}</span>}
         </div>
       </div>
       <div className="lol-score-runes">
