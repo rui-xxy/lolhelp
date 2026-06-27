@@ -688,7 +688,7 @@ function RiftScoreboardRow({
     <div
       className={`lol-rift-row ${isTarget ? 'lol-rift-row--target' : ''} ${
         isRecurring ? 'lol-rift-row--recurring' : ''
-      }`}
+      } ${linkTone ? `lol-rift-row--linked lol-rift-row--linked-${linkTone}` : ''}`}
     >
       <div className="lol-rift-player-cell">
         <div className="lol-rift-loadout">

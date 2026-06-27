@@ -2789,4 +2789,53 @@
   .lol-rift-damage {
     font-size: 12px;
   }
+
+  .lol-rift-row--linked {
+    --lol-score-link-color: #b7791f;
+    --lol-score-link-soft: rgba(245, 158, 11, 0.24);
+    box-shadow:
+      inset 4px 0 0 var(--lol-score-link-color),
+      inset 0 0 0 1px var(--lol-score-link-soft) !important;
+  }
+
+  .lol-rift-row--linked-amber {
+    --lol-score-link-color: #b7791f;
+    --lol-score-link-soft: rgba(245, 158, 11, 0.26);
+    --lol-score-link-glow: rgba(245, 158, 11, 0.22);
+  }
+
+  .lol-rift-row--linked-cyan {
+    --lol-score-link-color: #0584a2;
+    --lol-score-link-soft: rgba(6, 182, 212, 0.24);
+    --lol-score-link-glow: rgba(6, 182, 212, 0.2);
+  }
+
+  .lol-rift-row--linked-violet {
+    --lol-score-link-color: #7652c7;
+    --lol-score-link-soft: rgba(139, 92, 246, 0.24);
+    --lol-score-link-glow: rgba(139, 92, 246, 0.2);
+  }
+
+  .lol-rift-row--linked-rose {
+    --lol-score-link-color: #be4564;
+    --lol-score-link-soft: rgba(244, 63, 94, 0.24);
+    --lol-score-link-glow: rgba(244, 63, 94, 0.18);
+  }
+
+  .lol-rift-row--linked-emerald {
+    --lol-score-link-color: #087f5b;
+    --lol-score-link-soft: rgba(16, 185, 129, 0.24);
+    --lol-score-link-glow: rgba(16, 185, 129, 0.2);
+  }
+
+  .lol-rift-row--linked .lol-rift-champion img,
+  .lol-rift-row--linked .lol-rift-champion > span:first-child {
+    border-color: var(--lol-score-link-color) !important;
+    box-shadow: 0 0 0 2px var(--lol-score-link-soft);
+  }
+
+  .lol-rift-row--linked .lol-rift-player-name {
+    color: var(--lol-score-link-color);
+    text-shadow: 0 0 10px var(--lol-score-link-glow);
+  }
 }
