@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bot,
+  Gift,
+  PackageOpen,
   ShieldAlert,
   Sparkles,
   UserRoundCog,
@@ -34,12 +36,18 @@ import { TextInput } from './AssistControls';
 import {
   FriendsSection,
 } from './AssistSocialSections';
+import {
+  LootDisenchantSection,
+  RewardsClaimSection,
+} from './AssistLootRewardsSections';
 
 type SectionKey =
   | 'automation'
   | 'champions'
   | 'builds'
   | 'friends'
+  | 'loot'
+  | 'rewards'
   | 'account'
   | 'blacklist';
 
@@ -52,6 +60,8 @@ const sections: Array<{
   { key: 'champions', label: '英雄禁选', icon: WandSparkles },
   { key: 'builds', label: '符文装备', icon: Sparkles },
   { key: 'friends', label: '好友管理', icon: Users },
+  { key: 'loot', label: '碎片分解', icon: PackageOpen },
+  { key: 'rewards', label: '奖励获取', icon: Gift },
   { key: 'account', label: '账号展示', icon: UserRoundCog },
   { key: 'blacklist', label: '黑名单', icon: ShieldAlert },
 ];
@@ -384,6 +394,12 @@ export function AssistPage({
               deleteSelectedFriends={deleteSelectedFriends}
               setOperationState={setOperationState}
             />
+          )}
+          {activeSection === 'loot' && (
+            <LootDisenchantSection setOperationState={setOperationState} />
+          )}
+          {activeSection === 'rewards' && (
+            <RewardsClaimSection setOperationState={setOperationState} />
           )}
           {activeSection === 'account' && (
             <AccountSection

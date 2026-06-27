@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   AppSettings,
   AssistOverlayName,
+  AssistClaimRewardRequest,
+  AssistDisenchantRequest,
   AssistRecommendationRequest,
   LolConfigApplyProfileRequest,
   LolConfigApplyValuesRequest,
@@ -70,6 +72,19 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_LOCK_CURRENT_CHAMPION),
     applyAccountSettings: () =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_APPLY_ACCOUNT_SETTINGS),
+    getLoot: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_LOOT),
+    disenchantChampionShard: (request: AssistDisenchantRequest) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ASSIST_DISENCHANT_CHAMPION_SHARD,
+        request,
+      ),
+    getRewards: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_REWARDS),
+    claimReward: (request: AssistClaimRewardRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_CLAIM_REWARD, request),
+    claimRewards: (requests: AssistClaimRewardRequest[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_CLAIM_REWARDS, requests),
     toggleOverlay: (name: AssistOverlayName) =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY, name),
     setOverlayPinned: (name: AssistOverlayName, pinned: boolean) =>

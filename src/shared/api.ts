@@ -293,6 +293,47 @@ export interface AssistOperationResult {
   message: string;
 }
 
+export interface AssistChampionShard {
+  lootId: string;
+  championId: number;
+  name: string;
+  icon: string;
+  count: number;
+  value: number;
+  disenchantValue: number;
+}
+
+export interface AssistLootSummary {
+  championEssence: number;
+  shards: AssistChampionShard[];
+}
+
+export interface AssistDisenchantRequest {
+  lootId: string;
+  count: number;
+}
+
+export interface AssistRewardItem {
+  id: string;
+  title: string;
+}
+
+export interface AssistRewardGrant {
+  id: string;
+  status: string;
+  granteeId: string;
+  rewardGroupId: string;
+  title: string;
+  rewards: AssistRewardItem[];
+  disabled: boolean;
+}
+
+export interface AssistClaimRewardRequest {
+  rewardId: string;
+  rewardGroupId: string;
+  selections: string[];
+}
+
 export interface AssistLiveSpell {
   id: number;
   name: string;
@@ -337,6 +378,17 @@ export interface AssistApi {
   getProfileIcons: () => Promise<AssistProfileIcon[]>;
   lockCurrentChampion: () => Promise<AssistOperationResult>;
   applyAccountSettings: () => Promise<AssistOperationResult[]>;
+  getLoot: () => Promise<AssistLootSummary>;
+  disenchantChampionShard: (
+    request: AssistDisenchantRequest,
+  ) => Promise<AssistOperationResult>;
+  getRewards: () => Promise<AssistRewardGrant[]>;
+  claimReward: (
+    request: AssistClaimRewardRequest,
+  ) => Promise<AssistOperationResult>;
+  claimRewards: (
+    requests: AssistClaimRewardRequest[],
+  ) => Promise<AssistOperationResult[]>;
   toggleOverlay: (name: AssistOverlayName) => Promise<boolean>;
   setOverlayPinned: (name: AssistOverlayName, pinned: boolean) => Promise<boolean>;
   getLiveData: () => Promise<AssistLiveData>;

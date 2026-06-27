@@ -1,6 +1,8 @@
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
 import type {
+  AssistClaimRewardRequest,
+  AssistDisenchantRequest,
   AssistOverlayName,
   AssistRecommendationRequest,
 } from '../../../shared/api';
@@ -12,6 +14,13 @@ import {
   lockAssistCurrentChampion,
 } from '../../assist/championGuide';
 import { getAssistProfileIcons } from '../../assist/profileIcons';
+import {
+  claimAssistReward,
+  claimAssistRewards,
+  disenchantAssistChampionShard,
+  getAssistLoot,
+  getAssistRewards,
+} from '../../assist/lootRewards';
 import {
   applyAssistRecommendation,
   getAssistRecommendation,
@@ -53,6 +62,22 @@ export function registerAssistHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_APPLY_ACCOUNT_SETTINGS,
     () => applyAssistAccountSettings(),
+  );
+  ipcMain.handle(IPC_CHANNELS.ASSIST_GET_LOOT, () => getAssistLoot());
+  ipcMain.handle(
+    IPC_CHANNELS.ASSIST_DISENCHANT_CHAMPION_SHARD,
+    (_event, request: AssistDisenchantRequest) =>
+      disenchantAssistChampionShard(request?.lootId, request?.count),
+  );
+  ipcMain.handle(IPC_CHANNELS.ASSIST_GET_REWARDS, () => getAssistRewards());
+  ipcMain.handle(
+    IPC_CHANNELS.ASSIST_CLAIM_REWARD,
+    (_event, request: AssistClaimRewardRequest) => claimAssistReward(request),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ASSIST_CLAIM_REWARDS,
+    (_event, requests: AssistClaimRewardRequest[]) =>
+      claimAssistRewards(Array.isArray(requests) ? requests : []),
   );
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY,
