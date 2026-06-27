@@ -683,7 +683,7 @@ function RiftScoreboardRow({
             src={participant.championAvatar}
             alt={participant.championName}
             title={`${participant.championName} Lv.${participant.champLevel}`}
-            size={42}
+            size={36}
             rounded
           />
           <span>{participant.champLevel}</span>
@@ -695,7 +695,7 @@ function RiftScoreboardRow({
               src={spell.icon}
               alt={spell.name}
               title={spell.name}
-              size={19}
+              size={17}
             />
           ))}
         </div>
@@ -708,7 +708,7 @@ function RiftScoreboardRow({
                 src={rune.icon}
                 alt={rune.name}
                 title={rune.name}
-                size={19}
+                size={17}
               />
             ))}
         </div>
@@ -743,7 +743,7 @@ function RiftScoreboardRow({
       </div>
 
       <div className="lol-rift-rank" title={rank?.displayText ?? '未定级'}>
-        {rank ? <RankEmblem rank={rank} size={24} variant="mini" /> : <span className="lol-rift-rank-empty" />}
+        {rank ? <RankEmblem rank={rank} size={22} variant="mini" /> : <span className="lol-rift-rank-empty" />}
         <span>{rankDisplay(rank)}</span>
       </div>
       </div>

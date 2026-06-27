@@ -2694,3 +2694,130 @@
     color: #111827;
   }
 }
+
+@layer components {
+  .lol-rift-scoreboard {
+    gap: 14px;
+    padding: 0;
+  }
+
+  .lol-rift-team {
+    gap: 0;
+  }
+
+  .lol-rift-team + .lol-rift-team {
+    margin-top: 14px;
+  }
+
+  .lol-rift-team-bar {
+    min-height: 30px;
+    padding-inline: 0;
+    color: #64748b;
+  }
+
+  .lol-rift-grid,
+  .lol-rift-row {
+    grid-template-columns: minmax(324px, 2.15fr) minmax(178px, 1.15fr) 82px 72px;
+    gap: 10px;
+  }
+
+  .lol-rift-grid--head {
+    min-height: 28px;
+    padding-inline: 0;
+  }
+
+  .lol-rift-row,
+  .lol-rift-team--blue .lol-rift-row,
+  .lol-rift-team--red .lol-rift-row {
+    min-height: 52px;
+    padding: 7px 0;
+    font-size: 12px;
+  }
+
+  .lol-rift-player-cell {
+    grid-template-columns: 80px minmax(0, 1fr) 86px;
+    gap: 7px;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 36px 18px 18px;
+    gap: 4px;
+  }
+
+  .lol-rift-champion {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+  }
+
+  .lol-rift-champion img,
+  .lol-rift-champion > span:first-child {
+    border: 1px solid rgba(200, 170, 110, 0.56);
+  }
+
+  .lol-rift-champion span {
+    right: -3px;
+    bottom: -3px;
+    min-width: 17px;
+    height: 17px;
+    border: 1px solid rgba(200, 170, 110, 0.72);
+    border-radius: 999px;
+    background: #010a13;
+    color: var(--lol-gold-bright);
+    line-height: 15px;
+  }
+
+  .lol-rift-spells,
+  .lol-rift-runes {
+    gap: 2px;
+  }
+
+  .lol-rift-spells img,
+  .lol-rift-runes img {
+    width: 17px !important;
+    height: 17px !important;
+    border-radius: 4px;
+  }
+
+  .lol-rift-player-name {
+    max-width: 118px;
+    font-size: 12px;
+  }
+
+  .lol-rift-badges {
+    gap: 3px;
+    min-height: 16px;
+  }
+
+  .lol-rift-role-badge,
+  .lol-rift-badge {
+    height: 16px;
+    max-width: 68px;
+    padding-inline: 4px;
+    font-size: 10px;
+    line-height: 16px;
+  }
+
+  .lol-rift-badge-icon,
+  .lol-rift-badge-icon svg {
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
+  }
+
+  .lol-rift-rank {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 3px;
+    font-size: 10px;
+  }
+
+  .lol-rift-rank-empty {
+    width: 22px;
+    height: 22px;
+  }
+
+  .lol-rift-items {
+    grid-template-columns: repeat(7, 22px);
+    gap: 2px;
+  }
+}
