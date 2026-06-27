@@ -2793,9 +2793,6 @@
   .lol-rift-row--linked {
     --lol-score-link-color: #b7791f;
     --lol-score-link-soft: rgba(245, 158, 11, 0.24);
-    box-shadow:
-      inset 4px 0 0 var(--lol-score-link-color),
-      inset 0 0 0 1px var(--lol-score-link-soft) !important;
   }
 
   .lol-rift-row--linked-amber {
