@@ -2437,22 +2437,6 @@
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
   }
 
-  .lol-rift-champion span {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 3px;
-    border-radius: 7px 0 8px 0;
-    background: rgba(15, 23, 42, 0.84);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 16px;
-    text-align: center;
-  }
-
   .lol-rift-spells,
   .lol-rift-runes {
     display: grid;
@@ -2736,19 +2720,6 @@
   .lol-rift-champion img,
   .lol-rift-champion > span:first-child {
     border: 1px solid rgba(200, 170, 110, 0.56);
-  }
-
-  .lol-rift-champion span {
-    right: -3px;
-    bottom: -3px;
-    min-width: 17px;
-    height: 17px;
-    border: 1px solid rgba(200, 170, 110, 0.72);
-    border-radius: 999px;
-    background: #010a13;
-    color: var(--lol-gold-bright);
-    font-size: 10px;
-    line-height: 15px;
   }
 
   .lol-rift-spells,

@@ -700,7 +700,6 @@ function RiftScoreboardRow({
             size={40}
             rounded
           />
-          <span>{participant.champLevel}</span>
         </div>
         <div className="lol-rift-spells">
           {participant.spells.map((spell) => (
