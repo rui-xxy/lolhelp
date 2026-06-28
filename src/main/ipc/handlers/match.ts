@@ -23,8 +23,8 @@ export function registerMatchHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.MATCH_GET_PLAYER_RANKS,
-    async (_event, puuid: string): Promise<PlayerRankSummary[]> => {
-      return fetchPlayerRanksByPuuid(String(puuid ?? ''));
+    async (_event, puuid: string, region?: string): Promise<PlayerRankSummary[]> => {
+      return fetchPlayerRanksByPuuid(String(puuid ?? ''), typeof region === 'string' ? region : undefined);
     },
   );
 

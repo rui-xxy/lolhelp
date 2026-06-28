@@ -87,7 +87,9 @@ export function App() {
         className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none"
       >
         {regions.map((r) => (
-          <option key={r.key} value={r.key}>{r.name}</option>
+          <option key={r.key} value={r.key} title={'description' in r ? r.description : undefined}>
+            {'description' in r && r.description ? `${r.name}（${r.description}）` : r.name}
+          </option>
         ))}
       </select>
       <div className="relative">

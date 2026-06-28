@@ -4,6 +4,10 @@ import { getCachedCredentials } from '../lcu/lockfile';
 import { LcuClient } from '../lcu/client';
 import { buildProfileIcon } from '../lcu/gameData';
 import { getRegionConfig } from '../sgp/region';
+import {
+  lookupRiotAccountByRiotId,
+  normalizeRiotIdInput,
+} from '../riot/playerAccount';
 import { extractMatchDetail, buildLookupSummary, type SgpGame } from './matchMapper';
 import type {
   PlayerLookupRequest,
@@ -80,11 +84,22 @@ async function requestWithRetry<T>(
     if (msg.includes('401') || msg.includes('403')) {
       invalidateSgpAuth();
       const newAuth = await getSgpAuth();
-      const newClient = new SgpClient(newAuth);
+      const newClient = new SgpClient({ ...newAuth, region: client.auth.region });
       return await newClient.get<T>(path, params);
     }
     throw err;
   }
+}
+
+async function getSgpAuthForRegion(region?: string) {
+  let auth = await getSgpAuth();
+  if (region) {
+    const targetRegion = getRegionConfig(region);
+    if (targetRegion) {
+      auth = { ...auth, region: targetRegion };
+    }
+  }
+  return auth;
 }
 
 function collectRankQueues(stats: LcuRankedStats | LcuRankQueue[] | null | undefined): LcuRankQueue[] {
@@ -135,6 +150,7 @@ function mapRankQueue(queue: LcuRankQueue): PlayerRankSummary | null {
   if (!tier) return null;
 
   const queueType = queue.queueType ?? queue.queue ?? '';
+  if (queueType !== 'RANKED_SOLO_5x5' && queueType !== 'RANKED_FLEX_SR') return null;
   const queueName = RANK_QUEUE_NAMES[queueType] ?? '';
   const division = normalizeRankDivision(queue.division ?? queue.rank);
   const leaguePoints = toFiniteNumber(queue.leaguePoints ?? queue.ratedRating);
@@ -303,6 +319,66 @@ async function fetchCurrentRanks(
   return fetchRanksByPuuid(client, puuid ?? '', summonerId);
 }
 
+async function fetchSgpRanksByPuuid(
+  auth: Awaited<ReturnType<typeof getSgpAuth>>,
+  puuid: string,
+): Promise<PlayerRankSummary[]> {
+  if (!puuid) return [];
+  try {
+    const client = new SgpClient(auth);
+    const stats = await requestWithRetry<LcuRankedStats | LcuRankQueue[]>(
+      client,
+      `/leagues-ledge/v2/rankedStats/puuid/${encodeURIComponent(puuid)}`,
+    );
+    return getRankSummaries(stats);
+  } catch (err) {
+    console.warn('[match] SGP 段位查询失败:', puuid, err);
+    return [];
+  }
+}
+
+async function fetchLcuSummonerProfileByPuuid(
+  client: LcuClient,
+  puuid: string,
+): Promise<{
+  riotId: string;
+  level: number;
+  profileIconId: number;
+  summonerId?: number;
+} | null> {
+  const paths = [
+    `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(puuid)}`,
+    `/lol-summoner/v1/summoners/puuid/${encodeURIComponent(puuid)}`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const summoner = await client.get<{
+        gameName?: string;
+        tagLine?: string;
+        displayName?: string;
+        name?: string;
+        summonerId?: number;
+        summonerLevel?: number;
+        profileIconId?: number;
+      }>(path);
+      const gameName = summoner.gameName || summoner.displayName || summoner.name || '';
+      const riotId = gameName && summoner.tagLine && !gameName.includes('#')
+        ? `${gameName}#${summoner.tagLine}`
+        : gameName;
+      return {
+        riotId,
+        level: summoner.summonerLevel ?? 0,
+        profileIconId: summoner.profileIconId ?? 0,
+        summonerId: summoner.summonerId,
+      };
+    } catch {
+      // Some clients only support one of the two puuid endpoints.
+    }
+  }
+  return null;
+}
+
 async function fetchSummonerIdByPuuid(client: LcuClient, puuid: string): Promise<number | undefined> {
   const paths = [
     `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(puuid)}`,
@@ -338,14 +414,29 @@ function cachePlayerRanks(puuid: string, value: PlayerRankSummary[]): void {
   });
 }
 
-export async function fetchPlayerRanksByPuuid(puuid: string): Promise<PlayerRankSummary[]> {
+export async function fetchPlayerRanksByPuuid(
+  puuid: string,
+  region?: string,
+): Promise<PlayerRankSummary[]> {
   if (!puuid) return [];
-  const cached = playerRankCache.get(puuid);
+  const cacheKey = `${region ? getRegionConfig(region)?.key ?? region : 'current'}:${puuid}`;
+  const cached = playerRankCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value;
   }
   if (cached) {
-    playerRankCache.delete(puuid);
+    playerRankCache.delete(cacheKey);
+  }
+
+  if (region) {
+    try {
+      const auth = await getSgpAuthForRegion(region);
+      const ranks = await fetchSgpRanksByPuuid(auth, puuid);
+      cachePlayerRanks(cacheKey, ranks);
+      return ranks;
+    } catch {
+      // Fall back to local LCU below.
+    }
   }
 
   const creds = getCachedCredentials();
@@ -361,7 +452,15 @@ export async function fetchPlayerRanksByPuuid(puuid: string): Promise<PlayerRank
       ranks = await fetchRanksByPuuid(client, '', summonerId);
     }
   }
-  cachePlayerRanks(puuid, ranks);
+  if (ranks.length === 0) {
+    try {
+      const auth = await getSgpAuthForRegion(region);
+      ranks = await fetchSgpRanksByPuuid(auth, puuid);
+    } catch {
+      // Rank is optional.
+    }
+  }
+  cachePlayerRanks(cacheKey, ranks);
   return ranks;
 }
 
@@ -389,6 +488,33 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{
   championCount: number | null;
   skinCount: number | null;
 } | null> {
+  try {
+    const riotAccount = await lookupRiotAccountByRiotId(riotId);
+    if (riotAccount?.puuid) {
+      const creds = getCachedCredentials();
+      const client = creds ? new LcuClient(creds) : null;
+      const lcuProfile = client
+        ? await fetchLcuSummonerProfileByPuuid(client, riotAccount.puuid)
+        : null;
+      const ranks = client && lcuProfile
+        ? await fetchRanksByPuuid(client, riotAccount.puuid, lcuProfile.summonerId)
+        : [];
+      const counts = await fetchCollectionCounts(riotAccount.puuid);
+      return {
+        puuid: riotAccount.puuid,
+        riotId: lcuProfile?.riotId || riotAccount.riotId,
+        level: lcuProfile?.level ?? 0,
+        profileIconId: lcuProfile?.profileIconId ?? 0,
+        rank: pickPreferredRank(ranks),
+        ranks,
+        championCount: counts.championCount,
+        skinCount: counts.skinCount,
+      };
+    }
+  } catch (err) {
+    console.warn('[match] RiotClient Riot ID 查询失败，回退到 LCU:', riotId, err);
+  }
+
   const creds = getCachedCredentials();
   if (!creds) return null;
   const client = new LcuClient(creds);
@@ -486,30 +612,17 @@ async function fetchCurrentSummonerProfile(): Promise<{
 export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLookupResult> {
   const count = Math.min(MAX_COUNT, Math.max(1, Math.floor(req.pageSize ?? req.maxMatches ?? DEFAULT_COUNT)));
   const startIndex = Math.max(0, Math.floor(req.startIndex ?? 0));
-  // 清洗输入：去不可见字符（零宽/方向控制符），统一各种 # 变体为标准 #，去多余空格
-  const rawName = (req.name ?? '')
-    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '') // 零宽/方向控制符
-    .replace(/[﹟＃]/g, '#') // 全角/变体 # → 标准 #
-    .replace(/\s*#\s*/g, '#') // # 两边空格去掉
-    .trim();
+  // 清洗输入：去不可见字符，统一各种 # 变体为标准 #，去多余空格。
+  const rawName = normalizeRiotIdInput(req.name ?? '');
   const inputName = rawName;
   const isSelfQuery = ['', '自己', '我', 'me', 'self'].includes(inputName.toLowerCase());
 
   // 1. SGP 认证（同时拿到当前账号 puuid + 大区 + entitlements token）
   let auth;
   try {
-    auth = await getSgpAuth();
+    auth = await getSgpAuthForRegion(req.region);
   } catch (err) {
     return emptyResult(err instanceof Error ? err.message : String(err));
-  }
-
-  // 如果指定了目标大区，覆盖 auth 的 region（跨区查询）。
-  // entitlements token 通用，能查任何大区；puuid 只在玩家注册的大区有数据。
-  if (req.region) {
-    const targetRegion = getRegionConfig(req.region);
-    if (targetRegion) {
-      auth = { ...auth, region: targetRegion };
-    }
   }
 
   // 2. 确定查谁的 puuid
@@ -548,6 +661,11 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     ranks = lookup.ranks;
     championCount = lookup.championCount;
     skinCount = lookup.skinCount;
+  }
+
+  if (targetPuuid && ranks.length === 0) {
+    ranks = await fetchSgpRanksByPuuid(auth, targetPuuid);
+    rank = pickPreferredRank(ranks);
   }
 
   // 3. 请求战绩列表（用 targetPuuid，查自己或他人）
@@ -642,20 +760,12 @@ export async function resolvePuuid(
 ): Promise<{ puuid: string; riotId: string } | null> {
   let auth;
   try {
-    auth = await getSgpAuth();
+    auth = await getSgpAuthForRegion(region);
   } catch {
     return null;
   }
-  if (region) {
-    const targetRegion = getRegionConfig(region);
-    if (targetRegion) auth = { ...auth, region: targetRegion };
-  }
 
-  const rawName = (seedId ?? '')
-    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
-    .replace(/[﹟＃]/g, '#')
-    .replace(/\s*#\s*/g, '#')
-    .trim();
+  const rawName = normalizeRiotIdInput(seedId ?? '');
   const isSelf = ['', '自己', '我', 'me', 'self'].includes(rawName.toLowerCase());
 
   if (isSelf) {
@@ -676,13 +786,9 @@ export async function fetchMatchesByPuuid(
 ): Promise<PlayerMatchDetail[]> {
   let auth;
   try {
-    auth = await getSgpAuth();
+    auth = await getSgpAuthForRegion(region);
   } catch {
     return [];
-  }
-  if (region) {
-    const targetRegion = getRegionConfig(region);
-    if (targetRegion) auth = { ...auth, region: targetRegion };
   }
 
   const safeCount = Math.min(MAX_COUNT, Math.max(1, Math.floor(count)));

@@ -12,7 +12,7 @@ const SGP_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 //
 // 实测验证：能查完整历史战绩（100+场），不受 LCU 21 场缓存限制。
 export class SgpClient {
-  constructor(private auth: SgpAuth) {}
+  constructor(public readonly auth: SgpAuth) {}
 
   // 发 GET 请求到 SGP。path 形如 '/match-history-query/v1/...'。
   // params 作为 query string 拼接。

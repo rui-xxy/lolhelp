@@ -1,4 +1,4 @@
-import { LOL_REGIONS } from '../../shared/constants';
+import { LOL_REGIONS, LOL_REGION_ALIASES } from '../../shared/constants';
 
 // 国服大区码 → SGP 战绩服务器域名映射。
 // 数据来自参考项目 my-app/src/main/lolClient.ts 的 TENCENT_REGIONS（完整 27 个大区）。
@@ -17,18 +17,39 @@ function r(key: string, name: string, host: string): RegionConfig {
   return { key, name, matchHistory: host, common: host };
 }
 
-const NON_K8S_REGIONS = new Set(['BGP1', 'NJ100', 'GZ100', 'CQ100', 'TJ100', 'TJ101']);
-const REGION_LIST: RegionConfig[] = LOL_REGIONS.map(({ key, name }) => {
-  const prefix = key.toLowerCase();
-  const host = NON_K8S_REGIONS.has(key)
-    ? `https://${prefix}-sgp.lol.qq.com:21019`
-    : `https://${prefix}-k8s-sgp.lol.qq.com:21019`;
-  return r(key, name, host);
-});
+const REGION_HOSTS: Record<string, string> = {
+  HN1: 'https://hn1-k8s-sgp.lol.qq.com:21019',
+  HN10: 'https://hn10-k8s-sgp.lol.qq.com:21019',
+  BGP2: 'https://bgp2-k8s-sgp.lol.qq.com:21019',
+  NJ100: 'https://nj100-sgp.lol.qq.com:21019',
+  GZ100: 'https://gz100-sgp.lol.qq.com:21019',
+  CQ100: 'https://cq100-sgp.lol.qq.com:21019',
+  TJ100: 'https://tj100-sgp.lol.qq.com:21019',
+  TJ101: 'https://tj101-sgp.lol.qq.com:21019',
+  PBE: 'https://pbe-sgp.lol.qq.com:21019',
+  PREPBE: 'https://prepbe-sgp.lol.qq.com:21019',
+};
+
+const REGION_ALIAS_BY_KEY = new Map<string, string>(
+  LOL_REGION_ALIASES.map((region) => [region.key, region.targetKey]),
+);
+
+const REGION_LIST: RegionConfig[] = LOL_REGIONS.map(({ key, name }) =>
+  r(key, name, REGION_HOSTS[key] ?? `https://${key.toLowerCase()}-sgp.lol.qq.com:21019`),
+);
+
+export function normalizeRegionKey(key: string): string {
+  const raw = String(key ?? '').trim().toUpperCase().replace(/^TENCENT_/, '');
+  return REGION_ALIAS_BY_KEY.get(raw) ?? raw;
+}
 
 // 按大区码查 SGP 配置。未知大区返回 null。
 export function getRegionConfig(key: string): RegionConfig | null {
-  return REGION_LIST.find((reg) => reg.key === key.toUpperCase()) ?? null;
+  const normalized = normalizeRegionKey(key);
+  const region = REGION_LIST.find((reg) => reg.key === normalized);
+  if (region) return region;
+  const host = REGION_HOSTS[normalized];
+  return host ? r(normalized, normalized, host) : null;
 }
 
 // 所有支持的大区（供 UI 大区选择器用）。
@@ -40,5 +61,5 @@ export function getAllRegions(): RegionConfig[] {
 export function extractRegionFromLocation(location: string): string {
   if (!location) return '';
   const parts = location.split('.');
-  return parts[parts.length - 1].toUpperCase();
+  return normalizeRegionKey(parts[parts.length - 1]);
 }

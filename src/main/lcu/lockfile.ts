@@ -8,6 +8,12 @@ export interface LcuCredentials {
   protocol: string;
 }
 
+export interface RiotClientCredentials {
+  port: string;
+  token: string;
+  rsoPlatformId?: string;
+}
+
 const CANDIDATE_CLIENT_DIRS = [
   path.join('WeGameApps', '英雄联盟', 'LeagueClient'),
   path.join('英雄联盟', 'LeagueClient'),
@@ -74,6 +80,30 @@ function readFromUxLog(clientDir: string): LcuCredentials | null {
   }
 }
 
+function readRiotClientFromUxLog(clientDir: string): RiotClientCredentials | null {
+  const logPath = findLatestUxLog(clientDir);
+  if (!logPath) return null;
+
+  try {
+    const fd = fs.openSync(logPath, 'r');
+    const buf = Buffer.alloc(300 * 1024);
+    const bytesRead = fs.readSync(fd, buf, 0, buf.length, 0);
+    fs.closeSync(fd);
+    const content = buf.subarray(0, bytesRead).toString('utf-8');
+    const portMatch = content.match(/--riotclient-app-port=(\d+)/);
+    const tokenMatch = content.match(/--riotclient-auth-token=([A-Za-z0-9_-]+)/);
+    const platformMatch = content.match(/--rso_platform_id=([A-Za-z0-9_-]+)/);
+    if (!portMatch || !tokenMatch) return null;
+    return {
+      port: portMatch[1],
+      token: tokenMatch[1],
+      rsoPlatformId: platformMatch?.[1],
+    };
+  } catch {
+    return null;
+  }
+}
+
 function tryResolveFromDir(clientDir: string): LcuCredentials | null {
   try {
     const creds = readFromLockfile(clientDir);
@@ -111,6 +141,14 @@ export function readLockfile(): LcuCredentials | null {
   return null;
 }
 
+export function readRiotClientCredentials(): RiotClientCredentials | null {
+  for (const dir of resolveClientDirs()) {
+    const creds = readRiotClientFromUxLog(dir);
+    if (creds) return creds;
+  }
+  return null;
+}
+
 export function readCredentialsForInstallRoot(rootPath?: string): LcuCredentials | null {
   if (rootPath) {
     const clientDir = path.join(rootPath, 'LeagueClient');
@@ -126,6 +164,8 @@ export function readCredentialsForInstallRoot(rootPath?: string): LcuCredentials
 const CREDS_CACHE_TTL = 30_000;
 let cachedCreds: LcuCredentials | null = null;
 let cachedCredsAt = 0;
+let cachedRiotClientCreds: RiotClientCredentials | null = null;
+let cachedRiotClientCredsAt = 0;
 
 export function getCachedCredentials(): LcuCredentials | null {
   const now = Date.now();
@@ -137,7 +177,21 @@ export function getCachedCredentials(): LcuCredentials | null {
   return creds;
 }
 
+export function getCachedRiotClientCredentials(): RiotClientCredentials | null {
+  const now = Date.now();
+  if (cachedRiotClientCreds && now - cachedRiotClientCredsAt < CREDS_CACHE_TTL) {
+    return cachedRiotClientCreds;
+  }
+
+  const creds = readRiotClientCredentials();
+  cachedRiotClientCreds = creds;
+  cachedRiotClientCredsAt = creds ? now : 0;
+  return creds;
+}
+
 export function invalidateCredentialsCache(): void {
   cachedCreds = null;
   cachedCredsAt = 0;
+  cachedRiotClientCreds = null;
+  cachedRiotClientCredsAt = 0;
 }

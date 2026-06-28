@@ -949,6 +949,7 @@ export function MatchHistoryPage({
             <MatchDetail
               match={selectedMatch}
               targetPuuid={activeTab.result?.profile.puuid ?? ''}
+              region={activeTab.region}
               recurringMates={recurringMates}
               onPlayerSearch={handlePlayerSearch}
             />

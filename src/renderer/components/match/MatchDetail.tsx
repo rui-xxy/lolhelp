@@ -29,6 +29,7 @@ type LinkTone = 'amber' | 'cyan' | 'violet' | 'rose' | 'emerald';
 interface MatchDetailProps {
   match: PlayerMatchDetail;
   targetPuuid: string;
+  region?: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
 }
@@ -390,7 +391,7 @@ function rankDisplay(rank: PlayerRankSummary | null): string {
   return [tier, division, points].filter(Boolean).join(' ');
 }
 
-export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch }: MatchDetailProps) {
+export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlayerSearch }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('scoreboard');
   const [chartMetricKey, setChartMetricKey] = useState(CHART_METRICS[0].key);
   const [rankByPuuid, setRankByPuuid] = useState<Record<string, PlayerRankSummary[]>>({});
@@ -417,7 +418,7 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
     void Promise.all(
       puuids.map(async (puuid) => {
         try {
-          const ranks = await window.lolHelper.match.getPlayerRanks(puuid);
+          const ranks = await window.lolHelper.match.getPlayerRanks(puuid, region);
           return [puuid, ranks] as const;
         } catch {
           return [puuid, [] as PlayerRankSummary[]] as const;
@@ -437,7 +438,7 @@ export function MatchDetail({ match, targetPuuid, recurringMates, onPlayerSearch
     return () => {
       cancelled = true;
     };
-  }, [match.gameId, participants, useRiftScoreboard]);
+  }, [match.gameId, participants, region, useRiftScoreboard]);
 
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
   const selectedChartMetric =

@@ -42,8 +42,8 @@ const lolHelper: LolHelper = {
   match: {
     search: (req: PlayerLookupRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
-    getPlayerRanks: (puuid: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid),
+    getPlayerRanks: (puuid: string, region?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid, region),
     getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
   },
   live: {
