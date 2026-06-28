@@ -202,10 +202,6 @@ function formatCompact(value: number): string {
   return String(Math.round(value));
 }
 
-function teamLabel(teamId: number): string {
-  return teamId === 100 ? '蓝色方' : '红色方';
-}
-
 function teamTone(teamId: number): string {
   return teamId === 100 ? 'blue' : 'red';
 }
@@ -760,9 +756,7 @@ function ScoreboardTeam({
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
 }) {
-  const totals = teamTotals(players);
   const tone = teamTone(teamId);
-  const won = players[0]?.win ?? false;
   const hasRecurringMate = players.some(
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
@@ -770,14 +764,6 @@ function ScoreboardTeam({
 
   return (
     <section className={`lol-score-team lol-score-team--${tone}`}>
-      <div className="lol-score-team-bar">
-        <div className="lol-score-team-title">
-          <span className="lol-score-team-line" />
-          <span>{teamLabel(teamId)}</span>
-          <span className="lol-score-team-result">{won ? 'WIN' : 'LOSE'}</span>
-        </div>
-        <div className="lol-score-team-total">{`${totals.kills} / ${totals.deaths} / ${totals.assists}`}</div>
-      </div>
       <div className="lol-score-grid lol-score-grid--head">
         <span>玩家</span>
         <span>符文 / 强化</span>
@@ -836,7 +822,7 @@ function ScoreboardRow({
       <div className="lol-score-player">
         <div className="lol-score-spells">
           {participant.spells.map((spell) => (
-            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={17} />
+            <GameIcon key={`${participant.puuid}-${spell.id}`} src={spell.icon} alt={spell.name} title={spell.name} size={18} />
           ))}
         </div>
         <div className="lol-score-champion">
@@ -844,7 +830,7 @@ function ScoreboardRow({
             src={participant.championAvatar}
             alt={participant.championName}
             title={`${participant.championName} Lv.${participant.champLevel}`}
-            size={34}
+            size={40}
             rounded
           />
           <span>{participant.champLevel}</span>
@@ -885,7 +871,7 @@ function ScoreboardRow({
               src={item.icon}
               alt={item.name}
               title={item.name}
-              size={22}
+              size={24}
             />
           ) : (
             <span key={`${participant.puuid}-${slot}`} className="lol-score-item-empty" />
