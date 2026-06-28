@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { ChevronDown, Globe2, Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
@@ -71,6 +71,11 @@ export function App() {
   }, [activeView]);
 
   const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
+  const formatRegionOption = (region: (typeof regions)[number]) => {
+    if (!region.key) return `当前区服：${region.name}`;
+    const description = 'description' in region ? region.description : '';
+    return description ? `${region.name}（${description}）` : region.name;
+  };
 
   // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (
@@ -79,34 +84,39 @@ export function App() {
         e.preventDefault();
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="flex items-center gap-2"
+      className="flex h-9 items-center gap-1.5 rounded-full border border-app-primary/20 bg-app-surface-soft/95 p-1 shadow-sm shadow-app-primary/5 ring-1 ring-white/70"
     >
-      <select
-        value={matchRegion}
-        onChange={(e) => setMatchRegion(e.target.value)}
-        className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none"
-      >
-        {regions.map((r) => (
-          <option key={r.key} value={r.key} title={'description' in r ? r.description : undefined}>
-            {'description' in r && r.description ? `${r.name}（${r.description}）` : r.name}
-          </option>
-        ))}
-      </select>
+      <div className="relative flex h-7 w-44 shrink-0 items-center">
+        <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary" />
+        <select
+          value={matchRegion}
+          onChange={(e) => setMatchRegion(e.target.value)}
+          className="h-7 w-full appearance-none rounded-full border border-app-border/70 bg-app-surface py-0 pr-7 pl-7 text-xs font-medium text-app-text outline-none transition-colors hover:border-app-primary/40 focus:border-app-primary focus:ring-2 focus:ring-app-primary/15"
+        >
+          {regions.map((r) => (
+            <option key={r.key} value={r.key} title={'description' in r ? r.description : undefined}>
+              {formatRegionOption(r)}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-app-subtle" />
+      </div>
+      <div className="h-5 w-px shrink-0 bg-app-border" />
       <div className="relative">
-        <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" />
+        <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-primary" />
         <input
           type="text"
           value={matchSearchName}
           onChange={(e) => setMatchSearchName(e.target.value)}
-          placeholder="名字#数字（留空查自己）"
-          className="h-8 w-56 rounded-sm border border-app-border bg-app-surface-soft pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle focus:border-app-primary focus:bg-app-surface focus:outline-none"
+          placeholder="输入 Riot ID：名字#编号，不填查自己"
+          className="h-7 w-72 rounded-full border border-transparent bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none transition-colors focus:border-app-primary/25 focus:bg-app-surface"
         />
       </div>
       <button
         type="submit"
-        className="h-8 rounded-sm bg-app-primary px-3 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover"
+        className="h-7 shrink-0 rounded-full bg-gradient-to-r from-app-primary to-[#ff6b85] px-4 text-xs font-semibold text-white shadow-sm shadow-app-primary/25 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-app-primary/25 active:translate-y-0"
       >
-        查询
+        跨区查询
       </button>
     </form>
   ) : null;
