@@ -5,7 +5,7 @@ import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
-import { saveMatchesForProfile } from './savedMatchesStore';
+import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesStore';
 
 const PAGE_SIZE = 12;
 const SGP_BATCH = 100;
@@ -14,6 +14,7 @@ interface MatchHistoryPageProps {
   searchName: string;
   searchTrigger: number;
   region?: string;
+  savedAccountRequest?: { account: SavedMatchAccount; nonce: number } | null;
   onPlayerSearch?: (name: string) => void;
 }
 
@@ -31,6 +32,9 @@ interface MatchTab {
   selectedGameId: number | null;
   currentPage: number;
   filterQueue: string; // '' = 全部，'420' = 单排，'450' = 大乱斗 等
+  source?: 'search' | 'saved';
+  savedAccountId?: string;
+  savedMatches?: PlayerMatchDetail[];
 }
 
 // 模式筛选选项（tag → 中文名，tag 是 SGP 的 q_{queueId} 格式）
@@ -75,6 +79,33 @@ function createEmptyResult(error: string): PlayerLookupResult {
     totalMatches: 0,
     error,
   };
+}
+
+function buildLookupResultFromSavedAccount(account: SavedMatchAccount): PlayerLookupResult {
+  const matches = [...account.matches].sort((a, b) => b.gameCreation - a.gameCreation);
+  const wins = matches.filter((match) => match.win).length;
+  const losses = matches.length - wins;
+  const divisor = Math.max(1, matches.length);
+
+  return {
+    profile: account.profile,
+    matches,
+    summary: {
+      wins,
+      losses,
+      averageKda: matches.reduce((sum, match) => sum + match.kda, 0) / divisor,
+      averageDamage: matches.reduce((sum, match) => sum + match.damage, 0) / divisor,
+      averageCs: matches.reduce((sum, match) => sum + match.cs, 0) / divisor,
+    },
+    totalMatches: matches.length,
+  };
+}
+
+function filterSavedMatches(matches: PlayerMatchDetail[], queueKey: string): PlayerMatchDetail[] {
+  if (!queueKey) return matches;
+  const queueId = Number(queueKey);
+  if (!Number.isFinite(queueId)) return matches;
+  return matches.filter((match) => match.queueId === queueId);
 }
 
 function makeTabId(): string {
@@ -266,6 +297,7 @@ export function MatchHistoryPage({
   searchName,
   searchTrigger,
   region = '',
+  savedAccountRequest,
   onPlayerSearch,
 }: MatchHistoryPageProps) {
   const [tabs, setTabs] = useState<MatchTab[]>([]);
@@ -391,6 +423,60 @@ export function MatchHistoryPage({
     void loadInitialTab(tabId, query, regionKey);
   };
 
+  const openSavedAccountTab = (account: SavedMatchAccount) => {
+    const result = buildLookupResultFromSavedAccount(account);
+    const matches = result.matches;
+    const title = `${getDisplayName(account.profile.riotId)} · 保存`;
+    const existingTab = tabsRef.current.find(
+      (tab) => tab.source === 'saved' && tab.savedAccountId === account.id,
+    );
+
+    if (existingTab) {
+      updateTab(existingTab.id, (tab) => ({
+        ...tab,
+        title,
+        loading: false,
+        pageLoading: false,
+        result,
+        matches: filterSavedMatches(matches, tab.filterQueue),
+        savedMatches: matches,
+        loadedUpTo: matches.length,
+        hasMore: false,
+        selectedGameId: filterSavedMatches(matches, tab.filterQueue)[0]?.gameId ?? null,
+        currentPage: 1,
+      }));
+      setActiveTabId(existingTab.id);
+      setProfilePanelTabId(null);
+      setSaveModeTabId(null);
+      return;
+    }
+
+    const tabId = makeTabId();
+    const tab: MatchTab = {
+      id: tabId,
+      query: account.profile.riotId,
+      region: account.region,
+      title,
+      loading: false,
+      pageLoading: false,
+      result,
+      matches,
+      savedMatches: matches,
+      source: 'saved',
+      savedAccountId: account.id,
+      loadedUpTo: matches.length,
+      hasMore: false,
+      selectedGameId: matches[0]?.gameId ?? null,
+      currentPage: 1,
+      filterQueue: '',
+    };
+
+    setTabs((currentTabs) => [...currentTabs, tab]);
+    setActiveTabId(tabId);
+    setProfilePanelTabId(null);
+    setSaveModeTabId(null);
+  };
+
   useEffect(() => {
     if (searchTrigger === lastTriggerRef.current) return;
     lastTriggerRef.current = searchTrigger;
@@ -398,6 +484,11 @@ export function MatchHistoryPage({
       openSearchTab(searchName, region);
     }
   }, [searchTrigger, searchName, region]);
+
+  useEffect(() => {
+    if (!savedAccountRequest) return;
+    openSavedAccountTab(savedAccountRequest.account);
+  }, [savedAccountRequest?.nonce]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const selectedMatch = activeTab?.matches.find((match) => match.gameId === activeTab.selectedGameId);
@@ -478,6 +569,20 @@ export function MatchHistoryPage({
     if (!activeTab) return;
     setProfilePanelTabId(null);
     stopSaveMode();
+
+    if (activeTab.source === 'saved') {
+      const savedMatches = activeTab.savedMatches ?? activeTab.matches;
+      const nextMatches = filterSavedMatches(savedMatches, queueKey);
+      updateTab(activeTab.id, (tab) => ({
+        ...tab,
+        filterQueue: queueKey,
+        currentPage: 1,
+        matches: nextMatches,
+        selectedGameId: nextMatches[0]?.gameId ?? null,
+      }));
+      return;
+    }
+
     const filter = QUEUE_FILTERS.find((f) => f.key === queueKey);
     const tag = filter?.tag ?? '';
     // 重新加载该 tab（带 tag）
@@ -680,6 +785,10 @@ export function MatchHistoryPage({
                           取消
                         </button>
                       </>
+                    ) : activeTab.source === 'saved' ? (
+                      <span className="h-6 rounded-xs bg-app-surface-soft px-2 leading-6 text-[11px] font-medium text-app-muted">
+                        本地保存
+                      </span>
                     ) : (
                       <button
                         type="button"

@@ -14,7 +14,7 @@ import {
 import { APP_LAYOUT } from '../../shared/constants';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
-export type View = 'home' | 'matches' | 'saved' | 'live' | 'scout' | 'assist';
+export type View = 'home' | 'matches' | 'live' | 'scout' | 'assist';
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
@@ -25,6 +25,8 @@ interface AppShellProps {
   friendPanelHidden?: boolean; // 好友栏是否隐藏
   onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
   chatSessionsOpen?: boolean; // 会话管理窗口是否打开
+  savedMatchesOpen?: boolean;
+  onOpenSavedMatches?: () => void;
   onOpenChatSessions?: () => void; // 打开会话管理窗口
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
   onOpenSettings?: () => void; // 打开设置窗口
@@ -51,6 +53,8 @@ export function AppShell({
   friendPanelHidden = false,
   onToggleFriendPanel,
   chatSessionsOpen = false,
+  savedMatchesOpen = false,
+  onOpenSavedMatches,
   onOpenChatSessions,
   friendPanel,
   onOpenSettings,
@@ -116,18 +120,6 @@ export function AppShell({
           >
             <Swords className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">战绩</span>}
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('saved');
-            }}
-            title={collapsed ? '战绩保存' : undefined}
-            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <BookmarkCheck className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">战绩保存</span>}
           </a>
           <a
             href="#"
@@ -203,8 +195,23 @@ export function AppShell({
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
-          {(onOpenChatSessions || onToggleFriendPanel) && (
+          {(onOpenSavedMatches || onOpenChatSessions || onToggleFriendPanel) && (
             <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
+              {onOpenSavedMatches && (
+                <button
+                  type="button"
+                  onClick={onOpenSavedMatches}
+                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
+                    savedMatchesOpen
+                      ? 'bg-app-surface-soft text-app-primary'
+                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                  }`}
+                  title="保存的战绩"
+                  aria-label="保存的战绩"
+                >
+                  <BookmarkCheck className="size-4" />
+                </button>
+              )}
               {onOpenChatSessions && (
                 <button
                   type="button"
