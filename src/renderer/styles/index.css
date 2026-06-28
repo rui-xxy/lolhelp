@@ -463,6 +463,45 @@
       rgba(123, 66, 216, 0.12) 0 2px 10px;
   }
 
+  .match-result-card--selecting {
+    padding-left: 7px;
+  }
+
+  .match-result-card--checked {
+    border-color: rgba(255, 56, 92, 0.38);
+    background-color: var(--color-app-surface);
+    box-shadow:
+      rgba(255, 56, 92, 0.16) 0 0 0 1px inset,
+      rgba(255, 56, 92, 0.08) 0 2px 10px;
+  }
+
+  .match-result-check {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-app-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: rgba(0, 0, 0, 0.04) 0 1px 3px;
+  }
+
+  .match-result-card--checked .match-result-check {
+    border-color: var(--color-app-primary);
+    background: var(--color-app-primary);
+  }
+
+  .match-result-check > span {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: #fff;
+  }
+
   .match-result-avatar {
     position: relative;
     z-index: 10;

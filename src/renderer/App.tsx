@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { AppShell, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { SavedMatchesPage } from './components/match/SavedMatchesPage';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
@@ -15,6 +16,7 @@ import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
+  saved: '战绩保存',
   live: '实时对局',
   scout: '高手雷达',
   assist: '辅助功能',
@@ -152,7 +154,7 @@ export function App() {
     <AppShell
       title={PAGE_TITLES[activeView]}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
+      fullBleed={activeView === 'matches' || activeView === 'saved' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
@@ -179,6 +181,15 @@ export function App() {
           searchName={matchSearchName}
           searchTrigger={matchSearchTrigger}
           region={matchRegion}
+          onPlayerSearch={(name) => {
+            setMatchSearchName(name);
+            setActiveView('matches');
+            setMatchSearchTrigger((n) => n + 1);
+          }}
+        />
+      </div>
+      <div className={activeView === 'saved' ? 'h-full' : 'hidden'}>
+        <SavedMatchesPage
           onPlayerSearch={(name) => {
             setMatchSearchName(name);
             setActiveView('matches');

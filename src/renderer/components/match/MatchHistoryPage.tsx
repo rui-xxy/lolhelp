@@ -5,6 +5,7 @@ import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
+import { saveMatchesForProfile } from './savedMatchesStore';
 
 const PAGE_SIZE = 12;
 const SGP_BATCH = 100;
@@ -74,10 +75,6 @@ function createEmptyResult(error: string): PlayerLookupResult {
     totalMatches: 0,
     error,
   };
-}
-
-function getRankText(profile: PlayerLookupResult['profile'] | null | undefined): string {
-  return profile?.rank?.displayText || '未定级';
 }
 
 function makeTabId(): string {
@@ -275,6 +272,8 @@ export function MatchHistoryPage({
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
   const [profilePanelTabId, setProfilePanelTabId] = useState<string | null>(null);
+  const [saveModeTabId, setSaveModeTabId] = useState<string | null>(null);
+  const [saveSelections, setSaveSelections] = useState<Record<string, number[]>>({});
 
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
@@ -444,11 +443,41 @@ export function MatchHistoryPage({
   const pageEnd = displayedMatches.length > 0 ? pageStart + displayedMatches.length - 1 : 0;
   const pageNumbers = activeTab ? getPageNumbers(activeTab.currentPage, totalPages) : [];
   const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
+  const isSaveMode = activeTab ? saveModeTabId === activeTab.id : false;
+  const selectedSaveIds = new Set(activeTab ? saveSelections[activeTab.id] ?? [] : []);
+  const selectedSaveCount = selectedSaveIds.size;
+
+  const stopSaveMode = () => {
+    setSaveModeTabId(null);
+  };
+
+  const handleToggleSaveSelection = (gameId: number) => {
+    if (!activeTab) return;
+    setSaveSelections((current) => {
+      const nextIds = new Set(current[activeTab.id] ?? []);
+      if (nextIds.has(gameId)) {
+        nextIds.delete(gameId);
+      } else {
+        nextIds.add(gameId);
+      }
+      return { ...current, [activeTab.id]: Array.from(nextIds) };
+    });
+  };
+
+  const handleSaveSelectedMatches = () => {
+    if (!activeTab?.result?.profile || selectedSaveIds.size === 0) return;
+    const matchesToSave = activeTab.matches.filter((match) => selectedSaveIds.has(match.gameId));
+    if (matchesToSave.length === 0) return;
+    saveMatchesForProfile(activeTab.result.profile, activeTab.region, matchesToSave);
+    setSaveSelections((current) => ({ ...current, [activeTab.id]: [] }));
+    setSaveModeTabId(null);
+  };
 
   // 切换模式筛选：重新向 SGP 查询该模式的战绩（不是前端过滤）
   const handleFilterChange = (queueKey: string) => {
     if (!activeTab) return;
     setProfilePanelTabId(null);
+    stopSaveMode();
     const filter = QUEUE_FILTERS.find((f) => f.key === queueKey);
     const tag = filter?.tag ?? '';
     // 重新加载该 tab（带 tag）
@@ -521,6 +550,12 @@ export function MatchHistoryPage({
 
   const handleCloseTab = (tabId: string) => {
     setProfilePanelTabId((current) => (current === tabId ? null : current));
+    setSaveModeTabId((current) => (current === tabId ? null : current));
+    setSaveSelections((current) => {
+      const next = { ...current };
+      delete next[tabId];
+      return next;
+    });
     setTabs((currentTabs) => {
       const nextTabs = currentTabs.filter((tab) => tab.id !== tabId);
       if (activeTabId === tabId) {
@@ -626,9 +661,38 @@ export function MatchHistoryPage({
                     已加载 {activeTab.matches.length} 场
                     {activeTab.pageLoading && <span className="ml-2 text-app-primary">加载更早战绩...</span>}
                   </div>
-                  <span className="max-w-[120px] shrink-0 truncate text-right font-medium text-app-text">
-                    {getRankText(activeTab.result?.profile)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {isSaveMode ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={selectedSaveCount === 0}
+                          onClick={handleSaveSelectedMatches}
+                          className="h-6 rounded-xs bg-app-primary px-2 text-[11px] font-medium text-white transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
+                        >
+                          保存{selectedSaveCount > 0 ? selectedSaveCount : ''}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopSaveMode}
+                          className="h-6 rounded-xs px-2 text-[11px] text-app-muted transition-colors hover:bg-app-surface-soft hover:text-app-text"
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfilePanelTabId(null);
+                          setSaveModeTabId(activeTab.id);
+                        }}
+                        className="h-6 rounded-xs px-2 text-[11px] font-medium text-app-primary transition-colors hover:bg-app-surface-soft"
+                      >
+                        保存战绩
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
@@ -696,6 +760,9 @@ export function MatchHistoryPage({
                 }}
                 recurringMates={recurringMates}
                 targetPuuid={targetPuuid}
+                selectionMode={isSaveMode}
+                selectedIds={selectedSaveIds}
+                onToggleSelection={handleToggleSaveSelection}
                 onMateClick={(riotId) => {
                   // 点击队友头像 → 用他的 Riot ID 开新搜索
                   setProfilePanelTabId(null);

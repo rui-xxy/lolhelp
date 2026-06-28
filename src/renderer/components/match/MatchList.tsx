@@ -1,26 +1,27 @@
-import { GameIcon } from './GameIcon';
-import { ProfileIcon } from '../ProfileIcon';
+import type { CSSProperties } from 'react';
 import type { PlayerMatchDetail } from '../../../shared/api';
 import { buildChampionSplashFromAvatar } from '../../../shared/gameAssets';
-import type { CSSProperties } from 'react';
+import { ProfileIcon } from '../ProfileIcon';
+import { GameIcon } from './GameIcon';
 
-// 经常一起玩的队友信息（出现≥2次）
 export interface RecurringMate {
   puuid: string;
   riotId: string;
   profileIconId: number;
   profileIconUrl: string;
-  count: number; // 一起玩了几场
+  count: number;
 }
 
-// 左侧历史战绩列表。每行=队友头像（≥2场的）+英雄头像+模式+KDA。
 interface MatchListProps {
   matches: PlayerMatchDetail[];
   selectedGameId: number | null;
   onSelect: (gameId: number) => void;
-  recurringMates: Map<string, RecurringMate>; // puuid → 队友信息
-  targetPuuid: string; // 当前查询的玩家 puuid（排除自己）
-  onMateClick: (riotId: string) => void; // 点击队友头像查他战绩
+  recurringMates: Map<string, RecurringMate>;
+  targetPuuid: string;
+  onMateClick: (riotId: string) => void;
+  selectionMode?: boolean;
+  selectedIds?: Set<number>;
+  onToggleSelection?: (gameId: number) => void;
 }
 
 const MINUTE_MS = 60 * 1000;
@@ -47,6 +48,9 @@ export function MatchList({
   recurringMates,
   targetPuuid,
   onMateClick,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelection,
 }: MatchListProps) {
   if (matches.length === 0) {
     return (
@@ -58,30 +62,45 @@ export function MatchList({
 
   return (
     <div className="flex h-full flex-col gap-1.5 overflow-hidden">
-      {matches.map((m) => {
-        const isSelected = m.gameId === selectedGameId;
-        const playedAt = formatPlayedAt(m.gameCreation);
-        const resultClass = m.win ? 'match-result-card--win' : 'match-result-card--loss';
+      {matches.map((match) => {
+        const isSelected = match.gameId === selectedGameId;
+        const isChecked = selectedIds?.has(match.gameId) ?? false;
+        const playedAt = formatPlayedAt(match.gameCreation);
+        const resultClass = match.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
-        const fallbackSkinBackground = buildChampionSplashFromAvatar(m.championAvatar, m.championId, null, 1);
+        const fallbackSkinBackground = buildChampionSplashFromAvatar(
+          match.championAvatar,
+          match.championId,
+          null,
+          1,
+        );
         const skinBackground =
-          !m.championSplashUrl || /_0\.jpg$/i.test(m.championSplashUrl)
+          !match.championSplashUrl || /_0\.jpg$/i.test(match.championSplashUrl)
             ? fallbackSkinBackground
-            : m.championSplashUrl;
-
-        // 找这场里同队的、出现≥2次的队友（排除自己）
-        const matesInThisGame = m.participants
-          .filter((p) => p.teamId === m.participants.find((x) => x.puuid === targetPuuid)?.teamId)
-          .filter((p) => p.puuid !== targetPuuid)
-          .filter((p) => recurringMates.has(p.puuid))
-          .slice(0, 3); // 最多显示3个头像
+            : match.championSplashUrl;
+        const myTeam = match.participants.find((participant) => participant.puuid === targetPuuid)?.teamId;
+        const matesInThisGame = match.participants
+          .filter((participant) => participant.teamId === myTeam)
+          .filter((participant) => participant.puuid !== targetPuuid)
+          .filter((participant) => recurringMates.has(participant.puuid))
+          .slice(0, 3);
 
         return (
           <button
-            key={m.gameId}
-            onClick={() => onSelect(m.gameId)}
+            key={match.gameId}
+            type="button"
+            onClick={() => {
+              if (selectionMode) {
+                onToggleSelection?.(match.gameId);
+                return;
+              }
+              onSelect(match.gameId);
+            }}
+            aria-pressed={selectionMode ? isChecked : isSelected}
             className={`match-result-card ${resultClass} ${selectedClass} ${
               skinBackground ? 'match-result-card--has-skin' : ''
+            } ${selectionMode ? 'match-result-card--selecting' : ''} ${
+              isChecked ? 'match-result-card--checked' : ''
             }`}
             style={
               skinBackground
@@ -89,34 +108,39 @@ export function MatchList({
                 : undefined
             }
           >
-        {/* 英雄头像 */}
+            {selectionMode && (
+              <span className="match-result-check" aria-hidden="true">
+                {isChecked && <span />}
+              </span>
+            )}
+
             <GameIcon
-              src={m.championAvatar}
-              alt={m.championName}
-              title={m.championName}
+              src={match.championAvatar}
+              alt={match.championName}
+              title={match.championName}
               size={32}
               rounded
               className={`match-result-avatar ${
-                m.win ? 'match-result-avatar--win' : 'match-result-avatar--loss'
+                match.win ? 'match-result-avatar--win' : 'match-result-avatar--loss'
               }`}
             />
 
-            {/* 中间：模式 + 队友头像 + KDA + 日期 */}
             <div className="relative z-10 flex min-w-0 flex-1 items-center gap-2">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="match-result-mode">{m.queueName}</span>
-                  <span className="match-result-badge">{m.win ? 'WIN' : 'LOSE'}</span>
+                  <span className="match-result-mode">{match.queueName}</span>
+                  <span className="match-result-badge">{match.win ? 'WIN' : 'LOSE'}</span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums">
-                  <span className="text-app-muted">{m.kills}/{m.deaths}/{m.assists}</span>
+                  <span className="text-app-muted">
+                    {match.kills}/{match.deaths}/{match.assists}
+                  </span>
                 </div>
               </div>
 
-              {/* 队友头像（空白区，和英雄头像一样大，重叠显示） */}
               {matesInThisGame.length > 0 && (
                 <div className="group/mates mx-auto flex shrink-0 items-center">
-                  {matesInThisGame.map((mate, idx) => {
+                  {matesInThisGame.map((mate, index) => {
                     const info = recurringMates.get(mate.puuid);
                     if (!info) return null;
                     return (
@@ -125,14 +149,16 @@ export function MatchList({
                         iconId={info.profileIconId}
                         src={info.profileIconUrl}
                         alt={info.riotId}
-                        title={`${info.riotId}（一起${info.count}场）`}
+                        title={`${info.riotId}（一起 ${info.count} 场）`}
                         size={32}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMateClick(info.riotId);
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!selectionMode) {
+                            onMateClick(info.riotId);
+                          }
                         }}
                         className="size-8 cursor-pointer rounded-full border-2 border-app-bg object-cover transition-all hover:z-10 hover:scale-110 group-hover/mates:[&:not(:first-child)]:ml-0"
-                        style={{ marginLeft: idx === 0 ? 0 : -16, zIndex: idx }}
+                        style={{ marginLeft: index === 0 ? 0 : -16, zIndex: index }}
                       />
                     );
                   })}
