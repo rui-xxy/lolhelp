@@ -63,11 +63,19 @@ let dataLoaded = false;
 // datas.json 位置：优先项目根（开发时 process.cwd 是项目根；
 // 打包后 .vite/build 运行时 cwd 可能不同，回退到上一级）。
 function resolveDataPath(): string {
-  const direct = path.resolve(process.cwd(), 'datas.json');
-  if (fs.existsSync(direct)) return direct;
-  const parentPath = path.resolve(process.cwd(), '..', 'datas.json');
-  if (fs.existsSync(parentPath)) return parentPath;
-  throw new Error(`datas.json 未找到。尝试路径: ${direct} 和 ${parentPath}`);
+  const candidates = [
+    path.resolve(process.cwd(), 'datas.json'),
+    path.resolve(process.cwd(), '..', 'datas.json'),
+    process.resourcesPath ? path.resolve(process.resourcesPath, 'datas.json') : '',
+    process.resourcesPath ? path.resolve(process.resourcesPath, '..', 'datas.json') : '',
+    path.resolve(__dirname, '..', '..', 'datas.json'),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(`datas.json 未找到。尝试路径: ${candidates.join('、')}`);
 }
 
 function buildAvatarUrl(champ: Record<string, unknown>): string {

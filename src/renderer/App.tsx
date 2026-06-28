@@ -71,7 +71,7 @@ export function App() {
   }, [activeView]);
 
   const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
-  const formatRegionOption = (region: (typeof regions)[number]) => (region.key ? region.name : `当前区服：${region.name}`);
+  const formatRegionOption = (region: (typeof regions)[number]) => region.name;
 
   // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (
