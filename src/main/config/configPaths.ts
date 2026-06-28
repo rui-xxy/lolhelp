@@ -38,29 +38,82 @@ export function getConfigPaths(rootPath: string): ConfigPaths {
   };
 }
 
+const INSTALL_DRIVES = ['C:', 'D:', 'E:', 'F:', 'G:'];
+const INSTALL_ROOT_SUFFIXES = [
+  ['WeGameApps', '英雄联盟'],
+  ['英雄联盟'],
+  ['Tencent', '英雄联盟'],
+  ['Riot Games', 'League of Legends'],
+  ['Riot Games', 'League of Legends (PBE)'],
+];
+
+function cleanRootPath(rootPath: string): string {
+  return rootPath.trim().replace(/^["']|["']$/g, '');
+}
+
+export function normalizeInstallRoot(rootPath: string): string {
+  const cleaned = cleanRootPath(rootPath);
+  if (!cleaned) return '';
+
+  const normalized = path.normalize(cleaned);
+  const baseName = path.basename(normalized).toLowerCase();
+  if (baseName === 'game' || baseName === 'leagueclient') {
+    return path.dirname(normalized);
+  }
+
+  if (baseName === 'config') {
+    const parentPath = path.dirname(normalized);
+    const parentName = path.basename(parentPath).toLowerCase();
+    if (parentName === 'game' || parentName === 'leagueclient') {
+      return path.dirname(parentPath);
+    }
+  }
+
+  return normalized;
+}
+
+function uniqueRoots(roots: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const root of roots) {
+    const normalized = normalizeInstallRoot(root);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function getCandidateRootPaths(extraRoots: string[] = []): string[] {
+  const candidates = [...extraRoots, DEFAULT_LOL_ROOT_PATH];
+  for (const drive of INSTALL_DRIVES) {
+    for (const suffix of INSTALL_ROOT_SUFFIXES) {
+      candidates.push(path.join(drive, ...suffix));
+    }
+  }
+  return uniqueRoots(candidates);
+}
+
 export function rootLooksValid(rootPath: string): boolean {
+  const normalized = normalizeInstallRoot(rootPath);
+  if (!normalized) return false;
   return (
-    fs.existsSync(path.join(rootPath, 'Game', 'Config')) ||
-    fs.existsSync(path.join(rootPath, 'LeagueClient', 'Config'))
+    fs.existsSync(path.join(normalized, 'Game', 'Config')) ||
+    fs.existsSync(path.join(normalized, 'LeagueClient', 'Config'))
   );
 }
 
+export function detectLeagueInstallRoots(extraRoots: string[] = []): string[] {
+  return getCandidateRootPaths(extraRoots).filter(rootLooksValid);
+}
+
 export function resolveRootPath(rootPath?: string): string {
-  const trimmed = (rootPath ?? '').trim().replace(/^["']|["']$/g, '');
-  const requested = trimmed || DEFAULT_LOL_ROOT_PATH;
+  const requested = normalizeInstallRoot(rootPath ?? '') || DEFAULT_LOL_ROOT_PATH;
   if (rootLooksValid(requested)) return requested;
 
-  const candidates = new Set<string>([requested, DEFAULT_LOL_ROOT_PATH]);
-  for (const drive of ['C:', 'D:', 'E:', 'F:', 'G:']) {
-    candidates.add(path.join(drive, 'WeGameApps', '英雄联盟'));
-    candidates.add(path.join(drive, '英雄联盟'));
-    candidates.add(path.join(drive, 'Riot Games', 'League of Legends'));
-  }
-
-  for (const candidate of candidates) {
-    if (rootLooksValid(candidate)) return candidate;
-  }
-  return requested;
+  return detectLeagueInstallRoots([requested])[0] ?? requested;
 }
 
 export function readText(filePath: string): string | null {

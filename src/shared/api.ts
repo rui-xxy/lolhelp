@@ -573,6 +573,8 @@ export interface LolConfigApplyProfileRequest {
 
 export interface LolConfigApi {
   read: (rootPath?: string) => Promise<LolConfigState>;
+  detectRoots: () => Promise<string[]>;
+  selectRoot: () => Promise<string | null>;
   applyValues: (req: LolConfigApplyValuesRequest) => Promise<LolConfigApplyResult>;
   saveProfile: (req: LolConfigSaveProfileRequest) => Promise<LolConfigProfileSummary[]>;
   applyProfile: (req: LolConfigApplyProfileRequest) => Promise<LolConfigApplyResult>;

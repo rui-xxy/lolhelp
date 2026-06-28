@@ -97,6 +97,10 @@ const lolHelper: LolHelper = {
   config: {
     read: (rootPath?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.CONFIG_READ, rootPath),
+    detectRoots: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_DETECT_ROOTS),
+    selectRoot: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_SELECT_ROOT),
     applyValues: (req: LolConfigApplyValuesRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.CONFIG_APPLY_VALUES, req),
     saveProfile: (req: LolConfigSaveProfileRequest) =>

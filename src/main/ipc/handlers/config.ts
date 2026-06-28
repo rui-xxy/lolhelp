@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
 import type {
   LolConfigApplyProfileRequest,
@@ -8,6 +8,10 @@ import type {
   LolConfigSaveProfileRequest,
   LolConfigState,
 } from '../../../shared/api';
+import {
+  detectLeagueInstallRoots,
+  normalizeInstallRoot,
+} from '../../config/configPaths';
 import {
   applyLeagueConfigProfile,
   applyLeagueConfigValues,
@@ -28,6 +32,23 @@ export function registerConfigHandlers(): void {
     IPC_CHANNELS.CONFIG_READ,
     async (_event, rootPath?: string): Promise<LolConfigState> => {
       return readLeagueConfig(validateRootPath(rootPath));
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONFIG_DETECT_ROOTS,
+    async (): Promise<string[]> => detectLeagueInstallRoots(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONFIG_SELECT_ROOT,
+    async (): Promise<string | null> => {
+      const result = await dialog.showOpenDialog({
+        title: '选择英雄联盟安装目录',
+        properties: ['openDirectory'],
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      return normalizeInstallRoot(result.filePaths[0]);
     },
   );
 

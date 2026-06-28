@@ -34,6 +34,8 @@ export const IPC_CHANNELS = {
   ASSIST_EXPORT_BLACKLIST: 'assist:export-blacklist',
   // config 域：League 客户端/游戏内配置读取、保存和一键应用
   CONFIG_READ: 'config:read',
+  CONFIG_DETECT_ROOTS: 'config:detect-roots',
+  CONFIG_SELECT_ROOT: 'config:select-root',
   CONFIG_APPLY_VALUES: 'config:apply-values',
   CONFIG_SAVE_PROFILE: 'config:save-profile',
   CONFIG_APPLY_PROFILE: 'config:apply-profile',

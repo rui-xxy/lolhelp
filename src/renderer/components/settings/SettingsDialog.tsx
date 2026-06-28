@@ -10,8 +10,10 @@ import {
 } from 'react';
 import {
   Check,
+  FolderOpen,
   FolderSearch,
   RefreshCw,
+  Search,
   Settings,
   Upload,
   X,
@@ -74,7 +76,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     [profiles, selectedProfileId],
   );
 
-  const refresh = useCallback(async (pathOverride?: string) => {
+  const refresh = useCallback(async (pathOverride?: string): Promise<LolConfigState | null> => {
     setBusy('read');
     setNotice(null);
     try {
@@ -92,8 +94,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         setSelectedProfileId('');
       }
       setNotice(next.found ? null : { type: 'error', text: '没有找到可用的英雄联盟配置目录' });
+      return next;
     } catch (err) {
       setNotice({ type: 'error', text: err instanceof Error ? err.message : '读取配置失败' });
+      return null;
     } finally {
       setBusy(null);
     }
@@ -158,6 +162,53 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         : current,
     );
   }, []);
+
+  const detectRoots = useCallback(async () => {
+    setBusy('detect-root');
+    setNotice(null);
+    try {
+      const roots = await window.lolHelper.config.detectRoots();
+      if (roots.length === 0) {
+        setNotice({
+          type: 'error',
+          text: '没有自动检测到英雄联盟目录，可以点“选择文件夹”手动指定。',
+        });
+        return;
+      }
+
+      const next = await refresh(roots[0]);
+      if (next?.found) {
+        setNotice({
+          type: 'success',
+          text: roots.length > 1
+            ? `检测到 ${roots.length} 个可用目录，已使用第一个：${roots[0]}`
+            : `已检测到英雄联盟目录：${roots[0]}`,
+        });
+      }
+    } catch (err) {
+      setNotice({ type: 'error', text: err instanceof Error ? err.message : '自动检测失败' });
+    } finally {
+      setBusy(null);
+    }
+  }, [refresh]);
+
+  const chooseRoot = useCallback(async () => {
+    setBusy('select-root');
+    setNotice(null);
+    try {
+      const selected = await window.lolHelper.config.selectRoot();
+      if (!selected) return;
+
+      const next = await refresh(selected);
+      if (next?.found) {
+        setNotice({ type: 'success', text: `已切换到：${next.rootPath}` });
+      }
+    } catch (err) {
+      setNotice({ type: 'error', text: err instanceof Error ? err.message : '选择文件夹失败' });
+    } finally {
+      setBusy(null);
+    }
+  }, [refresh]);
 
   const applyDraft = useCallback(async () => {
     if (!draft) return;
@@ -268,6 +319,24 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               onChange={(e) => setRootPath(e.target.value)}
               className="h-8 min-w-0 flex-1 rounded-sm border border-app-border bg-app-surface px-2 text-xs text-app-text outline-none focus:border-app-primary"
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={detectRoots}
+              disabled={Boolean(busy)}
+            >
+              <Search className={`size-3.5 ${busy === 'detect-root' ? 'animate-pulse' : ''}`} />
+              自动检测
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={chooseRoot}
+              disabled={Boolean(busy)}
+            >
+              <FolderOpen className="size-3.5" />
+              选择文件夹
+            </Button>
             <Button
               variant="outline"
               size="sm"
