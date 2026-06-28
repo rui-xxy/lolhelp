@@ -71,11 +71,7 @@ export function App() {
   }, [activeView]);
 
   const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
-  const formatRegionOption = (region: (typeof regions)[number]) => {
-    if (!region.key) return `当前区服：${region.name}`;
-    const description = 'description' in region ? region.description : '';
-    return description ? `${region.name}（${description}）` : region.name;
-  };
+  const formatRegionOption = (region: (typeof regions)[number]) => (region.key ? region.name : `当前区服：${region.name}`);
 
   // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (
@@ -86,7 +82,7 @@ export function App() {
       }}
       className="flex h-9 items-center gap-1.5 rounded-full border border-app-primary/20 bg-app-surface-soft/95 p-1 shadow-sm shadow-app-primary/5 ring-1 ring-white/70"
     >
-      <div className="relative flex h-7 w-44 shrink-0 items-center">
+      <div className="relative flex h-7 w-32 shrink-0 items-center">
         <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary" />
         <select
           value={matchRegion}
@@ -108,15 +104,15 @@ export function App() {
           type="text"
           value={matchSearchName}
           onChange={(e) => setMatchSearchName(e.target.value)}
-          placeholder="输入 Riot ID：名字#编号，不填查自己"
-          className="h-7 w-72 rounded-full border border-transparent bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none transition-colors focus:border-app-primary/25 focus:bg-app-surface"
+          placeholder="名字#编号"
+          className="h-7 w-48 rounded-full border border-transparent bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none transition-colors focus:border-app-primary/25 focus:bg-app-surface"
         />
       </div>
       <button
         type="submit"
         className="h-7 shrink-0 rounded-full bg-gradient-to-r from-app-primary to-[#ff6b85] px-4 text-xs font-semibold text-white shadow-sm shadow-app-primary/25 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-app-primary/25 active:translate-y-0"
       >
-        跨区查询
+        查询
       </button>
     </form>
   ) : null;
