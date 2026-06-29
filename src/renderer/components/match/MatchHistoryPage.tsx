@@ -6,6 +6,7 @@ import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api'
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
 import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesStore';
+import { LOL_REGIONS } from '../../../shared/constants';
 
 const PAGE_SIZE = 12;
 const SGP_BATCH = 100;
@@ -14,6 +15,7 @@ interface MatchHistoryPageProps {
   searchName: string;
   searchTrigger: number;
   region?: string;
+  currentRegionKey?: string;
   currentRegionName?: string;
   savedAccountRequest?: { account: SavedMatchAccount; nonce: number } | null;
   onPlayerSearch?: (name: string) => void;
@@ -298,6 +300,7 @@ export function MatchHistoryPage({
   searchName,
   searchTrigger,
   region = '',
+  currentRegionKey = '',
   currentRegionName = '',
   savedAccountRequest,
   onPlayerSearch,
@@ -561,7 +564,10 @@ export function MatchHistoryPage({
     if (!activeTab?.result?.profile || selectedSaveIds.size === 0) return;
     const matchesToSave = activeTab.matches.filter((match) => selectedSaveIds.has(match.gameId));
     if (matchesToSave.length === 0) return;
-    saveMatchesForProfile(activeTab.result.profile, activeTab.region, matchesToSave, activeTab.region ? undefined : currentRegionName);
+    const savedRegionKey = activeTab.region || currentRegionKey;
+    const savedRegionName = LOL_REGIONS.find((item) => item.key === savedRegionKey)?.name
+      ?? (activeTab.region ? '' : currentRegionName);
+    saveMatchesForProfile(activeTab.result.profile, savedRegionKey, matchesToSave, savedRegionName);
     setSaveSelections((current) => ({ ...current, [activeTab.id]: [] }));
     setSaveModeTabId(null);
   };

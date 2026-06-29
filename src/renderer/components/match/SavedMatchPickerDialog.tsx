@@ -27,7 +27,6 @@ import {
 interface SavedMatchPickerDialogProps {
   open: boolean;
   onClose: () => void;
-  currentRegionName: string;
   onSelect: (account: SavedMatchAccount) => void;
 }
 
@@ -94,13 +93,11 @@ function isUsefulRegionName(regionName: string | undefined): regionName is strin
   return Boolean(normalized && !normalized.includes('读取') && !normalized.includes('无法'));
 }
 
-function getRegionName(account: SavedMatchAccount, fallbackRegionName?: string): string {
+function getRegionName(account: SavedMatchAccount): string {
   const region = account.region;
   if (!region) {
     const savedRegionName = account.regionName?.trim();
-    const fallback = fallbackRegionName?.trim();
     if (isUsefulRegionName(savedRegionName)) return savedRegionName;
-    if (isUsefulRegionName(fallback)) return fallback;
     return '未记录';
   }
   return LOL_REGIONS.find((item) => item.key === region)?.name ?? region;
@@ -169,7 +166,7 @@ function getChampionSummary(matches: PlayerMatchDetail[], championMap: Map<numbe
     .join(' · ') || '暂无';
 }
 
-export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSelect }: SavedMatchPickerDialogProps) {
+export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPickerDialogProps) {
   const [accounts, setAccounts] = useState<SavedMatchAccount[]>([]);
   const [groups, setGroups] = useState<SavedMatchGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupFilter>('all');
@@ -225,6 +222,7 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
     () => filteredAccounts.find((account) => account.id === activeAccountId) ?? null,
     [filteredAccounts, activeAccountId],
   );
+  const activeRanks = useMemo(() => (activeAccount ? getRanks(activeAccount) : []), [activeAccount]);
   const championMap = useMemo(() => new Map(champions.map((champion) => [champion.id, champion])), [champions]);
 
   const groupCounts = useMemo(() => {
@@ -364,7 +362,6 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
                       key={account.id}
                       account={account}
                       active={activeAccount?.id === account.id}
-                      currentRegionName={currentRegionName}
                       onClick={() => {
                         setActiveAccountId(account.id);
                         setActiveTab('info');
@@ -397,11 +394,27 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
                           {getFullRiotId(activeAccount.profile.riotId)}
                         </h3>
                         <span className="shrink-0 rounded-full border border-app-primary/20 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-app-primary shadow-sm">
-                          {getRegionName(activeAccount, currentRegionName)}
+                          {getRegionName(activeAccount)}
                         </span>
                       </div>
                       <div className="mt-1.5 text-[11px] text-app-muted">
                         {getAccountSummary(activeAccount.matches)} · 保存于 {formatSavedAt(activeAccount.updatedAt)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {activeRanks.length > 0 ? (
+                          activeRanks.map((rank) => (
+                            <span
+                              key={`${rank.queueType}-${rank.tier}-${rank.division}`}
+                              className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-app-text shadow-sm ring-1 ring-app-border"
+                            >
+                              {getRankText(rank)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="rounded-full bg-white/70 px-2.5 py-1 text-[11px] text-app-muted ring-1 ring-app-border">
+                            未保存到段位信息
+                          </span>
+                        )}
                       </div>
                     </div>
                     <select
@@ -452,7 +465,6 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
                     <AccountInfoPanel
                       account={activeAccount}
                       groups={groups}
-                      currentRegionName={currentRegionName}
                       championMap={championMap}
                     />
                   ) : (
@@ -478,12 +490,10 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
 function AccountListItem({
   account,
   active,
-  currentRegionName,
   onClick,
 }: {
   account: SavedMatchAccount;
   active: boolean;
-  currentRegionName: string;
   onClick: () => void;
 }) {
   return (
@@ -505,7 +515,7 @@ function AccountListItem({
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs font-semibold text-app-text">{getDisplayName(account.profile.riotId)}</div>
         <div className="mt-0.5 truncate text-[10px] text-app-subtle">
-          {getRegionName(account, currentRegionName)} · {getAccountSummary(account.matches)}
+          {getRegionName(account)} · {getAccountSummary(account.matches)}
         </div>
       </div>
       <span className="shrink-0 text-[10px] text-app-subtle">{formatSavedAt(account.updatedAt)}</span>
@@ -516,43 +526,21 @@ function AccountListItem({
 function AccountInfoPanel({
   account,
   groups,
-  currentRegionName,
   championMap,
 }: {
   account: SavedMatchAccount;
   groups: SavedMatchGroup[];
-  currentRegionName: string;
   championMap: Map<number, ChampionSummary>;
 }) {
   const stats = getMatchStats(account.matches);
-  const ranks = getRanks(account);
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
-        <div className="mb-3 text-xs font-semibold text-app-text">段位信息</div>
-        {ranks.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2">
-            {ranks.map((rank) => (
-              <div key={`${rank.queueType}-${rank.tier}-${rank.division}`} className="rounded-lg bg-app-bg-soft px-3 py-2">
-                <div className="text-xs font-semibold text-app-text">{rank.queueName || rank.queueType}</div>
-                <div className="mt-1 text-sm font-semibold text-app-primary">{getRankText(rank)}</div>
-                <div className="mt-0.5 text-[11px] text-app-muted">
-                  {rank.wins}胜 {rank.losses}负 · {rank.leaguePoints} LP
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-xs text-app-muted">未保存到段位信息</div>
-        )}
-      </section>
-
       <section className="overflow-hidden rounded-xl bg-app-surface shadow-sm ring-1 ring-app-border">
         <div className="bg-gradient-to-r from-app-primary-soft/55 to-transparent px-4 py-3">
           <div className="text-xs font-semibold text-app-text">基础信息</div>
           <div className="mt-1 text-[11px] text-app-muted">
-            {getRegionName(account, currentRegionName)} · {getGroupName(groups, account.groupId)}
+            {getRegionName(account)} · {getGroupName(groups, account.groupId)}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-px bg-app-border text-xs">

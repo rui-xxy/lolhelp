@@ -31,6 +31,7 @@ export function App() {
   const [matchSearchName, setMatchSearchName] = useState('');
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
+  const [currentRegionKey, setCurrentRegionKey] = useState('');
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
   const [friendPanelHidden, setFriendPanelHidden] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -51,6 +52,7 @@ export function App() {
         const region = await window.lolHelper.lcu.getCurrentRegion();
         if (cancelled) return;
         if (region.name && !region.error) {
+          setCurrentRegionKey(region.key ?? '');
           setCurrentRegionName(region.name);
           return;
         }
@@ -202,6 +204,7 @@ export function App() {
           searchName={matchSearchName}
           searchTrigger={matchSearchTrigger}
           region={matchRegion}
+          currentRegionKey={currentRegionKey}
           currentRegionName={currentRegionName}
           savedAccountRequest={savedAccountRequest}
           onPlayerSearch={(name) => {
@@ -242,7 +245,6 @@ export function App() {
       <SavedMatchPickerDialog
         open={savedPickerOpen}
         onClose={() => setSavedPickerOpen(false)}
-        currentRegionName={currentRegionName}
         onSelect={(account) => {
           setActiveView('matches');
           setSavedAccountRequest({ account, nonce: Date.now() });
