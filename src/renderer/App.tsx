@@ -121,7 +121,7 @@ export function App() {
   const handleFriendClick = useCallback((riotId: string) => {
     setActiveView('matches');
     setMatchSearchName(riotId);
-    setMatchRegion(''); // 好友默认本区
+    setMatchRegion(''); // 好友默认使用已读取到的大区
     // 延迟触发搜索（等视图切换完成）
     setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
   }, []);
@@ -215,6 +215,7 @@ export function App() {
       </div>
       <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
         <ScoutPage
+          currentRegionName={currentRegionName}
           onPlayerSearch={(name, region) => {
             setMatchSearchName(name);
             setMatchRegion(region ?? '');

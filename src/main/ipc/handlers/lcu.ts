@@ -303,7 +303,7 @@ export function registerLcuHandlers(): void {
         return {
           key: '',
           name: '',
-          error: `无法读取当前登录大区：${err instanceof Error ? err.message : String(err)}`,
+          error: `无法读取大区：${err instanceof Error ? err.message : String(err)}`,
         };
       }
     },

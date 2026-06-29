@@ -16,6 +16,7 @@ import { LOL_REGIONS } from '../../../shared/constants';
 
 interface ScoutPageProps {
   onPlayerSearch: (name: string, region?: string) => void;
+  currentRegionName: string;
 }
 
 // 默认配置
@@ -42,7 +43,6 @@ const QUEUE_OPTIONS = [
 
 // 时间窗快捷档（小时）
 const HOUR_OPTIONS = [1, 2, 3, 6, 12, 24];
-const SCOUT_REGION_OPTIONS = [{ key: '', name: '当前登录区' }, ...LOL_REGIONS];
 
 function makeScoutRunKey(config: ScoutConfig): string {
   return JSON.stringify({
@@ -68,7 +68,7 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
   return merged;
 }
 
-export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
+export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps) {
   const [config, setConfig] = useState<ScoutConfig>(DEFAULT_CONFIG);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
@@ -100,6 +100,10 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
         .map((id) => championMap.get(id))
         .filter((c): c is ChampionSummary => Boolean(c)),
     [config.championIds, championMap],
+  );
+  const regionOptions = useMemo(
+    () => [{ key: '', name: currentRegionName }, ...LOL_REGIONS],
+    [currentRegionName],
   );
 
   // 加载英雄列表 + 设置
@@ -321,7 +325,7 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
             disabled={running}
             className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none disabled:opacity-60"
           >
-            {SCOUT_REGION_OPTIONS.map((region) => (
+            {regionOptions.map((region) => (
               <option key={region.key} value={region.key}>
                 {region.name}
               </option>

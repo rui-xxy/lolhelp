@@ -875,7 +875,7 @@ export interface ScoutConfig {
   kdaThreshold: number; // KDA 达标阈值（默认 5.0）
   hoursWindow: number; // 时间窗（小时，默认 3），达标场须在此时间内
   targetCount: number; // 目标达标人数（默认 10）
-  region?: string; // 大区码（不传=本区）
+  region?: string; // 大区码（不传则使用已读取到的大区）
   tag?: string; // 模式筛选（q_420 等，不传=全部）
   topSeedsPerGame?: number; // 每场取综合分前 N 名当扩散种子（默认 2）
   excludePuuids?: string[]; // 继续搜索时排除已展示过的达标者
