@@ -9,7 +9,8 @@ import type { PlayerRankSummary, ScoutHit } from '../../../shared/api';
 interface ScoutHitCardProps {
   hit: ScoutHit;
   index: number;
-  onPlayerClick: (riotId: string) => void;
+  region?: string;
+  onPlayerClick: (riotId: string, region?: string) => void;
 }
 
 const RANK_TIER_NAMES: Record<string, string> = {
@@ -35,7 +36,7 @@ function getRankSub(rank: PlayerRankSummary): string {
   return [rank.queueName || '排位', rank.leaguePoints > 0 ? String(rank.leaguePoints) : ''].filter(Boolean).join(' ');
 }
 
-export function ScoutHitCard({ hit, index, onPlayerClick }: ScoutHitCardProps) {
+export function ScoutHitCard({ hit, index, region, onPlayerClick }: ScoutHitCardProps) {
   const { profile, qualifyingMatches } = hit;
   const riotId = profile.riotId || '未知玩家';
   const rank = profile.rank;
@@ -57,7 +58,7 @@ export function ScoutHitCard({ hit, index, onPlayerClick }: ScoutHitCardProps) {
             />
             <div className="min-w-0 flex-1">
               <button
-                onClick={() => riotId && onPlayerClick(riotId)}
+                onClick={() => riotId && onPlayerClick(riotId, region)}
                 disabled={!riotId}
                 className="block max-w-full truncate text-left text-sm font-semibold leading-5 text-app-text transition-colors hover:text-app-primary disabled:hover:text-app-text"
                 title={`查看 ${riotId} 的完整战绩`}

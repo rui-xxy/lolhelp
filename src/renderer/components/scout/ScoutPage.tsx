@@ -12,9 +12,10 @@ import type {
   ScoutProgress,
 } from '../../../shared/api';
 import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
+import { LOL_REGIONS } from '../../../shared/constants';
 
 interface ScoutPageProps {
-  onPlayerSearch: (name: string) => void;
+  onPlayerSearch: (name: string, region?: string) => void;
 }
 
 // 默认配置
@@ -41,6 +42,7 @@ const QUEUE_OPTIONS = [
 
 // 时间窗快捷档（小时）
 const HOUR_OPTIONS = [1, 2, 3, 6, 12, 24];
+const SCOUT_REGION_OPTIONS = [{ key: '', name: '当前登录区' }, ...LOL_REGIONS];
 
 function makeScoutRunKey(config: ScoutConfig): string {
   return JSON.stringify({
@@ -310,6 +312,23 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
           输入种子玩家 → 沿对局关系网扩散，找出指定英雄、近期手感火热的高手。
         </p>
 
+        {/* 大区 */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-app-text">目标大区</label>
+          <select
+            value={config.region ?? ''}
+            onChange={(e) => updateConfig({ region: e.target.value })}
+            disabled={running}
+            className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none disabled:opacity-60"
+          >
+            {SCOUT_REGION_OPTIONS.map((region) => (
+              <option key={region.key} value={region.key}>
+                {region.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* 种子 ID */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-app-text">种子召唤师</label>
@@ -317,7 +336,7 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
             type="text"
             value={config.seedId}
             onChange={(e) => updateConfig({ seedId: e.target.value })}
-            placeholder="名字#数字（留空查自己）"
+            placeholder="名字#编号"
             disabled={running}
             className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-3 text-xs text-app-text placeholder:text-app-subtle focus:border-app-primary focus:bg-app-surface focus:outline-none disabled:opacity-60"
           />
@@ -537,6 +556,7 @@ export function ScoutPage({ onPlayerSearch }: ScoutPageProps) {
                       <ScoutHitCard
                         hit={hit}
                         index={idx}
+                        region={config.region ?? ''}
                         onPlayerClick={onPlayerSearch}
                       />
                     </Fragment>

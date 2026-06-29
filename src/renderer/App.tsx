@@ -215,8 +215,9 @@ export function App() {
       </div>
       <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
         <ScoutPage
-          onPlayerSearch={(name) => {
+          onPlayerSearch={(name, region) => {
             setMatchSearchName(name);
+            setMatchRegion(region ?? '');
             setActiveView('matches');
             setMatchSearchTrigger((n) => n + 1);
           }}
