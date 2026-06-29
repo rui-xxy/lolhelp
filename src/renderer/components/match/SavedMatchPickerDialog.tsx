@@ -83,11 +83,6 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 }
 
-function getGroupName(groups: SavedMatchGroup[], groupId: string | undefined): string {
-  if (!groupId) return '未分组';
-  return groups.find((group) => group.id === groupId)?.name ?? '未分组';
-}
-
 function isUsefulRegionName(regionName: string | undefined): regionName is string {
   const normalized = regionName?.trim() ?? '';
   return Boolean(normalized && !normalized.includes('读取') && !normalized.includes('无法'));
@@ -131,50 +126,9 @@ function getRankDetailText(rank: PlayerRankSummary): string {
   return withoutQueue || text;
 }
 
-function getMatchStats(matches: PlayerMatchDetail[]) {
-  const wins = matches.filter((match) => match.win).length;
-  const losses = matches.length - wins;
-  const avgKda = matches.length
-    ? matches.reduce((sum, match) => sum + match.kda, 0) / matches.length
-    : 0;
-  const avgDamage = matches.length
-    ? matches.reduce((sum, match) => sum + match.damage, 0) / matches.length
-    : 0;
-  const avgCs = matches.length
-    ? matches.reduce((sum, match) => sum + match.cs, 0) / matches.length
-    : 0;
-  const winRate = matches.length ? Math.round((wins / matches.length) * 100) : 0;
-  return { wins, losses, avgKda, avgDamage, avgCs, winRate };
-}
-
-function getModeSummary(matches: PlayerMatchDetail[]): string {
-  const counts = new Map<string, number>();
-  for (const match of matches) {
-    counts.set(match.queueName || '未知模式', (counts.get(match.queueName || '未知模式') ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name, count]) => `${name} ${count}`)
-    .join(' · ') || '暂无';
-}
-
 function getChampionName(match: PlayerMatchDetail, championMap: Map<number, ChampionSummary>): string {
   const champion = championMap.get(match.championId);
   return champion?.title || champion?.name || match.championName || '未知英雄';
-}
-
-function getChampionSummary(matches: PlayerMatchDetail[], championMap: Map<number, ChampionSummary>): string {
-  const counts = new Map<string, number>();
-  for (const match of matches) {
-    const name = getChampionName(match, championMap);
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name, count]) => `${name} ${count}`)
-    .join(' · ') || '暂无';
 }
 
 export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPickerDialogProps) {
@@ -455,11 +409,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                   {activeTab === 'info' ? (
-                    <AccountInfoPanel
-                      account={activeAccount}
-                      groups={groups}
-                      championMap={championMap}
-                    />
+                    <AccountInfoPanel />
                   ) : (
                     <SavedMatchesPanel account={activeAccount} championMap={championMap} />
                   )}
@@ -544,40 +494,8 @@ function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
   );
 }
 
-function AccountInfoPanel({
-  account,
-  groups,
-  championMap,
-}: {
-  account: SavedMatchAccount;
-  groups: SavedMatchGroup[];
-  championMap: Map<number, ChampionSummary>;
-}) {
-  const stats = getMatchStats(account.matches);
-
-  return (
-    <div className="space-y-4">
-      <section className="overflow-hidden rounded-xl bg-app-surface shadow-sm ring-1 ring-app-border">
-        <div className="bg-gradient-to-r from-app-primary-soft/55 to-transparent px-4 py-3">
-          <div className="text-xs font-semibold text-app-text">基础信息</div>
-          <div className="mt-1 text-[11px] text-app-muted">
-            {getRegionName(account)} · {getGroupName(groups, account.groupId)}
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-px bg-app-border text-xs">
-          <InfoTile label="Riot ID" value={getFullRiotId(account.profile.riotId)} />
-          <InfoTile label="等级" value={account.profile.level ? String(account.profile.level) : '未记录'} />
-          <InfoTile label="保存战绩" value={`${account.matches.length} 场`} sub={`${stats.wins}胜 ${stats.losses}负 · ${stats.winRate}% 胜率`} />
-          <InfoTile label="英雄数量" value={account.profile.championCount == null ? '未记录' : String(account.profile.championCount)} />
-          <InfoTile label="皮肤数量" value={account.profile.skinCount == null ? '未记录' : String(account.profile.skinCount)} />
-          <InfoTile label="平均表现" value={`${stats.avgKda.toFixed(2)} KDA`} sub={`${formatNumber(stats.avgDamage)} 伤害 · ${stats.avgCs.toFixed(1)} 补刀`} />
-          <InfoTile label="主要模式" value={getModeSummary(account.matches)} />
-          <InfoTile label="常用英雄" value={getChampionSummary(account.matches, championMap)} />
-          <InfoTile label="最近保存" value={formatFullTime(account.updatedAt)} />
-        </div>
-      </section>
-    </div>
-  );
+function AccountInfoPanel() {
+  return <div className="h-full" />;
 }
 
 function SavedMatchesPanel({
@@ -623,26 +541,6 @@ function SavedMatchesPanel({
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function InfoTile({
-  label,
-  value,
-  sub,
-  wide = false,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  wide?: boolean;
-}) {
-  return (
-    <div className={`bg-app-surface px-4 py-3 ${wide ? 'col-span-3' : ''}`}>
-      <div className="text-[11px] text-app-subtle">{label}</div>
-      <div className="mt-1 break-all text-sm font-semibold text-app-text">{value}</div>
-      {sub && <div className="mt-0.5 text-[10px] text-app-muted">{sub}</div>}
     </div>
   );
 }
