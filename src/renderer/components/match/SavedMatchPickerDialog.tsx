@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
-  BookmarkCheck,
   Folder,
   FolderPlus,
   Trash2,
@@ -289,26 +288,19 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
         }
       }}
     >
-      <section className="flex h-[620px] w-[960px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-airbnb">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
-          <div className="flex size-8 items-center justify-center rounded-sm bg-app-surface-soft text-app-primary">
-            <BookmarkCheck className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-app-text">保存的战绩</h2>
-            <p className="truncate text-xs text-app-muted">选择账号后，可以查看账号信息或打开本地保存的战绩</p>
-          </div>
-          {notice && <span className="text-xs text-app-primary">{notice}</span>}
+      <section className="relative flex h-[620px] w-[960px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-airbnb">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          {notice && <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs text-app-primary shadow-sm">{notice}</span>}
           <button
             type="button"
             onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-sm text-app-subtle transition-colors hover:bg-app-surface-soft hover:text-app-text"
+            className="flex size-8 items-center justify-center rounded-full bg-white/85 text-app-subtle shadow-sm transition-colors hover:bg-app-surface-soft hover:text-app-text"
             title="关闭"
             aria-label="关闭"
           >
             <X className="size-4" />
           </button>
-        </header>
+        </div>
 
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-64 shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
@@ -699,10 +691,10 @@ function GroupButton({
       <button
         type="button"
         onClick={onClick}
-        className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border-l-2 px-2 text-left text-sm font-medium transition-colors ${
+        className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-sm font-medium transition-colors ${
           active
-            ? 'border-app-primary bg-app-surface text-app-text'
-            : 'border-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+            ? 'bg-app-surface text-app-text shadow-sm'
+            : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
         }`}
       >
         <span className="shrink-0">{icon}</span>

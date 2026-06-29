@@ -1108,11 +1108,10 @@
 
   .lol-score-row--target {
     background: linear-gradient(90deg, rgba(240, 210, 138, 0.16), rgba(240, 210, 138, 0.035));
-    box-shadow: inset 3px 0 0 var(--lol-gold-bright);
   }
 
   .lol-score-row--recurring {
-    box-shadow: inset 3px 0 0 rgba(83, 219, 255, 0.76);
+    background: rgba(83, 219, 255, 0.08);
   }
 
   .lol-score-player {
@@ -1666,11 +1665,10 @@
     background:
       linear-gradient(90deg, rgba(255, 56, 92, 0.08), transparent 55%),
       var(--color-app-surface);
-    box-shadow: inset 3px 0 0 var(--color-app-primary);
   }
 
   .lol-score-row--recurring {
-    box-shadow: inset 3px 0 0 var(--color-app-link);
+    background: rgba(66, 139, 255, 0.08);
   }
 
   .lol-score-champion img,
@@ -2456,7 +2454,7 @@
   }
 
   .lol-rift-row--recurring {
-    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.62);
+    background: rgba(245, 158, 11, 0.08);
   }
 
   .lol-rift-loadout {

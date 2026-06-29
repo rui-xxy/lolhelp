@@ -437,10 +437,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-9 w-full items-center rounded-sm border-l-2 px-3 text-left text-sm font-medium transition-colors ${
+      className={`flex h-9 w-full items-center rounded-sm px-3 text-left text-sm font-medium transition-colors ${
         active
-          ? 'border-app-primary bg-app-surface text-app-text'
-          : 'border-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+          ? 'bg-app-surface text-app-text shadow-sm'
+          : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
       }`}
     >
       {children}
