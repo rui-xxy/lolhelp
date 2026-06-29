@@ -202,6 +202,7 @@ export function App() {
           searchName={matchSearchName}
           searchTrigger={matchSearchTrigger}
           region={matchRegion}
+          currentRegionName={currentRegionName}
           savedAccountRequest={savedAccountRequest}
           onPlayerSearch={(name) => {
             setMatchSearchName(name);
@@ -241,6 +242,7 @@ export function App() {
       <SavedMatchPickerDialog
         open={savedPickerOpen}
         onClose={() => setSavedPickerOpen(false)}
+        currentRegionName={currentRegionName}
         onSelect={(account) => {
           setActiveView('matches');
           setSavedAccountRequest({ account, nonce: Date.now() });

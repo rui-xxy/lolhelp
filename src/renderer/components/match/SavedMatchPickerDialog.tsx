@@ -27,6 +27,7 @@ import {
 interface SavedMatchPickerDialogProps {
   open: boolean;
   onClose: () => void;
+  currentRegionName: string;
   onSelect: (account: SavedMatchAccount) => void;
 }
 
@@ -88,8 +89,20 @@ function getGroupName(groups: SavedMatchGroup[], groupId: string | undefined): s
   return groups.find((group) => group.id === groupId)?.name ?? '未分组';
 }
 
-function getRegionName(region: string): string {
-  if (!region) return '未记录';
+function isUsefulRegionName(regionName: string | undefined): regionName is string {
+  const normalized = regionName?.trim() ?? '';
+  return Boolean(normalized && !normalized.includes('读取') && !normalized.includes('无法'));
+}
+
+function getRegionName(account: SavedMatchAccount, fallbackRegionName?: string): string {
+  const region = account.region;
+  if (!region) {
+    const savedRegionName = account.regionName?.trim();
+    const fallback = fallbackRegionName?.trim();
+    if (isUsefulRegionName(savedRegionName)) return savedRegionName;
+    if (isUsefulRegionName(fallback)) return fallback;
+    return '未记录';
+  }
   return LOL_REGIONS.find((item) => item.key === region)?.name ?? region;
 }
 
@@ -150,7 +163,7 @@ function getChampionSummary(matches: PlayerMatchDetail[]): string {
     .join(' · ') || '暂无';
 }
 
-export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPickerDialogProps) {
+export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSelect }: SavedMatchPickerDialogProps) {
   const [accounts, setAccounts] = useState<SavedMatchAccount[]>([]);
   const [groups, setGroups] = useState<SavedMatchGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupFilter>('all');
@@ -257,7 +270,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
         }
       }}
     >
-      <section className="flex h-[600px] w-[940px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
+      <section className="flex h-[620px] w-[960px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-airbnb">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
           <div className="flex size-8 items-center justify-center rounded-sm bg-app-surface-soft text-app-primary">
             <BookmarkCheck className="size-4" />
@@ -342,6 +355,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       key={account.id}
                       account={account}
                       active={activeAccount?.id === account.id}
+                      currentRegionName={currentRegionName}
                       onClick={() => {
                         setActiveAccountId(account.id);
                         setActiveTab('info');
@@ -357,34 +371,34 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
             </div>
           </aside>
 
-          <main className="flex min-w-0 flex-1 flex-col">
+          <main className="flex min-w-0 flex-1 flex-col bg-app-bg">
             {activeAccount ? (
               <>
-                <div className="shrink-0 border-b border-app-border px-4 py-3">
-                  <div className="flex items-start gap-3">
+                <div className="shrink-0 border-b border-app-border bg-gradient-to-r from-app-primary-soft/70 via-app-surface to-app-surface px-5 py-4">
+                  <div className="flex items-start gap-3.5">
                     <ProfileIcon
                       iconId={activeAccount.profile.profileIconId}
                       src={activeAccount.profile.profileIconUrl}
                       alt={getDisplayName(activeAccount.profile.riotId)}
-                      size={48}
+                      size={56}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-app-text">
+                        <h3 className="truncate text-lg font-semibold text-app-text">
                           {getFullRiotId(activeAccount.profile.riotId)}
                         </h3>
-                        <span className="rounded-full bg-app-surface-soft px-2 py-0.5 text-[10px] text-app-muted">
-                          {getRegionName(activeAccount.region)}
+                        <span className="shrink-0 rounded-full border border-app-primary/20 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-app-primary shadow-sm">
+                          {getRegionName(activeAccount, currentRegionName)}
                         </span>
                       </div>
-                      <div className="mt-1 text-[11px] text-app-muted">
+                      <div className="mt-1.5 text-[11px] text-app-muted">
                         {getAccountSummary(activeAccount.matches)} · 保存于 {formatSavedAt(activeAccount.updatedAt)}
                       </div>
                     </div>
                     <select
                       value={activeAccount.groupId ?? ''}
                       onChange={(event) => moveAccount(activeAccount.id, event.target.value)}
-                      className="h-8 w-28 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text outline-none focus:border-app-primary"
+                      className="h-8 w-28 rounded-full border border-app-border bg-white/85 px-3 text-xs text-app-text outline-none focus:border-app-primary"
                     >
                       <option value="">未分组</option>
                       {groups.map((group) => (
@@ -399,14 +413,14 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                         onSelect(activeAccount);
                         onClose();
                       }}
-                      className="h-8 shrink-0 rounded-sm bg-app-primary px-3 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover"
+                      className="h-8 shrink-0 rounded-full bg-app-primary px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-app-primary-hover"
                     >
                       打开战绩
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteAccount(activeAccount.id)}
-                      className="flex size-8 shrink-0 items-center justify-center rounded-sm text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
                       title="删除这个保存账号"
                       aria-label="删除这个保存账号"
                     >
@@ -414,7 +428,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                     </button>
                   </div>
 
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-4 flex gap-2">
                     <TabButton active={activeTab === 'info'} onClick={() => setActiveTab('info')}>
                       账号信息
                     </TabButton>
@@ -426,7 +440,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                   {activeTab === 'info' ? (
-                    <AccountInfoPanel account={activeAccount} groups={groups} />
+                    <AccountInfoPanel account={activeAccount} groups={groups} currentRegionName={currentRegionName} />
                   ) : (
                     <SavedMatchesPanel account={activeAccount} />
                   )}
@@ -450,19 +464,21 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 function AccountListItem({
   account,
   active,
+  currentRegionName,
   onClick,
 }: {
   account: SavedMatchAccount;
   active: boolean;
+  currentRegionName: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-sm border px-2 py-2 text-left transition-colors ${
+      className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors ${
         active
-          ? 'border-app-primary-soft bg-app-surface text-app-text shadow-sm'
+          ? 'border-app-primary-soft bg-app-surface text-app-text shadow-sm ring-1 ring-app-primary/10'
           : 'border-transparent text-app-muted hover:border-app-border hover:bg-app-surface'
       }`}
     >
@@ -474,7 +490,9 @@ function AccountListItem({
       />
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs font-semibold text-app-text">{getDisplayName(account.profile.riotId)}</div>
-        <div className="mt-0.5 truncate text-[10px] text-app-subtle">{getAccountSummary(account.matches)}</div>
+        <div className="mt-0.5 truncate text-[10px] text-app-subtle">
+          {getRegionName(account, currentRegionName)} · {getAccountSummary(account.matches)}
+        </div>
       </div>
       <span className="shrink-0 text-[10px] text-app-subtle">{formatSavedAt(account.updatedAt)}</span>
     </button>
@@ -484,9 +502,11 @@ function AccountListItem({
 function AccountInfoPanel({
   account,
   groups,
+  currentRegionName,
 }: {
   account: SavedMatchAccount;
   groups: SavedMatchGroup[];
+  currentRegionName: string;
 }) {
   const stats = getMatchStats(account.matches);
   const ranks = getRanks(account);
@@ -501,11 +521,11 @@ function AccountInfoPanel({
         <StatCard label="平均伤害" value={formatNumber(stats.avgDamage)} />
       </div>
 
-      <section className="rounded-sm border border-app-border bg-app-surface">
-        <div className="border-b border-app-border px-3 py-2 text-xs font-semibold text-app-text">基础信息</div>
-        <div className="grid grid-cols-2 gap-x-5 gap-y-2 p-3 text-xs">
+      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
+        <div className="mb-3 text-xs font-semibold text-app-text">基础信息</div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
           <InfoRow label="Riot ID" value={getFullRiotId(account.profile.riotId)} />
-          <InfoRow label="大区" value={getRegionName(account.region)} />
+          <InfoRow label="大区" value={getRegionName(account, currentRegionName)} />
           <InfoRow label="等级" value={account.profile.level ? String(account.profile.level) : '未记录'} />
           <InfoRow label="分组" value={getGroupName(groups, account.groupId)} />
           <InfoRow label="英雄数量" value={account.profile.championCount == null ? '未记录' : String(account.profile.championCount)} />
@@ -516,12 +536,12 @@ function AccountInfoPanel({
         </div>
       </section>
 
-      <section className="rounded-sm border border-app-border bg-app-surface">
-        <div className="border-b border-app-border px-3 py-2 text-xs font-semibold text-app-text">段位信息</div>
+      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
+        <div className="mb-3 text-xs font-semibold text-app-text">段位信息</div>
         {ranks.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 p-3">
+          <div className="grid grid-cols-2 gap-2">
             {ranks.map((rank) => (
-              <div key={`${rank.queueType}-${rank.tier}-${rank.division}`} className="rounded-sm bg-app-bg-soft px-3 py-2">
+              <div key={`${rank.queueType}-${rank.tier}-${rank.division}`} className="rounded-lg bg-app-bg-soft px-3 py-2">
                 <div className="text-xs font-semibold text-app-text">{rank.queueName || rank.queueType}</div>
                 <div className="mt-1 text-sm font-semibold text-app-primary">{getRankText(rank)}</div>
                 <div className="mt-0.5 text-[11px] text-app-muted">
@@ -531,13 +551,13 @@ function AccountInfoPanel({
             ))}
           </div>
         ) : (
-          <div className="p-3 text-xs text-app-muted">未保存到段位信息</div>
+          <div className="text-xs text-app-muted">未保存到段位信息</div>
         )}
       </section>
 
-      <section className="rounded-sm border border-app-border bg-app-surface">
-        <div className="border-b border-app-border px-3 py-2 text-xs font-semibold text-app-text">保存战绩概览</div>
-        <div className="grid grid-cols-2 gap-x-5 gap-y-2 p-3 text-xs">
+      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
+        <div className="mb-3 text-xs font-semibold text-app-text">保存战绩概览</div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
           <InfoRow label="主要模式" value={getModeSummary(account.matches)} />
           <InfoRow label="常用英雄" value={getChampionSummary(account.matches)} />
           <InfoRow label="平均补刀" value={stats.avgCs.toFixed(1)} />
@@ -554,10 +574,10 @@ function SavedMatchesPanel({ account }: { account: SavedMatchAccount }) {
       {account.matches.map((match) => (
         <div
           key={match.gameId}
-          className={`grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 rounded-sm border px-3 py-2 ${
+          className={`grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 rounded-xl px-3 py-2.5 shadow-sm ring-1 ${
             match.win
-              ? 'border-app-win-border bg-app-win-bg/35'
-              : 'border-app-loss-border bg-app-loss-bg/35'
+              ? 'bg-app-win-bg/35 ring-app-win-border'
+              : 'bg-app-loss-bg/35 ring-app-loss-border'
           }`}
         >
           <div className="flex min-w-0 items-center gap-2">
@@ -591,9 +611,9 @@ function SavedMatchesPanel({ account }: { account: SavedMatchAccount }) {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-sm border border-app-border bg-app-surface px-3 py-2">
+    <div className="rounded-xl bg-app-surface px-4 py-3 shadow-sm ring-1 ring-app-border">
       <div className="text-[11px] text-app-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-app-text">{value}</div>
+      <div className="mt-1 text-base font-semibold text-app-text">{value}</div>
       {sub && <div className="mt-0.5 text-[10px] text-app-subtle">{sub}</div>}
     </div>
   );
@@ -621,10 +641,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`h-8 rounded-sm px-3 text-xs font-semibold transition-colors ${
+      className={`h-8 rounded-full px-4 text-xs font-semibold transition-colors ${
         active
-          ? 'bg-app-primary text-white'
-          : 'bg-app-surface-soft text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+          ? 'bg-app-primary text-white shadow-sm'
+          : 'bg-white/70 text-app-muted hover:bg-app-surface hover:text-app-text'
       }`}
     >
       {children}

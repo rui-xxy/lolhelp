@@ -15,6 +15,7 @@ export interface SavedMatchGroup {
 export interface SavedMatchAccount {
   id: string;
   region: string;
+  regionName?: string;
   profile: PlayerProfile;
   matches: PlayerMatchDetail[];
   groupId?: string;
@@ -68,6 +69,7 @@ function normalizeAccounts(value: unknown): SavedMatchAccount[] {
     .map((account) => ({
       ...account,
       region: account.region || '',
+      regionName: typeof account.regionName === 'string' ? account.regionName : undefined,
       groupId: account.groupId && groupIds.has(account.groupId) ? account.groupId : undefined,
       createdAt: Number.isFinite(account.createdAt) ? account.createdAt : Date.now(),
       updatedAt: Number.isFinite(account.updatedAt) ? account.updatedAt : Date.now(),
@@ -148,6 +150,7 @@ export function saveMatchesForProfile(
   profile: PlayerProfile,
   region: string,
   matches: PlayerMatchDetail[],
+  regionName?: string,
 ): SavedMatchAccount {
   const now = Date.now();
   const accountId = getAccountId(profile, region);
@@ -165,6 +168,7 @@ export function saveMatchesForProfile(
   const nextAccount: SavedMatchAccount = {
     id: accountId,
     region,
+    regionName: regionName?.trim() || existing?.regionName,
     profile,
     matches: Array.from(matchById.values()).sort((a, b) => b.gameCreation - a.gameCreation),
     groupId: existing?.groupId,

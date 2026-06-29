@@ -14,6 +14,7 @@ interface MatchHistoryPageProps {
   searchName: string;
   searchTrigger: number;
   region?: string;
+  currentRegionName?: string;
   savedAccountRequest?: { account: SavedMatchAccount; nonce: number } | null;
   onPlayerSearch?: (name: string) => void;
 }
@@ -297,6 +298,7 @@ export function MatchHistoryPage({
   searchName,
   searchTrigger,
   region = '',
+  currentRegionName = '',
   savedAccountRequest,
   onPlayerSearch,
 }: MatchHistoryPageProps) {
@@ -559,7 +561,7 @@ export function MatchHistoryPage({
     if (!activeTab?.result?.profile || selectedSaveIds.size === 0) return;
     const matchesToSave = activeTab.matches.filter((match) => selectedSaveIds.has(match.gameId));
     if (matchesToSave.length === 0) return;
-    saveMatchesForProfile(activeTab.result.profile, activeTab.region, matchesToSave);
+    saveMatchesForProfile(activeTab.result.profile, activeTab.region, matchesToSave, activeTab.region ? undefined : currentRegionName);
     setSaveSelections((current) => ({ ...current, [activeTab.id]: [] }));
     setSaveModeTabId(null);
   };
