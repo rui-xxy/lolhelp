@@ -11,6 +11,7 @@ import {
 import type { ChampionSummary, PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
 import { LOL_REGIONS } from '../../../shared/constants';
 import { ProfileIcon } from '../ProfileIcon';
+import { RankEmblem } from '../RankEmblem';
 import { GameIcon } from './GameIcon';
 import {
   createSavedMatchGroup,
@@ -118,6 +119,17 @@ function getRankText(rank: PlayerRankSummary): string {
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+function getRankQueueLabel(rank: PlayerRankSummary): string {
+  return rank.queueName || rank.queueType || '排位';
+}
+
+function getRankDetailText(rank: PlayerRankSummary): string {
+  const text = getRankText(rank);
+  const queueLabel = getRankQueueLabel(rank);
+  const withoutQueue = text.startsWith(queueLabel) ? text.slice(queueLabel.length).trim() : text;
+  return withoutQueue || text;
 }
 
 function getMatchStats(matches: PlayerMatchDetail[]) {
@@ -400,23 +412,8 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       <div className="mt-1.5 text-[11px] text-app-muted">
                         {getAccountSummary(activeAccount.matches)} · 保存于 {formatSavedAt(activeAccount.updatedAt)}
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {activeRanks.length > 0 ? (
-                          activeRanks.map((rank) => (
-                            <span
-                              key={`${rank.queueType}-${rank.tier}-${rank.division}`}
-                              className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-app-text shadow-sm ring-1 ring-app-border"
-                            >
-                              {getRankText(rank)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="rounded-full bg-white/70 px-2.5 py-1 text-[11px] text-app-muted ring-1 ring-app-border">
-                            未保存到段位信息
-                          </span>
-                        )}
-                      </div>
                     </div>
+                    <RankSummary ranks={activeRanks} />
                     <select
                       value={activeAccount.groupId ?? ''}
                       onChange={(event) => moveAccount(activeAccount.id, event.target.value)}
@@ -523,6 +520,36 @@ function AccountListItem({
   );
 }
 
+function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
+  if (ranks.length === 0) {
+    return (
+      <div className="hidden min-w-[150px] shrink-0 justify-end md:flex">
+        <div className="rounded-xl bg-white/70 px-3 py-2 text-right text-[11px] text-app-muted ring-1 ring-app-border">
+          未保存到段位信息
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hidden max-w-[250px] shrink-0 flex-col items-end gap-1.5 md:flex">
+      {ranks.slice(0, 2).map((rank) => (
+        <div
+          key={`${rank.queueType}-${rank.tier}-${rank.division}`}
+          className="flex min-w-[180px] items-center justify-end gap-2 rounded-xl bg-white/85 px-3 py-2 shadow-sm ring-1 ring-app-border"
+          title={getRankText(rank)}
+        >
+          <div className="min-w-0 text-right">
+            <div className="truncate text-[11px] text-app-muted">{getRankQueueLabel(rank)}</div>
+            <div className="truncate text-sm font-semibold text-app-text">{getRankDetailText(rank)}</div>
+          </div>
+          <RankEmblem rank={rank} size={42} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AccountInfoPanel({
   account,
   groups,
@@ -553,7 +580,6 @@ function AccountInfoPanel({
           <InfoTile label="主要模式" value={getModeSummary(account.matches)} />
           <InfoTile label="常用英雄" value={getChampionSummary(account.matches, championMap)} />
           <InfoTile label="最近保存" value={formatFullTime(account.updatedAt)} />
-          <InfoTile label="PUUID" value={account.profile.puuid || '未记录'} wide />
         </div>
       </section>
     </div>
