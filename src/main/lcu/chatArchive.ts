@@ -59,12 +59,15 @@ function mergeMessages(
 }
 
 function conversationKeys(conversation: ChatConversation): string[] {
+  const gameName = conversation.gameName?.trim() ?? '';
+  const gameTag = conversation.gameTag?.trim() ?? '';
+  const fullRiotId = gameName && gameTag ? `${gameName}#${gameTag}` : '';
   return [
     conversation.id,
     conversation.puuid,
     conversation.riotId,
-    conversation.gameName,
-    conversation.gameTag ? `${conversation.gameName}#${conversation.gameTag}` : '',
+    fullRiotId,
+    fullRiotId ? '' : gameName,
   ]
     .map((value) => value?.trim().toLowerCase())
     .filter((value): value is string => Boolean(value));
@@ -78,6 +81,70 @@ function isKnownFriend(
   const keys = conversationKeys(conversation);
   if (keys.length === 0) return null;
   return keys.some((key) => friendKeys.has(key));
+}
+
+function conversationsMatch(a: ChatConversation, b: ChatConversation): boolean {
+  const aKeys = new Set(conversationKeys(a));
+  return conversationKeys(b).some((key) => aKeys.has(key));
+}
+
+function firstNonEmpty(primary: string | undefined, fallback: string | undefined): string {
+  return primary?.trim() || fallback?.trim() || '';
+}
+
+function mergeUrlList(primary: string[] | undefined, fallback: string[] | undefined): string[] {
+  return Array.from(new Set([...(primary ?? []), ...(fallback ?? [])].filter(Boolean)));
+}
+
+function mergeConversationData(
+  primary: ChatConversation,
+  fallback?: ChatConversation,
+): ChatConversation {
+  if (!fallback) return primary;
+  const messages = mergeMessages(fallback.messages, primary.messages);
+  const lastMessage = messages[messages.length - 1];
+  const icon = primary.icon > 0 ? primary.icon : fallback.icon;
+  const iconUrl = firstNonEmpty(primary.iconUrl, fallback.iconUrl);
+  const iconUrls = mergeUrlList(primary.iconUrls, fallback.iconUrls);
+  const selfIcon = (primary.selfIcon ?? 0) > 0 ? primary.selfIcon : fallback.selfIcon;
+  const selfIconUrl = firstNonEmpty(primary.selfIconUrl, fallback.selfIconUrl) || undefined;
+  const selfIconUrls = mergeUrlList(primary.selfIconUrls, fallback.selfIconUrls);
+
+  return {
+    ...fallback,
+    ...primary,
+    id: firstNonEmpty(primary.id, fallback.id),
+    type: firstNonEmpty(primary.type, fallback.type) || 'chat',
+    gameName: firstNonEmpty(primary.gameName, fallback.gameName),
+    gameTag: firstNonEmpty(primary.gameTag, fallback.gameTag),
+    riotId: firstNonEmpty(primary.riotId, fallback.riotId) || '未知玩家',
+    puuid: firstNonEmpty(primary.puuid, fallback.puuid),
+    icon,
+    iconUrl: iconUrl || iconUrls[0] || '',
+    iconUrls,
+    selfIcon,
+    selfIconUrl,
+    selfIconUrls: selfIconUrls.length > 0 ? selfIconUrls : undefined,
+    unreadMessageCount: primary.unreadMessageCount,
+    lastMessage: lastMessage?.body ?? primary.lastMessage ?? fallback.lastMessage,
+    lastMessageAt: lastMessage?.timestamp ?? primary.lastMessageAt ?? fallback.lastMessageAt,
+    messages,
+  };
+}
+
+function dedupeConversations(conversations: ChatConversation[]): ChatConversation[] {
+  const deduped: ChatConversation[] = [];
+  for (const conversation of conversations) {
+    const existingIndex = deduped.findIndex((item) => conversationsMatch(item, conversation));
+    if (existingIndex >= 0) {
+      deduped[existingIndex] = mergeConversationData(deduped[existingIndex], conversation);
+    } else {
+      deduped.push(conversation);
+    }
+  }
+  return deduped.sort(
+    (a, b) => timestampValue(b.lastMessageAt) - timestampValue(a.lastMessageAt),
+  );
 }
 
 function normalizeConversation(value: unknown): ChatConversation | null {
@@ -138,12 +205,8 @@ function writeChatArchive(conversations: ChatConversation[]): void {
   fs.renameSync(tmpPath, filePath);
 }
 
-function conversationArchiveKey(conversation: ChatConversation): string {
-  return conversation.puuid || conversation.id || conversation.riotId;
-}
-
 export function readChatArchiveForDisplay(): ChatConversation[] {
-  return readChatArchive().map((conversation) => ({
+  return dedupeConversations(readChatArchive()).map((conversation) => ({
     ...conversation,
     archivedOnly: true,
     unreadMessageCount: 0,
@@ -154,31 +217,31 @@ export function mergeChatArchive(
   liveConversations: ChatConversation[],
   friendKeys?: Set<string>,
 ): ChatConversation[] {
-  const archived = readChatArchive();
-  const archivedByKey = new Map(
-    archived.map((conversation) => [conversationArchiveKey(conversation), conversation]),
-  );
-  const liveKeys = new Set(liveConversations.map(conversationArchiveKey));
+  const archived = dedupeConversations(readChatArchive());
+  const usedArchivedIndexes = new Set<number>();
   const merged: ChatConversation[] = [];
 
   for (const live of liveConversations) {
-    const archivedConversation = archivedByKey.get(conversationArchiveKey(live));
-    const messages = mergeMessages(archivedConversation?.messages ?? [], live.messages);
+    const archivedIndex = archived.findIndex((conversation, index) =>
+      !usedArchivedIndexes.has(index) && conversationsMatch(conversation, live));
+    const archivedConversation = archivedIndex >= 0 ? archived[archivedIndex] : undefined;
+    if (archivedIndex >= 0) usedArchivedIndexes.add(archivedIndex);
+    const mergedConversation = mergeConversationData(live, archivedConversation);
+    const messages = mergedConversation.messages;
     const lastMessage = messages[messages.length - 1];
-    const knownFriend = isKnownFriend(live, friendKeys);
+    const knownFriend = isKnownFriend(mergedConversation, friendKeys);
     merged.push({
-      ...archivedConversation,
-      ...live,
+      ...mergedConversation,
       messages,
-      lastMessage: lastMessage?.body ?? live.lastMessage,
-      lastMessageAt: lastMessage?.timestamp ?? live.lastMessageAt,
-      friendDeleted: knownFriend === null ? Boolean(live.friendDeleted) : !knownFriend,
+      lastMessage: lastMessage?.body ?? mergedConversation.lastMessage,
+      lastMessageAt: lastMessage?.timestamp ?? mergedConversation.lastMessageAt,
+      friendDeleted: knownFriend === null ? Boolean(mergedConversation.friendDeleted) : !knownFriend,
       archivedOnly: false,
     });
   }
 
-  for (const archivedConversation of archived) {
-    if (liveKeys.has(conversationArchiveKey(archivedConversation))) continue;
+  for (const [index, archivedConversation] of archived.entries()) {
+    if (usedArchivedIndexes.has(index)) continue;
     const knownFriend = isKnownFriend(archivedConversation, friendKeys);
     merged.push({
       ...archivedConversation,
@@ -190,9 +253,7 @@ export function mergeChatArchive(
     });
   }
 
-  const sorted = merged.sort(
-    (a, b) => timestampValue(b.lastMessageAt) - timestampValue(a.lastMessageAt),
-  );
+  const sorted = dedupeConversations(merged);
   writeChatArchive(sorted);
   return sorted;
 }
