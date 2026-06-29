@@ -725,8 +725,8 @@ export function MatchHistoryPage({
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
-      <div className="flex h-10 shrink-0 items-end border-b border-app-border bg-app-surface px-3 [-webkit-app-region:no-drag]">
-        <div className="flex h-9 min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden pb-2">
+      <div className="flex h-12 shrink-0 items-center border-b border-app-border bg-gradient-to-r from-app-surface via-app-surface to-app-bg-soft px-3 [-webkit-app-region:no-drag]">
+        <div className="flex h-10 min-w-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden pt-1 pb-2">
           {tabs.map((tab) => {
             const tabLabel = getTabLabel(tab);
             const isPressedOrDragging = tab.id === draggingTabId || tab.id === pressedTabId;
@@ -754,18 +754,18 @@ export function MatchHistoryPage({
                   handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
                 }}
                 onDrop={(event) => event.preventDefault()}
-                className={`group flex h-7 max-w-48 shrink-0 items-center gap-1.5 rounded-t-sm border border-b-0 px-2 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 ${
+                className={`group flex h-8 min-w-[112px] max-w-56 shrink-0 items-center gap-2 rounded-full border px-2.5 pr-2 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 ${
                   isPressedOrDragging ? 'cursor-grabbing' : 'cursor-default'
                 } ${
                   tab.id === activeTabId
-                    ? 'border-app-border bg-app-bg-soft text-app-text'
-                    : 'border-transparent bg-transparent text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                    ? 'border-app-border bg-white text-app-text shadow-[0_5px_16px_rgba(20,20,20,0.08)]'
+                    : 'border-transparent bg-white/45 text-app-muted hover:bg-white/80 hover:text-app-text hover:shadow-sm'
                 } ${tab.id === draggingTabId ? 'z-10 scale-[0.98] opacity-[0.65] shadow-airbnb' : ''}`}
               >
                 <button
                   type="button"
                   onClick={() => setActiveTabId(tab.id)}
-                  className="flex min-w-0 flex-1 cursor-inherit items-center gap-1.5 text-left"
+                  className="flex min-w-0 flex-1 cursor-inherit items-center gap-2 text-left"
                   title={tabLabel}
                 >
                   <ProfileIcon
@@ -773,12 +773,21 @@ export function MatchHistoryPage({
                     src={tab.result?.profile.profileIconUrl}
                     alt={tabLabel}
                     title={tabLabel}
-                    size={18}
-                    className="ring-1 ring-white/80"
+                    size={22}
+                    className={`ring-2 ${
+                      tab.id === activeTabId ? 'ring-app-primary-soft' : 'ring-white/80'
+                    }`}
                   />
-                  <span className="min-w-0 truncate">
-                    {tab.loading ? `${tabLabel} · 加载中` : tabLabel}
+                  <span
+                    className={`min-w-0 truncate ${
+                      tab.id === activeTabId ? 'font-semibold text-app-text' : 'font-medium'
+                    }`}
+                  >
+                    {tabLabel}
                   </span>
+                  {tab.loading && (
+                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(255,52,92,0.12)]" />
+                  )}
                 </button>
                 <button
                   type="button"
@@ -789,7 +798,7 @@ export function MatchHistoryPage({
                     event.stopPropagation();
                     handleCloseTab(tab.id);
                   }}
-                  className="flex size-4 shrink-0 items-center justify-center rounded-xs text-app-subtle opacity-0 transition-opacity hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus:opacity-100"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-app-subtle opacity-0 transition-[background-color,color,opacity] hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus:opacity-100"
                 >
                   <X className="size-3" />
                 </button>
