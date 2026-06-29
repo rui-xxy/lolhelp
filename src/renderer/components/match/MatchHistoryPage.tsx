@@ -140,6 +140,10 @@ function getDisplayName(riotId: string | undefined): string {
   return gameName || normalized || '未知玩家';
 }
 
+function getTabLabel(tab: MatchTab): string {
+  return getDisplayName(tab.result?.profile.riotId || tab.query || tab.title);
+}
+
 function getProfileRanks(profile: PlayerLookupResult['profile'] | null | undefined) {
   const ranks = profile?.ranks?.length ? profile.ranks : profile?.rank ? [profile.rank] : [];
   return ranks;
@@ -308,6 +312,7 @@ export function MatchHistoryPage({
   const [tabs, setTabs] = useState<MatchTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const [pressedTabId, setPressedTabId] = useState<string | null>(null);
   const [profilePanelTabId, setProfilePanelTabId] = useState<string | null>(null);
   const [saveModeTabId, setSaveModeTabId] = useState<string | null>(null);
   const [saveSelections, setSaveSelections] = useState<Record<string, number[]>>({});
@@ -319,6 +324,17 @@ export function MatchHistoryPage({
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
+
+  useEffect(() => {
+    if (!pressedTabId) return;
+    const clearPressedTab = () => setPressedTabId(null);
+    window.addEventListener('mouseup', clearPressedTab);
+    window.addEventListener('blur', clearPressedTab);
+    return () => {
+      window.removeEventListener('mouseup', clearPressedTab);
+      window.removeEventListener('blur', clearPressedTab);
+    };
+  }, [pressedTabId]);
 
   const updateTab = (tabId: string, updater: (tab: MatchTab) => MatchTab) => {
     setTabs((currentTabs) => currentTabs.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
@@ -709,53 +725,77 @@ export function MatchHistoryPage({
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
-      <div className="flex h-9 shrink-0 items-end border-b border-app-border bg-app-surface px-3 [-webkit-app-region:no-drag]">
-        <div className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              draggable
-              onDragStart={(event) => {
-                setDraggingTabId(tab.id);
-                setActiveTabId(tab.id);
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-              }}
-              onDragEnd={() => setDraggingTabId(null)}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
-                handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
-              }}
-              onDrop={(event) => event.preventDefault()}
-              className={`group flex h-7 max-w-44 cursor-grab items-center gap-1.5 rounded-t-sm border border-b-0 px-2 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 active:cursor-grabbing ${
-                tab.id === activeTabId
-                  ? 'border-app-border bg-app-bg-soft text-app-text'
-                  : 'border-transparent bg-transparent text-app-muted hover:bg-app-surface-soft hover:text-app-text'
-              } ${tab.id === draggingTabId ? 'z-10 scale-[0.98] opacity-[0.65] shadow-airbnb' : ''}`}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveTabId(tab.id)}
-                className="min-w-0 flex-1 truncate text-left"
-                title={tab.title}
-              >
-                {tab.loading ? '加载中...' : tab.title}
-              </button>
-              <button
-                type="button"
-                title="关闭"
-                aria-label="关闭标签页"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleCloseTab(tab.id);
+      <div className="flex h-10 shrink-0 items-end border-b border-app-border bg-app-surface px-3 [-webkit-app-region:no-drag]">
+        <div className="flex h-9 min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden pb-2">
+          {tabs.map((tab) => {
+            const tabLabel = getTabLabel(tab);
+            const isPressedOrDragging = tab.id === draggingTabId || tab.id === pressedTabId;
+            return (
+              <div
+                key={tab.id}
+                draggable
+                onMouseDown={(event) => {
+                  if (event.button === 0) setPressedTabId(tab.id);
                 }}
-                className="flex size-4 shrink-0 items-center justify-center rounded-xs text-app-subtle opacity-0 transition-opacity hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus:opacity-100"
+                onDragStart={(event) => {
+                  setDraggingTabId(tab.id);
+                  setPressedTabId(null);
+                  setActiveTabId(tab.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                }}
+                onDragEnd={() => {
+                  setDraggingTabId(null);
+                  setPressedTabId(null);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
+                }}
+                onDrop={(event) => event.preventDefault()}
+                className={`group flex h-7 max-w-48 shrink-0 items-center gap-1.5 rounded-t-sm border border-b-0 px-2 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 ${
+                  isPressedOrDragging ? 'cursor-grabbing' : 'cursor-default'
+                } ${
+                  tab.id === activeTabId
+                    ? 'border-app-border bg-app-bg-soft text-app-text'
+                    : 'border-transparent bg-transparent text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                } ${tab.id === draggingTabId ? 'z-10 scale-[0.98] opacity-[0.65] shadow-airbnb' : ''}`}
               >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => setActiveTabId(tab.id)}
+                  className="flex min-w-0 flex-1 cursor-inherit items-center gap-1.5 text-left"
+                  title={tabLabel}
+                >
+                  <ProfileIcon
+                    iconId={tab.result?.profile.profileIconId}
+                    src={tab.result?.profile.profileIconUrl}
+                    alt={tabLabel}
+                    title={tabLabel}
+                    size={18}
+                    className="ring-1 ring-white/80"
+                  />
+                  <span className="min-w-0 truncate">
+                    {tab.loading ? `${tabLabel} · 加载中` : tabLabel}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  title="关闭"
+                  aria-label="关闭标签页"
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleCloseTab(tab.id);
+                  }}
+                  className="flex size-4 shrink-0 items-center justify-center rounded-xs text-app-subtle opacity-0 transition-opacity hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus:opacity-100"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 
