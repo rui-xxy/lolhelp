@@ -126,6 +126,12 @@ function formatMessageTime(value: string): string {
   });
 }
 
+function conversationStatusText(conversation: ChatConversation): string {
+  if (conversation.friendDeleted) return '已删除好友';
+  if (conversation.archivedOnly) return '本地保存';
+  return '';
+}
+
 function MessageBubble({
   message,
   conversation,
@@ -152,9 +158,9 @@ function MessageBubble({
   return (
     <div className={`flex gap-2.5 ${message.fromSelf ? 'flex-row-reverse' : ''}`}>
       <ProfileIcon
-        iconId={message.fromSelf ? undefined : conversation.icon}
-        src={message.fromSelf ? undefined : conversation.iconUrl}
-        srcs={message.fromSelf ? [] : conversation.iconUrls}
+        iconId={message.fromSelf ? conversation.selfIcon : conversation.icon}
+        src={message.fromSelf ? conversation.selfIconUrl : conversation.iconUrl}
+        srcs={message.fromSelf ? conversation.selfIconUrls ?? [] : conversation.iconUrls}
         alt={message.fromSelf ? '我' : conversation.riotId}
         size={34}
         className="mt-4 border border-app-border"
@@ -286,10 +292,15 @@ export function ChatSessionDialog({
     (conversation) => conversation.id === selectedId,
   ) ?? null;
   const activeEmojiPage = EMOJI_PAGES[emojiPageIndex] ?? EMOJI_PAGES[0];
+  const canSendMessage = Boolean(
+    selectedConversation
+      && !selectedConversation.friendDeleted
+      && !selectedConversation.archivedOnly,
+  );
 
   const submitMessage = useCallback(async () => {
     const body = draft.trim();
-    if (!selectedConversation || !body || sending) return;
+    if (!selectedConversation || !body || sending || !canSendMessage) return;
     setSending(true);
     setSendError('');
     try {
@@ -310,7 +321,7 @@ export function ChatSessionDialog({
     } finally {
       setSending(false);
     }
-  }, [draft, loadConversations, selectedConversation, sending]);
+  }, [canSendMessage, draft, loadConversations, selectedConversation, sending]);
 
   const insertEmoji = useCallback((emoji: string) => {
     const textarea = textareaRef.current;
@@ -352,15 +363,9 @@ export function ChatSessionDialog({
         <aside className="flex w-[330px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           <header className="border-b border-app-border px-4 py-3">
             <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-sm bg-app-primary-soft text-app-primary">
-                <MessageCircleMore className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold text-app-text">会话管理</h2>
-                <p className="text-[11px] text-app-muted">
-                  {conversations.length} 个有聊天记录的玩家
-                </p>
-              </div>
+              <p className="min-w-0 flex-1 text-[11px] text-app-muted">
+                {conversations.length} 个有聊天记录的玩家
+              </p>
               <button
                 type="button"
                 onClick={() => void loadConversations(false)}
@@ -402,55 +407,65 @@ export function ChatSessionDialog({
                 </span>
               </div>
             ) : (
-              filteredConversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(conversation.id);
-                    setDraft('');
-                    setSendError('');
-                    setEmojiOpen(false);
-                    setEmojiPageIndex(0);
-                  }}
-                  className={`flex w-full items-center gap-3 border-b border-app-border/70 px-3 py-3 text-left transition-colors ${
-                    selectedId === conversation.id
-                      ? 'bg-app-surface'
-                      : 'hover:bg-app-nav-hover'
-                  }`}
-                >
-                  <div className="relative shrink-0">
-                    <ProfileIcon
-                      iconId={conversation.icon}
-                      src={conversation.iconUrl}
-                      srcs={conversation.iconUrls}
-                      alt={conversation.riotId}
-                      size={42}
-                      className="border border-app-border"
-                    />
-                    {conversation.unreadMessageCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[9px] font-semibold leading-4 text-white">
-                        {conversation.unreadMessageCount > 99
-                          ? '99+'
-                          : conversation.unreadMessageCount}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
-                        {conversation.riotId}
-                      </span>
-                      <span className="shrink-0 text-[10px] text-app-subtle">
-                        {formatConversationTime(conversation.lastMessageAt)}
-                      </span>
+              filteredConversations.map((conversation) => {
+                const statusText = conversationStatusText(conversation);
+                return (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(conversation.id);
+                      setDraft('');
+                      setSendError('');
+                      setEmojiOpen(false);
+                      setEmojiPageIndex(0);
+                    }}
+                    className={`flex w-full items-center gap-3 border-b border-app-border/70 px-3 py-3 text-left transition-colors ${
+                      selectedId === conversation.id
+                        ? 'bg-app-surface'
+                        : 'hover:bg-app-nav-hover'
+                    }`}
+                  >
+                    <div className="relative shrink-0">
+                      <ProfileIcon
+                        iconId={conversation.icon}
+                        src={conversation.iconUrl}
+                        srcs={conversation.iconUrls}
+                        alt={conversation.riotId}
+                        size={42}
+                        className="border border-app-border"
+                      />
+                      {conversation.unreadMessageCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[9px] font-semibold leading-4 text-white">
+                          {conversation.unreadMessageCount > 99
+                            ? '99+'
+                            : conversation.unreadMessageCount}
+                        </span>
+                      )}
                     </div>
-                    <p className="mt-1 truncate text-[11px] text-app-muted">
-                      {conversation.lastMessage}
-                    </p>
-                  </div>
-                </button>
-              ))
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
+                          {conversation.riotId}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-app-subtle">
+                          {formatConversationTime(conversation.lastMessageAt)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                        {statusText && (
+                          <span className="shrink-0 rounded-full bg-app-primary-soft px-1.5 py-0.5 text-[9px] font-medium text-app-primary">
+                            {statusText}
+                          </span>
+                        )}
+                        <p className="min-w-0 flex-1 truncate text-[11px] text-app-muted">
+                          {conversation.lastMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </aside>
@@ -468,8 +483,15 @@ export function ChatSessionDialog({
                   className="border border-app-border"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-app-text">
-                    {selectedConversation.riotId}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="truncate text-sm font-semibold text-app-text">
+                      {selectedConversation.riotId}
+                    </div>
+                    {conversationStatusText(selectedConversation) && (
+                      <span className="shrink-0 rounded-full bg-app-primary-soft px-2 py-0.5 text-[10px] font-medium text-app-primary">
+                        {conversationStatusText(selectedConversation)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-app-muted">
                     共 {selectedConversation.messages.length} 条聊天内容
@@ -509,14 +531,25 @@ export function ChatSessionDialog({
                   {sendError && (
                     <div className="mb-2 text-xs text-app-danger">{sendError}</div>
                   )}
+                  {!canSendMessage && (
+                    <div className="mb-2 rounded-sm bg-app-primary-soft/45 px-3 py-2 text-xs text-app-muted">
+                      {selectedConversation.friendDeleted
+                        ? '好友已删除，聊天记录已保存在本地，不能直接发送新消息。'
+                        : '这是本地保存的会话记录；客户端当前没有返回这个会话，所以暂时不能直接发送新消息。'}
+                    </div>
+                  )}
                   <div className="rounded-md border border-app-border bg-app-bg-soft transition-colors focus-within:border-app-primary">
                     <textarea
                       ref={textareaRef}
                       value={draft}
                       maxLength={1000}
                       rows={3}
-                      disabled={sending}
-                      placeholder={`发送给 ${selectedConversation.riotId}`}
+                      disabled={sending || !canSendMessage}
+                      placeholder={
+                        canSendMessage
+                          ? `发送给 ${selectedConversation.riotId}`
+                          : '本地保存的聊天记录'
+                      }
                       onChange={(event) => {
                         setDraft(event.target.value);
                         if (sendError) setSendError('');
@@ -538,13 +571,14 @@ export function ChatSessionDialog({
                         <button
                           type="button"
                           onClick={() => setEmojiOpen((current) => !current)}
+                          disabled={!canSendMessage}
                           title="选择表情"
                           aria-label="选择表情"
                           aria-expanded={emojiOpen}
                           className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
                             emojiOpen
                               ? 'bg-app-primary-soft text-app-primary'
-                              : 'text-app-muted hover:bg-app-surface hover:text-app-text'
+                              : 'text-app-muted hover:bg-app-surface hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50'
                           }`}
                         >
                           <Smile className="size-[18px]" />
@@ -607,7 +641,7 @@ export function ChatSessionDialog({
                       <button
                         type="button"
                         onClick={() => void submitMessage()}
-                        disabled={!draft.trim() || sending}
+                        disabled={!draft.trim() || sending || !canSendMessage}
                         className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-app-primary px-3 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:bg-app-nav-hover disabled:text-app-subtle"
                       >
                         <SendHorizontal className="size-3.5" />

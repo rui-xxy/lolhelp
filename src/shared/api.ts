@@ -94,6 +94,11 @@ export interface ChatConversation {
   icon: number;
   iconUrl: string;
   iconUrls: string[];
+  selfIcon?: number;
+  selfIconUrl?: string;
+  selfIconUrls?: string[];
+  friendDeleted?: boolean;
+  archivedOnly?: boolean;
   unreadMessageCount: number;
   lastMessage: string;
   lastMessageAt: string;

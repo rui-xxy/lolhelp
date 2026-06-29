@@ -20,6 +20,7 @@ import {
   getChatConversations,
   sendChatMessage,
 } from '../../lcu/chatSessions';
+import { readChatArchiveForDisplay } from '../../lcu/chatArchive';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -426,9 +427,15 @@ export function registerLcuHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, async () => {
     const creds = getCachedCredentials();
     if (!creds) {
-      throw new Error('英雄联盟客户端未连接');
+      return readChatArchiveForDisplay();
     }
-    return getChatConversations(new LcuClient(creds));
+    try {
+      return await getChatConversations(new LcuClient(creds));
+    } catch (error) {
+      const archived = readChatArchiveForDisplay();
+      if (archived.length > 0) return archived;
+      throw error;
+    }
   });
 
   ipcMain.handle(

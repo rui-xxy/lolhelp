@@ -5,6 +5,7 @@ import type {
 } from '../../shared/api';
 import { buildProfileIconCandidates } from '../../shared/gameAssets';
 import { LcuClient } from './client';
+import { mergeChatArchive } from './chatArchive';
 
 type RawRecord = Record<string, unknown>;
 
@@ -107,7 +108,7 @@ function findConversationPartner(
   conversation: RawRecord,
   me: RawRecord,
   friends: RawRecord[],
-): RawRecord {
+): { partner: RawRecord; isFriend: boolean } {
   const meIdentity = identityValues(me);
   const participants = participantRecords(conversation);
   const participant = participants.find(
@@ -122,10 +123,23 @@ function findConversationPartner(
   });
 
   return {
-    ...conversation,
-    ...friend,
-    ...participant,
+    partner: {
+      ...conversation,
+      ...friend,
+      ...participant,
+    },
+    isFriend: Boolean(friend),
   };
+}
+
+function makeFriendKeySet(friends: RawRecord[]): Set<string> {
+  const keys = new Set<string>();
+  for (const friend of friends) {
+    for (const key of identityValues(friend)) {
+      keys.add(key);
+    }
+  }
+  return keys;
 }
 
 function isOwnMessage(
@@ -206,7 +220,7 @@ export function buildChatConversations({
       const id = readString(conversation, ['id']);
       if (!id) return null;
 
-      const partner = findConversationPartner(conversation, me, friends);
+      const { partner, isFriend } = findConversationPartner(conversation, me, friends);
       const gameName = readString(partner, [
         'gameName',
         'displayName',
@@ -238,6 +252,13 @@ export function buildChatConversations({
         'profileIcon',
       ]);
       const iconUrls = buildProfileIconCandidates(icon);
+      const selfIcon = readNumber(me, [
+        'icon',
+        'iconId',
+        'profileIconId',
+        'profileIcon',
+      ]);
+      const selfIconUrls = buildProfileIconCandidates(selfIcon);
       const displayRiotId = riotId(gameName, gameTag)
         || readString(partner, ['name'])
         || '未知玩家';
@@ -252,6 +273,11 @@ export function buildChatConversations({
         icon,
         iconUrl: iconUrls[0] ?? '',
         iconUrls,
+        selfIcon,
+        selfIconUrl: selfIconUrls[0] ?? '',
+        selfIconUrls,
+        friendDeleted: !isFriend,
+        archivedOnly: false,
         unreadMessageCount: readNumber(conversation, [
           'unreadMessageCount',
           'unreadCount',
@@ -323,12 +349,13 @@ export async function getChatConversations(
     },
   );
 
-  return buildChatConversations({
+  const liveConversations = buildChatConversations({
     me,
     friends,
     conversations: directConversations,
     messagesByConversation: new Map(messageEntries.filter(([id]) => Boolean(id))),
   });
+  return mergeChatArchive(liveConversations, makeFriendKeySet(friends));
 }
 
 export async function sendChatMessage(
