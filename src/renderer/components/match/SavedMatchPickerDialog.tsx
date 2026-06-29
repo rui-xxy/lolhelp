@@ -8,7 +8,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type { PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
+import type { ChampionSummary, PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
 import { LOL_REGIONS } from '../../../shared/constants';
 import { ProfileIcon } from '../ProfileIcon';
 import { GameIcon } from './GameIcon';
@@ -151,10 +151,16 @@ function getModeSummary(matches: PlayerMatchDetail[]): string {
     .join(' · ') || '暂无';
 }
 
-function getChampionSummary(matches: PlayerMatchDetail[]): string {
+function getChampionName(match: PlayerMatchDetail, championMap: Map<number, ChampionSummary>): string {
+  const champion = championMap.get(match.championId);
+  return champion?.title || champion?.name || match.championName || '未知英雄';
+}
+
+function getChampionSummary(matches: PlayerMatchDetail[], championMap: Map<number, ChampionSummary>): string {
   const counts = new Map<string, number>();
   for (const match of matches) {
-    counts.set(match.championName || '未知英雄', (counts.get(match.championName || '未知英雄') ?? 0) + 1);
+    const name = getChampionName(match, championMap);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -171,6 +177,7 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [groupName, setGroupName] = useState('');
   const [notice, setNotice] = useState('');
+  const [champions, setChampions] = useState<ChampionSummary[]>([]);
 
   const refresh = () => {
     setAccounts(loadSavedMatchAccounts());
@@ -181,6 +188,7 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
     if (!open) return;
     refresh();
     setNotice('');
+    void window.lolHelper.match.getChampions().then(setChampions).catch(() => setChampions([]));
     window.addEventListener(SAVED_MATCHES_CHANGED_EVENT, refresh);
     window.addEventListener('focus', refresh);
     return () => {
@@ -217,6 +225,7 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
     () => filteredAccounts.find((account) => account.id === activeAccountId) ?? null,
     [filteredAccounts, activeAccountId],
   );
+  const championMap = useMemo(() => new Map(champions.map((champion) => [champion.id, champion])), [champions]);
 
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -440,9 +449,14 @@ export function SavedMatchPickerDialog({ open, onClose, currentRegionName, onSel
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                   {activeTab === 'info' ? (
-                    <AccountInfoPanel account={activeAccount} groups={groups} currentRegionName={currentRegionName} />
+                    <AccountInfoPanel
+                      account={activeAccount}
+                      groups={groups}
+                      currentRegionName={currentRegionName}
+                      championMap={championMap}
+                    />
                   ) : (
-                    <SavedMatchesPanel account={activeAccount} />
+                    <SavedMatchesPanel account={activeAccount} championMap={championMap} />
                   )}
                 </div>
               </>
@@ -503,39 +517,18 @@ function AccountInfoPanel({
   account,
   groups,
   currentRegionName,
+  championMap,
 }: {
   account: SavedMatchAccount;
   groups: SavedMatchGroup[];
   currentRegionName: string;
+  championMap: Map<number, ChampionSummary>;
 }) {
   const stats = getMatchStats(account.matches);
   const ranks = getRanks(account);
-  const latestMatch = account.matches[0];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-2">
-        <StatCard label="保存场次" value={`${account.matches.length} 场`} />
-        <StatCard label="胜负" value={`${stats.wins}胜 ${stats.losses}负`} sub={`${stats.winRate}% 胜率`} />
-        <StatCard label="平均 KDA" value={stats.avgKda.toFixed(2)} />
-        <StatCard label="平均伤害" value={formatNumber(stats.avgDamage)} />
-      </div>
-
-      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
-        <div className="mb-3 text-xs font-semibold text-app-text">基础信息</div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-          <InfoRow label="Riot ID" value={getFullRiotId(account.profile.riotId)} />
-          <InfoRow label="大区" value={getRegionName(account, currentRegionName)} />
-          <InfoRow label="等级" value={account.profile.level ? String(account.profile.level) : '未记录'} />
-          <InfoRow label="分组" value={getGroupName(groups, account.groupId)} />
-          <InfoRow label="英雄数量" value={account.profile.championCount == null ? '未记录' : String(account.profile.championCount)} />
-          <InfoRow label="皮肤数量" value={account.profile.skinCount == null ? '未记录' : String(account.profile.skinCount)} />
-          <InfoRow label="首次保存" value={formatFullTime(account.createdAt)} />
-          <InfoRow label="最近保存" value={formatFullTime(account.updatedAt)} />
-          <InfoRow label="PUUID" value={account.profile.puuid || '未记录'} wide />
-        </div>
-      </section>
-
       <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
         <div className="mb-3 text-xs font-semibold text-app-text">段位信息</div>
         {ranks.length > 0 ? (
@@ -555,20 +548,37 @@ function AccountInfoPanel({
         )}
       </section>
 
-      <section className="rounded-xl bg-app-surface p-4 shadow-sm ring-1 ring-app-border">
-        <div className="mb-3 text-xs font-semibold text-app-text">保存战绩概览</div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-          <InfoRow label="主要模式" value={getModeSummary(account.matches)} />
-          <InfoRow label="常用英雄" value={getChampionSummary(account.matches)} />
-          <InfoRow label="平均补刀" value={stats.avgCs.toFixed(1)} />
-          <InfoRow label="最近对局" value={latestMatch ? formatFullTime(latestMatch.gameCreation) : '暂无'} />
+      <section className="overflow-hidden rounded-xl bg-app-surface shadow-sm ring-1 ring-app-border">
+        <div className="bg-gradient-to-r from-app-primary-soft/55 to-transparent px-4 py-3">
+          <div className="text-xs font-semibold text-app-text">基础信息</div>
+          <div className="mt-1 text-[11px] text-app-muted">
+            {getRegionName(account, currentRegionName)} · {getGroupName(groups, account.groupId)}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-px bg-app-border text-xs">
+          <InfoTile label="Riot ID" value={getFullRiotId(account.profile.riotId)} />
+          <InfoTile label="等级" value={account.profile.level ? String(account.profile.level) : '未记录'} />
+          <InfoTile label="保存战绩" value={`${account.matches.length} 场`} sub={`${stats.wins}胜 ${stats.losses}负 · ${stats.winRate}% 胜率`} />
+          <InfoTile label="英雄数量" value={account.profile.championCount == null ? '未记录' : String(account.profile.championCount)} />
+          <InfoTile label="皮肤数量" value={account.profile.skinCount == null ? '未记录' : String(account.profile.skinCount)} />
+          <InfoTile label="平均表现" value={`${stats.avgKda.toFixed(2)} KDA`} sub={`${formatNumber(stats.avgDamage)} 伤害 · ${stats.avgCs.toFixed(1)} 补刀`} />
+          <InfoTile label="主要模式" value={getModeSummary(account.matches)} />
+          <InfoTile label="常用英雄" value={getChampionSummary(account.matches, championMap)} />
+          <InfoTile label="最近保存" value={formatFullTime(account.updatedAt)} />
+          <InfoTile label="PUUID" value={account.profile.puuid || '未记录'} wide />
         </div>
       </section>
     </div>
   );
 }
 
-function SavedMatchesPanel({ account }: { account: SavedMatchAccount }) {
+function SavedMatchesPanel({
+  account,
+  championMap,
+}: {
+  account: SavedMatchAccount;
+  championMap: Map<number, ChampionSummary>;
+}) {
   return (
     <div className="space-y-2">
       {account.matches.map((match) => (
@@ -581,10 +591,10 @@ function SavedMatchesPanel({ account }: { account: SavedMatchAccount }) {
           }`}
         >
           <div className="flex min-w-0 items-center gap-2">
-            <GameIcon src={match.championAvatar} alt={match.championName} size={34} rounded />
+            <GameIcon src={match.championAvatar} alt={getChampionName(match, championMap)} size={34} rounded />
             <div className="min-w-0">
               <div className="truncate text-xs font-semibold text-app-text">
-                {match.win ? '胜利' : '失败'} · {match.championName || '未知英雄'}
+                {match.win ? '胜利' : '失败'} · {getChampionName(match, championMap)}
               </div>
               <div className="mt-0.5 truncate text-[11px] text-app-muted">
                 {match.queueName || '未知模式'} · {formatFullTime(match.gameCreation)} · {formatDuration(match.gameDuration)}
@@ -609,21 +619,22 @@ function SavedMatchesPanel({ account }: { account: SavedMatchAccount }) {
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function InfoTile({
+  label,
+  value,
+  sub,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  wide?: boolean;
+}) {
   return (
-    <div className="rounded-xl bg-app-surface px-4 py-3 shadow-sm ring-1 ring-app-border">
-      <div className="text-[11px] text-app-muted">{label}</div>
-      <div className="mt-1 text-base font-semibold text-app-text">{value}</div>
-      {sub && <div className="mt-0.5 text-[10px] text-app-subtle">{sub}</div>}
-    </div>
-  );
-}
-
-function InfoRow({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
-  return (
-    <div className={wide ? 'col-span-2' : ''}>
+    <div className={`bg-app-surface px-4 py-3 ${wide ? 'col-span-3' : ''}`}>
       <div className="text-[11px] text-app-subtle">{label}</div>
-      <div className="mt-0.5 break-all font-medium text-app-text">{value}</div>
+      <div className="mt-1 break-all text-sm font-semibold text-app-text">{value}</div>
+      {sub && <div className="mt-0.5 text-[10px] text-app-muted">{sub}</div>}
     </div>
   );
 }
