@@ -414,46 +414,50 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       </div>
                     </div>
                     <RankSummary ranks={activeRanks} />
-                    <select
-                      value={activeAccount.groupId ?? ''}
-                      onChange={(event) => moveAccount(activeAccount.id, event.target.value)}
-                      className="h-8 w-28 rounded-full border border-app-border bg-white/85 px-3 text-xs text-app-text outline-none focus:border-app-primary"
-                    >
-                      <option value="">未分组</option>
-                      {groups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSelect(activeAccount);
-                        onClose();
-                      }}
-                      className="h-8 shrink-0 rounded-full bg-app-primary px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-app-primary-hover"
-                    >
-                      打开战绩
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteAccount(activeAccount.id)}
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
-                      title="删除这个保存账号"
-                      aria-label="删除这个保存账号"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
-                    <TabButton active={activeTab === 'info'} onClick={() => setActiveTab('info')}>
-                      账号信息
-                    </TabButton>
-                    <TabButton active={activeTab === 'matches'} onClick={() => setActiveTab('matches')}>
-                      战绩
-                    </TabButton>
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="flex gap-2">
+                      <TabButton active={activeTab === 'info'} onClick={() => setActiveTab('info')}>
+                        账号信息
+                      </TabButton>
+                      <TabButton active={activeTab === 'matches'} onClick={() => setActiveTab('matches')}>
+                        战绩
+                      </TabButton>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                      <select
+                        value={activeAccount.groupId ?? ''}
+                        onChange={(event) => moveAccount(activeAccount.id, event.target.value)}
+                        className="h-8 w-28 rounded-full border border-app-border bg-white/85 px-3 text-xs text-app-text outline-none focus:border-app-primary"
+                      >
+                        <option value="">未分组</option>
+                        {groups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelect(activeAccount);
+                          onClose();
+                        }}
+                        className="h-8 shrink-0 rounded-full bg-app-primary px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-app-primary-hover"
+                      >
+                        打开战绩
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteAccount(activeAccount.id)}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
+                        title="删除这个保存账号"
+                        aria-label="删除这个保存账号"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -523,8 +527,8 @@ function AccountListItem({
 function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
   if (ranks.length === 0) {
     return (
-      <div className="hidden min-w-[150px] shrink-0 justify-end md:flex">
-        <div className="rounded-xl bg-white/70 px-3 py-2 text-right text-[11px] text-app-muted ring-1 ring-app-border">
+      <div className="hidden w-20 shrink-0 justify-end md:flex">
+        <div className="text-center text-[11px] text-app-muted">
           未保存到段位信息
         </div>
       </div>
@@ -532,18 +536,16 @@ function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
   }
 
   return (
-    <div className="hidden max-w-[250px] shrink-0 flex-col items-end gap-1.5 md:flex">
+    <div className="hidden max-w-[180px] shrink-0 items-start justify-end gap-2 md:flex">
       {ranks.slice(0, 2).map((rank) => (
         <div
           key={`${rank.queueType}-${rank.tier}-${rank.division}`}
-          className="flex min-w-[180px] items-center justify-end gap-2 rounded-xl bg-white/85 px-3 py-2 shadow-sm ring-1 ring-app-border"
+          className="flex w-20 flex-col items-center text-center"
           title={getRankText(rank)}
         >
-          <div className="min-w-0 text-right">
-            <div className="truncate text-[11px] text-app-muted">{getRankQueueLabel(rank)}</div>
-            <div className="truncate text-sm font-semibold text-app-text">{getRankDetailText(rank)}</div>
-          </div>
-          <RankEmblem rank={rank} size={42} />
+          <RankEmblem rank={rank} size={44} />
+          <div className="mt-0.5 w-full truncate text-[10px] text-app-muted">{getRankQueueLabel(rank)}</div>
+          <div className="w-full truncate text-xs font-semibold text-app-text">{getRankDetailText(rank)}</div>
         </div>
       ))}
     </div>
