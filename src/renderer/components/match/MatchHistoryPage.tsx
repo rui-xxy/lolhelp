@@ -945,19 +945,19 @@ export function MatchHistoryPage({
           </div>
 
           {activeTab && activeTab.matches.length > 0 && (
-            <div className="shrink-0 border-t border-app-border/70 bg-app-sidebar/95 px-3 py-2">
-              <div className="flex items-center justify-between gap-1.5">
+            <div className="shrink-0 bg-gradient-to-t from-app-sidebar via-app-sidebar/95 to-app-sidebar/35 px-3 pt-3 pb-2">
+              <div className="mx-auto flex h-9 w-max max-w-full items-center gap-1 rounded-full border border-white/80 bg-white/68 px-1.5 shadow-[0_10px_26px_rgba(20,20,20,0.13)] backdrop-blur-md">
                 <button
                   type="button"
                   title="上一页"
                   aria-label="上一页"
                   disabled={activeTab.loading || activeTab.pageLoading || activeTab.currentPage <= 1}
                   onClick={() => handlePageChange(activeTab.currentPage - 1)}
-                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface enabled:hover:text-app-text disabled:opacity-25"
+                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-white enabled:hover:text-app-text disabled:opacity-25"
                 >
                   <ChevronLeft className="size-3.5" />
                 </button>
-                <div className="flex items-center gap-0.5 rounded-full bg-app-bg/60 p-0.5 shadow-[inset_0_0_0_1px_rgba(221,221,221,0.55)]">
+                <div className="flex items-center gap-0.5">
                   {pageNumbers.map((page) => (
                     <button
                       key={page}
@@ -966,8 +966,8 @@ export function MatchHistoryPage({
                       onClick={() => handlePageChange(page)}
                       className={`h-6 min-w-6 rounded-full px-1.5 text-[11px] font-medium tabular-nums transition-colors ${
                         page === activeTab.currentPage
-                          ? 'bg-app-text text-white shadow-sm'
-                          : 'text-app-muted hover:bg-app-surface hover:text-app-text'
+                          ? 'bg-app-primary text-white shadow-[0_4px_12px_rgba(255,56,92,0.28)]'
+                          : 'text-app-muted hover:bg-white hover:text-app-text'
                       }`}
                     >
                       {page}
@@ -984,7 +984,7 @@ export function MatchHistoryPage({
                     (activeTab.currentPage >= totalPages && !activeTab.hasMore)
                   }
                   onClick={() => handlePageChange(activeTab.currentPage + 1)}
-                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface enabled:hover:text-app-text disabled:opacity-25"
+                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-white enabled:hover:text-app-text disabled:opacity-25"
                 >
                   <ChevronRight className="size-3.5" />
                 </button>
