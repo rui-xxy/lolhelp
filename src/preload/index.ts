@@ -26,8 +26,8 @@ const lolHelper: LolHelper = {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
     getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
     getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
-    getChatConversations: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS),
+    getChatConversations: (accountKey?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, accountKey),
     sendChatMessage: (conversationId: string, body: string) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.LCU_SEND_CHAT_MESSAGE,

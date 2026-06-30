@@ -91,6 +91,14 @@ export interface ChatConversation {
   gameTag: string;
   riotId: string;
   puuid: string;
+  ownerKey?: string;
+  ownerRiotId?: string;
+  ownerPuuid?: string;
+  ownerGameName?: string;
+  ownerGameTag?: string;
+  ownerIcon?: number;
+  ownerIconUrl?: string;
+  ownerIconUrls?: string[];
   icon: number;
   iconUrl: string;
   iconUrls: string[];
@@ -105,12 +113,36 @@ export interface ChatConversation {
   messages: ChatMessage[];
 }
 
+export interface ChatAccountSummary {
+  key: string;
+  riotId: string;
+  gameName: string;
+  gameTag: string;
+  puuid: string;
+  icon: number;
+  iconUrl: string;
+  iconUrls: string[];
+  conversationCount: number;
+  lastMessageAt: string;
+  current?: boolean;
+  unknown?: boolean;
+}
+
+export interface ChatConversationsResponse {
+  conversations: ChatConversation[];
+  accounts: ChatAccountSummary[];
+  currentAccount?: ChatAccountSummary;
+  selectedAccount?: ChatAccountSummary;
+  selectedAccountKey: string;
+  readOnly: boolean;
+}
+
 // 占位接口：后续阶段接入 LCU 时填充方法签名
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
   getFriends: () => Promise<FriendInfo[]>;
-  getChatConversations: () => Promise<ChatConversation[]>;
+  getChatConversations: (accountKey?: string) => Promise<ChatConversationsResponse>;
   sendChatMessage: (
     conversationId: string,
     body: string,

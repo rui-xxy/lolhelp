@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   MessageCircleMore,
   RefreshCw,
   Search,
@@ -13,7 +14,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { ChatConversation, ChatMessage } from '../../../shared/api';
+import type {
+  ChatAccountSummary,
+  ChatConversation,
+  ChatMessage,
+} from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 
 const CHAT_REFRESH_INTERVAL_MS = 5_000;
@@ -196,6 +201,12 @@ export function ChatSessionDialog({
   onClose: () => void;
 }) {
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [accounts, setAccounts] = useState<ChatAccountSummary[]>([]);
+  const [currentAccount, setCurrentAccount] = useState<ChatAccountSummary | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<ChatAccountSummary | null>(null);
+  const [selectedAccountKey, setSelectedAccountKey] = useState('');
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [readOnlyAccount, setReadOnlyAccount] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -207,37 +218,58 @@ export function ChatSessionDialog({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [emojiPageIndex, setEmojiPageIndex] = useState(0);
   const loadingRef = useRef(false);
+  const selectedAccountKeyRef = useRef('');
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   const closeDialog = useCallback(() => {
     setSearch('');
     setDraft('');
     setSendError('');
     setEmojiOpen(false);
+    setAccountMenuOpen(false);
     setEmojiPageIndex(0);
     onClose();
   }, [onClose]);
 
-  const loadConversations = useCallback(async (showLoading: boolean) => {
+  const loadConversations = useCallback(async (
+    showLoading: boolean,
+    accountKey?: string,
+  ) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     if (showLoading) setLoading(true);
     else setRefreshing(true);
     try {
-      const next = await window.lolHelper.lcu.getChatConversations();
-      setConversations(next);
+      const response = await window.lolHelper.lcu.getChatConversations(
+        accountKey ?? (selectedAccountKeyRef.current || undefined),
+      );
+      selectedAccountKeyRef.current = response.selectedAccountKey;
+      setAccounts(response.accounts);
+      setCurrentAccount(response.currentAccount ?? null);
+      setSelectedAccount(response.selectedAccount ?? null);
+      setSelectedAccountKey(response.selectedAccountKey);
+      setReadOnlyAccount(response.readOnly);
+      setConversations(response.conversations);
       setSelectedId((current) => {
-        if (current && next.some((conversation) => conversation.id === current)) {
+        if (current && response.conversations.some((conversation) => conversation.id === current)) {
           return current;
         }
-        return next[0]?.id ?? '';
+        return response.conversations[0]?.id ?? '';
       });
       setError('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError));
-      if (showLoading) setConversations([]);
+      if (showLoading) {
+        setConversations([]);
+        setAccounts([]);
+        setCurrentAccount(null);
+        setSelectedAccount(null);
+        setSelectedAccountKey('');
+        setReadOnlyAccount(true);
+      }
     } finally {
       loadingRef.current = false;
       setLoading(false);
@@ -248,12 +280,18 @@ export function ChatSessionDialog({
   useEffect(() => {
     if (!open) return undefined;
     setSearch('');
-    void loadConversations(true);
+    selectedAccountKeyRef.current = '';
+    setSelectedAccountKey('');
+    void loadConversations(true, '');
     const timer = window.setInterval(() => {
       void loadConversations(false);
     }, CHAT_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [loadConversations, open]);
+
+  useEffect(() => {
+    selectedAccountKeyRef.current = selectedAccountKey;
+  }, [selectedAccountKey]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -278,6 +316,20 @@ export function ChatSessionDialog({
     return () => document.removeEventListener('mousedown', closeEmojiPicker);
   }, [emojiOpen]);
 
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const closeAccountMenu = (event: MouseEvent) => {
+      if (
+        event.target instanceof Node
+        && !accountMenuRef.current?.contains(event.target)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeAccountMenu);
+    return () => document.removeEventListener('mousedown', closeAccountMenu);
+  }, [accountMenuOpen]);
+
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return conversations;
@@ -294,6 +346,7 @@ export function ChatSessionDialog({
   const activeEmojiPage = EMOJI_PAGES[emojiPageIndex] ?? EMOJI_PAGES[0];
   const canSendMessage = Boolean(
     selectedConversation
+      && !readOnlyAccount
       && !selectedConversation.friendDeleted
       && !selectedConversation.archivedOnly,
   );
@@ -362,13 +415,87 @@ export function ChatSessionDialog({
       <section className="flex h-[680px] max-h-[88vh] w-[1040px] max-w-[94vw] overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
         <aside className="flex w-[330px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           <header className="border-b border-app-border px-4 py-3">
+            <div ref={accountMenuRef} className="relative mb-2">
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((current) => !current)}
+                className="flex h-8 w-full items-center gap-2 rounded-sm border border-app-border bg-app-surface px-2 text-left transition-colors hover:border-app-primary/60"
+              >
+                {selectedAccount && (
+                  <ProfileIcon
+                    iconId={selectedAccount.icon}
+                    src={selectedAccount.iconUrl}
+                    srcs={selectedAccount.iconUrls}
+                    alt={selectedAccount.riotId}
+                    size={22}
+                    className="border border-app-border"
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-app-text">
+                  {selectedAccount
+                    ? `${selectedAccount.current ? '当前' : '历史'} · ${selectedAccount.riotId}`
+                    : currentAccount
+                      ? `当前 · ${currentAccount.riotId}`
+                      : '选择账号'}
+                </span>
+                <ChevronDown className="size-3.5 shrink-0 text-app-subtle" />
+              </button>
+              {accountMenuOpen && (
+                <div className="absolute top-9 left-0 z-30 max-h-72 w-full overflow-y-auto rounded-md border border-app-border bg-app-surface p-1 shadow-airbnb">
+                  {accounts.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-app-muted">暂无保存账号</div>
+                  ) : (
+                    accounts.map((account) => (
+                      <button
+                        key={account.key}
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          setSelectedId('');
+                          setDraft('');
+                          setSendError('');
+                          setEmojiOpen(false);
+                          selectedAccountKeyRef.current = account.key;
+                          setSelectedAccountKey(account.key);
+                          void loadConversations(true, account.key);
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left transition-colors ${
+                          selectedAccountKey === account.key
+                            ? 'bg-app-primary-soft text-app-primary'
+                            : 'text-app-text hover:bg-app-nav-hover'
+                        }`}
+                      >
+                        <ProfileIcon
+                          iconId={account.icon}
+                          src={account.iconUrl}
+                          srcs={account.iconUrls}
+                          alt={account.riotId}
+                          size={26}
+                          className="border border-app-border"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">
+                            {account.riotId}
+                          </span>
+                          <span className="block text-[10px] text-app-muted">
+                            {account.current ? '当前登录账号' : '本地保存账号'}
+                            {' · '}
+                            {account.conversationCount} 个会话
+                          </span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <p className="min-w-0 flex-1 text-[11px] text-app-muted">
                 {conversations.length} 个有聊天记录的玩家
               </p>
               <button
                 type="button"
-                onClick={() => void loadConversations(false)}
+                onClick={() => void loadConversations(false, selectedAccountKey || undefined)}
                 disabled={loading || refreshing}
                 title="刷新会话"
                 aria-label="刷新会话"
@@ -531,7 +658,12 @@ export function ChatSessionDialog({
                   {sendError && (
                     <div className="mb-2 text-xs text-app-danger">{sendError}</div>
                   )}
-                  {!canSendMessage && (
+                  {readOnlyAccount && (
+                    <div className="mb-2 rounded-sm bg-app-primary-soft/45 px-3 py-2 text-xs text-app-muted">
+                      正在查看其它账号的本地聊天记录；切回当前登录账号后才能发送新消息。
+                    </div>
+                  )}
+                  {!readOnlyAccount && !canSendMessage && (
                     <div className="mb-2 rounded-sm bg-app-primary-soft/45 px-3 py-2 text-xs text-app-muted">
                       {selectedConversation.friendDeleted
                         ? '好友已删除，聊天记录已保存在本地，不能直接发送新消息。'

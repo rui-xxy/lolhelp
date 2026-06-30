@@ -424,16 +424,19 @@ export function registerLcuHandlers(): void {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, async () => {
+  ipcMain.handle(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, async (_event, accountKey?: string) => {
     const creds = getCachedCredentials();
     if (!creds) {
-      return readChatArchiveForDisplay();
+      return readChatArchiveForDisplay(typeof accountKey === 'string' ? accountKey : undefined);
     }
     try {
-      return await getChatConversations(new LcuClient(creds));
+      return await getChatConversations(
+        new LcuClient(creds),
+        typeof accountKey === 'string' ? accountKey : undefined,
+      );
     } catch (error) {
-      const archived = readChatArchiveForDisplay();
-      if (archived.length > 0) return archived;
+      const archived = readChatArchiveForDisplay(typeof accountKey === 'string' ? accountKey : undefined);
+      if (archived.conversations.length > 0 || archived.accounts.length > 0) return archived;
       throw error;
     }
   });

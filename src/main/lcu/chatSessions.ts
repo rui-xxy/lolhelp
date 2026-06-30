@@ -1,5 +1,7 @@
 import type {
+  ChatAccountSummary,
   ChatConversation,
+  ChatConversationsResponse,
   ChatMessage,
   FriendActionResult,
 } from '../../shared/api';
@@ -72,6 +74,47 @@ function timestampValue(value: string): number {
 function riotId(gameName: string, gameTag: string): string {
   if (!gameName) return '';
   return gameTag ? `${gameName}#${gameTag}` : gameName;
+}
+
+function normalizeAccountKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function makeOwnerAccount(me: RawRecord): ChatAccountSummary {
+  const gameName = readString(me, [
+    'gameName',
+    'displayName',
+    'summonerName',
+    'name',
+  ]);
+  const gameTag = readString(me, ['gameTag', 'tagLine']);
+  const puuid = readString(me, ['puuid']);
+  const id = readString(me, ['id', 'pid', 'summonerId', 'accountId']);
+  const displayRiotId = riotId(gameName, gameTag)
+    || readString(me, ['name', 'displayName', 'summonerName'])
+    || '当前账号';
+  const key = normalizeAccountKey(puuid || displayRiotId || id || 'current-account');
+  const icon = readNumber(me, [
+    'icon',
+    'iconId',
+    'profileIconId',
+    'profileIcon',
+  ]);
+  const iconUrls = buildProfileIconCandidates(icon);
+
+  return {
+    key,
+    riotId: displayRiotId,
+    gameName,
+    gameTag,
+    puuid,
+    icon,
+    iconUrl: iconUrls[0] ?? '',
+    iconUrls,
+    conversationCount: 0,
+    lastMessageAt: '',
+    current: true,
+  };
 }
 
 function identityValues(source: RawRecord): Set<string> {
@@ -317,7 +360,8 @@ async function mapWithConcurrency<T, R>(
 
 export async function getChatConversations(
   client: LcuClient,
-): Promise<ChatConversation[]> {
+  selectedAccountKey?: string,
+): Promise<ChatConversationsResponse> {
   const [meValue, friendsValue, conversationsValue] = await Promise.all([
     client.get<unknown>('/lol-chat/v1/me'),
     client.get<unknown>('/lol-chat/v1/friends'),
@@ -325,6 +369,7 @@ export async function getChatConversations(
   ]);
 
   const me = asRecord(meValue);
+  const owner = makeOwnerAccount(me);
   const friends = asRecords(friendsValue, 'friends');
   const conversations = asRecords(conversationsValue, 'conversations');
   const directConversations = conversations.filter((conversation) => {
@@ -355,7 +400,12 @@ export async function getChatConversations(
     conversations: directConversations,
     messagesByConversation: new Map(messageEntries.filter(([id]) => Boolean(id))),
   });
-  return mergeChatArchive(liveConversations, makeFriendKeySet(friends));
+  return mergeChatArchive(
+    liveConversations,
+    makeFriendKeySet(friends),
+    owner,
+    selectedAccountKey,
+  );
 }
 
 export async function sendChatMessage(

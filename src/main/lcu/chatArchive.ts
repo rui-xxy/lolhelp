@@ -1,9 +1,15 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ChatConversation, ChatMessage } from '../../shared/api';
+import type {
+  ChatAccountSummary,
+  ChatConversation,
+  ChatConversationsResponse,
+  ChatMessage,
+} from '../../shared/api';
 
 const CHAT_ARCHIVE_FILE = 'lolhelper-chat-archive.json';
+const UNKNOWN_OWNER_KEY = '__unknown__';
 
 function archivePath(): string {
   return path.join(app.getPath('userData'), CHAT_ARCHIVE_FILE);
@@ -16,6 +22,31 @@ function timestampValue(value: string): number {
   }
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeKey(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+function riotId(gameName: string | undefined, gameTag: string | undefined): string {
+  const name = gameName?.trim() ?? '';
+  const tag = gameTag?.trim() ?? '';
+  if (!name) return '';
+  return tag ? `${name}#${tag}` : name;
+}
+
+function ownerKeyFromValues(owner: {
+  key?: string;
+  puuid?: string;
+  riotId?: string;
+  gameName?: string;
+  gameTag?: string;
+}): string {
+  return normalizeKey(owner.key)
+    || normalizeKey(owner.puuid)
+    || normalizeKey(owner.riotId)
+    || normalizeKey(riotId(owner.gameName, owner.gameTag))
+    || normalizeKey(owner.gameName);
 }
 
 function normalizeMessage(value: unknown): ChatMessage | null {
@@ -31,6 +62,36 @@ function normalizeMessage(value: unknown): ChatMessage | null {
     fromSelf: Boolean(source.fromSelf),
     senderRiotId: typeof source.senderRiotId === 'string' ? source.senderRiotId : '',
   };
+}
+
+function inferredOwnerRiotId(messages: ChatMessage[]): string {
+  return messages.find((message) => message.fromSelf && message.senderRiotId.trim())
+    ?.senderRiotId.trim() ?? '';
+}
+
+function conversationOwnerKey(conversation: ChatConversation): string {
+  return ownerKeyFromValues({
+    key: conversation.ownerKey,
+    puuid: conversation.ownerPuuid,
+    riotId: conversation.ownerRiotId,
+    gameName: conversation.ownerGameName,
+    gameTag: conversation.ownerGameTag,
+  });
+}
+
+function ownerMatches(conversation: ChatConversation, ownerKey: string): boolean {
+  const normalizedOwnerKey = normalizeKey(ownerKey);
+  const conversationKey = conversationOwnerKey(conversation);
+  if (!normalizedOwnerKey) return true;
+  if (normalizedOwnerKey === UNKNOWN_OWNER_KEY) return !conversationKey;
+  return conversationKey === normalizedOwnerKey;
+}
+
+function sameConversationOwner(a: ChatConversation, b: ChatConversation): boolean {
+  const aOwner = conversationOwnerKey(a);
+  const bOwner = conversationOwnerKey(b);
+  if (!aOwner && !bOwner) return true;
+  return Boolean(aOwner && bOwner && aOwner === bOwner);
 }
 
 function messageKey(message: ChatMessage): string {
@@ -84,6 +145,7 @@ function isKnownFriend(
 }
 
 function conversationsMatch(a: ChatConversation, b: ChatConversation): boolean {
+  if (!sameConversationOwner(a, b)) return false;
   const aKeys = new Set(conversationKeys(a));
   return conversationKeys(b).some((key) => aKeys.has(key));
 }
@@ -94,6 +156,127 @@ function firstNonEmpty(primary: string | undefined, fallback: string | undefined
 
 function mergeUrlList(primary: string[] | undefined, fallback: string[] | undefined): string[] {
   return Array.from(new Set([...(primary ?? []), ...(fallback ?? [])].filter(Boolean)));
+}
+
+function accountFromConversation(conversation: ChatConversation): ChatAccountSummary {
+  const key = conversationOwnerKey(conversation) || UNKNOWN_OWNER_KEY;
+  const ownerIcon = conversation.ownerIcon ?? conversation.selfIcon ?? 0;
+  const ownerIconUrls = mergeUrlList(conversation.ownerIconUrls, conversation.selfIconUrls);
+  const ownerIconUrl = firstNonEmpty(conversation.ownerIconUrl, conversation.selfIconUrl)
+    || ownerIconUrls[0]
+    || '';
+  const ownerRiotId = firstNonEmpty(
+    conversation.ownerRiotId,
+    inferredOwnerRiotId(conversation.messages),
+  );
+  return {
+    key,
+    riotId: ownerRiotId || '未识别账号',
+    gameName: conversation.ownerGameName ?? '',
+    gameTag: conversation.ownerGameTag ?? '',
+    puuid: conversation.ownerPuuid ?? '',
+    icon: ownerIcon,
+    iconUrl: ownerIconUrl,
+    iconUrls: ownerIconUrls,
+    conversationCount: 0,
+    lastMessageAt: '',
+    unknown: key === UNKNOWN_OWNER_KEY,
+  };
+}
+
+function mergeAccountSummary(
+  primary: ChatAccountSummary,
+  fallback?: ChatAccountSummary,
+): ChatAccountSummary {
+  if (!fallback) return primary;
+  const icon = primary.icon > 0 ? primary.icon : fallback.icon;
+  const iconUrls = mergeUrlList(primary.iconUrls, fallback.iconUrls);
+  const lastMessageAt =
+    timestampValue(primary.lastMessageAt) >= timestampValue(fallback.lastMessageAt)
+      ? primary.lastMessageAt
+      : fallback.lastMessageAt;
+  return {
+    ...fallback,
+    ...primary,
+    key: primary.key || fallback.key,
+    riotId: firstNonEmpty(primary.riotId, fallback.riotId) || '未识别账号',
+    gameName: firstNonEmpty(primary.gameName, fallback.gameName),
+    gameTag: firstNonEmpty(primary.gameTag, fallback.gameTag),
+    puuid: firstNonEmpty(primary.puuid, fallback.puuid),
+    icon,
+    iconUrl: firstNonEmpty(primary.iconUrl, fallback.iconUrl) || iconUrls[0] || '',
+    iconUrls,
+    conversationCount: Math.max(primary.conversationCount, fallback.conversationCount),
+    lastMessageAt,
+    current: Boolean(primary.current || fallback.current),
+    unknown: Boolean(primary.unknown || fallback.unknown),
+  };
+}
+
+function buildAccountSummaries(
+  conversations: ChatConversation[],
+  currentOwner?: ChatAccountSummary,
+): ChatAccountSummary[] {
+  const byKey = new Map<string, ChatAccountSummary>();
+  if (currentOwner?.key) {
+    byKey.set(currentOwner.key, {
+      ...currentOwner,
+      current: true,
+      conversationCount: 0,
+      lastMessageAt: currentOwner.lastMessageAt ?? '',
+    });
+  }
+
+  for (const conversation of conversations) {
+    const account = accountFromConversation(conversation);
+    const existing = byKey.get(account.key);
+    byKey.set(account.key, mergeAccountSummary({
+      ...account,
+      conversationCount: (existing?.conversationCount ?? 0) + 1,
+      lastMessageAt: conversation.lastMessageAt,
+      current: currentOwner?.key === account.key,
+    }, existing));
+  }
+
+  return Array.from(byKey.values())
+    .sort((a, b) => {
+      if (a.current !== b.current) return a.current ? -1 : 1;
+      return timestampValue(b.lastMessageAt) - timestampValue(a.lastMessageAt);
+    });
+}
+
+function buildChatResponse(
+  conversations: ChatConversation[],
+  selectedAccountKey: string | undefined,
+  currentOwner?: ChatAccountSummary,
+): ChatConversationsResponse {
+  const accounts = buildAccountSummaries(conversations, currentOwner);
+  const fallbackKey = currentOwner?.key || accounts[0]?.key || '';
+  const normalizedSelectedKey = normalizeKey(selectedAccountKey) || fallbackKey;
+  const selectedKey = accounts.some((account) => account.key === normalizedSelectedKey)
+    ? normalizedSelectedKey
+    : fallbackKey;
+  const selectedConversations = selectedKey
+    ? conversations.filter((conversation) => ownerMatches(conversation, selectedKey))
+    : [];
+  const selectedAccount = accounts.find((account) => account.key === selectedKey);
+  const currentAccount = currentOwner
+    ? accounts.find((account) => account.key === currentOwner.key) ?? currentOwner
+    : undefined;
+
+  return {
+    conversations: selectedConversations.map((conversation) => ({
+      ...conversation,
+      archivedOnly: selectedKey !== currentOwner?.key ? true : conversation.archivedOnly,
+      friendDeleted: selectedKey !== currentOwner?.key ? false : conversation.friendDeleted,
+      unreadMessageCount: selectedKey !== currentOwner?.key ? 0 : conversation.unreadMessageCount,
+    })),
+    accounts,
+    currentAccount,
+    selectedAccount,
+    selectedAccountKey: selectedKey,
+    readOnly: !currentOwner?.key || selectedKey !== currentOwner.key,
+  };
 }
 
 function mergeConversationData(
@@ -109,6 +292,9 @@ function mergeConversationData(
   const selfIcon = (primary.selfIcon ?? 0) > 0 ? primary.selfIcon : fallback.selfIcon;
   const selfIconUrl = firstNonEmpty(primary.selfIconUrl, fallback.selfIconUrl) || undefined;
   const selfIconUrls = mergeUrlList(primary.selfIconUrls, fallback.selfIconUrls);
+  const ownerIcon = (primary.ownerIcon ?? 0) > 0 ? primary.ownerIcon : fallback.ownerIcon;
+  const ownerIconUrl = firstNonEmpty(primary.ownerIconUrl, fallback.ownerIconUrl) || undefined;
+  const ownerIconUrls = mergeUrlList(primary.ownerIconUrls, fallback.ownerIconUrls);
 
   return {
     ...fallback,
@@ -119,6 +305,14 @@ function mergeConversationData(
     gameTag: firstNonEmpty(primary.gameTag, fallback.gameTag),
     riotId: firstNonEmpty(primary.riotId, fallback.riotId) || '未知玩家',
     puuid: firstNonEmpty(primary.puuid, fallback.puuid),
+    ownerKey: firstNonEmpty(primary.ownerKey, fallback.ownerKey),
+    ownerRiotId: firstNonEmpty(primary.ownerRiotId, fallback.ownerRiotId),
+    ownerPuuid: firstNonEmpty(primary.ownerPuuid, fallback.ownerPuuid),
+    ownerGameName: firstNonEmpty(primary.ownerGameName, fallback.ownerGameName),
+    ownerGameTag: firstNonEmpty(primary.ownerGameTag, fallback.ownerGameTag),
+    ownerIcon,
+    ownerIconUrl,
+    ownerIconUrls: ownerIconUrls.length > 0 ? ownerIconUrls : undefined,
     icon,
     iconUrl: iconUrl || iconUrls[0] || '',
     iconUrls,
@@ -155,6 +349,20 @@ function normalizeConversation(value: unknown): ChatConversation | null {
     : [];
   if (!source.id || typeof source.id !== 'string' || messages.length === 0) return null;
   const lastMessage = messages[messages.length - 1];
+  const legacyOwnerRiotId = inferredOwnerRiotId(messages);
+  const ownerGameName = typeof source.ownerGameName === 'string' ? source.ownerGameName : '';
+  const ownerGameTag = typeof source.ownerGameTag === 'string' ? source.ownerGameTag : '';
+  const ownerRiotId = typeof source.ownerRiotId === 'string'
+    ? source.ownerRiotId
+    : legacyOwnerRiotId;
+  const ownerPuuid = typeof source.ownerPuuid === 'string' ? source.ownerPuuid : '';
+  const ownerKey = ownerKeyFromValues({
+    key: typeof source.ownerKey === 'string' ? source.ownerKey : '',
+    puuid: ownerPuuid,
+    riotId: ownerRiotId,
+    gameName: ownerGameName,
+    gameTag: ownerGameTag,
+  });
   return {
     id: source.id,
     type: typeof source.type === 'string' ? source.type : 'chat',
@@ -162,6 +370,16 @@ function normalizeConversation(value: unknown): ChatConversation | null {
     gameTag: typeof source.gameTag === 'string' ? source.gameTag : '',
     riotId: typeof source.riotId === 'string' ? source.riotId : '未知玩家',
     puuid: typeof source.puuid === 'string' ? source.puuid : '',
+    ownerKey,
+    ownerRiotId,
+    ownerPuuid,
+    ownerGameName,
+    ownerGameTag,
+    ownerIcon: Number.isFinite(source.ownerIcon) ? Number(source.ownerIcon) : source.selfIcon,
+    ownerIconUrl: typeof source.ownerIconUrl === 'string' ? source.ownerIconUrl : source.selfIconUrl,
+    ownerIconUrls: Array.isArray(source.ownerIconUrls)
+      ? source.ownerIconUrls.filter((url): url is string => typeof url === 'string')
+      : source.selfIconUrls,
     icon: Number.isFinite(source.icon) ? Number(source.icon) : 0,
     iconUrl: typeof source.iconUrl === 'string' ? source.iconUrl : '',
     iconUrls: Array.isArray(source.iconUrls)
@@ -205,26 +423,59 @@ function writeChatArchive(conversations: ChatConversation[]): void {
   fs.renameSync(tmpPath, filePath);
 }
 
-export function readChatArchiveForDisplay(): ChatConversation[] {
-  return dedupeConversations(readChatArchive()).map((conversation) => ({
+function stampConversationOwner(
+  conversation: ChatConversation,
+  owner: ChatAccountSummary,
+): ChatConversation {
+  return {
+    ...conversation,
+    ownerKey: owner.key,
+    ownerRiotId: owner.riotId,
+    ownerPuuid: owner.puuid,
+    ownerGameName: owner.gameName,
+    ownerGameTag: owner.gameTag,
+    ownerIcon: owner.icon,
+    ownerIconUrl: owner.iconUrl,
+    ownerIconUrls: owner.iconUrls,
+    selfIcon: (conversation.selfIcon ?? 0) > 0 ? conversation.selfIcon : owner.icon,
+    selfIconUrl: conversation.selfIconUrl || owner.iconUrl,
+    selfIconUrls: conversation.selfIconUrls ?? owner.iconUrls,
+  };
+}
+
+export function readChatArchiveForDisplay(
+  selectedAccountKey?: string,
+  currentOwner?: ChatAccountSummary,
+): ChatConversationsResponse {
+  const archived = dedupeConversations(readChatArchive()).map((conversation) => ({
     ...conversation,
     archivedOnly: true,
     unreadMessageCount: 0,
   }));
+  return buildChatResponse(archived, selectedAccountKey, currentOwner);
 }
 
 export function mergeChatArchive(
   liveConversations: ChatConversation[],
-  friendKeys?: Set<string>,
-): ChatConversation[] {
+  friendKeys: Set<string> | undefined,
+  owner: ChatAccountSummary,
+  selectedAccountKey?: string,
+): ChatConversationsResponse {
+  const ownerKey = owner.key;
+  const liveOwned = liveConversations.map((conversation) =>
+    stampConversationOwner(conversation, owner));
   const archived = dedupeConversations(readChatArchive());
+  const archivedForOwner = archived.filter((conversation) =>
+    ownerMatches(conversation, ownerKey));
+  const otherArchived = archived.filter((conversation) =>
+    !ownerMatches(conversation, ownerKey));
   const usedArchivedIndexes = new Set<number>();
   const merged: ChatConversation[] = [];
 
-  for (const live of liveConversations) {
-    const archivedIndex = archived.findIndex((conversation, index) =>
+  for (const live of liveOwned) {
+    const archivedIndex = archivedForOwner.findIndex((conversation, index) =>
       !usedArchivedIndexes.has(index) && conversationsMatch(conversation, live));
-    const archivedConversation = archivedIndex >= 0 ? archived[archivedIndex] : undefined;
+    const archivedConversation = archivedIndex >= 0 ? archivedForOwner[archivedIndex] : undefined;
     if (archivedIndex >= 0) usedArchivedIndexes.add(archivedIndex);
     const mergedConversation = mergeConversationData(live, archivedConversation);
     const messages = mergedConversation.messages;
@@ -240,7 +491,7 @@ export function mergeChatArchive(
     });
   }
 
-  for (const [index, archivedConversation] of archived.entries()) {
+  for (const [index, archivedConversation] of archivedForOwner.entries()) {
     if (usedArchivedIndexes.has(index)) continue;
     const knownFriend = isKnownFriend(archivedConversation, friendKeys);
     merged.push({
@@ -253,7 +504,7 @@ export function mergeChatArchive(
     });
   }
 
-  const sorted = dedupeConversations(merged);
+  const sorted = dedupeConversations([...otherArchived, ...merged]);
   writeChatArchive(sorted);
-  return sorted;
+  return buildChatResponse(sorted, selectedAccountKey || ownerKey, owner);
 }
