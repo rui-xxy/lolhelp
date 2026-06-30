@@ -95,7 +95,7 @@ function TarotCard({
                 visibleHistory.map((history, historyIndex) => (
                   <div
                     key={`${history.championAlias}-${historyIndex}`}
-                    className={`grid min-h-0 grid-cols-[26px_38px_minmax(0,1fr)_50px] items-center gap-2 rounded-sm border px-2 py-0.5 ${
+                    className={`grid min-h-0 grid-cols-[24px_26px_minmax(62px,1fr)_34px] items-center gap-1 rounded-sm border px-1.5 py-0.5 ${
                       history.win
                         ? 'border-green-100 bg-white/92'
                         : 'border-red-100 bg-white/92'
@@ -111,15 +111,15 @@ function TarotCard({
                         }}
                       />
                     </div>
-                    <span className="truncate text-[12px] font-bold text-app-body">{history.queueName.slice(0, 2)}</span>
+                    <span className="truncate text-[11px] font-bold text-app-body">{history.queueName.slice(0, 2)}</span>
                     <span
-                      className={`truncate text-center font-mono text-[12px] font-bold tracking-tight ${
+                      className={`whitespace-nowrap text-center font-mono text-[11px] font-bold tracking-tight ${
                         history.win ? 'text-app-success' : 'text-app-danger'
                       }`}
                     >
                       {history.kills}/{history.deaths}/{history.assists}
                     </span>
-                    <span className="truncate text-right font-mono text-[11px] font-bold text-app-text">
+                    <span className="whitespace-nowrap text-right font-mono text-[10px] font-bold text-app-text">
                       {history.timeStr}
                     </span>
                   </div>
