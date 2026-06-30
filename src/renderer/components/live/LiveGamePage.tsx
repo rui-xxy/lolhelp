@@ -38,10 +38,10 @@ function TarotCard({
   const champIcon = championIcon(player.championAlias);
   const historyOffset = historyPage * HISTORY_PAGE_SIZE;
   const visibleHistory = player.history.slice(historyOffset, historyOffset + HISTORY_PAGE_SIZE);
-  const teamAccent = isRedTeam ? 'text-[#b64c40]' : 'text-[#3f76b5]';
+  const teamAccent = isRedTeam ? 'text-app-primary' : 'text-app-link';
   const teamWash = isRedTeam
-    ? 'bg-gradient-to-br from-[#fff5f1] via-[#fbf9f6] to-[#fbf9f6]'
-    : 'bg-gradient-to-br from-[#f1f6ff] via-[#fbf9f6] to-[#fbf9f6]';
+    ? 'bg-gradient-to-br from-app-primary-soft/45 via-app-surface to-app-surface'
+    : 'bg-gradient-to-br from-blue-50 via-app-surface to-app-surface';
 
   return (
     <div className="live-tarot-card group relative min-w-0 [perspective:1200px]">
@@ -51,18 +51,18 @@ function TarotCard({
         animate={{ rotateY: isLoaded ? 0 : 180, opacity: isLoaded ? 1 : 0.78 }}
         transition={{ duration: 0.72, delay: index * 0.045, type: 'spring', stiffness: 72, damping: 18 }}
       >
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[3px] border border-[#b8956a] bg-[#fbf9f6] shadow-[0_5px_14px_rgba(90,68,42,0.15)] [backface-visibility:hidden]">
+        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)] [backface-visibility:hidden]">
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.035]"
             style={{
-              backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)',
+              backgroundImage: 'radial-gradient(circle at 50% 50%, #222222 1px, transparent 1px)',
               backgroundSize: '16px 16px',
             }}
           />
 
-          <div className={`relative border-b border-[#b8956a]/75 px-2 py-1.5 ${teamWash}`}>
-            <div className="flex items-center gap-2">
-              <div className="relative size-9 shrink-0 overflow-hidden rounded-full border border-[#b8956a] bg-[#efe8dc] shadow-inner">
+          <div className={`relative border-b border-app-border px-2.5 py-2 ${teamWash}`}>
+            <div className="flex items-center gap-2.5">
+              <div className="relative size-10 shrink-0 overflow-hidden rounded-full border border-white bg-app-surface-soft shadow-sm ring-1 ring-app-border">
                 {champIcon && (
                   <img
                     src={champIcon}
@@ -72,10 +72,10 @@ function TarotCard({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-bold leading-4 text-[#3d3022]">{player.gameName}</div>
+                <div className="truncate text-[13px] font-bold leading-4 text-app-text">{player.gameName}</div>
                 <div className="mt-0.5 flex items-center gap-1">
                   {isRedTeam ? <Sun size={9} className={teamAccent} /> : <Moon size={9} className={teamAccent} />}
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#8b7355]">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-app-muted">
                     {isRedTeam ? 'Sun' : 'Moon'}
                   </span>
                 </div>
@@ -83,32 +83,7 @@ function TarotCard({
             </div>
           </div>
 
-          <div className="grid h-8 shrink-0 grid-cols-3 gap-px border-b border-[#b8956a]/75 bg-[#b8956a]/75">
-            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
-              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">KDA</span>
-              <span className="mt-1 font-mono text-[11px] font-bold leading-none text-[#3d3022]">
-                {player.kda.toFixed(1)}
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
-              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Win%</span>
-              <span
-                className={`mt-1 font-mono text-[11px] font-bold leading-none ${
-                  player.winRate >= 50 ? 'text-[#3d8a58]' : 'text-[#bd4a48]'
-                }`}
-              >
-                {player.winRate}%
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center bg-[#fbf9f6]">
-              <span className="text-[7px] font-bold uppercase leading-none tracking-wider text-[#8b7355]">Games</span>
-              <span className="mt-1 font-mono text-[11px] font-bold leading-none text-[#3d3022]">
-                {player.matchCount}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col bg-[#f3eee5] p-1.5">
+          <div className="flex min-h-0 flex-1 flex-col bg-app-bg-soft p-2">
             <div
               className="live-history-list min-h-0 flex-1"
               style={{
@@ -120,13 +95,13 @@ function TarotCard({
                 visibleHistory.map((history, historyIndex) => (
                   <div
                     key={`${history.championAlias}-${historyIndex}`}
-                    className={`grid min-h-0 grid-cols-[22px_31px_minmax(0,1fr)_39px] items-center gap-1.5 rounded-[3px] border px-1.5 ${
+                    className={`grid min-h-0 grid-cols-[26px_38px_minmax(0,1fr)_50px] items-center gap-2 rounded-sm border px-2 py-0.5 ${
                       history.win
-                        ? 'border-[#d8e8d5] bg-[#fbf9f6]/95'
-                        : 'border-[#ead7d0] bg-[#fbf9f6]/95'
+                        ? 'border-green-100 bg-white/92'
+                        : 'border-red-100 bg-white/92'
                     }`}
                   >
-                    <div className="size-5 overflow-hidden rounded-full border border-[#b8956a]/45 bg-[#eee7dc]">
+                    <div className="size-6 overflow-hidden rounded-full border border-white bg-app-surface-soft shadow-sm ring-1 ring-app-border">
                       <img
                         src={championIcon(history.championAlias)}
                         alt={history.championName}
@@ -136,71 +111,71 @@ function TarotCard({
                         }}
                       />
                     </div>
-                    <span className="truncate text-[10px] font-bold text-[#5f5244]">{history.queueName.slice(0, 2)}</span>
+                    <span className="truncate text-[12px] font-bold text-app-body">{history.queueName.slice(0, 2)}</span>
                     <span
-                      className={`truncate text-center font-mono text-[11px] font-bold tracking-tight ${
-                        history.win ? 'text-[#3d8a58]' : 'text-[#bd4a48]'
+                      className={`truncate text-center font-mono text-[12px] font-bold tracking-tight ${
+                        history.win ? 'text-app-success' : 'text-app-danger'
                       }`}
                     >
                       {history.kills}/{history.deaths}/{history.assists}
                     </span>
-                    <span className="truncate text-right font-mono text-[10px] font-bold text-[#3d3022]">
+                    <span className="truncate text-right font-mono text-[11px] font-bold text-app-text">
                       {history.timeStr}
                     </span>
                   </div>
                 ))
               ) : (
-                <div className="row-span-8 flex items-center justify-center rounded-[3px] border border-dashed border-[#d9cbb8] text-[10px] text-[#8b7355]">
+                <div className="row-span-8 flex items-center justify-center rounded-sm border border-dashed border-app-border text-xs text-app-muted">
                   {player.history.length > 0 ? '本页暂无更多' : '暂无近期战绩'}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="absolute left-1 top-1 size-2 border-l-[1.5px] border-t-[1.5px] border-[#b8956a]" />
-          <div className="absolute right-1 top-1 size-2 border-r-[1.5px] border-t-[1.5px] border-[#b8956a]" />
-          <div className="absolute bottom-1 left-1 size-2 border-b-[1.5px] border-l-[1.5px] border-[#b8956a]" />
-          <div className="absolute bottom-1 right-1 size-2 border-b-[1.5px] border-r-[1.5px] border-[#b8956a]" />
+          <div className="absolute left-1.5 top-1.5 size-2 border-l border-t border-app-primary/35" />
+          <div className="absolute right-1.5 top-1.5 size-2 border-r border-t border-app-primary/35" />
+          <div className="absolute bottom-1.5 left-1.5 size-2 border-b border-l border-app-primary/25" />
+          <div className="absolute right-1.5 bottom-1.5 size-2 border-r border-b border-app-primary/25" />
         </div>
 
-        <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[3px] border border-[#b8956a] bg-[#fbf9f6] shadow-[0_5px_14px_rgba(90,68,42,0.15)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.045]"
             style={{
-              backgroundImage: 'radial-gradient(circle at 50% 50%, #8b7355 1px, transparent 1px)',
+              backgroundImage: 'radial-gradient(circle at 50% 50%, #222222 1px, transparent 1px)',
               backgroundSize: '12px 12px',
             }}
           />
-          <div className="absolute inset-2 border border-[#b8956a]/35" />
-          <div className="absolute left-1 top-1 size-4 border-l-[1.5px] border-t-[1.5px] border-[#b8956a]" />
-          <div className="absolute right-1 top-1 size-4 border-r-[1.5px] border-t-[1.5px] border-[#b8956a]" />
-          <div className="absolute bottom-1 left-1 size-4 border-b-[1.5px] border-l-[1.5px] border-[#b8956a]" />
-          <div className="absolute bottom-1 right-1 size-4 border-b-[1.5px] border-r-[1.5px] border-[#b8956a]" />
+          <div className="absolute inset-2 rounded-sm border border-app-primary/20" />
+          <div className="absolute left-1 top-1 size-4 border-l border-t border-app-primary/35" />
+          <div className="absolute right-1 top-1 size-4 border-r border-t border-app-primary/35" />
+          <div className="absolute bottom-1 left-1 size-4 border-b border-l border-app-primary/25" />
+          <div className="absolute right-1 bottom-1 size-4 border-r border-b border-app-primary/25" />
           <div className="absolute top-5 flex w-full flex-col items-center">
-            <Star size={10} className="mb-1 text-[#b8956a] opacity-80" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#8b7355]">Destiny</span>
+            <Star size={10} className="mb-1 text-app-primary opacity-70" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-app-muted">Destiny</span>
           </div>
           <div className="relative flex items-center justify-center">
-            <div className="absolute size-20 rotate-45 border border-[#b8956a]/40" />
-            <div className="absolute size-24 animate-[spin_30s_linear_infinite] rounded-full border border-dashed border-[#b8956a]/50" />
-            <div className="relative z-10 size-14 overflow-hidden rounded-full border-[3px] border-[#b8956a] bg-[#fbf9f6] shadow-[0_0_18px_rgba(184,149,106,0.28)]">
+            <div className="absolute size-20 rotate-45 border border-app-primary/20" />
+            <div className="absolute size-24 animate-[spin_30s_linear_infinite] rounded-full border border-dashed border-app-primary/25" />
+            <div className="relative z-10 size-14 overflow-hidden rounded-full border-[3px] border-white bg-app-surface shadow-[0_0_18px_rgba(255,56,92,0.22)] ring-1 ring-app-primary/25">
               {champIcon && (
                 <img
                   src={champIcon}
                   alt={player.championName}
-                  className="h-full w-full scale-110 object-cover opacity-90 mix-blend-multiply"
+                  className="h-full w-full scale-110 object-cover opacity-90"
                 />
               )}
             </div>
           </div>
           <div className="absolute bottom-7 flex w-full flex-col items-center px-2">
-            <span className="w-full truncate text-center text-[12px] font-bold text-[#3d3022]">{player.gameName}</span>
+            <span className="w-full truncate text-center text-[13px] font-bold text-app-text">{player.gameName}</span>
             <div className="mt-1 flex w-full items-center justify-center gap-2 opacity-80">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#b8956a]" />
-              <span className="max-w-[72px] truncate font-mono text-[8px] uppercase tracking-wider text-[#b8956a]">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-app-primary/45" />
+              <span className="max-w-[72px] truncate font-mono text-[9px] uppercase tracking-wider text-app-primary">
                 {player.championName}
               </span>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#b8956a]" />
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-app-primary/45" />
             </div>
           </div>
         </div>
@@ -289,38 +264,37 @@ export function LiveGamePage() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#f3ead8] font-serif text-[#4a3b2c]">
-      <div className="pointer-events-none absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-38 mix-blend-multiply" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f5eddf] via-[#f1e7d5] to-[#e9dcc5]" />
+    <div className="relative flex h-full flex-col overflow-hidden bg-app-bg text-app-text">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(255,56,92,0.08),transparent_28%),radial-gradient(circle_at_88%_0%,rgba(66,139,255,0.08),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7f7f7_100%)]" />
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
         <div className="mb-2 flex h-7 shrink-0 items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2 rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 px-2.5 py-1 shadow-[0_2px_10px_rgba(95,75,48,0.07)] backdrop-blur">
-            <Sparkles size={12} className="shrink-0 text-[#b8956a]" />
-            <span className="truncate text-[11px] font-bold text-[#7d674c]">{statusText}</span>
+          <div className="flex min-w-0 items-center gap-2 rounded-full border border-app-border bg-white/78 px-2.5 py-1 shadow-[0_4px_14px_rgba(20,20,20,0.06)] backdrop-blur">
+            <Sparkles size={12} className="shrink-0 text-app-primary" />
+            <span className="truncate text-[11px] font-bold text-app-body">{statusText}</span>
             <span className={`size-1.5 shrink-0 rounded-full ${
-              loading ? 'animate-pulse bg-[#b8956a]' : isLoaded ? 'bg-[#3d8a58]' : 'bg-[#bd4a48]'
+              loading ? 'animate-pulse bg-app-primary' : isLoaded ? 'bg-app-success' : 'bg-app-danger'
             }`} />
           </div>
 
           <div className="flex min-w-0 items-center gap-2">
             {hasBattle && (
-              <div className="flex h-7 items-center gap-1 rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 px-1.5 shadow-[0_2px_10px_rgba(95,75,48,0.07)] backdrop-blur">
+              <div className="flex h-7 items-center gap-1 rounded-full border border-app-border bg-white/78 px-1.5 shadow-[0_4px_14px_rgba(20,20,20,0.06)] backdrop-blur">
                 <button
                   type="button"
                   title="上一页战绩"
                   aria-label="上一页战绩"
                   disabled={historyPage <= 0}
                   onClick={() => handleHistoryPageChange(-1)}
-                  className="grid size-5 place-items-center rounded-full text-[#8b7355] transition-colors enabled:hover:bg-[#efe5d5] enabled:hover:text-[#3d3022] disabled:opacity-30"
+                  className="grid size-5 place-items-center rounded-full text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
                 >
                   <ChevronLeft size={13} />
                 </button>
-                <div className="flex min-w-[112px] items-center justify-center gap-1 px-1 font-mono text-[10px] font-bold text-[#6d5a43]">
+                <div className="flex min-w-[112px] items-center justify-center gap-1 px-1 font-mono text-[10px] font-bold text-app-body">
                   <span>{historyStart}-{historyEnd}</span>
-                  <span className="text-[#aa987f]">/</span>
+                  <span className="text-app-subtle">/</span>
                   <span>{maxHistoryCount}</span>
-                  <span className="ml-1 text-[#aa987f]">{historyPage + 1}/{totalHistoryPages}</span>
+                  <span className="ml-1 text-app-subtle">{historyPage + 1}/{totalHistoryPages}</span>
                 </div>
                 <button
                   type="button"
@@ -328,7 +302,7 @@ export function LiveGamePage() {
                   aria-label="下一页战绩"
                   disabled={historyPage >= totalHistoryPages - 1}
                   onClick={() => handleHistoryPageChange(1)}
-                  className="grid size-5 place-items-center rounded-full text-[#8b7355] transition-colors enabled:hover:bg-[#efe5d5] enabled:hover:text-[#3d3022] disabled:opacity-30"
+                  className="grid size-5 place-items-center rounded-full text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
                 >
                   <ChevronRight size={13} />
                 </button>
@@ -339,7 +313,7 @@ export function LiveGamePage() {
               onClick={fetchBattle}
               disabled={loading}
               title="刷新实时对局"
-              className="grid size-7 place-items-center rounded-full border border-[#d8c6ac] bg-[#fbf9f6]/78 text-[#8b7355] shadow-[0_2px_10px_rgba(95,75,48,0.07)] transition-colors hover:bg-[#efe5d5] hover:text-[#3d3022] disabled:cursor-not-allowed disabled:opacity-60"
+              className="grid size-7 place-items-center rounded-full border border-app-border bg-white/78 text-app-muted shadow-[0_4px_14px_rgba(20,20,20,0.06)] transition-colors hover:bg-app-surface-soft hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -348,12 +322,12 @@ export function LiveGamePage() {
 
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto">
           {error && !inGame ? (
-            <div className="flex h-full items-center justify-center text-sm text-[#8b7355]">{error}</div>
+            <div className="flex h-full items-center justify-center text-sm text-app-muted">{error}</div>
           ) : !hasBattle && !loading ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-[#8b7355]">
-              <Star size={24} className="opacity-45" />
-              <span className="text-sm">当前不在游戏中</span>
-              <span className="text-xs opacity-65">进入对局或选人阶段后点击刷新</span>
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-app-muted">
+              <Star size={24} className="text-app-primary opacity-45" />
+              <span className="text-sm text-app-body">当前不在游戏中</span>
+              <span className="text-xs opacity-75">进入对局或选人阶段后点击刷新</span>
             </div>
           ) : (
             <div className="live-card-board">
@@ -369,9 +343,9 @@ export function LiveGamePage() {
                 ))}
               </div>
               <div className="live-versus-divider">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
-                <Swords size={12} className="shrink-0 text-[#b8956a]" />
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#b8956a] to-transparent" />
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-app-border to-transparent" />
+                <Swords size={12} className="shrink-0 text-app-primary/65" />
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-app-border to-transparent" />
               </div>
               <div className="live-team-grid">
                 {enemyTeam.map((player, idx) => (
