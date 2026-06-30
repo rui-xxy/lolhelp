@@ -551,8 +551,6 @@ export function MatchHistoryPage({
   }
   const knownPages = activeTab ? Math.max(1, Math.ceil(activeTab.matches.length / PAGE_SIZE)) : 1;
   const totalPages = activeTab?.hasMore ? knownPages + 5 : knownPages;
-  const pageStart = activeTab && displayedMatches.length > 0 ? (activeTab.currentPage - 1) * PAGE_SIZE + 1 : 0;
-  const pageEnd = displayedMatches.length > 0 ? pageStart + displayedMatches.length - 1 : 0;
   const pageNumbers = activeTab ? getPageNumbers(activeTab.currentPage, totalPages) : [];
   const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
   const isSaveMode = activeTab ? saveModeTabId === activeTab.id : false;
@@ -947,11 +945,7 @@ export function MatchHistoryPage({
           </div>
 
           {activeTab && activeTab.matches.length > 0 && (
-            <div className="shrink-0 border-t border-app-border bg-app-surface px-3 py-1.5">
-              <div className="mb-1.5 flex items-center justify-between text-[10px] text-app-subtle">
-                <span>显示 {pageStart}-{pageEnd}</span>
-                <span>{activeTab.hasMore ? '可继续翻页加载更早战绩' : `${activeTab.matches.length} 场（全部）`}</span>
-              </div>
+            <div className="shrink-0 border-t border-app-border/70 bg-app-sidebar/95 px-3 py-2">
               <div className="flex items-center justify-between gap-1.5">
                 <button
                   type="button"
@@ -959,20 +953,20 @@ export function MatchHistoryPage({
                   aria-label="上一页"
                   disabled={activeTab.loading || activeTab.pageLoading || activeTab.currentPage <= 1}
                   onClick={() => handlePageChange(activeTab.currentPage - 1)}
-                  className="flex size-6 items-center justify-center rounded-xs border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
+                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface enabled:hover:text-app-text disabled:opacity-25"
                 >
                   <ChevronLeft className="size-3.5" />
                 </button>
-                <div className="flex items-center gap-0.5 rounded-xs bg-app-surface-soft p-0.5">
+                <div className="flex items-center gap-0.5 rounded-full bg-app-bg/60 p-0.5 shadow-[inset_0_0_0_1px_rgba(221,221,221,0.55)]">
                   {pageNumbers.map((page) => (
                     <button
                       key={page}
                       type="button"
                       disabled={activeTab.loading || activeTab.pageLoading}
                       onClick={() => handlePageChange(page)}
-                      className={`h-6 min-w-6 rounded-xs px-1.5 text-[11px] font-medium tabular-nums transition-colors ${
+                      className={`h-6 min-w-6 rounded-full px-1.5 text-[11px] font-medium tabular-nums transition-colors ${
                         page === activeTab.currentPage
-                          ? 'bg-app-text text-white'
+                          ? 'bg-app-text text-white shadow-sm'
                           : 'text-app-muted hover:bg-app-surface hover:text-app-text'
                       }`}
                     >
@@ -990,7 +984,7 @@ export function MatchHistoryPage({
                     (activeTab.currentPage >= totalPages && !activeTab.hasMore)
                   }
                   onClick={() => handlePageChange(activeTab.currentPage + 1)}
-                  className="flex size-6 items-center justify-center rounded-xs border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
+                  className="flex size-6 items-center justify-center rounded-full border border-transparent bg-transparent text-app-muted transition-colors enabled:hover:bg-app-surface enabled:hover:text-app-text disabled:opacity-25"
                 >
                   <ChevronRight className="size-3.5" />
                 </button>
