@@ -433,9 +433,9 @@ export function ChatSessionDialog({
                 )}
                 <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-app-text">
                   {selectedAccount
-                    ? `${selectedAccount.current ? '当前' : '历史'} · ${selectedAccount.riotId}`
+                    ? selectedAccount.riotId
                     : currentAccount
-                      ? `当前 · ${currentAccount.riotId}`
+                      ? currentAccount.riotId
                       : '选择账号'}
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 text-app-subtle" />

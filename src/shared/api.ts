@@ -115,6 +115,7 @@ export interface ChatConversation {
 
 export interface ChatAccountSummary {
   key: string;
+  keys?: string[];
   riotId: string;
   gameName: string;
   gameTag: string;

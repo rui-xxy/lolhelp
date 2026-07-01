@@ -49,6 +49,16 @@ function ownerKeyFromValues(owner: {
     || normalizeKey(owner.gameName);
 }
 
+function uniqueKeys(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.map(normalizeKey).filter(Boolean)));
+}
+
+function keysOverlap(a: string[], b: string[]): boolean {
+  if (a.length === 0 || b.length === 0) return false;
+  const aSet = new Set(a);
+  return b.some((key) => aSet.has(key));
+}
+
 function normalizeMessage(value: unknown): ChatMessage | null {
   if (!value || typeof value !== 'object') return null;
   const source = value as Partial<ChatMessage>;
@@ -69,6 +79,28 @@ function inferredOwnerRiotId(messages: ChatMessage[]): string {
     ?.senderRiotId.trim() ?? '';
 }
 
+function conversationOwnerKeys(conversation: ChatConversation): string[] {
+  return uniqueKeys([
+    conversation.ownerKey,
+    conversation.ownerPuuid,
+    conversation.ownerRiotId,
+    riotId(conversation.ownerGameName, conversation.ownerGameTag),
+    conversation.ownerGameName,
+    inferredOwnerRiotId(conversation.messages),
+  ]);
+}
+
+function accountOwnerKeys(account: ChatAccountSummary): string[] {
+  return uniqueKeys([
+    ...(account.keys ?? []),
+    account.key,
+    account.puuid,
+    account.riotId,
+    riotId(account.gameName, account.gameTag),
+    account.gameName,
+  ]);
+}
+
 function conversationOwnerKey(conversation: ChatConversation): string {
   return ownerKeyFromValues({
     key: conversation.ownerKey,
@@ -79,19 +111,11 @@ function conversationOwnerKey(conversation: ChatConversation): string {
   });
 }
 
-function ownerMatches(conversation: ChatConversation, ownerKey: string): boolean {
-  const normalizedOwnerKey = normalizeKey(ownerKey);
-  const conversationKey = conversationOwnerKey(conversation);
-  if (!normalizedOwnerKey) return true;
-  if (normalizedOwnerKey === UNKNOWN_OWNER_KEY) return !conversationKey;
-  return conversationKey === normalizedOwnerKey;
-}
-
 function sameConversationOwner(a: ChatConversation, b: ChatConversation): boolean {
-  const aOwner = conversationOwnerKey(a);
-  const bOwner = conversationOwnerKey(b);
-  if (!aOwner && !bOwner) return true;
-  return Boolean(aOwner && bOwner && aOwner === bOwner);
+  const aOwnerKeys = conversationOwnerKeys(a);
+  const bOwnerKeys = conversationOwnerKeys(b);
+  if (aOwnerKeys.length === 0 && bOwnerKeys.length === 0) return true;
+  return keysOverlap(aOwnerKeys, bOwnerKeys);
 }
 
 function messageKey(message: ChatMessage): string {
@@ -159,7 +183,8 @@ function mergeUrlList(primary: string[] | undefined, fallback: string[] | undefi
 }
 
 function accountFromConversation(conversation: ChatConversation): ChatAccountSummary {
-  const key = conversationOwnerKey(conversation) || UNKNOWN_OWNER_KEY;
+  const keys = conversationOwnerKeys(conversation);
+  const key = conversationOwnerKey(conversation) || keys[0] || UNKNOWN_OWNER_KEY;
   const ownerIcon = conversation.ownerIcon ?? conversation.selfIcon ?? 0;
   const ownerIconUrls = mergeUrlList(conversation.ownerIconUrls, conversation.selfIconUrls);
   const ownerIconUrl = firstNonEmpty(conversation.ownerIconUrl, conversation.selfIconUrl)
@@ -171,6 +196,7 @@ function accountFromConversation(conversation: ChatConversation): ChatAccountSum
   );
   return {
     key,
+    keys: keys.length > 0 ? keys : [UNKNOWN_OWNER_KEY],
     riotId: ownerRiotId || '未识别账号',
     gameName: conversation.ownerGameName ?? '',
     gameTag: conversation.ownerGameTag ?? '',
@@ -189,6 +215,10 @@ function mergeAccountSummary(
   fallback?: ChatAccountSummary,
 ): ChatAccountSummary {
   if (!fallback) return primary;
+  const keys = Array.from(new Set([
+    ...accountOwnerKeys(fallback),
+    ...accountOwnerKeys(primary),
+  ]));
   const icon = primary.icon > 0 ? primary.icon : fallback.icon;
   const iconUrls = mergeUrlList(primary.iconUrls, fallback.iconUrls);
   const lastMessageAt =
@@ -198,7 +228,8 @@ function mergeAccountSummary(
   return {
     ...fallback,
     ...primary,
-    key: primary.key || fallback.key,
+    key: primary.current ? primary.key : fallback.current ? fallback.key : primary.key || fallback.key,
+    keys,
     riotId: firstNonEmpty(primary.riotId, fallback.riotId) || '未识别账号',
     gameName: firstNonEmpty(primary.gameName, fallback.gameName),
     gameTag: firstNonEmpty(primary.gameTag, fallback.gameTag),
@@ -206,7 +237,7 @@ function mergeAccountSummary(
     icon,
     iconUrl: firstNonEmpty(primary.iconUrl, fallback.iconUrl) || iconUrls[0] || '',
     iconUrls,
-    conversationCount: Math.max(primary.conversationCount, fallback.conversationCount),
+    conversationCount: primary.conversationCount + fallback.conversationCount,
     lastMessageAt,
     current: Boolean(primary.current || fallback.current),
     unknown: Boolean(primary.unknown || fallback.unknown),
@@ -217,10 +248,11 @@ function buildAccountSummaries(
   conversations: ChatConversation[],
   currentOwner?: ChatAccountSummary,
 ): ChatAccountSummary[] {
-  const byKey = new Map<string, ChatAccountSummary>();
+  const accounts: ChatAccountSummary[] = [];
   if (currentOwner?.key) {
-    byKey.set(currentOwner.key, {
+    accounts.push({
       ...currentOwner,
+      keys: accountOwnerKeys(currentOwner),
       current: true,
       conversationCount: 0,
       lastMessageAt: currentOwner.lastMessageAt ?? '',
@@ -229,16 +261,26 @@ function buildAccountSummaries(
 
   for (const conversation of conversations) {
     const account = accountFromConversation(conversation);
-    const existing = byKey.get(account.key);
-    byKey.set(account.key, mergeAccountSummary({
+    const accountKeys = accountOwnerKeys(account);
+    const existingIndex = accounts.findIndex((item) =>
+      keysOverlap(accountOwnerKeys(item), accountKeys));
+    const existing = existingIndex >= 0 ? accounts[existingIndex] : undefined;
+    const merged = mergeAccountSummary({
       ...account,
-      conversationCount: (existing?.conversationCount ?? 0) + 1,
+      conversationCount: 1,
       lastMessageAt: conversation.lastMessageAt,
-      current: currentOwner?.key === account.key,
-    }, existing));
+      current: currentOwner
+        ? keysOverlap(accountOwnerKeys(currentOwner), accountKeys)
+        : false,
+    }, existing);
+    if (existingIndex >= 0) {
+      accounts[existingIndex] = merged;
+    } else {
+      accounts.push(merged);
+    }
   }
 
-  return Array.from(byKey.values())
+  return accounts
     .sort((a, b) => {
       if (a.current !== b.current) return a.current ? -1 : 1;
       return timestampValue(b.lastMessageAt) - timestampValue(a.lastMessageAt);
@@ -253,29 +295,38 @@ function buildChatResponse(
   const accounts = buildAccountSummaries(conversations, currentOwner);
   const fallbackKey = currentOwner?.key || accounts[0]?.key || '';
   const normalizedSelectedKey = normalizeKey(selectedAccountKey) || fallbackKey;
-  const selectedKey = accounts.some((account) => account.key === normalizedSelectedKey)
-    ? normalizedSelectedKey
-    : fallbackKey;
-  const selectedConversations = selectedKey
-    ? conversations.filter((conversation) => ownerMatches(conversation, selectedKey))
+  const selectedAccount = accounts.find((account) =>
+    accountOwnerKeys(account).includes(normalizedSelectedKey))
+    ?? accounts.find((account) => account.key === fallbackKey)
+    ?? accounts[0];
+  const selectedKey = selectedAccount?.key ?? fallbackKey;
+  const selectedKeys = selectedAccount ? accountOwnerKeys(selectedAccount) : [];
+  const selectedIsCurrent = Boolean(
+    selectedAccount
+      && currentOwner
+      && keysOverlap(accountOwnerKeys(selectedAccount), accountOwnerKeys(currentOwner)),
+  );
+  const selectedConversations = selectedKeys.length > 0
+    ? conversations.filter((conversation) =>
+      keysOverlap(conversationOwnerKeys(conversation), selectedKeys))
     : [];
-  const selectedAccount = accounts.find((account) => account.key === selectedKey);
   const currentAccount = currentOwner
-    ? accounts.find((account) => account.key === currentOwner.key) ?? currentOwner
+    ? accounts.find((account) =>
+      keysOverlap(accountOwnerKeys(account), accountOwnerKeys(currentOwner))) ?? currentOwner
     : undefined;
 
   return {
     conversations: selectedConversations.map((conversation) => ({
       ...conversation,
-      archivedOnly: selectedKey !== currentOwner?.key ? true : conversation.archivedOnly,
-      friendDeleted: selectedKey !== currentOwner?.key ? false : conversation.friendDeleted,
-      unreadMessageCount: selectedKey !== currentOwner?.key ? 0 : conversation.unreadMessageCount,
+      archivedOnly: selectedIsCurrent ? conversation.archivedOnly : true,
+      friendDeleted: selectedIsCurrent ? conversation.friendDeleted : false,
+      unreadMessageCount: selectedIsCurrent ? conversation.unreadMessageCount : 0,
     })),
     accounts,
     currentAccount,
     selectedAccount,
     selectedAccountKey: selectedKey,
-    readOnly: !currentOwner?.key || selectedKey !== currentOwner.key,
+    readOnly: !selectedIsCurrent,
   };
 }
 
@@ -461,14 +512,14 @@ export function mergeChatArchive(
   owner: ChatAccountSummary,
   selectedAccountKey?: string,
 ): ChatConversationsResponse {
-  const ownerKey = owner.key;
+  const ownerKeys = accountOwnerKeys(owner);
   const liveOwned = liveConversations.map((conversation) =>
     stampConversationOwner(conversation, owner));
   const archived = dedupeConversations(readChatArchive());
   const archivedForOwner = archived.filter((conversation) =>
-    ownerMatches(conversation, ownerKey));
+    keysOverlap(conversationOwnerKeys(conversation), ownerKeys));
   const otherArchived = archived.filter((conversation) =>
-    !ownerMatches(conversation, ownerKey));
+    !keysOverlap(conversationOwnerKeys(conversation), ownerKeys));
   const usedArchivedIndexes = new Set<number>();
   const merged: ChatConversation[] = [];
 
@@ -506,5 +557,5 @@ export function mergeChatArchive(
 
   const sorted = dedupeConversations([...otherArchived, ...merged]);
   writeChatArchive(sorted);
-  return buildChatResponse(sorted, selectedAccountKey || ownerKey, owner);
+  return buildChatResponse(sorted, selectedAccountKey || owner.key, owner);
 }

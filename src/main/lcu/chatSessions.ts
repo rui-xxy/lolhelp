@@ -104,6 +104,13 @@ function makeOwnerAccount(me: RawRecord): ChatAccountSummary {
 
   return {
     key,
+    keys: Array.from(new Set([
+      key,
+      puuid.trim().toLowerCase(),
+      displayRiotId.trim().toLowerCase(),
+      riotId(gameName, gameTag).trim().toLowerCase(),
+      gameName.trim().toLowerCase(),
+    ].filter(Boolean))),
     riotId: displayRiotId,
     gameName,
     gameTag,
