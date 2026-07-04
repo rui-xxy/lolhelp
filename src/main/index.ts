@@ -10,6 +10,7 @@ import {
   configureAssistWindows,
   disposeAssistWindows,
 } from './assist/windows';
+import { startLiveWatcher, stopLiveWatcher } from './live/liveWatcher';
 
 const APP_WINDOW_TITLE = 'LOL助手';
 const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
@@ -122,6 +123,7 @@ setTimeout(() => {
 app.on('ready', () => {
   createWindow();
   startAssistEngine();
+  startLiveWatcher();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -135,6 +137,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   stopAssistEngine();
+  stopLiveWatcher();
   disposeAssistWindows();
 });
 

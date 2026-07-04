@@ -141,21 +141,26 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   const [notice, setNotice] = useState('');
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
 
-  const refresh = () => {
-    setAccounts(loadSavedMatchAccounts());
-    setGroups(loadSavedMatchGroups());
+  const refresh = async () => {
+    const [nextAccounts, nextGroups] = await Promise.all([
+      loadSavedMatchAccounts(),
+      loadSavedMatchGroups(),
+    ]);
+    setAccounts(nextAccounts);
+    setGroups(nextGroups);
   };
 
   useEffect(() => {
     if (!open) return;
-    refresh();
+    void refresh();
     setNotice('');
     void window.lolHelper.match.getChampions().then(setChampions).catch(() => setChampions([]));
-    window.addEventListener(SAVED_MATCHES_CHANGED_EVENT, refresh);
-    window.addEventListener('focus', refresh);
+    const refreshListener = () => void refresh();
+    window.addEventListener(SAVED_MATCHES_CHANGED_EVENT, refreshListener);
+    window.addEventListener('focus', refreshListener);
     return () => {
-      window.removeEventListener(SAVED_MATCHES_CHANGED_EVENT, refresh);
-      window.removeEventListener('focus', refresh);
+      window.removeEventListener(SAVED_MATCHES_CHANGED_EVENT, refreshListener);
+      window.removeEventListener('focus', refreshListener);
     };
   }, [open]);
 
@@ -198,34 +203,35 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
     return counts;
   }, [accounts]);
 
-  const createGroup = () => {
+  const createGroup = async () => {
     const trimmed = groupName.trim();
     if (!trimmed) {
       setNotice('先输入分组名称');
       return;
     }
-    const nextGroups = createSavedMatchGroup(trimmed);
-    setGroups(nextGroups);
+    const state = await createSavedMatchGroup(trimmed);
+    setGroups(state.groups);
+    setAccounts(state.accounts);
     setGroupName('');
-    setActiveGroup(nextGroups[0]?.id ?? 'all');
+    setActiveGroup(state.groups[0]?.id ?? 'all');
     setNotice('分组已创建');
   };
 
-  const deleteGroup = (groupId: string) => {
-    const result = deleteSavedMatchGroup(groupId);
-    setGroups(result.groups);
-    setAccounts(result.accounts);
+  const deleteGroup = async (groupId: string) => {
+    const state = await deleteSavedMatchGroup(groupId);
+    setGroups(state.groups);
+    setAccounts(state.accounts);
     setActiveGroup('all');
     setNotice('分组已删除，里面的账号已移到未分组');
   };
 
-  const deleteAccount = (accountId: string) => {
-    setAccounts(deleteSavedMatchAccount(accountId));
+  const deleteAccount = async (accountId: string) => {
+    setAccounts(await deleteSavedMatchAccount(accountId));
     setNotice('保存账号已删除');
   };
 
-  const moveAccount = (accountId: string, groupId: string) => {
-    setAccounts(setSavedMatchAccountGroup(accountId, groupId || undefined));
+  const moveAccount = async (accountId: string, groupId: string) => {
+    setAccounts(await setSavedMatchAccountGroup(accountId, groupId || undefined));
     setNotice('分组已更新');
   };
 
@@ -282,7 +288,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                     count={groupCounts.get(group.id) ?? 0}
                     icon={<Folder className="size-4" />}
                     onClick={() => setActiveGroup(group.id)}
-                    onDelete={() => deleteGroup(group.id)}
+                    onDelete={() => void deleteGroup(group.id)}
                   />
                 ))}
               </nav>
@@ -294,14 +300,14 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                     value={groupName}
                     onChange={(event) => setGroupName(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') createGroup();
+                      if (event.key === 'Enter') void createGroup();
                     }}
                     placeholder="比如：朋友"
                     className="h-8 min-w-0 flex-1 rounded-sm border border-app-border bg-app-surface px-2 text-xs text-app-text outline-none focus:border-app-primary"
                   />
                   <button
                     type="button"
-                    onClick={createGroup}
+                    onClick={() => void createGroup()}
                     className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-app-primary text-white transition-colors hover:bg-app-primary-hover"
                     title="新建分组"
                     aria-label="新建分组"
@@ -374,7 +380,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                     <div className="ml-auto flex items-center gap-2">
                       <select
                         value={activeAccount.groupId ?? ''}
-                        onChange={(event) => moveAccount(activeAccount.id, event.target.value)}
+                        onChange={(event) => void moveAccount(activeAccount.id, event.target.value)}
                         className="h-8 w-28 rounded-full border border-app-border bg-white/85 px-3 text-xs text-app-text outline-none focus:border-app-primary"
                       >
                         <option value="">未分组</option>
@@ -396,7 +402,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteAccount(activeAccount.id)}
+                        onClick={() => void deleteAccount(activeAccount.id)}
                         className="flex size-8 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
                         title="删除这个保存账号"
                         aria-label="删除这个保存账号"

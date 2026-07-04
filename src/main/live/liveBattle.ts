@@ -17,8 +17,32 @@ import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
 
 const RECENT_MATCH_COUNT = 24;
 const LIVE_BATTLE_CACHE_TTL_MS = 15_000;
+const LIVE_BATTLE_EMPTY_CACHE_TTL_MS = 2_000;
+const PLAYER_STATS_CACHE_TTL_MS = 120_000;
+const PLAYER_STATS_QUICK_TIMEOUT_MS = 4_500;
 let liveBattleCache: { expiresAt: number; value: LiveBattleInfo } | null = null;
 let liveBattleInFlight: Promise<LiveBattleInfo> | null = null;
+let liveBattleCacheVersion = 0;
+
+type PlayerStatsSummary = {
+  kda: number;
+  winRate: number;
+  history: LiveBattlePlayer['history'];
+};
+
+const EMPTY_PLAYER_STATS: PlayerStatsSummary = {
+  kda: 0,
+  winRate: 0,
+  history: [],
+};
+
+const playerStatsCache = new Map<string, { expiresAt: number; value: PlayerStatsSummary }>();
+const playerStatsInFlight = new Map<string, Promise<PlayerStatsSummary>>();
+
+export function invalidateLiveBattleCache(): void {
+  liveBattleCache = null;
+  liveBattleCacheVersion += 1;
+}
 
 function createLcuClient(): LcuClient {
   const creds = getCachedCredentials();
@@ -44,7 +68,7 @@ function formatTimeAgo(timestamp: number): string {
 function calcPlayerStats(
   matches: Array<Record<string, unknown>>,
   puuid: string,
-): { kda: number; winRate: number; history: LiveBattlePlayer['history'] } {
+): PlayerStatsSummary {
   let totalKills = 0;
   let totalDeaths = 0;
   let totalAssists = 0;
@@ -100,6 +124,60 @@ function calcPlayerStats(
 }
 
 // 从 gameflow session 解析玩家骨架
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), timeoutMs);
+    promise
+      .then((value) => resolve(value))
+      .catch(() => resolve(fallback))
+      .finally(() => clearTimeout(timer));
+  });
+}
+
+async function fetchPlayerStats(
+  client: LcuClient,
+  puuid: string,
+): Promise<PlayerStatsSummary> {
+  const matchResp = await client.get<Record<string, unknown>>(
+    `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${RECENT_MATCH_COUNT}`,
+  );
+  const games = ((matchResp.games as Record<string, unknown>)?.games as Array<Record<string, unknown>>) ?? [];
+  return calcPlayerStats(games, puuid);
+}
+
+function getCachedPlayerStats(puuid: string): PlayerStatsSummary | null {
+  const cached = playerStatsCache.get(puuid);
+  if (!cached || cached.expiresAt <= Date.now()) {
+    if (cached) playerStatsCache.delete(puuid);
+    return null;
+  }
+  return structuredClone(cached.value);
+}
+
+function getPlayerStats(client: LcuClient, puuid: string): Promise<PlayerStatsSummary> {
+  const cached = getCachedPlayerStats(puuid);
+  if (cached) return Promise.resolve(cached);
+
+  const inFlight = playerStatsInFlight.get(puuid);
+  if (inFlight) return inFlight;
+
+  const request = fetchPlayerStats(client, puuid)
+    .then((value) => {
+      playerStatsCache.set(puuid, {
+        expiresAt: Date.now() + PLAYER_STATS_CACHE_TTL_MS,
+        value,
+      });
+      return value;
+    })
+    .catch(() => EMPTY_PLAYER_STATS)
+    .finally(() => {
+      playerStatsInFlight.delete(puuid);
+    });
+
+  playerStatsInFlight.set(puuid, request);
+  return request;
+}
+
 interface PlayerSkeleton {
   puuid: string;
   summonerId: number;
@@ -202,18 +280,15 @@ async function enrichPlayers(
       let winRate = 0;
       let history: LiveBattlePlayer['history'] = [];
       if (s.puuid) {
-        try {
-          const matchResp = await client.get<Record<string, unknown>>(
-            `/lol-match-history/v1/products/lol/${s.puuid}/matches?begIndex=0&endIndex=${RECENT_MATCH_COUNT}`,
-          );
-          const games = ((matchResp.games as Record<string, unknown>)?.games as Array<Record<string, unknown>>) ?? [];
-          const stats = calcPlayerStats(games, s.puuid);
-          kda = stats.kda;
-          winRate = stats.winRate;
-          history = stats.history;
-        } catch {
-          // 战绩拿不到就留默认值
-        }
+        const cachedStats = getCachedPlayerStats(s.puuid);
+        const stats = cachedStats ?? (await withTimeout(
+          getPlayerStats(client, s.puuid),
+          PLAYER_STATS_QUICK_TIMEOUT_MS,
+          EMPTY_PLAYER_STATS,
+        ));
+        kda = stats.kda;
+        winRate = stats.winRate;
+        history = stats.history;
       }
 
       return {
@@ -330,12 +405,15 @@ export async function getLiveBattle(): Promise<LiveBattleInfo> {
     return structuredClone(liveBattleCache.value);
   }
   if (!liveBattleInFlight) {
+    const version = liveBattleCacheVersion;
     liveBattleInFlight = loadLiveBattle()
       .then((value) => {
-        liveBattleCache = {
-          expiresAt: Date.now() + LIVE_BATTLE_CACHE_TTL_MS,
-          value,
-        };
+        if (version === liveBattleCacheVersion) {
+          liveBattleCache = {
+            expiresAt: Date.now() + (value.inGame ? LIVE_BATTLE_CACHE_TTL_MS : LIVE_BATTLE_EMPTY_CACHE_TTL_MS),
+            value,
+          };
+        }
         return value;
       })
       .finally(() => {

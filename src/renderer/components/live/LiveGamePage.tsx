@@ -5,6 +5,17 @@ import type { LiveBattlePlayer } from '../../../shared/api';
 
 const HISTORY_PAGE_SIZE = 8;
 
+function battleRosterKey(myTeam: LiveBattlePlayer[], enemyTeam: LiveBattlePlayer[]) {
+  const playerKey = (player: LiveBattlePlayer) =>
+    `${player.teamId}:${player.puuid || player.riotId}:${player.championId}`;
+
+  return `${myTeam.map(playerKey).join('|')}::${enemyTeam.map(playerKey).join('|')}`;
+}
+
+function loadedCardSet(total: number) {
+  return new Set(Array.from({ length: total }, (_, index) => index));
+}
+
 function championIcon(alias: string) {
   // 用腾讯图床（国内稳定），不依赖 ddragon 版本号
   return alias ? `https://game.gtimg.cn/images/lol/act/img/champion/${alias}.png` : '';
@@ -44,14 +55,14 @@ function TarotCard({
     : 'bg-gradient-to-br from-blue-50 via-app-surface to-app-surface';
 
   return (
-    <div className="live-tarot-card group relative min-w-0 [perspective:1200px]">
+    <div className="live-tarot-card group relative min-w-0">
       <motion.div
-        className="relative h-full w-full [transform-style:preserve-3d]"
-        initial={{ rotateY: 180, opacity: 0.78 }}
-        animate={{ rotateY: isLoaded ? 0 : 180, opacity: isLoaded ? 1 : 0.78 }}
-        transition={{ duration: 0.72, delay: index * 0.045, type: 'spring', stiffness: 72, damping: 18 }}
+        className="relative h-full w-full"
+        initial={{ opacity: 0, y: 10, scale: 0.985 }}
+        animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 10, scale: isLoaded ? 1 : 0.985 }}
+        transition={{ duration: 0.26, delay: index * 0.018, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)] [backface-visibility:hidden]">
+        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)]">
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.035]"
             style={{
@@ -94,7 +105,7 @@ function TarotCard({
               {visibleHistory.length > 0 ? (
                 visibleHistory.map((history, historyIndex) => (
                   <div
-                    key={`${history.championAlias}-${historyIndex}`}
+                    key={`${historyPage}-${history.championAlias}-${historyIndex}-${history.kills}-${history.deaths}-${history.assists}`}
                     className={`grid min-h-0 grid-cols-[24px_26px_minmax(62px,1fr)_34px] items-center gap-1 rounded-sm border px-1.5 py-0.5 ${
                       history.win
                         ? 'border-green-100 bg-white/92'
@@ -137,48 +148,6 @@ function TarotCard({
           <div className="absolute bottom-1.5 left-1.5 size-2 border-b border-l border-app-primary/25" />
           <div className="absolute right-1.5 bottom-1.5 size-2 border-r border-b border-app-primary/25" />
         </div>
-
-        <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.045]"
-            style={{
-              backgroundImage: 'radial-gradient(circle at 50% 50%, #222222 1px, transparent 1px)',
-              backgroundSize: '12px 12px',
-            }}
-          />
-          <div className="absolute inset-2 rounded-sm border border-app-primary/20" />
-          <div className="absolute left-1 top-1 size-4 border-l border-t border-app-primary/35" />
-          <div className="absolute right-1 top-1 size-4 border-r border-t border-app-primary/35" />
-          <div className="absolute bottom-1 left-1 size-4 border-b border-l border-app-primary/25" />
-          <div className="absolute right-1 bottom-1 size-4 border-r border-b border-app-primary/25" />
-          <div className="absolute top-5 flex w-full flex-col items-center">
-            <Star size={10} className="mb-1 text-app-primary opacity-70" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-app-muted">Destiny</span>
-          </div>
-          <div className="relative flex items-center justify-center">
-            <div className="absolute size-20 rotate-45 border border-app-primary/20" />
-            <div className="absolute size-24 animate-[spin_30s_linear_infinite] rounded-full border border-dashed border-app-primary/25" />
-            <div className="relative z-10 size-14 overflow-hidden rounded-full border-[3px] border-white bg-app-surface shadow-[0_0_18px_rgba(255,56,92,0.22)] ring-1 ring-app-primary/25">
-              {champIcon && (
-                <img
-                  src={champIcon}
-                  alt={player.championName}
-                  className="h-full w-full scale-110 object-cover opacity-90"
-                />
-              )}
-            </div>
-          </div>
-          <div className="absolute bottom-7 flex w-full flex-col items-center px-2">
-            <span className="w-full truncate text-center text-[13px] font-bold text-app-text">{player.gameName}</span>
-            <div className="mt-1 flex w-full items-center justify-center gap-2 opacity-80">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-app-primary/45" />
-              <span className="max-w-[72px] truncate font-mono text-[9px] uppercase tracking-wider text-app-primary">
-                {player.championName}
-              </span>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-app-primary/45" />
-            </div>
-          </div>
-        </div>
       </motion.div>
     </div>
   );
@@ -194,6 +163,9 @@ export function LiveGamePage() {
   const [loadedCards, setLoadedCards] = useState<Set<number>>(new Set());
   const [historyPage, setHistoryPage] = useState(0);
   const cardTimerIds = useRef<number[]>([]);
+  const fetchSeqRef = useRef(0);
+  const battleRosterKeyRef = useRef('');
+  const loadedCardCountRef = useRef(0);
 
   const clearCardTimers = useCallback(() => {
     cardTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -201,46 +173,88 @@ export function LiveGamePage() {
   }, []);
 
   const fetchBattle = useCallback(async () => {
+    const requestId = fetchSeqRef.current + 1;
+    fetchSeqRef.current = requestId;
     clearCardTimers();
     setLoading(true);
     setError('');
 
+    const isCurrentRequest = () => fetchSeqRef.current === requestId;
+
     try {
       const info = await window.lolHelper.live.getBattle();
+      if (!isCurrentRequest()) return;
       setInGame(info.inGame);
       setPhase(info.phase);
       if (info.error) setError(info.error);
 
       if (info.inGame) {
-        setLoadedCards(new Set());
-        setHistoryPage(0);
+        const nextRosterKey = battleRosterKey(info.myTeam, info.enemyTeam);
+        const total = info.myTeam.length + info.enemyTeam.length;
+        const sameRoster = nextRosterKey === battleRosterKeyRef.current;
+        const alreadyLoaded = sameRoster && loadedCardCountRef.current >= total;
+
+        battleRosterKeyRef.current = nextRosterKey;
         setMyTeam(info.myTeam);
         setEnemyTeam(info.enemyTeam);
-        const total = info.myTeam.length + info.enemyTeam.length;
+
+        if (alreadyLoaded) {
+          setLoadedCards((current) => (current.size === total ? current : loadedCardSet(total)));
+          loadedCardCountRef.current = total;
+          return;
+        }
+
+        loadedCardCountRef.current = 0;
+        setLoadedCards(new Set());
+        setHistoryPage(0);
 
         for (let i = 0; i < total; i += 1) {
           const timerId = window.setTimeout(() => {
-            setLoadedCards((prev) => new Set([...prev, i]));
-          }, i * 85);
+            setLoadedCards((prev) => {
+              const next = new Set([...prev, i]);
+              loadedCardCountRef.current = next.size;
+              return next;
+            });
+          }, i * 35);
           cardTimerIds.current.push(timerId);
         }
       } else {
+        battleRosterKeyRef.current = '';
+        loadedCardCountRef.current = 0;
         setLoadedCards(new Set());
         setHistoryPage(0);
         setMyTeam([]);
         setEnemyTeam([]);
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       setInGame(false);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   }, [clearCardTimers]);
 
   useEffect(() => {
     fetchBattle();
     return clearCardTimers;
+  }, [clearCardTimers, fetchBattle]);
+
+  useEffect(() => {
+    return window.lolHelper.live.onStateChanged((event) => {
+      setPhase(event.phase);
+      if (!event.inGame) {
+        clearCardTimers();
+        battleRosterKeyRef.current = '';
+        loadedCardCountRef.current = 0;
+        setLoadedCards(new Set());
+        setHistoryPage(0);
+        setMyTeam([]);
+        setEnemyTeam([]);
+        setInGame(false);
+      }
+      void fetchBattle();
+    });
   }, [clearCardTimers, fetchBattle]);
 
   const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
@@ -327,7 +341,7 @@ export function LiveGamePage() {
             <div className="flex h-full flex-col items-center justify-center gap-2 text-app-muted">
               <Star size={24} className="text-app-primary opacity-45" />
               <span className="text-sm text-app-body">当前不在游戏中</span>
-              <span className="text-xs opacity-75">进入对局或选人阶段后点击刷新</span>
+              <span className="text-xs opacity-75">进入选人或游戏后会自动识别，也可以手动刷新</span>
             </div>
           ) : (
             <div className="live-card-board">

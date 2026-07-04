@@ -9,6 +9,7 @@ import type {
   LolConfigApplyValuesRequest,
   LolConfigSaveProfileRequest,
   LolHelper,
+  LiveStateChangeEvent,
   PlayerLookupRequest,
   ScoutConfig,
   ScoutProgress,
@@ -44,10 +45,39 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
     getPlayerRanks: (puuid: string, region?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid, region),
+    getSavedMatches: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES),
+    importSavedMatches: (state) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_IMPORT_SAVED_MATCHES, state),
+    saveMatchesForProfile: (profile, region, matches, regionName) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.MATCH_SAVE_MATCHES_FOR_PROFILE,
+        profile,
+        region,
+        matches,
+        regionName,
+      ),
+    createSavedMatchGroup: (name: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_CREATE_SAVED_GROUP, name),
+    deleteSavedMatchGroup: (groupId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_GROUP, groupId),
+    setSavedMatchAccountGroup: (accountId: string, groupId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_GROUP, accountId, groupId),
+    deleteSavedMatchAccount: (accountId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_ACCOUNT, accountId),
+    deleteSavedMatch: (accountId: string, gameId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_MATCH, accountId, gameId),
     getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
+    onStateChanged: (listener: (event: LiveStateChangeEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, payload: LiveStateChangeEvent) => {
+        listener(payload);
+      };
+      ipcRenderer.on(IPC_CHANNELS.LIVE_STATE_CHANGED, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.LIVE_STATE_CHANGED, handler);
+    },
   },
   window: {
     setWidth: (width: number) =>

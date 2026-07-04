@@ -684,9 +684,18 @@ export interface LiveBattleInfo {
   error?: string;
 }
 
+export interface LiveStateChangeEvent {
+  phase: string;
+  inGame: boolean;
+  source: 'websocket' | 'poll';
+  uri?: string;
+  at: number;
+}
+
 // live 域 API 契约
 export interface LiveApi {
   getBattle: () => Promise<LiveBattleInfo>;
+  onStateChanged: (listener: (event: LiveStateChangeEvent) => void) => () => void;
 }
 
 // window 域：窗口控制
@@ -894,10 +903,46 @@ export interface PlayerLookupResult {
   error?: string; // 失败原因（玩家不存在/客户端未开/请求失败）
 }
 
+export interface SavedMatchGroup {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SavedMatchAccount {
+  id: string;
+  region: string;
+  regionName?: string;
+  profile: PlayerProfile;
+  matches: PlayerMatchDetail[];
+  groupId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SavedMatchesState {
+  accounts: SavedMatchAccount[];
+  groups: SavedMatchGroup[];
+}
+
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
   getPlayerRanks: (puuid: string, region?: string) => Promise<PlayerRankSummary[]>;
+  getSavedMatches: () => Promise<SavedMatchesState>;
+  importSavedMatches: (state: SavedMatchesState) => Promise<SavedMatchesState>;
+  saveMatchesForProfile: (
+    profile: PlayerProfile,
+    region: string,
+    matches: PlayerMatchDetail[],
+    regionName?: string,
+  ) => Promise<SavedMatchAccount>;
+  createSavedMatchGroup: (name: string) => Promise<SavedMatchesState>;
+  deleteSavedMatchGroup: (groupId: string) => Promise<SavedMatchesState>;
+  setSavedMatchAccountGroup: (accountId: string, groupId?: string) => Promise<SavedMatchAccount[]>;
+  deleteSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount[]>;
+  deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchAccount[]>;
   // 返回英雄列表（给前端英雄选择器用）
   getChampions: () => Promise<ChampionSummary[]>;
 }

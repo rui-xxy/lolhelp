@@ -40,6 +40,10 @@ interface MatchTab {
   savedMatches?: PlayerMatchDetail[];
 }
 
+interface OpenSearchTabOptions {
+  forceRefresh?: boolean;
+}
+
 // 模式筛选选项（tag → 中文名，tag 是 SGP 的 q_{queueId} 格式）
 const QUEUE_FILTERS = [
   { key: '', tag: '', name: '全部' },
@@ -320,6 +324,7 @@ export function MatchHistoryPage({
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
   const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
+  const tabLoadSeqRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -366,8 +371,14 @@ export function MatchHistoryPage({
   };
 
   const loadInitialTab = async (tabId: string, query: string, regionKey: string, tag?: string) => {
+    const requestSeq = (tabLoadSeqRef.current[tabId] ?? 0) + 1;
+    tabLoadSeqRef.current[tabId] = requestSeq;
+    const isLatestRequest = () => tabLoadSeqRef.current[tabId] === requestSeq;
+
     updateTab(tabId, (tab) => ({
       ...tab,
+      query,
+      region: regionKey,
       loading: true,
       pageLoading: false,
       result: null,
@@ -377,10 +388,14 @@ export function MatchHistoryPage({
       selectedGameId: null,
       currentPage: 1,
       filterQueue: tag ? QUEUE_FILTERS.find((f) => f.tag === tag)?.key ?? '' : '',
+      source: 'search',
+      savedAccountId: undefined,
+      savedMatches: undefined,
     }));
 
     try {
       const result = await requestBatch(query, regionKey, 0, tag);
+      if (!isLatestRequest()) return;
       updateTab(tabId, (tab) => {
         const nextMatches = result.matches;
         return {
@@ -395,6 +410,7 @@ export function MatchHistoryPage({
         };
       });
     } catch (err) {
+      if (!isLatestRequest()) return;
       const errorResult = createEmptyResult(err instanceof Error ? err.message : String(err));
       updateTab(tabId, (tab) => ({
         ...tab,
@@ -405,12 +421,14 @@ export function MatchHistoryPage({
     }
   };
 
-  const openSearchTab = (rawQuery: string, regionKey: string) => {
+  const openSearchTab = (rawQuery: string, regionKey: string, options: OpenSearchTabOptions = {}) => {
     const query = rawQuery.trim();
     const existingTab = tabsRef.current.find((tab) => tab.query === query && tab.region === regionKey);
     if (existingTab) {
       setActiveTabId(existingTab.id);
-      if (
+      if (options.forceRefresh) {
+        void loadInitialTab(existingTab.id, query, regionKey);
+      } else if (
         !existingTab.loading &&
         (!existingTab.result?.profile.riotId ||
           existingTab.title === '我的战绩' ||
@@ -437,6 +455,7 @@ export function MatchHistoryPage({
       selectedGameId: null,
       currentPage: 1,
       filterQueue: '',
+      source: 'search',
     };
 
     setTabs((currentTabs) => [...currentTabs, tab]);
@@ -502,7 +521,7 @@ export function MatchHistoryPage({
     if (searchTrigger === lastTriggerRef.current) return;
     lastTriggerRef.current = searchTrigger;
     if (searchTrigger > 0) {
-      openSearchTab(searchName, region);
+      openSearchTab(searchName, region, { forceRefresh: true });
     }
   }, [searchTrigger, searchName, region]);
 
@@ -574,14 +593,14 @@ export function MatchHistoryPage({
     });
   };
 
-  const handleSaveSelectedMatches = () => {
+  const handleSaveSelectedMatches = async () => {
     if (!activeTab?.result?.profile || selectedSaveIds.size === 0) return;
     const matchesToSave = activeTab.matches.filter((match) => selectedSaveIds.has(match.gameId));
     if (matchesToSave.length === 0) return;
     const savedRegionKey = activeTab.region || currentRegionKey;
     const savedRegionName = LOL_REGIONS.find((item) => item.key === savedRegionKey)?.name
       ?? (activeTab.region ? '' : currentRegionName);
-    saveMatchesForProfile(activeTab.result.profile, savedRegionKey, matchesToSave, savedRegionName);
+    await saveMatchesForProfile(activeTab.result.profile, savedRegionKey, matchesToSave, savedRegionName);
     setSaveSelections((current) => ({ ...current, [activeTab.id]: [] }));
     setSaveModeTabId(null);
   };
@@ -636,6 +655,10 @@ export function MatchHistoryPage({
       return;
     }
 
+    const requestSeq = (tabLoadSeqRef.current[activeTab.id] ?? 0) + 1;
+    tabLoadSeqRef.current[activeTab.id] = requestSeq;
+    const isLatestRequest = () => tabLoadSeqRef.current[activeTab.id] === requestSeq;
+
     updateTab(activeTab.id, (tab) => ({ ...tab, pageLoading: true }));
 
     try {
@@ -648,6 +671,7 @@ export function MatchHistoryPage({
       while (hasMore && targetEnd > nextMatches.length && guard < 5) {
         const currentTag = QUEUE_FILTERS.find((f) => f.key === activeTab.filterQueue)?.tag;
         const response = await requestBatch(activeTab.query, activeTab.region, loadedUpTo, currentTag);
+        if (!isLatestRequest()) return;
         const existingIds = new Set(nextMatches.map((match) => match.gameId));
         const additions = response.matches.filter((match) => !existingIds.has(match.gameId));
         nextMatches = [...nextMatches, ...additions];
@@ -658,6 +682,7 @@ export function MatchHistoryPage({
         guard++;
       }
 
+      if (!isLatestRequest()) return;
       const pageMatches = getDisplayedMatches(nextMatches, page);
       updateTab(activeTab.id, (tab) => ({
         ...tab,
@@ -670,12 +695,14 @@ export function MatchHistoryPage({
         selectedGameId: pageMatches[0]?.gameId ?? tab.selectedGameId,
       }));
     } catch (err) {
+      if (!isLatestRequest()) return;
       console.error('[match] 翻页加载失败:', err);
       updateTab(activeTab.id, (tab) => ({ ...tab, pageLoading: false }));
     }
   };
 
   const handleCloseTab = (tabId: string) => {
+    delete tabLoadSeqRef.current[tabId];
     setProfilePanelTabId((current) => (current === tabId ? null : current));
     setSaveModeTabId((current) => (current === tabId ? null : current));
     setSaveSelections((current) => {
@@ -827,7 +854,7 @@ export function MatchHistoryPage({
                         <button
                           type="button"
                           disabled={selectedSaveCount === 0}
-                          onClick={handleSaveSelectedMatches}
+                          onClick={() => void handleSaveSelectedMatches()}
                           className="h-6 rounded-xs bg-app-primary px-2 text-[11px] font-medium text-white transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
                         >
                           保存{selectedSaveCount > 0 ? selectedSaveCount : ''}

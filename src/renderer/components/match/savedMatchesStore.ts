@@ -1,210 +1,116 @@
-import type { PlayerMatchDetail, PlayerProfile } from '../../../shared/api';
+import type {
+  PlayerMatchDetail,
+  PlayerProfile,
+  SavedMatchAccount,
+  SavedMatchGroup,
+  SavedMatchesState,
+} from '../../../shared/api';
 
-const STORAGE_KEY = 'lolhelp:saved-match-accounts:v1';
-const GROUP_STORAGE_KEY = 'lolhelp:saved-match-groups:v1';
+export type { SavedMatchAccount, SavedMatchGroup, SavedMatchesState };
 
 export const SAVED_MATCHES_CHANGED_EVENT = 'lolhelp:saved-matches-changed';
-
-export interface SavedMatchGroup {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface SavedMatchAccount {
-  id: string;
-  region: string;
-  regionName?: string;
-  profile: PlayerProfile;
-  matches: PlayerMatchDetail[];
-  groupId?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-function getAccountId(profile: PlayerProfile, region: string): string {
-  const identity = profile.puuid || profile.riotId || 'unknown';
-  return `${region || 'current'}:${identity}`;
-}
+const LEGACY_ACCOUNTS_STORAGE_KEY = 'lolhelp:saved-match-accounts:v1';
+const LEGACY_GROUPS_STORAGE_KEY = 'lolhelp:saved-match-groups:v1';
+const LEGACY_MIGRATION_STORAGE_KEY = 'lolhelp:saved-matches-migrated:v2';
 
 function emitSavedMatchesChanged() {
   window.dispatchEvent(new CustomEvent(SAVED_MATCHES_CHANGED_EVENT));
 }
 
-function makeGroupId(): string {
-  return `group-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function normalizeGroups(value: unknown): SavedMatchGroup[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((group): group is SavedMatchGroup => {
-      if (!group || typeof group !== 'object') return false;
-      const candidate = group as Partial<SavedMatchGroup>;
-      return typeof candidate.id === 'string' && typeof candidate.name === 'string';
-    })
-    .map((group) => ({
-      ...group,
-      name: group.name.trim() || '未命名分组',
-      createdAt: Number.isFinite(group.createdAt) ? group.createdAt : Date.now(),
-      updatedAt: Number.isFinite(group.updatedAt) ? group.updatedAt : Date.now(),
-    }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-function normalizeAccounts(value: unknown): SavedMatchAccount[] {
-  if (!Array.isArray(value)) return [];
-  const groupIds = new Set(loadSavedMatchGroups().map((group) => group.id));
-  return value
-    .filter((account): account is SavedMatchAccount => {
-      if (!account || typeof account !== 'object') return false;
-      const candidate = account as Partial<SavedMatchAccount>;
-      return (
-        typeof candidate.id === 'string' &&
-        candidate.profile !== undefined &&
-        Array.isArray(candidate.matches)
-      );
-    })
-    .map((account) => ({
-      ...account,
-      region: account.region || '',
-      regionName: typeof account.regionName === 'string' ? account.regionName : undefined,
-      groupId: account.groupId && groupIds.has(account.groupId) ? account.groupId : undefined,
-      createdAt: Number.isFinite(account.createdAt) ? account.createdAt : Date.now(),
-      updatedAt: Number.isFinite(account.updatedAt) ? account.updatedAt : Date.now(),
-      matches: [...account.matches].sort((a, b) => b.gameCreation - a.gameCreation),
-    }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-export function loadSavedMatchAccounts(): SavedMatchAccount[] {
+function parseLegacyArray(key: string): unknown[] {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return [];
-    return normalizeAccounts(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-export function loadSavedMatchGroups(): SavedMatchGroup[] {
+function markLegacyMigrationDone() {
   try {
-    const raw = window.localStorage.getItem(GROUP_STORAGE_KEY);
-    if (!raw) return [];
-    return normalizeGroups(JSON.parse(raw));
+    window.localStorage.setItem(LEGACY_MIGRATION_STORAGE_KEY, 'done');
   } catch {
-    return [];
+    // Ignore storage failures; the import path still works.
   }
 }
 
-function writeSavedMatchAccounts(accounts: SavedMatchAccount[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+async function migrateLegacySavedMatches(): Promise<SavedMatchesState | null> {
+  try {
+    if (window.localStorage.getItem(LEGACY_MIGRATION_STORAGE_KEY) === 'done') return null;
+
+    const accounts = parseLegacyArray(LEGACY_ACCOUNTS_STORAGE_KEY);
+    const groups = parseLegacyArray(LEGACY_GROUPS_STORAGE_KEY);
+    if (accounts.length === 0 && groups.length === 0) {
+      markLegacyMigrationDone();
+      return null;
+    }
+
+    const state = await window.lolHelper.match.importSavedMatches({
+      accounts: accounts as SavedMatchAccount[],
+      groups: groups as SavedMatchGroup[],
+    });
+    markLegacyMigrationDone();
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadSavedMatchesState(): Promise<SavedMatchesState> {
+  const state = await window.lolHelper.match.getSavedMatches();
+  return (await migrateLegacySavedMatches()) ?? state;
+}
+
+export async function loadSavedMatchAccounts(): Promise<SavedMatchAccount[]> {
+  return (await loadSavedMatchesState()).accounts;
+}
+
+export async function loadSavedMatchGroups(): Promise<SavedMatchGroup[]> {
+  return (await loadSavedMatchesState()).groups;
+}
+
+export async function createSavedMatchGroup(name: string): Promise<SavedMatchesState> {
+  const state = await window.lolHelper.match.createSavedMatchGroup(name);
   emitSavedMatchesChanged();
+  return state;
 }
 
-function writeSavedMatchGroups(groups: SavedMatchGroup[]) {
-  window.localStorage.setItem(GROUP_STORAGE_KEY, JSON.stringify(groups));
+export async function deleteSavedMatchGroup(groupId: string): Promise<SavedMatchesState> {
+  const state = await window.lolHelper.match.deleteSavedMatchGroup(groupId);
   emitSavedMatchesChanged();
+  return state;
 }
 
-export function createSavedMatchGroup(name: string): SavedMatchGroup[] {
-  const trimmed = name.trim();
-  if (!trimmed) return loadSavedMatchGroups();
-  const now = Date.now();
-  const groups = loadSavedMatchGroups();
-  const nextGroups = [
-    { id: makeGroupId(), name: trimmed, createdAt: now, updatedAt: now },
-    ...groups,
-  ];
-  writeSavedMatchGroups(nextGroups);
-  return nextGroups;
-}
-
-export function deleteSavedMatchGroup(groupId: string): {
-  groups: SavedMatchGroup[];
-  accounts: SavedMatchAccount[];
-} {
-  const groups = loadSavedMatchGroups().filter((group) => group.id !== groupId);
-  const accounts = loadSavedMatchAccounts().map((account) =>
-    account.groupId === groupId ? { ...account, groupId: undefined, updatedAt: Date.now() } : account,
-  );
-  writeSavedMatchGroups(groups);
-  writeSavedMatchAccounts(accounts);
-  return { groups, accounts };
-}
-
-export function setSavedMatchAccountGroup(accountId: string, groupId?: string): SavedMatchAccount[] {
-  const validGroupIds = new Set(loadSavedMatchGroups().map((group) => group.id));
-  const nextGroupId = groupId && validGroupIds.has(groupId) ? groupId : undefined;
-  const accounts = loadSavedMatchAccounts().map((account) =>
-    account.id === accountId
-      ? { ...account, groupId: nextGroupId, updatedAt: Date.now() }
-      : account,
-  );
-  writeSavedMatchAccounts(accounts);
+export async function setSavedMatchAccountGroup(
+  accountId: string,
+  groupId?: string,
+): Promise<SavedMatchAccount[]> {
+  const accounts = await window.lolHelper.match.setSavedMatchAccountGroup(accountId, groupId);
+  emitSavedMatchesChanged();
   return accounts;
 }
 
-export function saveMatchesForProfile(
+export async function saveMatchesForProfile(
   profile: PlayerProfile,
   region: string,
   matches: PlayerMatchDetail[],
   regionName?: string,
-): SavedMatchAccount {
-  const now = Date.now();
-  const accountId = getAccountId(profile, region);
-  const accounts = loadSavedMatchAccounts();
-  const existing = accounts.find((account) => account.id === accountId);
-  const matchById = new Map<number, PlayerMatchDetail>();
-
-  for (const match of existing?.matches ?? []) {
-    matchById.set(match.gameId, match);
-  }
-  for (const match of matches) {
-    matchById.set(match.gameId, match);
-  }
-
-  const nextAccount: SavedMatchAccount = {
-    id: accountId,
-    region,
-    regionName: regionName?.trim() || existing?.regionName,
-    profile,
-    matches: Array.from(matchById.values()).sort((a, b) => b.gameCreation - a.gameCreation),
-    groupId: existing?.groupId,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-
-  const nextAccounts = [
-    nextAccount,
-    ...accounts.filter((account) => account.id !== accountId),
-  ].sort((a, b) => b.updatedAt - a.updatedAt);
-  writeSavedMatchAccounts(nextAccounts);
-  return nextAccount;
+): Promise<SavedMatchAccount> {
+  const account = await window.lolHelper.match.saveMatchesForProfile(profile, region, matches, regionName);
+  emitSavedMatchesChanged();
+  return account;
 }
 
-export function deleteSavedMatchAccount(accountId: string): SavedMatchAccount[] {
-  const nextAccounts = loadSavedMatchAccounts().filter((account) => account.id !== accountId);
-  writeSavedMatchAccounts(nextAccounts);
-  return nextAccounts;
+export async function deleteSavedMatchAccount(accountId: string): Promise<SavedMatchAccount[]> {
+  const accounts = await window.lolHelper.match.deleteSavedMatchAccount(accountId);
+  emitSavedMatchesChanged();
+  return accounts;
 }
 
-export function deleteSavedMatch(accountId: string, gameId: number): SavedMatchAccount[] {
-  const accounts = loadSavedMatchAccounts();
-  const nextAccounts = accounts
-    .map((account) =>
-      account.id === accountId
-        ? {
-            ...account,
-            matches: account.matches.filter((match) => match.gameId !== gameId),
-            updatedAt: Date.now(),
-          }
-        : account,
-    )
-    .filter((account) => account.matches.length > 0)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-
-  writeSavedMatchAccounts(nextAccounts);
-  return nextAccounts;
+export async function deleteSavedMatch(accountId: string, gameId: number): Promise<SavedMatchAccount[]> {
+  const accounts = await window.lolHelper.match.deleteSavedMatch(accountId, gameId);
+  emitSavedMatchesChanged();
+  return accounts;
 }
