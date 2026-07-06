@@ -368,7 +368,7 @@ export function AssistPage({
               updateAssist={updateAssist}
               updateBoolean={updateBoolean}
               openPicker={openPicker}
-              championSummary={championSummary}
+              championMap={championMap}
               setChampionArray={setChampionArray}
               setRoleChampionArray={setRoleChampionArray}
               setBan={setBan}

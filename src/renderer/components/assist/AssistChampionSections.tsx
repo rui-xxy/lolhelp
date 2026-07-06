@@ -2,7 +2,9 @@ import type {
   AssistOperationResult,
   AssistRole,
   AssistSettings,
+  ChampionSummary,
 } from '../../../shared/api';
+import { GameIcon } from '../match/GameIcon';
 import {
   ActionButton,
   SelectInput,
@@ -36,12 +38,79 @@ const positionOptions: Array<[string, string]> = [
   ['FILL', '补位'],
 ];
 
+function championName(champion: ChampionSummary): string {
+  return champion.title || champion.name;
+}
+
+function ChampionSlotPicker({
+  label,
+  ids,
+  maxVisible = 6,
+  championMap,
+  onClick,
+}: {
+  label: string;
+  ids: number[];
+  maxVisible?: number;
+  championMap: Map<number, ChampionSummary>;
+  onClick: () => void;
+}) {
+  const champions = ids
+    .map((id) => championMap.get(id))
+    .filter((champion): champion is ChampionSummary => Boolean(champion));
+  const visibleChampions = champions.slice(0, maxVisible);
+  const names = champions.map(championName).join('、');
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={names || label}
+      aria-label={label}
+      className="group flex min-h-12 w-full min-w-0 items-center gap-2 rounded-sm border border-app-border bg-app-bg px-2.5 py-2 text-left transition-colors hover:border-app-primary hover:bg-app-surface-soft focus:outline-none focus:ring-2 focus:ring-app-primary/20"
+    >
+      {visibleChampions.length > 0 ? (
+        <>
+          <span className="flex shrink-0 -space-x-2">
+            {visibleChampions.map((champion) => (
+              <GameIcon
+                key={champion.id}
+                src={champion.avatar}
+                alt={championName(champion)}
+                title={championName(champion)}
+                size={32}
+                rounded
+                className="ring-2 ring-app-bg group-hover:ring-app-surface-soft"
+              />
+            ))}
+            {champions.length > visibleChampions.length && (
+              <span className="flex size-8 items-center justify-center rounded-full bg-app-primary-soft text-[10px] font-semibold text-app-primary ring-2 ring-app-bg">
+                +{champions.length - visibleChampions.length}
+              </span>
+            )}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-app-text">
+            {names}
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-app-border bg-app-surface text-xs text-app-subtle group-hover:border-app-primary group-hover:text-app-primary">
+            +
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-app-muted">未设置</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 export function ChampionsSection({
   assist,
   updateAssist,
   updateBoolean,
   openPicker,
-  championSummary,
+  championMap,
   setChampionArray,
   setRoleChampionArray,
   setBan,
@@ -50,7 +119,7 @@ export function ChampionsSection({
   updateAssist: UpdateAssist;
   updateBoolean: UpdateBoolean;
   openPicker: OpenPicker;
-  championSummary: (ids: number[]) => string;
+  championMap: Map<number, ChampionSummary>;
   setChampionArray: (source: 'normal' | 'aram' | 'arena', ids: number[]) => void;
   setRoleChampionArray: (role: AssistRole, ids: number[]) => void;
   setBan: (role: AssistRole | 'arena', ids: number[]) => void;
@@ -69,71 +138,71 @@ export function ChampionsSection({
           ['aram', '大乱斗换人顺序'],
           ['arena', '斗魂竞技场英雄'],
         ] as const).map(([key, label]) => (
-          <div key={key} className="grid grid-cols-[160px_1fr_auto] items-center gap-3 py-2">
+          <div key={key} className="grid grid-cols-[160px_minmax(0,1fr)] items-center gap-3 py-2">
             <span className="text-sm text-app-body">{label}</span>
-            <span className="truncate text-xs text-app-muted">
-              {championSummary(assist.champions[key])}
-            </span>
-            <ActionButton
+            <ChampionSlotPicker
+              label={label}
+              ids={assist.champions[key]}
+              championMap={championMap}
               onClick={() => openPicker(
                 label,
                 assist.champions[key],
                 24,
                 (ids) => setChampionArray(key, ids),
               )}
-            >
-              选择
-            </ActionButton>
+            />
           </div>
         ))}
       </SettingCard>
       <SettingCard title="按位置选用与禁用">
+        <div className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-0.5 text-[11px] font-medium text-app-subtle">
+          <span>位置</span>
+          <span>自动选用英雄</span>
+          <span>自动禁用英雄</span>
+        </div>
         {(Object.keys(roleLabels) as AssistRole[]).map((role) => (
-          <div key={role} className="grid grid-cols-[70px_1fr_auto_1fr_auto] items-center gap-2 py-2">
+          <div key={role} className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
             <span className="text-sm font-medium text-app-body">{roleLabels[role]}</span>
-            <span className="truncate text-xs text-app-muted">
-              {championSummary(assist.champions.byRole[role])}
-            </span>
-            <ActionButton
+            <ChampionSlotPicker
+              label={`${roleLabels[role]}自动选用英雄`}
+              ids={assist.champions.byRole[role]}
+              championMap={championMap}
               onClick={() => openPicker(
                 `${roleLabels[role]}选用`,
                 assist.champions.byRole[role],
                 24,
                 (ids) => setRoleChampionArray(role, ids),
               )}
-            >
-              选用
-            </ActionButton>
-            <span className="truncate text-xs text-app-muted">
-              {championSummary(assist.champions.bans[role] ? [assist.champions.bans[role]] : [])}
-            </span>
-            <ActionButton
+            />
+            <ChampionSlotPicker
+              label={`${roleLabels[role]}自动禁用英雄`}
+              ids={assist.champions.bans[role] ? [assist.champions.bans[role]] : []}
+              maxVisible={1}
+              championMap={championMap}
               onClick={() => openPicker(
                 `${roleLabels[role]}禁用`,
                 assist.champions.bans[role] ? [assist.champions.bans[role]] : [],
                 1,
                 (ids) => setBan(role, ids),
               )}
-            >
-              禁用
-            </ActionButton>
+            />
           </div>
         ))}
-        <div className="grid grid-cols-[70px_1fr_auto] items-center gap-2 py-2">
+        <div className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
           <span className="text-sm font-medium text-app-body">斗魂</span>
-          <span className="truncate text-xs text-app-muted">
-            {championSummary(assist.champions.bans.arena ? [assist.champions.bans.arena] : [])}
-          </span>
-          <ActionButton
+          <span />
+          <ChampionSlotPicker
+            label="斗魂自动禁用英雄"
+            ids={assist.champions.bans.arena ? [assist.champions.bans.arena] : []}
+            maxVisible={1}
+            championMap={championMap}
             onClick={() => openPicker(
               '斗魂禁用',
               assist.champions.bans.arena ? [assist.champions.bans.arena] : [],
               1,
               (ids) => setBan('arena', ids),
             )}
-          >
-            选择禁用英雄
-          </ActionButton>
+          />
         </div>
       </SettingCard>
       <SettingCard title="快速游戏位置">

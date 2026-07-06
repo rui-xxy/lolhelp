@@ -4,16 +4,101 @@ import { motion } from 'framer-motion';
 import type { LiveBattlePlayer } from '../../../shared/api';
 
 const HISTORY_PAGE_SIZE = 8;
+const SHARED_PLAY_COLORS = [
+  '#d946ef',
+  '#0891b2',
+  '#16a34a',
+  '#f97316',
+  '#7c3aed',
+  '#0d9488',
+];
 
 function battleRosterKey(myTeam: LiveBattlePlayer[], enemyTeam: LiveBattlePlayer[]) {
   const playerKey = (player: LiveBattlePlayer) =>
-    `${player.teamId}:${player.puuid || player.riotId}:${player.championId}`;
+    `${player.teamId}:${player.puuid || player.riotId}:${player.championId}:${player.premadeId || ''}`;
 
   return `${myTeam.map(playerKey).join('|')}::${enemyTeam.map(playerKey).join('|')}`;
 }
 
 function loadedCardSet(total: number) {
   return new Set(Array.from({ length: total }, (_, index) => index));
+}
+
+function playerIdentity(player: LiveBattlePlayer) {
+  return player.puuid || player.riotId || `${player.teamId}:${player.summonerId}`;
+}
+
+function currentPartyKey(player: LiveBattlePlayer) {
+  return player.premadeId ? `${player.teamId}:${player.premadeId}` : '';
+}
+
+function buildSharedPlayColors(players: LiveBattlePlayer[]) {
+  const colors = new Map<string, string>();
+  const groupedPlayerIndexes = new Set<number>();
+  let colorIndex = 0;
+
+  const playersByCurrentParty = new Map<string, number[]>();
+  players.forEach((player, index) => {
+    const key = currentPartyKey(player);
+    if (!key) return;
+    playersByCurrentParty.set(key, [...(playersByCurrentParty.get(key) ?? []), index]);
+  });
+
+  playersByCurrentParty.forEach((indexes) => {
+    if (indexes.length < 2) return;
+    const color = SHARED_PLAY_COLORS[colorIndex % SHARED_PLAY_COLORS.length];
+    colorIndex += 1;
+    indexes.forEach((index) => {
+      groupedPlayerIndexes.add(index);
+      colors.set(playerIdentity(players[index]), color);
+    });
+  });
+
+  const parent = players.map((_, index) => index);
+  const find = (index: number): number => {
+    if (parent[index] !== index) parent[index] = find(parent[index]);
+    return parent[index];
+  };
+  const union = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootB] = rootA;
+  };
+
+  const playersByPastTeam = new Map<string, number[]>();
+  players.forEach((player, playerIndex) => {
+    if (groupedPlayerIndexes.has(playerIndex)) return;
+    const seenKeys = new Set<string>();
+    player.history.forEach((history) => {
+      if (!history.gameId || !history.teamId) return;
+      seenKeys.add(`${player.teamId}:${history.gameId}:${history.teamId}`);
+    });
+    seenKeys.forEach((key) => {
+      const indexes = playersByPastTeam.get(key) ?? [];
+      indexes.push(playerIndex);
+      playersByPastTeam.set(key, indexes);
+    });
+  });
+
+  playersByPastTeam.forEach((indexes) => {
+    if (indexes.length < 2) return;
+    indexes.slice(1).forEach((index) => union(indexes[0], index));
+  });
+
+  const groups = new Map<number, number[]>();
+  players.forEach((_, index) => {
+    const root = find(index);
+    groups.set(root, [...(groups.get(root) ?? []), index]);
+  });
+
+  groups.forEach((indexes) => {
+    if (indexes.length < 2) return;
+    const color = SHARED_PLAY_COLORS[colorIndex % SHARED_PLAY_COLORS.length];
+    colorIndex += 1;
+    indexes.forEach((index) => colors.set(playerIdentity(players[index]), color));
+  });
+
+  return colors;
 }
 
 function championIcon(alias: string) {
@@ -39,12 +124,14 @@ function TarotCard({
   isLoaded,
   index,
   historyPage,
+  sharedColor,
 }: {
   player: LiveBattlePlayer;
   isRedTeam?: boolean;
   isLoaded: boolean;
   index: number;
   historyPage: number;
+  sharedColor?: string;
 }) {
   const champIcon = championIcon(player.championAlias);
   const historyOffset = historyPage * HISTORY_PAGE_SIZE;
@@ -83,7 +170,13 @@ function TarotCard({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-bold leading-4 text-app-text">{player.gameName}</div>
+                <div
+                  className="truncate text-[13px] font-bold leading-4 text-app-text"
+                  style={sharedColor ? { color: sharedColor } : undefined}
+                  title={sharedColor ? '组队或近期同队' : undefined}
+                >
+                  {player.gameName}
+                </div>
                 <div className="mt-0.5 flex items-center gap-1">
                   {isRedTeam ? <Sun size={9} className={teamAccent} /> : <Moon size={9} className={teamAccent} />}
                   <span className="text-[9px] font-bold uppercase tracking-wider text-app-muted">
@@ -258,6 +351,7 @@ export function LiveGamePage() {
   }, [clearCardTimers, fetchBattle]);
 
   const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
+  const sharedPlayColors = useMemo(() => buildSharedPlayColors(allPlayers), [allPlayers]);
   const hasBattle = inGame && allPlayers.length > 0;
   const isLoaded = hasBattle && loadedCards.size >= allPlayers.length;
   const maxHistoryCount = useMemo(
@@ -353,6 +447,7 @@ export function LiveGamePage() {
                     isLoaded={loadedCards.has(idx)}
                     index={idx}
                     historyPage={historyPage}
+                    sharedColor={sharedPlayColors.get(playerIdentity(player))}
                   />
                 ))}
               </div>
@@ -370,6 +465,7 @@ export function LiveGamePage() {
                     isLoaded={loadedCards.has(idx + myTeam.length)}
                     index={idx + myTeam.length}
                     historyPage={historyPage}
+                    sharedColor={sharedPlayColors.get(playerIdentity(player))}
                   />
                 ))}
               </div>

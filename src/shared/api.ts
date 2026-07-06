@@ -657,11 +657,14 @@ export interface LiveBattlePlayer {
   championName: string;
   championAlias: string;
   teamId: number;
+  premadeId?: string;
   // 统计摘要（从最近 N 场算）
   kda: number;
   winRate: number;
   matchCount: number;
   history: {
+    gameId?: number;
+    teamId?: number;
     championId: number;
     championName: string;
     championAlias: string;

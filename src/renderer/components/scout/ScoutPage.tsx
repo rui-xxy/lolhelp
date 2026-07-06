@@ -19,11 +19,15 @@ interface ScoutPageProps {
   currentRegionName: string;
 }
 
+const KDA_THRESHOLD_MIN = 10;
+const KDA_THRESHOLD_MAX = 25;
+const KDA_THRESHOLD_STEP = 0.5;
+
 // 默认配置
 const DEFAULT_CONFIG: ScoutConfig = {
   seedId: '',
   championIds: [],
-  kdaThreshold: 5.0,
+  kdaThreshold: KDA_THRESHOLD_MIN,
   hoursWindow: 3,
   targetCount: 10,
   region: '',
@@ -43,6 +47,12 @@ const QUEUE_OPTIONS = [
 
 // 时间窗快捷档（小时）
 const HOUR_OPTIONS = [1, 2, 3, 6, 12, 24];
+
+function clampKdaThreshold(value: number | undefined): number {
+  const numeric = Number(value ?? KDA_THRESHOLD_MIN);
+  if (!Number.isFinite(numeric)) return KDA_THRESHOLD_MIN;
+  return Math.min(KDA_THRESHOLD_MAX, Math.max(KDA_THRESHOLD_MIN, numeric));
+}
 
 function makeScoutRunKey(config: ScoutConfig): string {
   return JSON.stringify({
@@ -121,8 +131,13 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
         setFavoriteIds(s.favoriteChampions ?? []);
         setChampionPresets(s.championPresets ?? []);
         // 回填上次的雷达配置
-        if (s.scoutDefaults) {
-          setConfig((c) => ({ ...c, ...s.scoutDefaults }));
+        const scoutDefaults = s.scoutDefaults;
+        if (scoutDefaults) {
+          setConfig((c) => ({
+            ...c,
+            ...scoutDefaults,
+            kdaThreshold: clampKdaThreshold(scoutDefaults.kdaThreshold),
+          }));
         }
         if (champs.length === 0) {
           setChampionsError('英雄列表为空（datas.json 可能未加载，请重启应用）');
@@ -165,7 +180,13 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
   );
 
   const updateConfig = (patch: Partial<ScoutConfig>) => {
-    setConfig((c) => ({ ...c, ...patch }));
+    setConfig((c) => ({
+      ...c,
+      ...patch,
+      ...(patch.kdaThreshold !== undefined
+        ? { kdaThreshold: clampKdaThreshold(patch.kdaThreshold) }
+        : {}),
+    }));
   };
 
   const getChampionDisplayName = useCallback(
@@ -306,7 +327,7 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
   return (
     <div className="flex h-full">
       {/* ===== 左侧：配置面板 ===== */}
-      <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-app-border bg-app-surface p-4">
+      <aside className="scout-config-panel flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-app-border p-4">
         {/* 标题 */}
         <div className="flex items-center gap-2">
           <Search className="size-4 text-app-primary" />
@@ -323,7 +344,7 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             value={config.region ?? ''}
             onChange={(e) => updateConfig({ region: e.target.value })}
             disabled={running}
-            className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none disabled:opacity-60"
+            className="scout-control"
           >
             {regionOptions.map((region) => (
               <option key={region.key} value={region.key}>
@@ -342,7 +363,7 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             onChange={(e) => updateConfig({ seedId: e.target.value })}
             placeholder="名字#编号"
             disabled={running}
-            className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-3 text-xs text-app-text placeholder:text-app-subtle focus:border-app-primary focus:bg-app-surface focus:outline-none disabled:opacity-60"
+            className="scout-control"
           />
         </div>
 
@@ -353,7 +374,7 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             value={config.tag}
             onChange={(e) => updateConfig({ tag: e.target.value })}
             disabled={running}
-            className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-2 text-xs text-app-text focus:border-app-primary focus:outline-none disabled:opacity-60"
+            className="scout-control"
           >
             {QUEUE_OPTIONS.map((q) => (
               <option key={q.tag} value={q.tag}>
@@ -384,30 +405,35 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             )}
           </div>
 
-          {/* 已选英雄摘要（头像列表） */}
-          {selectedChampions.length > 0 && (
-            <div className="flex flex-wrap gap-1 rounded-xs border border-app-border bg-app-surface-soft p-1.5">
-              {selectedChampions.map((c) => (
-                <GameIcon
-                  key={c.id}
-                  src={c.avatar}
-                  alt={c.title || c.name}
-                  title={c.title || c.name}
-                  size={28}
-                  rounded
-                />
-              ))}
-            </div>
-          )}
-
-          {/* 打开弹窗按钮 */}
+          {/* 已选英雄摘要：整个区域可点击打开选择弹窗 */}
           <button
+            type="button"
             onClick={() => setPickerOpen(true)}
             disabled={running}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-sm border border-app-border bg-app-surface-soft text-xs font-medium text-app-text transition-colors hover:border-app-primary hover:bg-app-surface disabled:opacity-60"
+            className="scout-hero-picker group"
           >
-            <Pencil className="size-3.5" />
-            {config.championIds.length > 0 ? '修改英雄' : '选择英雄'}
+            {selectedChampions.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 pr-7">
+                {selectedChampions.map((c) => (
+                  <GameIcon
+                    key={c.id}
+                    src={c.avatar}
+                    alt={c.title || c.name}
+                    title={c.title || c.name}
+                    size={28}
+                    rounded
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[54px] items-center justify-center gap-2 text-xs font-medium text-app-muted">
+                <Pencil className="size-3.5" />
+                点击选择英雄
+              </div>
+            )}
+            <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-sm border border-app-border bg-white/88 text-app-muted shadow-sm transition-colors group-hover:border-app-primary group-hover:text-app-primary">
+              <Pencil className="size-3.5" />
+            </span>
           </button>
           {/* 加载/错误状态提示 */}
           {championsLoading && (
@@ -428,14 +454,20 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
           </div>
           <input
             type="range"
-            min={1}
-            max={10}
-            step={0.5}
+            min={KDA_THRESHOLD_MIN}
+            max={KDA_THRESHOLD_MAX}
+            step={KDA_THRESHOLD_STEP}
             value={config.kdaThreshold}
             onChange={(e) => updateConfig({ kdaThreshold: Number(e.target.value) })}
             disabled={running}
-            className="w-full accent-app-primary disabled:opacity-60"
+            className="scout-range"
           />
+          <div className="flex justify-between font-mono text-[10px] text-app-subtle">
+            <span>{KDA_THRESHOLD_MIN}</span>
+            <span>15</span>
+            <span>20</span>
+            <span>{KDA_THRESHOLD_MAX}+</span>
+          </div>
         </div>
 
         {/* 时间窗 */}
@@ -469,7 +501,7 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             value={config.targetCount}
             onChange={(e) => updateConfig({ targetCount: Math.max(1, Number(e.target.value) || 1) })}
             disabled={running}
-            className="h-8 rounded-sm border border-app-border bg-app-surface-soft px-3 text-xs text-app-text focus:border-app-primary focus:outline-none disabled:opacity-60"
+            className="scout-control"
           />
         </div>
 

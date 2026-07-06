@@ -100,10 +100,14 @@ function calcPlayerStats(
 
     const championId = Number(me.championId ?? 0);
     const hero = getHeroByKey(championId);
+    const gameId = Number(match.gameId ?? 0);
+    const teamId = Number(me.teamId ?? 0);
     const queueId = Number(match.queueId ?? 0);
     const creation = Number(match.gameCreation ?? 0);
 
     history.push({
+      gameId,
+      teamId,
       championId,
       championName: hero?.name ?? `英雄${championId}`,
       championAlias: hero?.alias ?? '',
@@ -183,6 +187,14 @@ interface PlayerSkeleton {
   summonerId: number;
   championId: number;
   teamId: number;
+  premadeId?: string;
+}
+
+function currentPartyId(player: Record<string, unknown>): string | undefined {
+  const raw = player.teamParticipantId ?? player.premadeId ?? player.partyId;
+  if (raw === undefined || raw === null) return undefined;
+  const value = String(raw).trim();
+  return value && value !== '0' ? value : undefined;
 }
 
 function parseTeamFromGameflow(
@@ -199,6 +211,7 @@ function parseTeamFromGameflow(
       summonerId: Number(p.summonerId ?? 0),
       championId: Number(p.championId ?? 0),
       teamId,
+      premadeId: currentPartyId(p),
     }));
 
   const t1 = toSkeleton(teamOne, 100);
@@ -227,6 +240,7 @@ function parseTeamFromChampSelect(
         summonerId: Number(p.summonerId ?? 0),
         championId: Number(p.championId ?? 0),
         teamId,
+        premadeId: currentPartyId(p),
       }));
 
   return {
@@ -300,6 +314,7 @@ async function enrichPlayers(
         championName,
         championAlias,
         teamId: s.teamId,
+        premadeId: s.premadeId,
         kda,
         winRate,
         matchCount: history.length,
