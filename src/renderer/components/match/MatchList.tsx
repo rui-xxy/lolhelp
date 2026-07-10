@@ -1,6 +1,4 @@
-import type { CSSProperties } from 'react';
 import type { PlayerMatchDetail } from '../../../shared/api';
-import { buildChampionSplashFromAvatar } from '../../../shared/gameAssets';
 import { ProfileIcon } from '../ProfileIcon';
 import { GameIcon } from './GameIcon';
 
@@ -61,23 +59,13 @@ export function MatchList({
   }
 
   return (
-    <div className="flex h-full flex-col gap-1.5 overflow-hidden">
+    <div className="flex h-full flex-col gap-0.5 overflow-hidden">
       {matches.map((match) => {
         const isSelected = match.gameId === selectedGameId;
         const isChecked = selectedIds?.has(match.gameId) ?? false;
         const playedAt = formatPlayedAt(match.gameCreation);
         const resultClass = match.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
-        const fallbackSkinBackground = buildChampionSplashFromAvatar(
-          match.championAvatar,
-          match.championId,
-          null,
-          1,
-        );
-        const skinBackground =
-          !match.championSplashUrl || /_0\.jpg$/i.test(match.championSplashUrl)
-            ? fallbackSkinBackground
-            : match.championSplashUrl;
         const myTeam = match.participants.find((participant) => participant.puuid === targetPuuid)?.teamId;
         const matesInThisGame = match.participants
           .filter((participant) => participant.teamId === myTeam)
@@ -98,15 +86,10 @@ export function MatchList({
             }}
             aria-pressed={selectionMode ? isChecked : isSelected}
             className={`match-result-card ${resultClass} ${selectedClass} ${
-              skinBackground ? 'match-result-card--has-skin' : ''
-            } ${selectionMode ? 'match-result-card--selecting' : ''} ${
+              selectionMode ? 'match-result-card--selecting' : ''
+            } ${
               isChecked ? 'match-result-card--checked' : ''
             }`}
-            style={
-              skinBackground
-                ? ({ '--match-skin-bg': `url("${skinBackground}")` } as CSSProperties)
-                : undefined
-            }
           >
             {selectionMode && (
               <span className="match-result-check" aria-hidden="true">
@@ -118,7 +101,7 @@ export function MatchList({
               src={match.championAvatar}
               alt={match.championName}
               title={match.championName}
-              size={32}
+              size={30}
               rounded
               className={`match-result-avatar ${
                 match.win ? 'match-result-avatar--win' : 'match-result-avatar--loss'
@@ -126,10 +109,10 @@ export function MatchList({
             />
 
             <div className="relative z-10 flex min-w-0 flex-1 items-center gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="match-result-mode">{match.queueName}</span>
-                  <span className="match-result-badge">{match.win ? 'WIN' : 'LOSE'}</span>
+                  <span className="match-result-badge">{match.win ? '胜利' : '失败'}</span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums">
                   <span className="text-app-muted">
@@ -139,7 +122,7 @@ export function MatchList({
               </div>
 
               {matesInThisGame.length > 0 && (
-                <div className="group/mates mx-auto flex shrink-0 items-center">
+                <div className="group/mates ml-1 flex shrink-0 items-center">
                   {matesInThisGame.map((mate, index) => {
                     const info = recurringMates.get(mate.puuid);
                     if (!info) return null;
@@ -150,15 +133,15 @@ export function MatchList({
                         src={info.profileIconUrl}
                         alt={info.riotId}
                         title={`${info.riotId}（一起 ${info.count} 场）`}
-                        size={32}
+                        size={24}
                         onClick={(event) => {
                           event.stopPropagation();
                           if (!selectionMode) {
                             onMateClick(info.riotId);
                           }
                         }}
-                        className="size-8 cursor-pointer rounded-full border-2 border-app-bg object-cover transition-all hover:z-10 hover:scale-110 group-hover/mates:[&:not(:first-child)]:ml-0"
-                        style={{ marginLeft: index === 0 ? 0 : -16, zIndex: index }}
+                        className="size-6 cursor-pointer rounded-full border border-app-surface object-cover transition-transform hover:z-10 hover:scale-105"
+                        style={{ marginLeft: index === 0 ? 0 : -8, zIndex: index }}
                       />
                     );
                   })}

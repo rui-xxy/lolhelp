@@ -3526,3 +3526,260 @@
     font-size: 12px;
   }
 }
+
+/* Match detail is an edge-to-edge work surface. Every scoreboard column must
+   shrink inside the available width instead of creating a nested scroll area. */
+@layer components {
+  .lol-postgame,
+  .lol-postgame-content,
+  .lol-rift-scoreboard,
+  .lol-scoreboard,
+  .lol-rift-team,
+  .lol-rift-team-rows,
+  .lol-score-team {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .lol-postgame {
+    overflow: hidden;
+  }
+
+  .lol-postgame-tabs {
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+
+  .lol-postgame-content,
+  .lol-postgame-content:has(.lol-rift-scoreboard),
+  .lol-postgame-content:has(.lol-scoreboard) {
+    overflow: visible;
+    padding: 6px 10px 8px;
+  }
+
+  .lol-rift-grid,
+  .lol-rift-row {
+    width: 100%;
+    grid-template-columns:
+      minmax(250px, 1.72fr)
+      minmax(150px, 0.92fr)
+      minmax(66px, 0.4fr)
+      minmax(48px, 0.3fr);
+    gap: 7px;
+  }
+
+  .lol-rift-player-cell {
+    grid-template-columns: 86px minmax(0, 1fr) minmax(68px, 82px);
+    gap: 6px;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 38px 18px 18px;
+    gap: 4px;
+  }
+
+  .lol-rift-champion {
+    width: 38px;
+    height: 38px;
+  }
+
+  .lol-rift-player-name {
+    max-width: 100%;
+  }
+
+  .lol-rift-items {
+    grid-template-columns: repeat(7, minmax(0, 22px));
+    gap: 2px;
+  }
+
+  .lol-rift-items img,
+  .lol-rift-items .lol-score-item-empty {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .lol-score-grid {
+    width: 100%;
+    grid-template-columns:
+      minmax(150px, 1.24fr)
+      minmax(96px, 0.68fr)
+      minmax(150px, 1fr)
+      minmax(66px, 0.42fr)
+      minmax(48px, 0.3fr);
+    gap: 7px;
+  }
+
+  .lol-score-runes {
+    gap: 3px;
+  }
+
+  .lol-score-enhancement {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-score-enhancement-glyph {
+    width: 20px;
+    height: 20px;
+  }
+
+  .lol-score-items {
+    grid-template-columns: repeat(7, minmax(0, 22px));
+    gap: 2px;
+  }
+
+  .lol-score-items img,
+  .lol-score-items .lol-score-item-empty {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+/* Quiet, scan-friendly match history list. Champion art stays in the avatar;
+   result and selection are conveyed without framing every row as a card. */
+@layer components {
+  .match-result-card {
+    min-height: 42px;
+    max-height: 48px;
+    flex: 1 1 44px;
+    gap: 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0 8px 0 10px;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .match-result-card::before {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 2px;
+    z-index: 2;
+    width: 2px;
+    height: 18px;
+    border-radius: 999px;
+    background-image: none;
+    background-color: transparent;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 150ms ease;
+  }
+
+  .match-result-card::after,
+  .match-result-card--win::after,
+  .match-result-card--loss::after {
+    border-radius: var(--radius-sm);
+    background: var(--color-app-nav-hover);
+    opacity: 0;
+  }
+
+  .match-result-card:hover,
+  .match-result-card--selected,
+  .match-result-card--win.match-result-card--selected,
+  .match-result-card--loss.match-result-card--selected {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .match-result-card:hover::after {
+    opacity: 0.7;
+  }
+
+  .match-result-card--selected::after {
+    opacity: 1;
+  }
+
+  .match-result-card--selected::before,
+  .match-result-card--checked::before {
+    opacity: 1;
+  }
+
+  .match-result-card--win.match-result-card--selected::before {
+    background: var(--color-app-success);
+  }
+
+  .match-result-card--loss.match-result-card--selected::before {
+    background: var(--color-app-danger);
+  }
+
+  .match-result-card--checked,
+  .match-result-card--checked:hover {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .match-result-card--checked::before {
+    background: var(--color-app-primary);
+  }
+
+  .match-result-card--checked::after {
+    background: var(--color-app-primary-soft);
+    opacity: 1;
+  }
+
+  .match-result-avatar,
+  .match-result-avatar--win,
+  .match-result-avatar--loss {
+    border: 1px solid var(--color-app-border-strong);
+    box-shadow: none;
+  }
+
+  .match-result-mode {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .match-result-badge {
+    height: auto;
+    border: 0 !important;
+    border-radius: 0;
+    padding: 0;
+    background: transparent !important;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    transform: none;
+  }
+
+  .match-result-card--win .match-result-badge {
+    color: var(--color-app-success);
+  }
+
+  .match-result-card--loss .match-result-badge {
+    color: var(--color-app-danger);
+  }
+
+  .match-result-time {
+    min-width: 40px;
+  }
+
+  .match-result-time-value {
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .lol-rift-player-name,
+  .lol-score-player-name {
+    cursor: pointer;
+    transition:
+      color 140ms ease,
+      text-decoration-color 140ms ease;
+  }
+
+  .lol-rift-row .lol-rift-player-name:hover,
+  .lol-rift-row .lol-rift-player-name:focus-visible,
+  .lol-score-row .lol-score-player-name:hover,
+  .lol-score-row .lol-score-player-name:focus-visible {
+    color: var(--color-app-primary);
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 56, 92, 0.38);
+    text-underline-offset: 2px;
+    text-shadow: none;
+    outline: none;
+  }
+}
