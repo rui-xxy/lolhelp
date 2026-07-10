@@ -63,6 +63,8 @@ export const IPC_CHANNELS = {
   SCOUT_CANCEL: 'scout:cancel',
   // match 域：英雄列表（给选择器用）
   MATCH_GET_CHAMPIONS: 'match:get-champions',
+  // ranking 域：第三方英雄排行数据统一由主进程请求和整理。
+  RANKING_GET_CHAMPIONS: 'ranking:get-champions',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

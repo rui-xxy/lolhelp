@@ -2,6 +2,7 @@ import { getCachedCredentials } from '../lcu/lockfile';
 import { LcuClient } from '../lcu/client';
 import { getHeroByKey } from '../lcu/heroData';
 import { getQueueName } from '../match/queueNames';
+import { fetchPlayerRankByPuuid } from '../match/matchService';
 import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
 
 // 实时对局服务：检测你是否在游戏中，拿 10 人骨架 + 并行战绩。
@@ -20,6 +21,7 @@ const LIVE_BATTLE_CACHE_TTL_MS = 15_000;
 const LIVE_BATTLE_EMPTY_CACHE_TTL_MS = 2_000;
 const PLAYER_STATS_CACHE_TTL_MS = 120_000;
 const PLAYER_STATS_QUICK_TIMEOUT_MS = 4_500;
+const PLAYER_RANK_QUICK_TIMEOUT_MS = 3_200;
 let liveBattleCache: { expiresAt: number; value: LiveBattleInfo } | null = null;
 let liveBattleInFlight: Promise<LiveBattleInfo> | null = null;
 let liveBattleCacheVersion = 0;
@@ -188,6 +190,7 @@ interface PlayerSkeleton {
   championId: number;
   teamId: number;
   premadeId?: string;
+  position?: string;
 }
 
 function currentPartyId(player: Record<string, unknown>): string | undefined {
@@ -195,6 +198,12 @@ function currentPartyId(player: Record<string, unknown>): string | undefined {
   if (raw === undefined || raw === null) return undefined;
   const value = String(raw).trim();
   return value && value !== '0' ? value : undefined;
+}
+
+function currentPosition(player: Record<string, unknown>): string | undefined {
+  const raw = player.assignedPosition ?? player.selectedPosition ?? player.position ?? player.lane;
+  const value = String(raw ?? '').trim();
+  return value || undefined;
 }
 
 function parseTeamFromGameflow(
@@ -212,6 +221,7 @@ function parseTeamFromGameflow(
       championId: Number(p.championId ?? 0),
       teamId,
       premadeId: currentPartyId(p),
+      position: currentPosition(p),
     }));
 
   const t1 = toSkeleton(teamOne, 100);
@@ -241,6 +251,7 @@ function parseTeamFromChampSelect(
         championId: Number(p.championId ?? 0),
         teamId,
         premadeId: currentPartyId(p),
+        position: currentPosition(p),
       }));
 
   return {
@@ -260,6 +271,7 @@ async function enrichPlayers(
       // 默认值
       let gameName = `玩家${s.summonerId || '?'}`;
       let championName = `英雄${s.championId}`;
+      let summonerLevel = 0;
 
       // 召唤师名（通过 summonerId）
       if (s.summonerId > 0) {
@@ -268,6 +280,7 @@ async function enrichPlayers(
             `/lol-summoner/v1/summoners/${s.summonerId}`,
           );
           gameName = (sum.gameName as string) || (sum.name as string) || gameName;
+          summonerLevel = Number(sum.summonerLevel ?? 0);
           if (!s.puuid) s.puuid = (sum.puuid as string) ?? s.puuid;
         } catch {
           // 回退：通过 puuid 查
@@ -277,6 +290,7 @@ async function enrichPlayers(
                 `/lol-summoner/v2/summoners/puuid/${s.puuid}`,
               );
               gameName = (sum.gameName as string) || gameName;
+              summonerLevel = Number(sum.summonerLevel ?? 0);
             } catch {
               // 放弃
             }
@@ -293,16 +307,27 @@ async function enrichPlayers(
       let kda = 0;
       let winRate = 0;
       let history: LiveBattlePlayer['history'] = [];
+      let rank: LiveBattlePlayer['rank'] = null;
       if (s.puuid) {
         const cachedStats = getCachedPlayerStats(s.puuid);
-        const stats = cachedStats ?? (await withTimeout(
-          getPlayerStats(client, s.puuid),
-          PLAYER_STATS_QUICK_TIMEOUT_MS,
-          EMPTY_PLAYER_STATS,
-        ));
+        const [stats, fetchedRank] = await Promise.all([
+          cachedStats
+            ? Promise.resolve(cachedStats)
+            : withTimeout(
+              getPlayerStats(client, s.puuid),
+              PLAYER_STATS_QUICK_TIMEOUT_MS,
+              EMPTY_PLAYER_STATS,
+            ),
+          withTimeout(
+            fetchPlayerRankByPuuid(s.puuid),
+            PLAYER_RANK_QUICK_TIMEOUT_MS,
+            null,
+          ),
+        ]);
         kda = stats.kda;
         winRate = stats.winRate;
         history = stats.history;
+        rank = fetchedRank;
       }
 
       return {
@@ -315,6 +340,9 @@ async function enrichPlayers(
         championAlias,
         teamId: s.teamId,
         premadeId: s.premadeId,
+        summonerLevel,
+        position: s.position,
+        rank,
         kda,
         winRate,
         matchCount: history.length,

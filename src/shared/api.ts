@@ -641,6 +641,7 @@ export interface LolHelper {
   scout: ScoutApi;
   config: LolConfigApi;
   assist: AssistApi;
+  ranking: RankingApi;
 }
 
 // ============================================================================
@@ -658,6 +659,9 @@ export interface LiveBattlePlayer {
   championAlias: string;
   teamId: number;
   premadeId?: string;
+  summonerLevel?: number;
+  position?: string;
+  rank?: PlayerRankSummary | null;
   // 统计摘要（从最近 N 场算）
   kda: number;
   winRate: number;
@@ -973,6 +977,58 @@ export interface MatchApi {
   deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchAccount[]>;
   // 返回英雄列表（给前端英雄选择器用）
   getChampions: () => Promise<ChampionSummary[]>;
+}
+
+// ============================================================================
+// 英雄排行
+// ============================================================================
+
+export type ChampionRankingMode = 'ranked' | 'aram' | 'arena' | 'hextech';
+export type ChampionRankingRegion = 'global' | 'na' | 'kr' | 'jp' | 'tw';
+export type ChampionRankingPosition = 'ALL' | 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
+
+export interface ChampionRankingRequest {
+  mode: ChampionRankingMode;
+  region?: ChampionRankingRegion;
+  tier?: string;
+  position?: ChampionRankingPosition;
+  refresh?: boolean;
+}
+
+export interface ChampionCounterSummary {
+  champion: ChampionSummary;
+  games: number;
+  winRate: number;
+}
+
+export interface ChampionRankingEntry {
+  champion: ChampionSummary;
+  rank: number;
+  previousRank: number | null;
+  tier: number;
+  winRate: number;
+  pickRate: number;
+  banRate: number | null;
+  kda: number | null;
+  games: number;
+  firstPlaceRate: number | null;
+  counters: ChampionCounterSummary[];
+}
+
+export interface ChampionRankingResult {
+  entries: ChampionRankingEntry[];
+  meta: {
+    mode: ChampionRankingMode;
+    version: string;
+    analyzedAt: string;
+    matchCount: number | null;
+    source: string;
+  };
+  error?: string;
+}
+
+export interface RankingApi {
+  getChampions: (request: ChampionRankingRequest) => Promise<ChampionRankingResult>;
 }
 
 // ============================================================================

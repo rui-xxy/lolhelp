@@ -12,6 +12,7 @@ import {
 } from './components/match/savedMatchesStore';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
+import { ChampionRankingPage } from './components/ranking/ChampionRankingPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { AssistPage } from './components/assist/AssistPage';
@@ -24,6 +25,7 @@ const PAGE_TITLES: Record<View, string> = {
   matches: '', // 战绩页标题栏放搜索框，标题留空
   live: '',
   scout: '高手雷达',
+  ranking: '英雄排行',
   assist: '辅助功能',
 };
 
@@ -265,7 +267,7 @@ export function App() {
       title={activeView === 'live' ? livePageTitle : PAGE_TITLES[activeView]}
       activeView={activeView}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
+      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'ranking' || activeView === 'assist'}
       headerExtra={matchSearchBar}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
@@ -337,6 +339,9 @@ export function App() {
           configPanelMinimized={scoutPanelActuallyMinimized}
           onConfigPanelMinimize={() => setScoutPanelMinimized(true)}
         />
+      </div>
+      <div className={activeView === 'ranking' ? 'h-full' : 'hidden'}>
+        <ChampionRankingPage />
       </div>
       <div className={activeView === 'assist' ? 'h-full' : 'hidden'}>
         <AssistPage

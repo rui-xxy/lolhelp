@@ -5,6 +5,7 @@ import type {
   AssistClaimRewardRequest,
   AssistDisenchantRequest,
   AssistRecommendationRequest,
+  ChampionRankingRequest,
   LolConfigApplyProfileRequest,
   LolConfigApplyValuesRequest,
   LolConfigSaveProfileRequest,
@@ -70,6 +71,10 @@ const lolHelper: LolHelper = {
     deleteSavedMatch: (accountId: string, gameId: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_MATCH, accountId, gameId),
     getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
+  },
+  ranking: {
+    getChampions: (request: ChampionRankingRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_CHAMPIONS, request),
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),

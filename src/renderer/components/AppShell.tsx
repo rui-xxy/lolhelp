@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
+  ChartNoAxesColumnIncreasing,
   Crosshair,
   BookmarkCheck,
   Home,
@@ -18,13 +19,14 @@ import { ProfileIcon } from './ProfileIcon';
 import { GameIcon } from './match/GameIcon';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
-export type View = 'home' | 'matches' | 'live' | 'scout' | 'assist';
+export type View = 'home' | 'matches' | 'live' | 'scout' | 'ranking' | 'assist';
 
 const NAV_ITEMS = [
   { view: 'home', label: '主页', icon: Home },
   { view: 'matches', label: '战绩', icon: Swords },
   { view: 'live', label: '实时对局', icon: Radar },
   { view: 'scout', label: '高手雷达', icon: Crosshair },
+  { view: 'ranking', label: '英雄排行', icon: ChartNoAxesColumnIncreasing },
   { view: 'assist', label: '辅助功能', icon: Sparkles },
 ] as const;
 

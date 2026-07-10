@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CircleDashed, RefreshCw } from 'lucide-react';
+import { CircleDashed, DatabaseZap, RefreshCw, UsersRound } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { LiveBattlePlayer } from '../../../shared/api';
+import { LIVE_PREVIEW_ENEMY_TEAM, LIVE_PREVIEW_MY_TEAM } from './livePreviewData';
 
 const HISTORY_PAGE_SIZE = 8;
 const SHARED_PLAY_COLORS = [
@@ -118,6 +119,58 @@ function phaseLabel(phase: string) {
   return map[phase] ?? phase;
 }
 
+const POSITION_NAMES: Record<string, string> = {
+  top: '上单',
+  jungle: '打野',
+  middle: '中路',
+  mid: '中路',
+  bottom: '下路',
+  bot: '下路',
+  adc: '下路',
+  utility: '辅助',
+  support: '辅助',
+};
+
+function positionLabel(position?: string) {
+  return POSITION_NAMES[String(position ?? '').toLowerCase()] ?? '';
+}
+
+function rankLabel(player: LiveBattlePlayer) {
+  if (!player.rank) return '未定级';
+
+  const tierNames: Record<string, string> = {
+    IRON: '铁',
+    BRONZE: '铜',
+    SILVER: '银',
+    GOLD: '金',
+    PLATINUM: '铂',
+    EMERALD: '翡',
+    DIAMOND: '钻',
+    MASTER: '大师',
+    GRANDMASTER: '宗师',
+    CHALLENGER: '王者',
+  };
+  const tier = tierNames[player.rank.tier.toUpperCase()] ?? player.rank.tier;
+  return `${tier}${player.rank.division ? ` ${player.rank.division}` : ''}`;
+}
+
+function summarizeTeam(players: LiveBattlePlayer[]) {
+  const playersWithMatches = players.filter((player) => player.matchCount > 0);
+  const averageWinRate = playersWithMatches.length > 0
+    ? Math.round(playersWithMatches.reduce((total, player) => total + player.winRate, 0) / playersWithMatches.length)
+    : 0;
+  const partyCounts = new Map<string, number>();
+  players.forEach((player) => {
+    const key = currentPartyKey(player);
+    if (key) partyCounts.set(key, (partyCounts.get(key) ?? 0) + 1);
+  });
+  const groupedPlayers = Array.from(partyCounts.values())
+    .filter((count) => count > 1)
+    .reduce((total, count) => total + count, 0);
+
+  return { averageWinRate, groupedPlayers };
+}
+
 function TarotCard({
   player,
   isLoaded,
@@ -132,9 +185,19 @@ function TarotCard({
   const champIcon = championIcon(player.championAlias);
   const visibleHistory = player.history.slice(0, HISTORY_PAGE_SIZE);
   const recentWins = visibleHistory.filter((history) => history.win).length;
+  const recentLosses = visibleHistory.length - recentWins;
+  const currentPosition = positionLabel(player.position);
+  const currentRank = rankLabel(player);
+  const tierClass = player.rank?.tier?.toLowerCase() ?? 'unranked';
+  const partyStyle = sharedColor
+    ? ({ '--live-party-color': sharedColor } as React.CSSProperties)
+    : undefined;
 
   return (
-    <div className="live-tarot-card group relative min-w-0">
+    <div
+      className={`live-tarot-card group relative min-w-0 ${sharedColor ? 'live-tarot-card--linked' : ''}`}
+      style={partyStyle}
+    >
       <motion.div
         className="relative h-full w-full"
         initial={{ opacity: 0 }}
@@ -142,9 +205,9 @@ function TarotCard({
         transition={{ duration: 0.18, delay: index * 0.01, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="relative flex h-full w-full flex-col overflow-hidden bg-app-surface">
-          <div className="relative border-b border-app-border px-2.5 py-2.5">
-            <div className="flex items-center gap-2.5">
-              <div className="relative size-9 shrink-0 overflow-hidden rounded-full bg-app-surface-soft ring-1 ring-app-border">
+          <div className="live-player-profile">
+            <div className="live-player-identity">
+              <div className="live-player-avatar">
                 {champIcon && (
                   <img
                     src={champIcon}
@@ -154,22 +217,46 @@ function TarotCard({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div
-                  className="truncate text-[13px] font-semibold leading-4 text-app-text"
-                  style={sharedColor ? { color: sharedColor } : undefined}
-                  title={sharedColor ? '组队或近期同队' : undefined}
-                >
-                  {player.gameName}
+                <div className="live-player-name-line">
+                  <strong
+                    style={sharedColor ? { color: sharedColor } : undefined}
+                    title={sharedColor ? '组队或近期同队' : player.gameName}
+                  >
+                    {player.gameName}
+                  </strong>
+                  {sharedColor && (
+                    <span className="live-player-party" title="组队或近期同队">
+                      <UsersRound className="size-2.5" />
+                    </span>
+                  )}
                 </div>
-                <div className="mt-0.5 truncate text-[10px] text-app-subtle">
+                <div className="live-player-champion-name" title={player.championName}>
                   {player.championName}
-                  {visibleHistory.length > 0 && ` · 近${visibleHistory.length}局 ${recentWins}胜`}
                 </div>
               </div>
             </div>
+            <div className="live-player-tags">
+              <span className="live-player-tag live-player-tag--position">
+                {currentPosition || '未分路'}
+              </span>
+              <span
+                className={`live-player-tag live-player-tag--rank live-player-rank--${tierClass}`}
+                title={player.rank?.displayText}
+              >
+                {currentRank}
+              </span>
+              <span className={`live-player-tag ${player.winRate >= 50 ? 'live-player-tag--win' : 'live-player-tag--loss'}`}>
+                胜率 {player.matchCount > 0 ? `${player.winRate}%` : '—'}
+              </span>
+            </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col px-2 py-1.5">
+          <div className="live-history-caption">
+            <span>近期战绩</span>
+            <span><b>{recentWins}</b> 胜 <i>{recentLosses}</i> 负</span>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col px-1.5 pb-1.5">
             <div
               className="live-history-list min-h-0 flex-1"
               style={{
@@ -181,7 +268,7 @@ function TarotCard({
                 visibleHistory.map((history, historyIndex) => (
                   <div
                     key={`${history.championAlias}-${historyIndex}-${history.kills}-${history.deaths}-${history.assists}`}
-                    className="grid min-h-0 grid-cols-[4px_20px_24px_minmax(58px,1fr)_32px] items-center gap-1 px-1 py-0.5 odd:bg-app-bg-soft/65"
+                    className="live-history-row"
                   >
                     <span
                       className={`size-1 rounded-full ${history.win ? 'bg-app-success/65' : 'bg-app-danger/55'}`}
@@ -197,15 +284,15 @@ function TarotCard({
                         }}
                       />
                     </div>
-                    <span className="truncate text-[10px] font-medium text-app-muted">{history.queueName.slice(0, 2)}</span>
+                    <span className="live-history-mode">{history.queueName.slice(0, 2)}</span>
                     <span
-                      className={`whitespace-nowrap text-center font-mono text-[11px] font-semibold tracking-tight ${
+                      className={`live-history-kda ${
                         history.win ? 'text-app-success' : 'text-app-danger'
                       }`}
                     >
                       {history.kills}/{history.deaths}/{history.assists}
                     </span>
-                    <span className="whitespace-nowrap text-right font-mono text-[10px] font-medium text-app-muted">
+                    <span className="live-history-time">
                       {history.timeStr}
                     </span>
                   </div>
@@ -234,11 +321,13 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
   const [inGame, setInGame] = useState(false);
   const [phase, setPhase] = useState('');
   const [error, setError] = useState('');
+  const [previewMode, setPreviewMode] = useState(false);
   const [loadedCards, setLoadedCards] = useState<Set<number>>(new Set());
   const cardTimerIds = useRef<number[]>([]);
   const fetchSeqRef = useRef(0);
   const battleRosterKeyRef = useRef('');
   const loadedCardCountRef = useRef(0);
+  const previewModeRef = useRef(false);
 
   const clearCardTimers = useCallback(() => {
     cardTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -313,6 +402,7 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
 
   useEffect(() => {
     return window.lolHelper.live.onStateChanged((event) => {
+      if (previewModeRef.current) return;
       setPhase(event.phase);
       if (!event.inGame) {
         clearCardTimers();
@@ -327,10 +417,41 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
     });
   }, [clearCardTimers, fetchBattle]);
 
+  const loadRealBattle = useCallback(() => {
+    previewModeRef.current = false;
+    setPreviewMode(false);
+    void fetchBattle();
+  }, [fetchBattle]);
+
+  const togglePreviewMode = useCallback(() => {
+    if (previewModeRef.current) {
+      loadRealBattle();
+      return;
+    }
+
+    fetchSeqRef.current += 1;
+    clearCardTimers();
+    previewModeRef.current = true;
+    setPreviewMode(true);
+    setLoading(false);
+    setError('');
+    setPhase('InProgress');
+    setInGame(true);
+    setMyTeam(LIVE_PREVIEW_MY_TEAM);
+    setEnemyTeam(LIVE_PREVIEW_ENEMY_TEAM);
+    battleRosterKeyRef.current = battleRosterKey(LIVE_PREVIEW_MY_TEAM, LIVE_PREVIEW_ENEMY_TEAM);
+    loadedCardCountRef.current = 10;
+    setLoadedCards(loadedCardSet(10));
+  }, [clearCardTimers, loadRealBattle]);
+
   const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
   const sharedPlayColors = useMemo(() => buildSharedPlayColors(allPlayers), [allPlayers]);
+  const myTeamSummary = useMemo(() => summarizeTeam(myTeam), [myTeam]);
+  const enemyTeamSummary = useMemo(() => summarizeTeam(enemyTeam), [enemyTeam]);
   const hasBattle = inGame && allPlayers.length > 0;
-  const statusText = loading ? '读取中' : hasBattle ? phaseLabel(phase) : error ? '读取失败' : '未进入对局';
+  const statusText = previewMode
+    ? '演示对局'
+    : loading ? '读取中' : hasBattle ? phaseLabel(phase) : error ? '读取失败' : '未进入对局';
 
   useEffect(() => {
     onTitleChange?.(statusText);
@@ -338,15 +459,30 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-app-bg text-app-text">
-      <button
-        type="button"
-        onClick={fetchBattle}
-        disabled={loading}
-        title="刷新实时对局"
-        className="absolute top-2 right-3 z-20 grid size-7 place-items-center rounded-sm text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-      </button>
+      <div className="absolute top-2 right-3 z-20 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={togglePreviewMode}
+          className={`flex h-7 items-center gap-1.5 rounded-sm px-2 text-[10px] font-semibold transition-colors ${
+            previewMode
+              ? 'bg-app-primary-soft text-app-primary'
+              : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+          }`}
+          title={previewMode ? '返回真实实时对局' : '载入十人测试数据'}
+        >
+          <DatabaseZap className="size-3.5" />
+          {previewMode ? '返回实时' : '测试数据'}
+        </button>
+        <button
+          type="button"
+          onClick={loadRealBattle}
+          disabled={loading && !previewMode}
+          title="刷新实时对局"
+          className="grid size-7 place-items-center rounded-sm text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={13} className={loading && !previewMode ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
@@ -363,8 +499,11 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
             <div className="live-card-board">
               <section className="live-team-section">
                 <div className="live-team-heading live-team-heading--mine">
-                  <span>我方</span>
-                  <span>{myTeam.length} 人</span>
+                  <span className="live-team-name">我方 <small>{myTeam.length}人</small></span>
+                  <span className="live-team-summary">
+                    <span>均胜率 <b>{myTeamSummary.averageWinRate || '—'}{myTeamSummary.averageWinRate ? '%' : ''}</b></span>
+                    <span>组队 <b>{myTeamSummary.groupedPlayers || '—'}</b></span>
+                  </span>
                 </div>
                 <div className="live-team-grid">
                   {myTeam.map((player, idx) => (
@@ -380,8 +519,11 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
               </section>
               <section className="live-team-section">
                 <div className="live-team-heading live-team-heading--enemy">
-                  <span>对方</span>
-                  <span>{enemyTeam.length} 人</span>
+                  <span className="live-team-name">对方 <small>{enemyTeam.length}人</small></span>
+                  <span className="live-team-summary">
+                    <span>均胜率 <b>{enemyTeamSummary.averageWinRate || '—'}{enemyTeamSummary.averageWinRate ? '%' : ''}</b></span>
+                    <span>组队 <b>{enemyTeamSummary.groupedPlayers || '—'}</b></span>
+                  </span>
                 </div>
                 <div className="live-team-grid">
                   {enemyTeam.map((player, idx) => (
