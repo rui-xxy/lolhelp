@@ -22,7 +22,7 @@ import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
-  live: '实时对局',
+  live: '',
   scout: '高手雷达',
   assist: '辅助功能',
 };
@@ -55,6 +55,7 @@ export function App() {
   const [matchSearchName, setMatchSearchName] = useState('');
   const [matchRegion, setMatchRegion] = useState('');
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
+  const [livePageTitle, setLivePageTitle] = useState('未进入对局');
   const [currentRegionKey, setCurrentRegionKey] = useState('');
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
   const [friendPanelHidden, setFriendPanelHidden] = useState(false);
@@ -261,7 +262,7 @@ export function App() {
 
   return (
     <AppShell
-      title={PAGE_TITLES[activeView]}
+      title={activeView === 'live' ? livePageTitle : PAGE_TITLES[activeView]}
       activeView={activeView}
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
@@ -326,7 +327,7 @@ export function App() {
         />
       </div>
       <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
-        <LiveGamePage />
+        <LiveGamePage onTitleChange={setLivePageTitle} />
       </div>
       <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
         <ScoutPage

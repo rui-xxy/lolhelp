@@ -276,9 +276,11 @@ export function AppShell({
             aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
             className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
           >
-            <span className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-app-text text-white transition-colors group-hover:bg-app-selected group-hover:text-app-text">
-              <Sparkles className="absolute size-3.5 transition-opacity group-hover:opacity-0" />
-              <PanelLeft className="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-border-strong bg-white shadow-[var(--shadow-ui-sm)] transition-colors group-hover:bg-app-selected">
+              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#ff5a70_0_25%,#efb54a_0_50%,#33a780_0_75%,#4c83d6_0)] transition-opacity group-hover:opacity-0" />
+              <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-white transition-opacity group-hover:opacity-0" />
+              <Sparkles className="absolute size-3.5 text-app-text transition-opacity group-hover:opacity-0" />
+              <PanelLeft className="absolute size-4 text-app-text opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
             {!collapsed && (
               <span className="truncate text-sm font-semibold">LOL助手</span>

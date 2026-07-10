@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Moon, RefreshCw, Sparkles, Star, Sun, Swords } from 'lucide-react';
+import { CircleDashed, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { LiveBattlePlayer } from '../../../shared/api';
 
@@ -120,47 +120,31 @@ function phaseLabel(phase: string) {
 
 function TarotCard({
   player,
-  isRedTeam,
   isLoaded,
   index,
-  historyPage,
   sharedColor,
 }: {
   player: LiveBattlePlayer;
-  isRedTeam?: boolean;
   isLoaded: boolean;
   index: number;
-  historyPage: number;
   sharedColor?: string;
 }) {
   const champIcon = championIcon(player.championAlias);
-  const historyOffset = historyPage * HISTORY_PAGE_SIZE;
-  const visibleHistory = player.history.slice(historyOffset, historyOffset + HISTORY_PAGE_SIZE);
-  const teamAccent = isRedTeam ? 'text-app-primary' : 'text-app-link';
-  const teamWash = isRedTeam
-    ? 'bg-gradient-to-br from-app-primary-soft/45 via-app-surface to-app-surface'
-    : 'bg-gradient-to-br from-blue-50 via-app-surface to-app-surface';
+  const visibleHistory = player.history.slice(0, HISTORY_PAGE_SIZE);
+  const recentWins = visibleHistory.filter((history) => history.win).length;
 
   return (
     <div className="live-tarot-card group relative min-w-0">
       <motion.div
         className="relative h-full w-full"
-        initial={{ opacity: 0, y: 10, scale: 0.985 }}
-        animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 10, scale: isLoaded ? 1 : 0.985 }}
-        transition={{ duration: 0.26, delay: index * 0.018, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isLoaded ? 1 : 0 }}
+        transition={{ duration: 0.18, delay: index * 0.01, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-[0_8px_22px_rgba(20,20,20,0.08)]">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.035]"
-            style={{
-              backgroundImage: 'radial-gradient(circle at 50% 50%, #222222 1px, transparent 1px)',
-              backgroundSize: '16px 16px',
-            }}
-          />
-
-          <div className={`relative border-b border-app-border px-2.5 py-2 ${teamWash}`}>
+        <div className="relative flex h-full w-full flex-col overflow-hidden bg-app-surface">
+          <div className="relative border-b border-app-border px-2.5 py-2.5">
             <div className="flex items-center gap-2.5">
-              <div className="relative size-10 shrink-0 overflow-hidden rounded-full border border-white bg-app-surface-soft shadow-sm ring-1 ring-app-border">
+              <div className="relative size-9 shrink-0 overflow-hidden rounded-full bg-app-surface-soft ring-1 ring-app-border">
                 {champIcon && (
                   <img
                     src={champIcon}
@@ -171,23 +155,21 @@ function TarotCard({
               </div>
               <div className="min-w-0 flex-1">
                 <div
-                  className="truncate text-[13px] font-bold leading-4 text-app-text"
+                  className="truncate text-[13px] font-semibold leading-4 text-app-text"
                   style={sharedColor ? { color: sharedColor } : undefined}
                   title={sharedColor ? '组队或近期同队' : undefined}
                 >
                   {player.gameName}
                 </div>
-                <div className="mt-0.5 flex items-center gap-1">
-                  {isRedTeam ? <Sun size={9} className={teamAccent} /> : <Moon size={9} className={teamAccent} />}
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-app-muted">
-                    {isRedTeam ? 'Sun' : 'Moon'}
-                  </span>
+                <div className="mt-0.5 truncate text-[10px] text-app-subtle">
+                  {player.championName}
+                  {visibleHistory.length > 0 && ` · 近${visibleHistory.length}局 ${recentWins}胜`}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col bg-app-bg-soft p-2">
+          <div className="flex min-h-0 flex-1 flex-col px-2 py-1.5">
             <div
               className="live-history-list min-h-0 flex-1"
               style={{
@@ -198,14 +180,14 @@ function TarotCard({
               {visibleHistory.length > 0 ? (
                 visibleHistory.map((history, historyIndex) => (
                   <div
-                    key={`${historyPage}-${history.championAlias}-${historyIndex}-${history.kills}-${history.deaths}-${history.assists}`}
-                    className={`grid min-h-0 grid-cols-[24px_26px_minmax(62px,1fr)_34px] items-center gap-1 rounded-sm border px-1.5 py-0.5 ${
-                      history.win
-                        ? 'border-green-100 bg-white/92'
-                        : 'border-red-100 bg-white/92'
-                    }`}
+                    key={`${history.championAlias}-${historyIndex}-${history.kills}-${history.deaths}-${history.assists}`}
+                    className="grid min-h-0 grid-cols-[4px_20px_24px_minmax(58px,1fr)_32px] items-center gap-1 px-1 py-0.5 odd:bg-app-bg-soft/65"
                   >
-                    <div className="size-6 overflow-hidden rounded-full border border-white bg-app-surface-soft shadow-sm ring-1 ring-app-border">
+                    <span
+                      className={`size-1 rounded-full ${history.win ? 'bg-app-success/65' : 'bg-app-danger/55'}`}
+                      aria-hidden="true"
+                    />
+                    <div className="size-5 overflow-hidden rounded-full bg-app-surface-soft ring-1 ring-app-border">
                       <img
                         src={championIcon(history.championAlias)}
                         alt={history.championName}
@@ -215,38 +197,37 @@ function TarotCard({
                         }}
                       />
                     </div>
-                    <span className="truncate text-[11px] font-bold text-app-body">{history.queueName.slice(0, 2)}</span>
+                    <span className="truncate text-[10px] font-medium text-app-muted">{history.queueName.slice(0, 2)}</span>
                     <span
-                      className={`whitespace-nowrap text-center font-mono text-[11px] font-bold tracking-tight ${
+                      className={`whitespace-nowrap text-center font-mono text-[11px] font-semibold tracking-tight ${
                         history.win ? 'text-app-success' : 'text-app-danger'
                       }`}
                     >
                       {history.kills}/{history.deaths}/{history.assists}
                     </span>
-                    <span className="whitespace-nowrap text-right font-mono text-[10px] font-bold text-app-text">
+                    <span className="whitespace-nowrap text-right font-mono text-[10px] font-medium text-app-muted">
                       {history.timeStr}
                     </span>
                   </div>
                 ))
               ) : (
-                <div className="row-span-8 flex items-center justify-center rounded-sm border border-dashed border-app-border text-xs text-app-muted">
+                <div className="row-span-8 flex items-center justify-center text-xs text-app-subtle">
                   {player.history.length > 0 ? '本页暂无更多' : '暂无近期战绩'}
                 </div>
               )}
             </div>
           </div>
-
-          <div className="absolute left-1.5 top-1.5 size-2 border-l border-t border-app-primary/35" />
-          <div className="absolute right-1.5 top-1.5 size-2 border-r border-t border-app-primary/35" />
-          <div className="absolute bottom-1.5 left-1.5 size-2 border-b border-l border-app-primary/25" />
-          <div className="absolute right-1.5 bottom-1.5 size-2 border-r border-b border-app-primary/25" />
         </div>
       </motion.div>
     </div>
   );
 }
 
-export function LiveGamePage() {
+interface LiveGamePageProps {
+  onTitleChange?: (title: string) => void;
+}
+
+export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
   const [loading, setLoading] = useState(false);
   const [myTeam, setMyTeam] = useState<LiveBattlePlayer[]>([]);
   const [enemyTeam, setEnemyTeam] = useState<LiveBattlePlayer[]>([]);
@@ -254,7 +235,6 @@ export function LiveGamePage() {
   const [phase, setPhase] = useState('');
   const [error, setError] = useState('');
   const [loadedCards, setLoadedCards] = useState<Set<number>>(new Set());
-  const [historyPage, setHistoryPage] = useState(0);
   const cardTimerIds = useRef<number[]>([]);
   const fetchSeqRef = useRef(0);
   const battleRosterKeyRef = useRef('');
@@ -299,7 +279,6 @@ export function LiveGamePage() {
 
         loadedCardCountRef.current = 0;
         setLoadedCards(new Set());
-        setHistoryPage(0);
 
         for (let i = 0; i < total; i += 1) {
           const timerId = window.setTimeout(() => {
@@ -315,7 +294,6 @@ export function LiveGamePage() {
         battleRosterKeyRef.current = '';
         loadedCardCountRef.current = 0;
         setLoadedCards(new Set());
-        setHistoryPage(0);
         setMyTeam([]);
         setEnemyTeam([]);
       }
@@ -341,7 +319,6 @@ export function LiveGamePage() {
         battleRosterKeyRef.current = '';
         loadedCardCountRef.current = 0;
         setLoadedCards(new Set());
-        setHistoryPage(0);
         setMyTeam([]);
         setEnemyTeam([]);
         setInGame(false);
@@ -353,122 +330,71 @@ export function LiveGamePage() {
   const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
   const sharedPlayColors = useMemo(() => buildSharedPlayColors(allPlayers), [allPlayers]);
   const hasBattle = inGame && allPlayers.length > 0;
-  const isLoaded = hasBattle && loadedCards.size >= allPlayers.length;
-  const maxHistoryCount = useMemo(
-    () => allPlayers.reduce((max, player) => Math.max(max, player.history.length), 0),
-    [allPlayers],
-  );
-  const totalHistoryPages = Math.max(1, Math.ceil(maxHistoryCount / HISTORY_PAGE_SIZE));
-  const historyStart = maxHistoryCount > 0 ? historyPage * HISTORY_PAGE_SIZE + 1 : 0;
-  const historyEnd = Math.min(maxHistoryCount, (historyPage + 1) * HISTORY_PAGE_SIZE);
   const statusText = loading ? '读取中' : hasBattle ? phaseLabel(phase) : error ? '读取失败' : '未进入对局';
 
   useEffect(() => {
-    setHistoryPage((currentPage) => Math.min(currentPage, totalHistoryPages - 1));
-  }, [totalHistoryPages]);
-
-  const handleHistoryPageChange = (delta: number) => {
-    setHistoryPage((currentPage) => Math.min(totalHistoryPages - 1, Math.max(0, currentPage + delta)));
-  };
+    onTitleChange?.(statusText);
+  }, [onTitleChange, statusText]);
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-app-bg text-app-text">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(255,56,92,0.08),transparent_28%),radial-gradient(circle_at_88%_0%,rgba(66,139,255,0.08),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7f7f7_100%)]" />
+      <button
+        type="button"
+        onClick={fetchBattle}
+        disabled={loading}
+        title="刷新实时对局"
+        className="absolute top-2 right-3 z-20 grid size-7 place-items-center rounded-sm text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+      </button>
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
-        <div className="mb-2 flex h-7 shrink-0 items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2 rounded-full border border-app-border bg-white/78 px-2.5 py-1 shadow-[0_4px_14px_rgba(20,20,20,0.06)] backdrop-blur">
-            <Sparkles size={12} className="shrink-0 text-app-primary" />
-            <span className="truncate text-[11px] font-bold text-app-body">{statusText}</span>
-            <span className={`size-1.5 shrink-0 rounded-full ${
-              loading ? 'animate-pulse bg-app-primary' : isLoaded ? 'bg-app-success' : 'bg-app-danger'
-            }`} />
-          </div>
-
-          <div className="flex min-w-0 items-center gap-2">
-            {hasBattle && (
-              <div className="flex h-7 items-center gap-1 rounded-full border border-app-border bg-white/78 px-1.5 shadow-[0_4px_14px_rgba(20,20,20,0.06)] backdrop-blur">
-                <button
-                  type="button"
-                  title="上一页战绩"
-                  aria-label="上一页战绩"
-                  disabled={historyPage <= 0}
-                  onClick={() => handleHistoryPageChange(-1)}
-                  className="grid size-5 place-items-center rounded-full text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
-                >
-                  <ChevronLeft size={13} />
-                </button>
-                <div className="flex min-w-[112px] items-center justify-center gap-1 px-1 font-mono text-[10px] font-bold text-app-body">
-                  <span>{historyStart}-{historyEnd}</span>
-                  <span className="text-app-subtle">/</span>
-                  <span>{maxHistoryCount}</span>
-                  <span className="ml-1 text-app-subtle">{historyPage + 1}/{totalHistoryPages}</span>
-                </div>
-                <button
-                  type="button"
-                  title="下一页战绩"
-                  aria-label="下一页战绩"
-                  disabled={historyPage >= totalHistoryPages - 1}
-                  onClick={() => handleHistoryPageChange(1)}
-                  className="grid size-5 place-items-center rounded-full text-app-muted transition-colors enabled:hover:bg-app-surface-soft enabled:hover:text-app-text disabled:opacity-30"
-                >
-                  <ChevronRight size={13} />
-                </button>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={fetchBattle}
-              disabled={loading}
-              title="刷新实时对局"
-              className="grid size-7 place-items-center rounded-full border border-app-border bg-white/78 text-app-muted shadow-[0_4px_14px_rgba(20,20,20,0.06)] transition-colors hover:bg-app-surface-soft hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           {error && !inGame ? (
             <div className="flex h-full items-center justify-center text-sm text-app-muted">{error}</div>
           ) : !hasBattle && !loading ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-app-muted">
-              <Star size={24} className="text-app-primary opacity-45" />
-              <span className="text-sm text-app-body">当前不在游戏中</span>
-              <span className="text-xs opacity-75">进入选人或游戏后会自动识别，也可以手动刷新</span>
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-app-muted">
+              <div className="grid size-10 place-items-center rounded-full bg-app-surface-soft">
+                <CircleDashed size={18} className="text-app-subtle" />
+              </div>
+              <span className="text-sm text-app-body">未进入对局</span>
             </div>
           ) : (
             <div className="live-card-board">
-              <div className="live-team-grid">
-                {myTeam.map((player, idx) => (
-                  <TarotCard
-                    key={`${player.puuid}-${idx}`}
-                    player={player}
-                    isLoaded={loadedCards.has(idx)}
-                    index={idx}
-                    historyPage={historyPage}
-                    sharedColor={sharedPlayColors.get(playerIdentity(player))}
-                  />
-                ))}
-              </div>
-              <div className="live-versus-divider">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-app-border to-transparent" />
-                <Swords size={12} className="shrink-0 text-app-primary/65" />
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-app-border to-transparent" />
-              </div>
-              <div className="live-team-grid">
-                {enemyTeam.map((player, idx) => (
-                  <TarotCard
-                    key={`${player.puuid}-${idx}`}
-                    player={player}
-                    isRedTeam
-                    isLoaded={loadedCards.has(idx + myTeam.length)}
-                    index={idx + myTeam.length}
-                    historyPage={historyPage}
-                    sharedColor={sharedPlayColors.get(playerIdentity(player))}
-                  />
-                ))}
-              </div>
+              <section className="live-team-section">
+                <div className="live-team-heading live-team-heading--mine">
+                  <span>我方</span>
+                  <span>{myTeam.length} 人</span>
+                </div>
+                <div className="live-team-grid">
+                  {myTeam.map((player, idx) => (
+                    <TarotCard
+                      key={`${player.puuid}-${idx}`}
+                      player={player}
+                      isLoaded={loadedCards.has(idx)}
+                      index={idx}
+                      sharedColor={sharedPlayColors.get(playerIdentity(player))}
+                    />
+                  ))}
+                </div>
+              </section>
+              <section className="live-team-section">
+                <div className="live-team-heading live-team-heading--enemy">
+                  <span>对方</span>
+                  <span>{enemyTeam.length} 人</span>
+                </div>
+                <div className="live-team-grid">
+                  {enemyTeam.map((player, idx) => (
+                    <TarotCard
+                      key={`${player.puuid}-${idx}`}
+                      player={player}
+                      isLoaded={loadedCards.has(idx + myTeam.length)}
+                      index={idx + myTeam.length}
+                      sharedColor={sharedPlayColors.get(playerIdentity(player))}
+                    />
+                  ))}
+                </div>
+              </section>
             </div>
           )}
         </div>
