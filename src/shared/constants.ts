@@ -4,7 +4,7 @@ export const APP_LAYOUT = {
   workspaceWidth: 1280,
   friendPanelWidth: 288,
   hiddenFriendPanelWidth: 0,
-  expandedSidebarWidth: 240,
+  expandedSidebarWidth: 264,
   collapsedSidebarWidth: 64,
 } as const;
 

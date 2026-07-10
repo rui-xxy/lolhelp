@@ -1,59 +1,54 @@
 @import "tailwindcss";
 
-/* 设计基调：Airbnb-inspired consumer surface
-   纯白 canvas + Ink 近黑文字 + Rausch (#ff385c) 单一品牌强调色。
-   形状语言柔软（按钮 8px、卡片 14px 圆角），靠白色层级和 hairline 边框区分区域，
-   单一阴影层级（卡片 hover 浮起），无重度电竞色，无 dark mode。
-   参考 docs 同级的 DESIGN.md（Airbnb 设计系统分析）。
-   保留 app- 前缀避免组件 className 大改，色值严格对齐 Airbnb token。 */
+/* Codex-inspired desktop work surface. The app-* names stay stable so pages can
+   migrate incrementally while sharing one neutral, low-contrast foundation. */
 @theme {
-  /* 背景：canvas 纯白 → surface-soft 极浅灰 → surface-strong 略深（侧边栏导航区） */
   --color-app-bg: #ffffff;
-  --color-app-bg-soft: #f7f7f7;
-  --color-app-sidebar: #f2f2f2;
+  --color-app-bg-soft: #f9f9f9;
+  --color-app-shell: #f6f1e4;
+  --color-app-sidebar: #f6f1e4;
 
-  /* 卡片：canvas 纯白 → surface-soft 极浅灰（软底/输入框底） */
   --color-app-surface: #ffffff;
-  --color-app-surface-soft: #f7f7f7;
+  --color-app-surface-soft: #f3f3f3;
 
-  /* 边框：hairline 默认浅灰 → border-strong 较重（focus/disabled 描边） */
-  --color-app-border: #dddddd;
-  --color-app-border-strong: #c1c1c1;
+  --color-app-border: rgba(26, 28, 31, 0.08);
+  --color-app-border-strong: rgba(26, 28, 31, 0.12);
 
-  /* 导航项 hover 背景：在侧边栏 #f2f2f2 底上的深浅灰高亮（明显可见但不深成黑）。
-     当前页不做视觉标记（仅 hover 高亮）。 */
-  --color-app-nav-hover: #e5e5e5;
+  --color-app-nav-hover: rgba(26, 28, 31, 0.05);
+  --color-app-selected: rgba(26, 28, 31, 0.07);
+  --color-app-focus: #339cff;
 
-  /* 文字：ink 近黑（非纯黑）→ body 次级 → muted 说明 → muted-soft 更弱 */
-  --color-app-text: #222222;
-  --color-app-body: #3f3f3f;
-  --color-app-muted: #6a6a6a;
-  --color-app-subtle: #929292;
+  --color-app-text: #1a1c1f;
+  --color-app-body: rgba(26, 28, 31, 0.82);
+  --color-app-muted: rgba(26, 28, 31, 0.7);
+  --color-app-subtle: rgba(26, 28, 31, 0.5);
 
-  /* 主色：Rausch 红（单一品牌色，用于按钮/强调/选中态）+ active 按压 + disabled 淡红 */
   --color-app-primary: #ff385c;
   --color-app-primary-hover: #e00b41;
-  --color-app-primary-soft: #ffd1da;
+  --color-app-primary-soft: rgba(255, 56, 92, 0.1);
 
-  /* 语义色：error 红（比 Rausch 更深更饱和）→ success 绿 → link 蓝（仅法律链接） */
-  --color-app-danger: #c13515;
-  --color-app-danger-hover: #b32505;
-  --color-app-success: #008a05;
-  --color-app-link: #428bff;
+  --color-app-danger: #cf3154;
+  --color-app-danger-hover: #b72545;
+  --color-app-success: #16803a;
+  --color-app-link: #3578d4;
 
-  /* 胜负语义色（战绩/雷达卡片高亮用，与 match-result-card 的金/紫基调呼应） */
-  --color-app-win: #ef7c1a;
-  --color-app-win-bg: #fff6ca;
-  --color-app-win-border: rgba(239, 124, 26, 0.34);
+  --color-app-win: #16803a;
+  --color-app-win-bg: rgba(22, 128, 58, 0.08);
+  --color-app-win-border: rgba(22, 128, 58, 0.18);
   --color-app-loss: #cf3154;
-  --color-app-loss-bg: #ffe5ee;
-  --color-app-loss-border: rgba(207, 49, 84, 0.3);
+  --color-app-loss-bg: rgba(207, 49, 84, 0.08);
+  --color-app-loss-border: rgba(207, 49, 84, 0.18);
 
-  /* 圆角系统（Airbnb 形状语言）：xs 4 / sm 8 / md 14 / lg 20 / full 胶囊 */
   --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-ui-sm: 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+  --shadow-ui-shell: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px -20px rgba(0, 0, 0, 0.18);
+  --shadow-ui-popover: 0 0 0 0.5px rgba(26, 28, 31, 0.08), 0 9px 32px -10px rgba(0, 0, 0, 0.12);
+
+  --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* shadcn 语义 token → 映射到 app-* 体系，shadcn 组件源码一行不改。
@@ -77,13 +72,13 @@
   --color-destructive-foreground: #ffffff;
   --color-border: var(--color-app-border);
   --color-input: var(--color-app-border-strong);
-  --color-ring: var(--color-app-primary);
+  --color-ring: var(--color-app-focus);
 }
 
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(34, 34, 34, 0.24) transparent;
+    scrollbar-color: rgba(26, 28, 31, 0.2) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -105,15 +100,15 @@
     border: 2px solid transparent;
     border-radius: 999px;
     background-clip: padding-box;
-    background-color: rgba(34, 34, 34, 0.18);
+    background-color: rgba(26, 28, 31, 0.16);
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(34, 34, 34, 0.3);
+    background-color: rgba(26, 28, 31, 0.28);
   }
 
   *::-webkit-scrollbar-thumb:active {
-    background-color: rgba(34, 34, 34, 0.4);
+    background-color: rgba(26, 28, 31, 0.38);
   }
 
   *::-webkit-scrollbar-corner {
@@ -126,26 +121,30 @@
     width: 288px;
     flex-shrink: 0;
     overflow: hidden;
-    border-left: 1px solid var(--color-app-border);
-    background: var(--color-app-surface);
+    padding: 44px 8px 8px 0;
+    background: var(--color-app-shell);
     transition:
-      width 220ms cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 140ms ease;
+      width 300ms var(--ease-ui),
+      padding 300ms var(--ease-ui);
     will-change: width;
   }
 
   .friend-panel-column > * {
-    min-width: 288px;
+    min-width: 280px;
+    overflow: hidden;
+    border: 1px solid var(--color-app-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-ui-shell);
     opacity: 1;
     transform: translateX(0);
     transition:
       opacity 160ms ease,
-      transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      transform 300ms var(--ease-ui);
   }
 
   .friend-panel-column--hidden {
     width: 0;
-    border-left-width: 0;
+    padding-right: 0;
     pointer-events: none;
   }
 
@@ -2923,9 +2922,8 @@
   }
 }
 
-/* Airbnb 单一阴影层级：卡片 hover 浮起、下拉菜单、搜索框。
-   系统只有这一个 shadow 定义，其余表面全部 flat。
-   用 .shadow-airbnb 工具类按需应用（避免全局重 shadow）。 */
+/* Compatibility utility for existing dialogs while pages migrate to the shared
+   popover elevation token. */
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
@@ -2939,10 +2937,7 @@
   }
 
   .shadow-airbnb {
-    box-shadow:
-      rgba(0, 0, 0, 0.02) 0 0 0 1px,
-      rgba(0, 0, 0, 0.04) 0 2px 6px 0,
-      rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+    box-shadow: var(--shadow-ui-popover);
   }
 }
 

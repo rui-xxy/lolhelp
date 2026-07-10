@@ -56,13 +56,14 @@ const createWindow = () => {
     height: 800,
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: 680,
+    backgroundColor: '#f6f1e4',
     // 隐藏系统标题栏文字区，用自己的顶部标题栏；保留原生最小化/最大化/关闭按钮。
     // 拖拽窗口/双击最大化/Windows Snap 仍由原生支持，零 bug 风险。
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#faf9f7', // 控制按钮区背景，与右侧顶栏 app-surface 同色
-      symbolColor: '#25201a', // 控制按钮符号色，与 app-text 同色
-      height: 48, // 与顶部栏 h-12（48px）对齐
+      color: '#f6f1e4', // 与顶部暖色标题栏保持一体
+      symbolColor: '#1a1c1f',
+      height: 44,
     },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

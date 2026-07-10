@@ -111,14 +111,14 @@ export function App() {
         e.preventDefault();
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="flex h-9 items-center gap-1.5 rounded-full border border-app-primary/20 bg-app-surface-soft/95 p-1 shadow-sm shadow-app-primary/5 ring-1 ring-white/70"
+      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-white/75 shadow-[0_1px_2px_rgba(26,28,31,0.06)] transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/30 focus-within:bg-white/90 focus-within:shadow-[0_0_0_3px_rgba(255,56,92,0.10),0_5px_18px_rgba(255,56,92,0.16)]"
     >
-      <div className="relative flex h-7 w-32 shrink-0 items-center">
-        <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary" />
+      <div className="relative flex w-32 shrink-0 items-center border-r border-app-border bg-app-shell/45">
+        <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary/75" />
         <select
           value={matchRegion}
           onChange={(e) => setMatchRegion(e.target.value)}
-          className="h-7 w-full appearance-none rounded-full border border-app-border/70 bg-app-surface py-0 pr-7 pl-7 text-xs font-medium text-app-text outline-none transition-colors hover:border-app-primary/40 focus:border-app-primary focus:ring-2 focus:ring-app-primary/15"
+          className="h-full w-full appearance-none bg-transparent py-0 pr-7 pl-7 text-xs font-medium text-app-text outline-none"
         >
           {regions.map((r) => (
             <option key={r.key} value={r.key} title={'description' in r ? r.description : undefined}>
@@ -128,20 +128,19 @@ export function App() {
         </select>
         <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-app-subtle" />
       </div>
-      <div className="h-5 w-px shrink-0 bg-app-border" />
-      <div className="relative">
-        <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-primary" />
+      <div className="relative flex items-center">
+        <Search className="pointer-events-none absolute left-2.5 size-3.5 text-app-muted" />
         <input
           type="text"
           value={matchSearchName}
           onChange={(e) => setMatchSearchName(e.target.value)}
           placeholder="名字#编号"
-          className="h-7 w-48 rounded-full border border-transparent bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none transition-colors focus:border-app-primary/25 focus:bg-app-surface"
+          className="h-full w-48 bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none"
         />
       </div>
       <button
         type="submit"
-        className="h-7 shrink-0 rounded-full bg-gradient-to-r from-app-primary to-[#ff6b85] px-4 text-xs font-semibold text-white shadow-sm shadow-app-primary/25 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-app-primary/25 active:translate-y-0"
+        className="shrink-0 bg-app-primary px-4 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover"
       >
         查询
       </button>
@@ -263,6 +262,7 @@ export function App() {
   return (
     <AppShell
       title={PAGE_TITLES[activeView]}
+      activeView={activeView}
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'assist'}
       headerExtra={matchSearchBar}
@@ -303,6 +303,7 @@ export function App() {
         setFollowAccountsOpen(false);
         setSettingsOpen(true);
       }}
+      settingsOpen={settingsOpen}
       friendPanel={
         <FriendPanel
           onFriendClick={handleFriendClick}

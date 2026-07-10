@@ -20,6 +20,14 @@ import { GameIcon } from './match/GameIcon';
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches' | 'live' | 'scout' | 'assist';
 
+const NAV_ITEMS = [
+  { view: 'home', label: '主页', icon: Home },
+  { view: 'matches', label: '战绩', icon: Swords },
+  { view: 'live', label: '实时对局', icon: Radar },
+  { view: 'scout', label: '高手雷达', icon: Crosshair },
+  { view: 'assist', label: '辅助功能', icon: Sparkles },
+] as const;
+
 export interface ScoutSidebarStatus {
   running: boolean;
   progress: ScoutProgress | null;
@@ -32,6 +40,7 @@ export interface ScoutSidebarStatus {
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
+  activeView: View;
   onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
   fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
@@ -47,6 +56,7 @@ interface AppShellProps {
   onOpenChatSessions?: () => void; // 打开会话管理窗口
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
   onOpenSettings?: () => void; // 打开设置窗口
+  settingsOpen?: boolean;
   scoutStatus?: ScoutSidebarStatus | null;
   onScoutPlayerSearch?: (name: string, region?: string) => void;
   onScoutStatusClick?: () => void;
@@ -221,6 +231,7 @@ function SidebarScoutStatus({
 // - 右上角 titleBarOverlay 区（约 138px）保留给原生窗口控制按钮
 export function AppShell({
   title,
+  activeView,
   onNavigate,
   children,
   fullBleed = false,
@@ -236,6 +247,7 @@ export function AppShell({
   onOpenChatSessions,
   friendPanel,
   onOpenSettings,
+  settingsOpen = false,
   scoutStatus,
   onScoutPlayerSearch,
   onScoutStatusClick,
@@ -247,13 +259,13 @@ export function AppShell({
   const workspaceWidth = APP_LAYOUT.workspaceWidth - sidebarWidth;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-app-bg text-app-text">
+    <div className="relative flex h-screen overflow-hidden bg-app-shell text-app-text">
       {/* ===== 左侧侧边栏（三段式：顶/中/底）===== */}
       <aside
-        className={`flex shrink-0 flex-col border-r border-app-border bg-app-sidebar transition-[width] duration-200 ${
-          collapsed ? 'w-16' : 'w-60'
-        }`}
+        className="relative z-10 flex shrink-0 flex-col bg-app-sidebar pt-11 transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
+        style={{ width: `${sidebarWidth}px` }}
       >
+        <div className="absolute inset-x-0 top-0 h-11 [-webkit-app-region:drag]" aria-hidden="true" />
         {/* 顶部：Logo 区容器可拖拽移动窗口，里面的 button 设 no-drag 保证点击折叠有效。
             是侧边栏折叠/展开的唯一入口。
             默认显示 Logo 色块；hover 时色块切换成 PanelLeft 图标。 */}
@@ -262,12 +274,11 @@ export function AppShell({
             onClick={() => setCollapsed((c) => !c)}
             title={collapsed ? '展开侧边栏' : '折叠侧边栏'}
             aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-            className="group flex h-12 w-full items-center gap-2 border-b border-app-border px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-surface-soft"
+            className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
           >
-            {/* Logo 区：默认显示色块，hover 时切换为 PanelLeft 图标（两者同尺寸，叠放） */}
-            <span className="relative flex size-7 shrink-0 items-center justify-center">
-              <span className="absolute inset-0 rounded-sm bg-app-primary transition-opacity group-hover:opacity-0" />
-              <PanelLeft className="size-4 text-app-text opacity-0 transition-opacity group-hover:opacity-100" />
+            <span className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-app-text text-white transition-colors group-hover:bg-app-selected group-hover:text-app-text">
+              <Sparkles className="absolute size-3.5 transition-opacity group-hover:opacity-0" />
+              <PanelLeft className="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
             {!collapsed && (
               <span className="truncate text-sm font-semibold">LOL助手</span>
@@ -275,69 +286,30 @@ export function AppShell({
           </button>
         </div>
 
-        {/* 中间：导航区。折叠时只显图标，展开时图标+文本。
-            只有鼠标 hover 才显示浅灰高亮 + 文字加深；当前页不特殊标记。 */}
         <nav className="flex-1 overflow-hidden p-2">
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('home');
-            }}
-            title={collapsed ? '主页' : undefined}
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <Home className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">主页</span>}
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('matches');
-            }}
-            title={collapsed ? '战绩' : undefined}
-            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <Swords className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">战绩</span>}
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('live');
-            }}
-            title={collapsed ? '实时对局' : undefined}
-            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <Radar className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">实时对局</span>}
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('scout');
-            }}
-            title={collapsed ? '高手雷达' : undefined}
-            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <Crosshair className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">高手雷达</span>}
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onNavigate('assist');
-            }}
-            title={collapsed ? '辅助功能' : undefined}
-            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
-          >
-            <Sparkles className="size-4 shrink-0" />
-            {!collapsed && <span className="truncate">辅助功能</span>}
-          </a>
+          {NAV_ITEMS.map((item, index) => {
+            const Icon = item.icon;
+            const active = activeView === item.view;
+            return (
+              <button
+                key={item.view}
+                type="button"
+                onClick={() => onNavigate(item.view)}
+                title={collapsed ? item.label : undefined}
+                aria-current={active ? 'page' : undefined}
+                className={`relative flex h-9 w-full items-center gap-3 rounded-sm px-3 text-left text-[13px] font-medium transition-colors ${
+                  index > 0 ? 'mt-1' : ''
+                } ${
+                  active
+                    ? 'bg-app-selected text-app-text'
+                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+                }`}
+              >
+                <Icon className="size-4 shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </button>
+            );
+          })}
           <SidebarScoutStatus
             status={scoutStatus}
             collapsed={collapsed}
@@ -349,34 +321,32 @@ export function AppShell({
         {/* 底部：设置入口与状态区 */}
         <div className="shrink-0 border-t border-app-border p-2">
           {onOpenSettings && (
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onOpenSettings();
-              }}
+            <button
+              type="button"
+              onClick={onOpenSettings}
               title={collapsed ? '设置' : undefined}
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+              className={`flex h-9 w-full items-center gap-3 rounded-sm px-3 text-left text-[13px] font-medium transition-colors ${
+                settingsOpen
+                  ? 'bg-app-selected text-app-text'
+                  : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+              }`}
             >
               <Settings className="size-4 shrink-0" />
               {!collapsed && <span className="truncate">设置</span>}
-            </a>
-          )}
-          {!collapsed && (
-            <p className="mt-2 border-t border-app-border px-3 pt-2 text-xs text-app-subtle">
-              状态 · 待填充
-            </p>
+            </button>
           )}
         </div>
       </aside>
 
       {/* ===== 右侧主工作区（顶部标题 + 主内容）===== */}
       <div
-        className="flex min-w-0 flex-none flex-col"
+        className="relative z-10 flex min-w-0 flex-none pt-11 pr-2 pb-2"
         style={{ width: `${workspaceWidth}px` }}
       >
-        {/* 顶部标题区：延续主工作区背景（app-surface），可拖拽移动窗口。 */}
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border bg-app-surface pr-[138px] pl-4 [-webkit-app-region:drag]">
+        {/* 全局工具栏位于暖色标题栏，白色面板只承载页面内容。 */}
+        <header className={`absolute top-0 right-2 left-0 z-30 flex h-11 items-center gap-3 pl-3 [-webkit-app-region:drag] ${
+          friendPanelHidden ? 'pr-[138px]' : 'pr-1'
+        }`}>
           {headerExtra ? (
             <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
           ) : (
@@ -390,8 +360,8 @@ export function AppShell({
                   onClick={onOpenSavedMatches}
                   className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
                     savedMatchesOpen
-                      ? 'bg-app-surface-soft text-app-primary'
-                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                      ? 'bg-app-selected text-app-text'
+                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
                   }`}
                   title="保存的战绩"
                   aria-label="保存的战绩"
@@ -405,8 +375,8 @@ export function AppShell({
                   onClick={onOpenFollowAccounts}
                   className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
                     followAccountsOpen
-                      ? 'bg-app-surface-soft text-app-primary'
-                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                      ? 'bg-app-selected text-app-text'
+                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
                   }`}
                   title="关注账号"
                   aria-label="关注账号"
@@ -425,8 +395,8 @@ export function AppShell({
                   onClick={onOpenChatSessions}
                   className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
                     chatSessionsOpen
-                      ? 'bg-app-surface-soft text-app-primary'
-                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                      ? 'bg-app-selected text-app-text'
+                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
                   }`}
                   title="会话管理"
                   aria-label="会话管理"
@@ -440,8 +410,8 @@ export function AppShell({
                   onClick={onToggleFriendPanel}
                   className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
                     friendPanelHidden
-                      ? 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
-                      : 'bg-app-surface-soft text-app-primary hover:bg-app-nav-hover'
+                      ? 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+                      : 'bg-app-selected text-app-text hover:bg-app-nav-hover'
                   }`}
                   title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
                   aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
@@ -453,12 +423,14 @@ export function AppShell({
           )}
         </header>
 
-        {/* 主内容区：纯白 canvas（Airbnb 风格，无网格背景），承载功能模块。
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-app-border bg-app-surface shadow-[var(--shadow-ui-shell)]">
+        {/* 主内容区：连续的中性工作画布，承载各功能模块。
             fullBleed=true 时不加 max-w/padding，由内容自己管布局（战绩页双栏全宽）。
             fullBleed=false（默认）时 max-w-5xl 居中。 */}
         <main className={`flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
           <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
         </main>
+        </section>
       </div>
 
       {friendPanel && (
