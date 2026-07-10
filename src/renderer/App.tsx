@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Globe2, Search } from 'lucide-react';
-import { AppShell, type View } from './components/AppShell';
+import { AppShell, type ScoutSidebarStatus, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { FollowAccountsDialog, type FollowAccountRequest } from './components/match/FollowAccountsDialog';
 import { SavedMatchPickerDialog } from './components/match/SavedMatchPickerDialog';
-import type { SavedMatchAccount } from './components/match/savedMatchesStore';
+import {
+  loadSavedMatchesState,
+  SAVED_MATCHES_CHANGED_EVENT,
+  type SavedMatchAccount,
+} from './components/match/savedMatchesStore';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
 import { FriendPanel } from './components/FriendPanel';
@@ -25,6 +30,25 @@ const PAGE_TITLES: Record<View, string> = {
 const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
 const HIDDEN_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
 const FRIEND_PANEL_ANIMATION_MS = 220;
+const FOLLOW_ALERTS_READ_STORAGE_KEY = 'lolhelp:follow-alerts-read:v1';
+
+function loadReadFollowAlertIds(): Set<string> {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(FOLLOW_ALERTS_READ_STORAGE_KEY) ?? '[]');
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === 'string' && id.length > 0));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveReadFollowAlertIds(ids: Set<string>): void {
+  try {
+    window.localStorage.setItem(FOLLOW_ALERTS_READ_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // Ignore localStorage failures; the badge will refresh on the next app session.
+  }
+}
 
 export function App() {
   const [activeView, setActiveView] = useState<View>('home');
@@ -37,10 +61,15 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatSessionsOpen, setChatSessionsOpen] = useState(false);
   const [savedPickerOpen, setSavedPickerOpen] = useState(false);
+  const [followAccountsOpen, setFollowAccountsOpen] = useState(false);
+  const [followAlertCount, setFollowAlertCount] = useState(0);
+  const [followAccountRequest, setFollowAccountRequest] = useState<FollowAccountRequest | null>(null);
   const [savedAccountRequest, setSavedAccountRequest] = useState<{
     account: SavedMatchAccount;
     nonce: number;
   } | null>(null);
+  const [scoutSidebarStatus, setScoutSidebarStatus] = useState<ScoutSidebarStatus | null>(null);
+  const [scoutPanelMinimized, setScoutPanelMinimized] = useState(false);
   const friendPanelTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -128,6 +157,70 @@ export function App() {
     setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
   }, []);
 
+  const handlePlayerSearch = useCallback((name: string, region?: string) => {
+    setMatchSearchName(name);
+    setMatchRegion(region ?? '');
+    setActiveView('matches');
+    setMatchSearchTrigger((n) => n + 1);
+  }, []);
+
+  const handleFollowAccount = useCallback((riotId: string, region?: string) => {
+    setSavedPickerOpen(false);
+    setChatSessionsOpen(false);
+    setSettingsOpen(false);
+    setFollowAccountsOpen(true);
+    setFollowAccountRequest({ riotId, region, nonce: Date.now() });
+  }, []);
+
+  const markCurrentFollowAlertsRead = useCallback(async () => {
+    try {
+      const state = await loadSavedMatchesState();
+      saveReadFollowAlertIds(new Set((state.followAlerts ?? []).map((alert) => alert.id)));
+      setFollowAlertCount(0);
+    } catch {
+      setFollowAlertCount(0);
+    }
+  }, []);
+
+  const refreshFollowAlertCount = useCallback(async () => {
+    try {
+      const state = await loadSavedMatchesState();
+      const alertIds = (state.followAlerts ?? []).map((alert) => alert.id);
+      if (followAccountsOpen) {
+        saveReadFollowAlertIds(new Set(alertIds));
+        setFollowAlertCount(0);
+        return;
+      }
+
+      const activeIds = new Set(alertIds);
+      const readIds = loadReadFollowAlertIds();
+      const keptReadIds = new Set(Array.from(readIds).filter((id) => activeIds.has(id)));
+      if (keptReadIds.size !== readIds.size) {
+        saveReadFollowAlertIds(keptReadIds);
+      }
+      setFollowAlertCount(alertIds.filter((id) => !keptReadIds.has(id)).length);
+    } catch {
+      setFollowAlertCount(0);
+    }
+  }, [followAccountsOpen]);
+
+  useEffect(() => {
+    void refreshFollowAlertCount();
+    const listener = () => void refreshFollowAlertCount();
+    window.addEventListener(SAVED_MATCHES_CHANGED_EVENT, listener);
+    window.addEventListener('focus', listener);
+    const timer = window.setInterval(listener, 30_000);
+    return () => {
+      window.removeEventListener(SAVED_MATCHES_CHANGED_EVENT, listener);
+      window.removeEventListener('focus', listener);
+      window.clearInterval(timer);
+    };
+  }, [refreshFollowAlertCount]);
+
+  useEffect(() => {
+    if (followAccountsOpen) void markCurrentFollowAlertsRead();
+  }, [followAccountsOpen, markCurrentFollowAlertsRead]);
+
   const setWindowWidth = useCallback((width: number) => {
     void window.lolHelper.window.setWidth(width).catch((err) => {
       console.error('[friend] 设置好友栏窗口宽度失败:', err);
@@ -165,6 +258,8 @@ export function App() {
     }, FRIEND_PANEL_ANIMATION_MS);
   }, [friendPanelHidden, setWindowWidth]);
 
+  const scoutPanelActuallyMinimized = scoutPanelMinimized && scoutSidebarStatus !== null;
+
   return (
     <AppShell
       title={PAGE_TITLES[activeView]}
@@ -175,24 +270,43 @@ export function App() {
       onToggleFriendPanel={toggleFriendPanelHidden}
       chatSessionsOpen={chatSessionsOpen}
       savedMatchesOpen={savedPickerOpen}
+      followAccountsOpen={followAccountsOpen}
+      followAlertCount={followAlertCount}
+      scoutStatus={scoutPanelActuallyMinimized ? scoutSidebarStatus : null}
+      onScoutPlayerSearch={handlePlayerSearch}
+      onScoutStatusClick={() => {
+        setActiveView('scout');
+        setScoutPanelMinimized(false);
+      }}
       onOpenSavedMatches={() => {
         setChatSessionsOpen(false);
         setSettingsOpen(false);
+        setFollowAccountsOpen(false);
         setSavedPickerOpen(true);
+      }}
+      onOpenFollowAccounts={() => {
+        setSavedPickerOpen(false);
+        setChatSessionsOpen(false);
+        setSettingsOpen(false);
+        setFollowAccountsOpen(true);
+        void markCurrentFollowAlertsRead();
       }}
       onOpenChatSessions={() => {
         setSavedPickerOpen(false);
+        setFollowAccountsOpen(false);
         setSettingsOpen(false);
         setChatSessionsOpen(true);
       }}
       onOpenSettings={() => {
         setSavedPickerOpen(false);
         setChatSessionsOpen(false);
+        setFollowAccountsOpen(false);
         setSettingsOpen(true);
       }}
       friendPanel={
         <FriendPanel
           onFriendClick={handleFriendClick}
+          onFriendFollow={handleFollowAccount}
         />
       }
     >
@@ -207,11 +321,7 @@ export function App() {
           currentRegionKey={currentRegionKey}
           currentRegionName={currentRegionName}
           savedAccountRequest={savedAccountRequest}
-          onPlayerSearch={(name) => {
-            setMatchSearchName(name);
-            setActiveView('matches');
-            setMatchSearchTrigger((n) => n + 1);
-          }}
+          onPlayerSearch={handlePlayerSearch}
         />
       </div>
       <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
@@ -220,22 +330,15 @@ export function App() {
       <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
         <ScoutPage
           currentRegionName={currentRegionName}
-          onPlayerSearch={(name, region) => {
-            setMatchSearchName(name);
-            setMatchRegion(region ?? '');
-            setActiveView('matches');
-            setMatchSearchTrigger((n) => n + 1);
-          }}
+          onPlayerSearch={handlePlayerSearch}
+          onStatusChange={setScoutSidebarStatus}
+          configPanelMinimized={scoutPanelActuallyMinimized}
+          onConfigPanelMinimize={() => setScoutPanelMinimized(true)}
         />
       </div>
       <div className={activeView === 'assist' ? 'h-full' : 'hidden'}>
         <AssistPage
-          onPlayerSearch={(riotId, region) => {
-            setMatchSearchName(riotId);
-            setMatchRegion(region ?? '');
-            setActiveView('matches');
-            setMatchSearchTrigger((n) => n + 1);
-          }}
+          onPlayerSearch={handlePlayerSearch}
         />
       </div>
       <ChatSessionDialog
@@ -249,6 +352,13 @@ export function App() {
           setActiveView('matches');
           setSavedAccountRequest({ account, nonce: Date.now() });
         }}
+      />
+      <FollowAccountsDialog
+        open={followAccountsOpen}
+        onClose={() => setFollowAccountsOpen(false)}
+        currentRegionKey={currentRegionKey}
+        currentRegionName={currentRegionName}
+        request={followAccountRequest}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AppShell>

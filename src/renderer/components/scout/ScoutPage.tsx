@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Square, Star, Pencil } from 'lucide-react';
+import { Pencil, Search, Square, Star } from 'lucide-react';
 import { ChampionPickerDialog } from './ChampionPickerDialog';
 import { GameIcon } from '../match/GameIcon';
 import { ScoutHitCard } from './ScoutHitCard';
@@ -17,6 +17,17 @@ import { LOL_REGIONS } from '../../../shared/constants';
 interface ScoutPageProps {
   onPlayerSearch: (name: string, region?: string) => void;
   currentRegionName: string;
+  configPanelMinimized?: boolean;
+  onConfigPanelMinimize?: () => void;
+  onStatusChange?: (status: {
+    running: boolean;
+    progress: ScoutProgress | null;
+    hits: ScoutHit[];
+    targetCount: number;
+    region?: string;
+    startedAt?: number | null;
+    finishedAt?: number | null;
+  } | null) => void;
 }
 
 const KDA_THRESHOLD_MIN = 10;
@@ -78,7 +89,13 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
   return merged;
 }
 
-export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps) {
+export function ScoutPage({
+  onPlayerSearch,
+  currentRegionName,
+  configPanelMinimized = false,
+  onConfigPanelMinimize,
+  onStatusChange,
+}: ScoutPageProps) {
   const [config, setConfig] = useState<ScoutConfig>(DEFAULT_CONFIG);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
@@ -99,8 +116,9 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
   const [championsLoading, setChampionsLoading] = useState(true);
   const [championsError, setChampionsError] = useState('');
   const [activeRunKey, setActiveRunKey] = useState('');
-  const [runBaseCount, setRunBaseCount] = useState(0);
   const [batchStarts, setBatchStarts] = useState<number[]>([]);
+  const [searchStartedAt, setSearchStartedAt] = useState<number | null>(null);
+  const [searchFinishedAt, setSearchFinishedAt] = useState<number | null>(null);
 
   // 英雄 id → 详情（给已选摘要展示用）
   const championMap = useMemo(() => new Map(champions.map((c) => [c.id, c])), [champions]);
@@ -266,7 +284,11 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
       excludePuuids,
     };
 
+    const startedAt = Date.now();
     setRunning(true);
+    onConfigPanelMinimize?.();
+    setSearchStartedAt(startedAt);
+    setSearchFinishedAt(null);
     if (continuing) {
       setBatchStarts((prev) => (prev.includes(baseHits.length) ? prev : [...prev, baseHits.length]));
     } else {
@@ -277,7 +299,6 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
     setFinalSummary('');
     setError('');
     setActiveRunKey(currentRunKey);
-    setRunBaseCount(baseHits.length);
 
     // 持久化本次配置
     persistSettings({ ...settings, scoutDefaults: config });
@@ -305,9 +326,19 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      setSearchFinishedAt(Date.now());
       setRunning(false);
     }
-  }, [activeRunKey, canStart, config, currentRunKey, hits, settings, persistSettings]);
+  }, [
+    activeRunKey,
+    canStart,
+    config,
+    currentRunKey,
+    hits,
+    onConfigPanelMinimize,
+    settings,
+    persistSettings,
+  ]);
 
   const handleCancel = useCallback(async () => {
     try {
@@ -317,21 +348,59 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
     }
   }, []);
 
-  const pct =
-    progress && config.targetCount > 0
-      ? Math.min(100, Math.round((progress.hits / progress.target) * 100))
-      : 0;
-  const progressLabel = running ? '搜索中...' : progress?.phase === 'aborted' ? '已取消' : '已完成';
   const batchStartSet = useMemo(() => new Set(batchStarts), [batchStarts]);
 
+  useEffect(() => {
+    const shouldShowStatus = running || Boolean(progress) || hits.length > 0;
+    onStatusChange?.(
+      shouldShowStatus
+        ? {
+            running,
+            progress,
+            hits,
+            targetCount: config.targetCount,
+            region: config.region ?? '',
+            startedAt: searchStartedAt,
+            finishedAt: searchFinishedAt,
+          }
+        : null,
+    );
+  }, [
+    config.region,
+    config.targetCount,
+    hits,
+    onStatusChange,
+    progress,
+    running,
+    searchFinishedAt,
+    searchStartedAt,
+  ]);
+
+  useEffect(() => {
+    return () => onStatusChange?.(null);
+  }, [onStatusChange]);
+
+  const canMinimizeConfigPanel = Boolean(onConfigPanelMinimize && running);
+  const handleConfigPanelClick = useCallback(() => {
+    if (!canMinimizeConfigPanel) return;
+    onConfigPanelMinimize?.();
+  }, [canMinimizeConfigPanel, onConfigPanelMinimize]);
+
   return (
-    <div className="flex h-full">
+    <div className={`scout-page flex h-full ${configPanelMinimized ? 'scout-page--panel-minimized' : ''}`}>
       {/* ===== 左侧：配置面板 ===== */}
-      <aside className="scout-config-panel flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-app-border p-4">
+      <aside
+        aria-hidden={configPanelMinimized}
+        onClick={handleConfigPanelClick}
+        title={canMinimizeConfigPanel ? '点击收起到侧边栏' : undefined}
+        className={`scout-config-panel flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-app-border p-4 ${
+          canMinimizeConfigPanel ? 'scout-config-panel--clickable' : ''
+        }`}
+      >
         {/* 标题 */}
         <div className="flex items-center gap-2">
           <Search className="size-4 text-app-primary" />
-          <h2 className="text-sm font-semibold">高手雷达</h2>
+          <h2 className="truncate text-sm font-semibold">高手雷达</h2>
         </div>
         <p className="text-[11px] leading-relaxed text-app-subtle">
           输入种子玩家 → 沿对局关系网扩散，找出指定英雄、近期手感火热的高手。
@@ -410,10 +479,10 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             type="button"
             onClick={() => setPickerOpen(true)}
             disabled={running}
-            className="scout-hero-picker group"
+            className="scout-hero-picker"
           >
             {selectedChampions.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 pr-7">
+              <div className="flex flex-wrap gap-1.5">
                 {selectedChampions.map((c) => (
                   <GameIcon
                     key={c.id}
@@ -431,9 +500,6 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
                 点击选择英雄
               </div>
             )}
-            <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-sm border border-app-border bg-white/88 text-app-muted shadow-sm transition-colors group-hover:border-app-primary group-hover:text-app-primary">
-              <Pencil className="size-3.5" />
-            </span>
           </button>
           {/* 加载/错误状态提示 */}
           {championsLoading && (
@@ -517,8 +583,11 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
             </button>
           ) : (
             <button
-              onClick={handleCancel}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-app-border bg-app-surface px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-soft"
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleCancel();
+              }}
+              className="scout-cancel-button flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-app-border bg-app-surface px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-soft"
             >
               <Square className="size-3 fill-current" />
               取消
@@ -534,35 +603,6 @@ export function ScoutPage({ onPlayerSearch, currentRegionName }: ScoutPageProps)
 
       {/* ===== 右侧：结果区 ===== */}
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* 进度条 */}
-        {(running || progress) && (
-          <div className="border-b border-app-border bg-app-surface px-4 py-2.5">
-            <div className="mb-1 flex items-center justify-between text-[11px] text-app-muted">
-              <span>
-                {progressLabel}
-                {progress && (
-                  <span className="ml-2 tabular-nums">
-                    本轮达标 <b className="text-app-primary">{progress.hits}</b>/{progress.target}
-                    {runBaseCount > 0 && (
-                      <>
-                        {' · '}当前共 {runBaseCount + progress.hits}
-                      </>
-                    )}
-                    {' · '}候选 {progress.checked}
-                    {' · '}剩余种子 {progress.seedQueueRemaining}
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-app-border">
-              <div
-                className="h-full bg-app-primary transition-all duration-300"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
         {/* 达标者流 */}
         <div className="flex-1 overflow-y-auto bg-app-bg p-4">
           {error && (

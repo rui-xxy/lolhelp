@@ -63,6 +63,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_GROUP, groupId),
     setSavedMatchAccountGroup: (accountId: string, groupId?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_GROUP, accountId, groupId),
+    setSavedMatchAccountFollow: (accountId: string, enabled: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_FOLLOW, accountId, enabled),
     deleteSavedMatchAccount: (accountId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_ACCOUNT, accountId),
     deleteSavedMatch: (accountId: string, gameId: number) =>

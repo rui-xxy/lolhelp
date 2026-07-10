@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
+  Bell,
   Folder,
   FolderPlus,
   Trash2,
@@ -16,9 +17,9 @@ import {
   createSavedMatchGroup,
   deleteSavedMatchAccount,
   deleteSavedMatchGroup,
-  loadSavedMatchAccounts,
-  loadSavedMatchGroups,
+  loadSavedMatchesState,
   SAVED_MATCHES_CHANGED_EVENT,
+  setSavedMatchAccountFollow,
   setSavedMatchAccountGroup,
   type SavedMatchAccount,
   type SavedMatchGroup,
@@ -57,6 +58,10 @@ function formatSavedAt(timestamp: number): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function getSavedAt(account: SavedMatchAccount): number {
+  return Number.isFinite(account.createdAt) ? account.createdAt : account.updatedAt;
 }
 
 function formatFullTime(timestamp: number): string {
@@ -142,12 +147,9 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
 
   const refresh = async () => {
-    const [nextAccounts, nextGroups] = await Promise.all([
-      loadSavedMatchAccounts(),
-      loadSavedMatchGroups(),
-    ]);
-    setAccounts(nextAccounts);
-    setGroups(nextGroups);
+    const state = await loadSavedMatchesState();
+    setAccounts(state.accounts);
+    setGroups(state.groups);
   };
 
   useEffect(() => {
@@ -158,9 +160,11 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
     const refreshListener = () => void refresh();
     window.addEventListener(SAVED_MATCHES_CHANGED_EVENT, refreshListener);
     window.addEventListener('focus', refreshListener);
+    const timer = window.setInterval(refreshListener, 30_000);
     return () => {
       window.removeEventListener(SAVED_MATCHES_CHANGED_EVENT, refreshListener);
       window.removeEventListener('focus', refreshListener);
+      window.clearInterval(timer);
     };
   }, [open]);
 
@@ -233,6 +237,13 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   const moveAccount = async (accountId: string, groupId: string) => {
     setAccounts(await setSavedMatchAccountGroup(accountId, groupId || undefined));
     setNotice('分组已更新');
+  };
+
+  const toggleFollow = async (accountId: string, enabled: boolean) => {
+    const state = await setSavedMatchAccountFollow(accountId, enabled);
+    setAccounts(state.accounts);
+    setGroups(state.groups);
+    setNotice(enabled ? '已关注，后台每分钟检查最新战绩' : '已取消关注');
   };
 
   if (!open) return null;
@@ -362,7 +373,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                         </span>
                       </div>
                       <div className="mt-1.5 text-[11px] text-app-muted">
-                        {getAccountSummary(activeAccount.matches)} · 保存于 {formatSavedAt(activeAccount.updatedAt)}
+                        {getAccountSummary(activeAccount.matches)} · 保存于 {formatSavedAt(getSavedAt(activeAccount))}
                       </div>
                     </div>
                     <RankSummary ranks={activeRanks} />
@@ -390,6 +401,23 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                           </option>
                         ))}
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => void toggleFollow(activeAccount.id, !activeAccount.follow?.enabled)}
+                        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-colors ${
+                          activeAccount.follow?.enabled
+                            ? 'bg-app-primary-soft text-app-primary hover:bg-white'
+                            : 'bg-white/80 text-app-muted hover:bg-app-surface hover:text-app-primary'
+                        }`}
+                        title={activeAccount.follow?.enabled ? '取消关注这个账号' : '关注这个账号'}
+                      >
+                        {activeAccount.follow?.enabled ? (
+                          <Bell className="size-3.5 fill-app-primary" />
+                        ) : (
+                          <Bell className="size-3.5" />
+                        )}
+                        {activeAccount.follow?.enabled ? '已关注' : '关注'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -462,12 +490,17 @@ function AccountListItem({
         size={34}
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-semibold text-app-text">{getDisplayName(account.profile.riotId)}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-xs font-semibold text-app-text">
+            {getDisplayName(account.profile.riotId)}
+          </span>
+          {account.follow?.enabled && <Bell className="size-3 shrink-0 fill-app-primary text-app-primary" />}
+        </div>
         <div className="mt-0.5 truncate text-[10px] text-app-subtle">
           {getRegionName(account)} · {getAccountSummary(account.matches)}
         </div>
       </div>
-      <span className="shrink-0 text-[10px] text-app-subtle">{formatSavedAt(account.updatedAt)}</span>
+      <span className="shrink-0 text-[10px] text-app-subtle">{formatSavedAt(getSavedAt(account))}</span>
     </button>
   );
 }

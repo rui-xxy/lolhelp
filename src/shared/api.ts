@@ -920,13 +920,37 @@ export interface SavedMatchAccount {
   profile: PlayerProfile;
   matches: PlayerMatchDetail[];
   groupId?: string;
+  follow?: SavedMatchFollowSettings;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface SavedMatchFollowSettings {
+  enabled: boolean;
+  startedAt: number;
+  updatedAt: number;
+  lastCheckedAt?: number;
+  lastNotifiedGameId?: number;
+  lastError?: string;
+}
+
+export interface SavedMatchFollowAlert {
+  id: string;
+  accountId: string;
+  riotId: string;
+  region: string;
+  regionName?: string;
+  profileIconId?: number;
+  profileIconUrl?: string;
+  match: PlayerMatchDetail;
+  detectedAt: number;
+  notifiedAt?: number;
 }
 
 export interface SavedMatchesState {
   accounts: SavedMatchAccount[];
   groups: SavedMatchGroup[];
+  followAlerts?: SavedMatchFollowAlert[];
 }
 
 // match 域 API 契约
@@ -944,6 +968,7 @@ export interface MatchApi {
   createSavedMatchGroup: (name: string) => Promise<SavedMatchesState>;
   deleteSavedMatchGroup: (groupId: string) => Promise<SavedMatchesState>;
   setSavedMatchAccountGroup: (accountId: string, groupId?: string) => Promise<SavedMatchAccount[]>;
+  setSavedMatchAccountFollow: (accountId: string, enabled: boolean) => Promise<SavedMatchesState>;
   deleteSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount[]>;
   deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchAccount[]>;
   // 返回英雄列表（给前端英雄选择器用）

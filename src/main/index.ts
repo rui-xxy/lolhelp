@@ -1,3 +1,4 @@
+import './safeConsole';
 import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -11,6 +12,7 @@ import {
   disposeAssistWindows,
 } from './assist/windows';
 import { startLiveWatcher, stopLiveWatcher } from './live/liveWatcher';
+import { startSavedMatchFollowWatcher, stopSavedMatchFollowWatcher } from './match/savedMatchFollowWatcher';
 
 const APP_WINDOW_TITLE = 'LOL助手';
 const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
@@ -124,6 +126,7 @@ app.on('ready', () => {
   createWindow();
   startAssistEngine();
   startLiveWatcher();
+  startSavedMatchFollowWatcher();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -138,6 +141,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopAssistEngine();
   stopLiveWatcher();
+  stopSavedMatchFollowWatcher();
   disposeAssistWindows();
 });
 

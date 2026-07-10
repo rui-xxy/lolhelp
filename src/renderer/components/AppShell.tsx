@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  Bell,
   Crosshair,
   BookmarkCheck,
   Home,
@@ -12,9 +13,22 @@ import {
   Users,
 } from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
+import type { ScoutHit, ScoutProgress } from '../../shared/api';
+import { ProfileIcon } from './ProfileIcon';
+import { GameIcon } from './match/GameIcon';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
 export type View = 'home' | 'matches' | 'live' | 'scout' | 'assist';
+
+export interface ScoutSidebarStatus {
+  running: boolean;
+  progress: ScoutProgress | null;
+  hits: ScoutHit[];
+  targetCount: number;
+  region?: string;
+  startedAt?: number | null;
+  finishedAt?: number | null;
+}
 
 interface AppShellProps {
   title: string; // 右侧顶部页面标题（占位）
@@ -26,10 +40,171 @@ interface AppShellProps {
   onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
   chatSessionsOpen?: boolean; // 会话管理窗口是否打开
   savedMatchesOpen?: boolean;
+  followAccountsOpen?: boolean;
+  followAlertCount?: number;
   onOpenSavedMatches?: () => void;
+  onOpenFollowAccounts?: () => void;
   onOpenChatSessions?: () => void; // 打开会话管理窗口
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
   onOpenSettings?: () => void; // 打开设置窗口
+  scoutStatus?: ScoutSidebarStatus | null;
+  onScoutPlayerSearch?: (name: string, region?: string) => void;
+  onScoutStatusClick?: () => void;
+}
+
+function getScoutHitRiotId(hit: ScoutHit | null | undefined): string {
+  return hit?.profile.riotId?.trim() || '';
+}
+
+function getScoutHitDisplayName(hit: ScoutHit | null | undefined): string {
+  const riotId = getScoutHitRiotId(hit);
+  return riotId.split('#')[0] || riotId || '搜寻中';
+}
+
+function formatScoutElapsed(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return hours > 0
+    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
+    : `${minutes}:${pad(seconds)}`;
+}
+
+function SidebarScoutStatus({
+  status,
+  collapsed,
+  onPlayerSearch,
+  onRestore,
+}: {
+  status?: ScoutSidebarStatus | null;
+  collapsed: boolean;
+  onPlayerSearch?: (name: string, region?: string) => void;
+  onRestore?: () => void;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!status?.running) {
+      setNow(Date.now());
+      return undefined;
+    }
+
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [status?.running, status?.startedAt]);
+
+  if (!status || (!status.running && !status.progress && status.hits.length === 0)) return null;
+
+  const latestHit = status.progress?.latestHit ?? status.hits[status.hits.length - 1] ?? null;
+  const latestRiotId = getScoutHitRiotId(latestHit);
+  const latestMatch = latestHit?.qualifyingMatches[0];
+  const latestScore = latestMatch
+    ? `${latestMatch.kills}/${latestMatch.deaths}/${latestMatch.assists}`
+    : '';
+  const foundCount = status.hits.length;
+  const elapsedMs = status.startedAt
+    ? Math.max(0, (status.running ? now : (status.finishedAt ?? now)) - status.startedAt)
+    : 0;
+  const elapsedText = formatScoutElapsed(elapsedMs);
+  const statusText = status.running
+    ? '搜索中'
+    : status.progress?.phase === 'aborted'
+      ? '已取消'
+      : status.progress?.phase === 'error'
+        ? '异常'
+        : '已完成';
+  const canOpenLatest = Boolean(latestRiotId && onPlayerSearch);
+  const openLatest = () => {
+    if (onRestore) {
+      onRestore();
+      return;
+    }
+    if (!canOpenLatest) return;
+    onPlayerSearch?.(latestRiotId, status.region);
+  };
+  const displayName = latestHit
+    ? getScoutHitDisplayName(latestHit)
+    : status.running
+      ? '正在搜寻高手'
+      : '暂无命中';
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center px-2 pt-2">
+        <button
+          type="button"
+          onClick={openLatest}
+          disabled={!canOpenLatest && !onRestore}
+          title={`高手雷达：${statusText}，已找到 ${foundCount} 人${latestRiotId ? `，最新 ${latestRiotId}` : ''}`}
+          className={`sidebar-scout-compact ${status.running ? 'sidebar-scout-compact--running' : ''}`}
+        >
+          <span className="sidebar-scout-compact__pulse" aria-hidden="true" />
+          {latestHit ? (
+            <ProfileIcon
+              iconId={latestHit.profile.profileIconId}
+              src={latestHit.profile.profileIconUrl}
+              alt={getScoutHitDisplayName(latestHit)}
+              size={30}
+              className="relative z-10 ring-2 ring-white"
+            />
+          ) : (
+            <span className="sidebar-scout-orb sidebar-scout-orb--compact" aria-hidden="true" />
+          )}
+          {foundCount > 0 && <span className="sidebar-scout-compact__badge">{foundCount}</span>}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section className={`sidebar-scout-card ${status.running ? 'sidebar-scout-card--running' : ''}`}>
+      <button
+        type="button"
+        onClick={openLatest}
+        disabled={!canOpenLatest && !onRestore}
+        className="sidebar-scout-player"
+      >
+        <span className="sidebar-scout-avatar">
+          {latestHit ? (
+            <ProfileIcon
+              iconId={latestHit.profile.profileIconId}
+              src={latestHit.profile.profileIconUrl}
+              alt={getScoutHitDisplayName(latestHit)}
+              size={34}
+              className="sidebar-scout-avatar__image"
+            />
+          ) : (
+            <span className="sidebar-scout-orb" aria-hidden="true" />
+          )}
+          {status.running && <span className="sidebar-scout-avatar__live" />}
+        </span>
+        <div className="min-w-0 flex-1 text-left">
+          <div className="truncate text-xs font-semibold text-app-text">
+            {displayName}
+          </div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-app-muted">
+            {latestMatch ? (
+              <>
+                <GameIcon src={latestMatch.championAvatar} alt={latestMatch.championName} size={14} rounded />
+                <span className="truncate">{latestMatch.championName}</span>
+                <span className="sidebar-scout-score">{latestScore}</span>
+              </>
+            ) : (
+              <span>{status.running ? '实时筛选达标对局' : '命中后显示最新玩家'}</span>
+            )}
+          </div>
+        </div>
+      </button>
+
+      <div className="sidebar-scout-foot">
+        <span>已找到 <b>{foundCount}</b></span>
+        <span>计时 <b>{elapsedText}</b></span>
+      </div>
+    </section>
+  );
 }
 
 // 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
@@ -54,10 +229,16 @@ export function AppShell({
   onToggleFriendPanel,
   chatSessionsOpen = false,
   savedMatchesOpen = false,
+  followAccountsOpen = false,
+  followAlertCount = 0,
   onOpenSavedMatches,
+  onOpenFollowAccounts,
   onOpenChatSessions,
   friendPanel,
   onOpenSettings,
+  scoutStatus,
+  onScoutPlayerSearch,
+  onScoutStatusClick,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarWidth = collapsed
@@ -157,6 +338,12 @@ export function AppShell({
             <Sparkles className="size-4 shrink-0" />
             {!collapsed && <span className="truncate">辅助功能</span>}
           </a>
+          <SidebarScoutStatus
+            status={scoutStatus}
+            collapsed={collapsed}
+            onPlayerSearch={onScoutPlayerSearch}
+            onRestore={onScoutStatusClick}
+          />
         </nav>
 
         {/* 底部：设置入口与状态区 */}
@@ -195,7 +382,7 @@ export function AppShell({
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
-          {(onOpenSavedMatches || onOpenChatSessions || onToggleFriendPanel) && (
+          {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onToggleFriendPanel) && (
             <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
               {onOpenSavedMatches && (
                 <button
@@ -210,6 +397,26 @@ export function AppShell({
                   aria-label="保存的战绩"
                 >
                   <BookmarkCheck className="size-4" />
+                </button>
+              )}
+              {onOpenFollowAccounts && (
+                <button
+                  type="button"
+                  onClick={onOpenFollowAccounts}
+                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
+                    followAccountsOpen
+                      ? 'bg-app-surface-soft text-app-primary'
+                      : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                  }`}
+                  title="关注账号"
+                  aria-label="关注账号"
+                >
+                  <Bell className="size-4" />
+                  {followAlertCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-app-surface">
+                      {followAlertCount > 99 ? '99+' : followAlertCount}
+                    </span>
+                  )}
                 </button>
               )}
               {onOpenChatSessions && (

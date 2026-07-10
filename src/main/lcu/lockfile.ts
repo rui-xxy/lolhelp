@@ -130,11 +130,20 @@ function resolveClientDirs(): string[] {
   return dirs;
 }
 
+let lastLoggedLcuCredentialKey = '';
+
+function logCredentialsResolved(sourcePath: string, creds: LcuCredentials): void {
+  const key = `${sourcePath}|${creds.pid}|${creds.port}|${creds.protocol}`;
+  if (key === lastLoggedLcuCredentialKey) return;
+  lastLoggedLcuCredentialKey = key;
+  console.log(`[lcu] credentials resolved from ${sourcePath} (port=${creds.port})`);
+}
+
 export function readLockfile(): LcuCredentials | null {
   for (const dir of resolveClientDirs()) {
     const creds = tryResolveFromDir(dir);
     if (creds) {
-      console.log(`[lcu] credentials resolved from ${dir} (port=${creds.port})`);
+      logCredentialsResolved(dir, creds);
       return creds;
     }
   }
@@ -154,7 +163,7 @@ export function readCredentialsForInstallRoot(rootPath?: string): LcuCredentials
     const clientDir = path.join(rootPath, 'LeagueClient');
     const creds = tryResolveFromDir(clientDir);
     if (creds) {
-      console.log(`[lcu] credentials resolved from ${clientDir} (port=${creds.port})`);
+      logCredentialsResolved(clientDir, creds);
       return creds;
     }
   }

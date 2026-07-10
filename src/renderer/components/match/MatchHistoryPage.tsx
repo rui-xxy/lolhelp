@@ -18,7 +18,7 @@ interface MatchHistoryPageProps {
   currentRegionKey?: string;
   currentRegionName?: string;
   savedAccountRequest?: { account: SavedMatchAccount; nonce: number } | null;
-  onPlayerSearch?: (name: string) => void;
+  onPlayerSearch?: (name: string, region?: string) => void;
 }
 
 interface MatchTab {
@@ -741,10 +741,11 @@ export function MatchHistoryPage({
 
   const handlePlayerSearch = (riotId: string) => {
     if (!riotId.trim()) return;
+    const searchRegion = activeTab?.region ?? region;
     if (onPlayerSearch) {
-      onPlayerSearch(riotId);
+      onPlayerSearch(riotId, searchRegion);
     } else {
-      openSearchTab(riotId, region);
+      openSearchTab(riotId, searchRegion);
     }
   };
 

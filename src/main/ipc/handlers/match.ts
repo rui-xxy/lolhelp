@@ -10,6 +10,7 @@ import {
   getSavedMatches,
   importSavedMatches,
   saveMatchesForProfile,
+  setSavedMatchAccountFollow,
   setSavedMatchAccountGroup,
 } from '../../match/savedMatchesStore';
 import type {
@@ -60,6 +61,10 @@ export function registerMatchHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_GROUP, async (_event, accountId, groupId) => {
     return setSavedMatchAccountGroup(String(accountId ?? ''), groupId ? String(groupId) : undefined);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_FOLLOW, async (_event, accountId, enabled) => {
+    return setSavedMatchAccountFollow(String(accountId ?? ''), Boolean(enabled));
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_DELETE_SAVED_ACCOUNT, async (_event, accountId) => {

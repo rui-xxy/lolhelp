@@ -2,11 +2,12 @@ import type {
   PlayerMatchDetail,
   PlayerProfile,
   SavedMatchAccount,
+  SavedMatchFollowAlert,
   SavedMatchGroup,
   SavedMatchesState,
 } from '../../../shared/api';
 
-export type { SavedMatchAccount, SavedMatchGroup, SavedMatchesState };
+export type { SavedMatchAccount, SavedMatchFollowAlert, SavedMatchGroup, SavedMatchesState };
 
 export const SAVED_MATCHES_CHANGED_EVENT = 'lolhelp:saved-matches-changed';
 const LEGACY_ACCOUNTS_STORAGE_KEY = 'lolhelp:saved-match-accounts:v1';
@@ -90,6 +91,15 @@ export async function setSavedMatchAccountGroup(
   const accounts = await window.lolHelper.match.setSavedMatchAccountGroup(accountId, groupId);
   emitSavedMatchesChanged();
   return accounts;
+}
+
+export async function setSavedMatchAccountFollow(
+  accountId: string,
+  enabled: boolean,
+): Promise<SavedMatchesState> {
+  const state = await window.lolHelper.match.setSavedMatchAccountFollow(accountId, enabled);
+  emitSavedMatchesChanged();
+  return state;
 }
 
 export async function saveMatchesForProfile(

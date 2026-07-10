@@ -49,6 +49,7 @@ export const IPC_CHANNELS = {
   MATCH_CREATE_SAVED_GROUP: 'match:create-saved-group',
   MATCH_DELETE_SAVED_GROUP: 'match:delete-saved-group',
   MATCH_SET_SAVED_ACCOUNT_GROUP: 'match:set-saved-account-group',
+  MATCH_SET_SAVED_ACCOUNT_FOLLOW: 'match:set-saved-account-follow',
   MATCH_DELETE_SAVED_ACCOUNT: 'match:delete-saved-account',
   MATCH_DELETE_SAVED_MATCH: 'match:delete-saved-match',
   // window 域：窗口控制

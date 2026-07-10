@@ -4,19 +4,24 @@ import path from 'node:path';
 import type {
   PlayerMatchDetail,
   PlayerProfile,
+  PlayerLookupResult,
   SavedMatchAccount,
+  SavedMatchFollowAlert,
+  SavedMatchFollowSettings,
   SavedMatchGroup,
   SavedMatchesState,
 } from '../../shared/api';
 
 const SAVED_MATCHES_FILE = 'lolhelper-saved-matches.json';
+const FOLLOW_RECENT_MATCH_WINDOW_MS = 60 * 60 * 1000;
+const FOLLOW_ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function getStorePath(): string {
   return path.join(app.getPath('userData'), SAVED_MATCHES_FILE);
 }
 
 function emptyState(): SavedMatchesState {
-  return { accounts: [], groups: [] };
+  return { accounts: [], groups: [], followAlerts: [] };
 }
 
 function getAccountId(profile: PlayerProfile, region: string): string {
@@ -26,6 +31,26 @@ function getAccountId(profile: PlayerProfile, region: string): string {
 
 function makeGroupId(): string {
   return `group-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeFollowSettings(value: unknown): SavedMatchFollowSettings | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const follow = value as Partial<SavedMatchFollowSettings>;
+  if (!follow.enabled) return undefined;
+  return {
+    enabled: true,
+    startedAt: optionalFiniteNumber(follow.startedAt) ?? Date.now(),
+    updatedAt: optionalFiniteNumber(follow.updatedAt) ?? Date.now(),
+    lastCheckedAt: optionalFiniteNumber(follow.lastCheckedAt),
+    lastNotifiedGameId: optionalFiniteNumber(follow.lastNotifiedGameId),
+    lastError: typeof follow.lastError === 'string' && follow.lastError.trim()
+      ? follow.lastError.trim()
+      : undefined,
+  };
 }
 
 function normalizeGroups(value: unknown): SavedMatchGroup[] {
@@ -58,23 +83,62 @@ function normalizeAccounts(value: unknown, groups: SavedMatchGroup[]): SavedMatc
         Array.isArray(candidate.matches)
       );
     })
-    .map((account) => ({
-      ...account,
-      region: account.region || '',
-      regionName: typeof account.regionName === 'string' ? account.regionName : undefined,
-      groupId: account.groupId && groupIds.has(account.groupId) ? account.groupId : undefined,
-      createdAt: Number.isFinite(account.createdAt) ? account.createdAt : Date.now(),
-      updatedAt: Number.isFinite(account.updatedAt) ? account.updatedAt : Date.now(),
-      matches: [...account.matches].sort((a, b) => b.gameCreation - a.gameCreation),
-    }))
+    .map((account) => {
+      const follow = normalizeFollowSettings(account.follow);
+      return {
+        ...account,
+        region: account.region || '',
+        regionName: typeof account.regionName === 'string' ? account.regionName : undefined,
+        groupId: account.groupId && groupIds.has(account.groupId) ? account.groupId : undefined,
+        ...(follow ? { follow } : {}),
+        createdAt: Number.isFinite(account.createdAt) ? account.createdAt : Date.now(),
+        updatedAt: Number.isFinite(account.updatedAt) ? account.updatedAt : Date.now(),
+        matches: [...account.matches].sort((a, b) => b.gameCreation - a.gameCreation),
+      };
+    })
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function normalizeFollowAlerts(value: unknown, accountIds: Set<string>): SavedMatchFollowAlert[] {
+  if (!Array.isArray(value)) return [];
+  const minDetectedAt = Date.now() - FOLLOW_ALERT_RETENTION_MS;
+  return value
+    .filter((alert): alert is SavedMatchFollowAlert => {
+      if (!alert || typeof alert !== 'object') return false;
+      const candidate = alert as Partial<SavedMatchFollowAlert>;
+      const detectedAt = optionalFiniteNumber(candidate.detectedAt) ?? candidate.match?.gameCreation;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.accountId === 'string' &&
+        accountIds.has(candidate.accountId) &&
+        typeof candidate.riotId === 'string' &&
+        candidate.match !== undefined &&
+        typeof candidate.match === 'object' &&
+        Number.isFinite(candidate.match.gameId) &&
+        Number.isFinite(candidate.match.gameCreation) &&
+        typeof detectedAt === 'number' &&
+        detectedAt >= minDetectedAt
+      );
+    })
+    .map((alert) => ({
+      ...alert,
+      region: alert.region || '',
+      regionName: typeof alert.regionName === 'string' ? alert.regionName : undefined,
+      profileIconId: Number.isFinite(alert.profileIconId) ? alert.profileIconId : undefined,
+      profileIconUrl: typeof alert.profileIconUrl === 'string' ? alert.profileIconUrl : undefined,
+      detectedAt: Number.isFinite(alert.detectedAt) ? alert.detectedAt : Date.now(),
+      notifiedAt: Number.isFinite(alert.notifiedAt) ? alert.notifiedAt : undefined,
+    }))
+    .sort((a, b) => b.match.gameCreation - a.match.gameCreation);
 }
 
 function normalizeState(value: unknown): SavedMatchesState {
   const raw = value && typeof value === 'object' ? value as Partial<SavedMatchesState> : {};
   const groups = normalizeGroups(raw.groups);
   const accounts = normalizeAccounts(raw.accounts, groups);
-  return { accounts, groups };
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const followAlerts = normalizeFollowAlerts(raw.followAlerts, accountIds);
+  return { accounts, groups, followAlerts };
 }
 
 function readState(): SavedMatchesState {
@@ -137,6 +201,7 @@ function mergeAccounts(
     groupId: incoming.groupId && validGroupIds.has(incoming.groupId)
       ? incoming.groupId
       : existing.groupId,
+    follow: incoming.follow ?? existing.follow,
     createdAt: Math.min(existing.createdAt, incoming.createdAt),
     updatedAt: Math.max(existing.updatedAt, incoming.updatedAt),
     matches: Array.from(matchById.values()).sort((a, b) => b.gameCreation - a.gameCreation),
@@ -163,7 +228,12 @@ function mergeSavedMatchesState(current: SavedMatchesState, incoming: SavedMatch
   }
 
   const accounts = Array.from(accountById.values()).sort((a, b) => b.updatedAt - a.updatedAt);
-  return { accounts, groups };
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const alertById = new Map<string, SavedMatchFollowAlert>();
+  for (const alert of normalizeFollowAlerts(current.followAlerts, accountIds)) alertById.set(alert.id, alert);
+  for (const alert of normalizeFollowAlerts(incoming.followAlerts, accountIds)) alertById.set(alert.id, alert);
+  const followAlerts = Array.from(alertById.values()).sort((a, b) => b.match.gameCreation - a.match.gameCreation);
+  return { accounts, groups, followAlerts };
 }
 
 export function getSavedMatches(): SavedMatchesState {
@@ -194,6 +264,7 @@ export function createSavedMatchGroup(name: string): SavedMatchesState {
 export function deleteSavedMatchGroup(groupId: string): SavedMatchesState {
   const state = readState();
   return writeState({
+    ...state,
     groups: state.groups.filter((group) => group.id !== groupId),
     accounts: state.accounts.map((account) =>
       account.groupId === groupId
@@ -215,6 +286,113 @@ export function setSavedMatchAccountGroup(accountId: string, groupId?: string): 
         : account,
     ),
   }).accounts;
+}
+
+export function setSavedMatchAccountFollow(accountId: string, enabled: boolean): SavedMatchesState {
+  const state = readState();
+  const now = Date.now();
+  return writeState({
+    ...state,
+    accounts: state.accounts.map((account) => {
+      if (account.id !== accountId) return account;
+      if (!enabled) {
+        return { ...account, follow: undefined };
+      }
+      return {
+        ...account,
+        follow: {
+          enabled: true,
+          startedAt: account.follow?.startedAt ?? now,
+          updatedAt: now,
+          lastCheckedAt: account.follow?.lastCheckedAt,
+          lastNotifiedGameId: account.follow?.lastNotifiedGameId,
+          lastError: undefined,
+        },
+      };
+    }),
+    followAlerts: enabled
+      ? state.followAlerts
+      : (state.followAlerts ?? []).filter((alert) => alert.accountId !== accountId),
+  });
+}
+
+export function saveSavedMatchFollowPollResult(
+  accountId: string,
+  result: PlayerLookupResult | null,
+  checkedAt: number,
+  error?: string,
+): { state: SavedMatchesState; alert: SavedMatchFollowAlert | null; shouldNotify: boolean } {
+  const state = readState();
+  const account = state.accounts.find((item) => item.id === accountId);
+  if (!account?.follow?.enabled) {
+    return { state, alert: null, shouldNotify: false };
+  }
+
+  const latestMatch = result?.matches[0];
+  const matchById = new Map<number, PlayerMatchDetail>();
+  for (const match of account.matches) matchById.set(match.gameId, match);
+  if (latestMatch) matchById.set(latestMatch.gameId, latestMatch);
+
+  const isRecent = Boolean(latestMatch && latestMatch.gameCreation >= checkedAt - FOLLOW_RECENT_MATCH_WINDOW_MS);
+  const shouldNotify = Boolean(
+    isRecent &&
+      latestMatch &&
+      account.follow.lastNotifiedGameId !== latestMatch.gameId,
+  );
+
+  const nextProfile = result?.profile?.puuid
+    ? { ...account.profile, ...result.profile }
+    : account.profile;
+  const nextFollow: SavedMatchFollowSettings = {
+    ...account.follow,
+    enabled: true,
+    updatedAt: checkedAt,
+    lastCheckedAt: checkedAt,
+    lastError: error || result?.error || undefined,
+    lastNotifiedGameId: shouldNotify && latestMatch
+      ? latestMatch.gameId
+      : account.follow.lastNotifiedGameId,
+  };
+  const nextAccount: SavedMatchAccount = {
+    ...account,
+    profile: nextProfile,
+    matches: Array.from(matchById.values()).sort((a, b) => b.gameCreation - a.gameCreation),
+    follow: nextFollow,
+    updatedAt: account.updatedAt,
+  };
+
+  const activeAlerts = state.followAlerts ?? [];
+  let alert: SavedMatchFollowAlert | null = null;
+  if (isRecent && latestMatch) {
+    const alertId = `${accountId}:${latestMatch.gameId}`;
+    const existingAlert = activeAlerts.find((item) => item.id === alertId);
+    alert = existingAlert ?? {
+      id: alertId,
+      accountId,
+      riotId: nextProfile.riotId || account.profile.riotId,
+      region: account.region,
+      regionName: account.regionName,
+      profileIconId: nextProfile.profileIconId,
+      profileIconUrl: nextProfile.profileIconUrl,
+      match: latestMatch,
+      detectedAt: checkedAt,
+      notifiedAt: shouldNotify ? checkedAt : undefined,
+    };
+  }
+  const nextAlerts = alert
+    ? [alert, ...activeAlerts.filter((item) => item.accountId !== accountId)]
+    : activeAlerts;
+
+  const nextState = writeState({
+    ...state,
+    accounts: [
+      nextAccount,
+      ...state.accounts.filter((item) => item.id !== accountId),
+    ],
+    followAlerts: nextAlerts,
+  });
+
+  return { state: nextState, alert, shouldNotify };
 }
 
 export function saveMatchesForProfile(
@@ -243,6 +421,7 @@ export function saveMatchesForProfile(
     profile,
     matches: Array.from(matchById.values()).sort((a, b) => b.gameCreation - a.gameCreation),
     groupId: existing?.groupId,
+    follow: existing?.follow,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -262,6 +441,7 @@ export function deleteSavedMatchAccount(accountId: string): SavedMatchAccount[] 
   return writeState({
     ...state,
     accounts: state.accounts.filter((account) => account.id !== accountId),
+    followAlerts: (state.followAlerts ?? []).filter((alert) => alert.accountId !== accountId),
   }).accounts;
 }
 
@@ -280,5 +460,8 @@ export function deleteSavedMatch(accountId: string, gameId: number): SavedMatchA
           : account,
       )
       .filter((account) => account.matches.length > 0),
+    followAlerts: (state.followAlerts ?? []).filter(
+      (alert) => !(alert.accountId === accountId && alert.match.gameId === gameId),
+    ),
   }).accounts;
 }

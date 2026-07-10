@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Bell, Clock, Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import type { CSSProperties } from 'react';
@@ -14,6 +14,7 @@ import {
 
 interface FriendPanelProps {
   onFriendClick: (riotId: string) => void;
+  onFriendFollow?: (riotId: string) => void;
 }
 
 const AVAILABILITY_COLOR: Record<string, string> = {
@@ -110,7 +111,7 @@ function formatFriendAddedTime(friend: FriendInfo, now: number): string {
   return `${exact}（${formatFriendAddedAgo(timestamp, now)}）`;
 }
 
-export function FriendPanel({ onFriendClick }: FriendPanelProps) {
+export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps) {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -210,6 +211,13 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
     setActionFriendId('');
     const riotId = friend.gameTag ? `${friend.gameName}#${friend.gameTag}` : friend.gameName;
     onFriendClick(riotId);
+  };
+
+  const handleFriendFollow = (friend: FriendInfo) => {
+    if (!friend.gameName) return;
+    setActionFriendId('');
+    const riotId = friend.gameTag ? `${friend.gameName}#${friend.gameTag}` : friend.gameName;
+    onFriendFollow?.(riotId);
   };
 
   const handleSpectate = async (friend: FriendInfo) => {
@@ -392,6 +400,16 @@ export function FriendPanel({ onFriendClick }: FriendPanelProps) {
                                 <Search className="size-3.5" />
                                 查战绩
                               </button>
+                              {onFriendFollow && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleFriendFollow(friend)}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-body hover:bg-app-surface-soft"
+                                >
+                                  <Bell className="size-3.5" />
+                                  关注
+                                </button>
+                              )}
                               {friend.lol?.gameStatus === 'inGame' && (
                                 <button
                                   type="button"
