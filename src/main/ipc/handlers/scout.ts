@@ -38,6 +38,15 @@ export function registerScoutHandlers(): void {
       registerWebContentsCleanup(event);
       const validatedConfig = validateScoutConfig(config);
       const wcId = event.sender.id;
+      const sender = event.sender;
+      const senderFrame = event.senderFrame;
+      const rendererUnavailable = () => {
+        try {
+          return sender.isDestroyed() || senderFrame === null || senderFrame.isDestroyed();
+        } catch {
+          return true;
+        }
+      };
       // 标记新一轮任务（清除上次的取消标志）
       cancelFlags.set(wcId, false);
       const sessionKey = getScoutSessionKey(validatedConfig);
@@ -59,12 +68,18 @@ export function registerScoutHandlers(): void {
           fetchRank: fetchPlayerRankByPuuid,
         },
         onProgress: (progress) => {
-          // 推送给发起方 renderer。webContents 可能已销毁（窗口关闭），加保护。
-          if (!event.sender.isDestroyed()) {
-            event.sender.send(IPC_CHANNELS.SCOUT_PROGRESS, progress);
+          if (rendererUnavailable()) {
+            cancelFlags.set(wcId, true);
+            return;
+          }
+          try {
+            sender.send(IPC_CHANNELS.SCOUT_PROGRESS, progress);
+          } catch {
+            // 热更新或渲染进程异常退出时立即停止长任务，避免继续查询和刷错误日志。
+            cancelFlags.set(wcId, true);
           }
         },
-        shouldCancel: () => cancelFlags.get(wcId) === true,
+        shouldCancel: () => cancelFlags.get(wcId) === true || rendererUnavailable(),
       });
 
       // 清理本轮标志

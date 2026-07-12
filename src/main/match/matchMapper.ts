@@ -123,6 +123,8 @@ interface SgpGameJson {
   queueId: number;
   gameCreation: number;
   gameDuration: number;
+  gameVersion?: string;
+  gameType?: string;
   gameMode?: string;
   participants: SgpParticipant[];
   teams?: SgpTeam[];
@@ -419,6 +421,8 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
     queueName: getQueueName(json.queueId),
     gameCreation: json.gameCreation,
     gameDuration: json.gameDuration,
+    gameVersion: json.gameVersion,
+    gameType: json.gameType || 'MATCHED_GAME',
     championId: target?.championId ?? 0,
     championName: target?.championName || hero?.name || '',
     championAvatar: hero?.avatar ?? '',

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
 import { fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
+import { downloadReplay, getReplayAvailability, watchReplay } from '../../match/replayService';
 import {
   createSavedMatchGroup,
   deleteSavedMatch,
@@ -73,6 +74,18 @@ export function registerMatchHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.MATCH_DELETE_SAVED_MATCH, async (_event, accountId, gameId) => {
     return deleteSavedMatch(String(accountId ?? ''), Number(gameId));
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_GET_REPLAY_AVAILABILITY, async (_event, request) => {
+    return getReplayAvailability(request);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_DOWNLOAD_REPLAY, async (_event, gameId) => {
+    return downloadReplay(gameId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_WATCH_REPLAY, async (_event, gameId) => {
+    return watchReplay(gameId);
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_GET_CHAMPIONS, async (): Promise<ChampionSummary[]> => {

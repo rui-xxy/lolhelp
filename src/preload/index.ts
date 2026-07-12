@@ -12,6 +12,7 @@ import type {
   LolHelper,
   LiveStateChangeEvent,
   PlayerLookupRequest,
+  ReplayAvailabilityRequest,
   ScoutConfig,
   ScoutProgress,
 } from '../shared/api';
@@ -70,6 +71,12 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_ACCOUNT, accountId),
     deleteSavedMatch: (accountId: string, gameId: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DELETE_SAVED_MATCH, accountId, gameId),
+    getReplayAvailability: (request: ReplayAvailabilityRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_REPLAY_AVAILABILITY, request),
+    downloadReplay: (gameId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_DOWNLOAD_REPLAY, gameId),
+    watchReplay: (gameId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_WATCH_REPLAY, gameId),
     getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
   },
   ranking: {

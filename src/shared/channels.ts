@@ -52,6 +52,9 @@ export const IPC_CHANNELS = {
   MATCH_SET_SAVED_ACCOUNT_FOLLOW: 'match:set-saved-account-follow',
   MATCH_DELETE_SAVED_ACCOUNT: 'match:delete-saved-account',
   MATCH_DELETE_SAVED_MATCH: 'match:delete-saved-match',
+  MATCH_GET_REPLAY_AVAILABILITY: 'match:get-replay-availability',
+  MATCH_DOWNLOAD_REPLAY: 'match:download-replay',
+  MATCH_WATCH_REPLAY: 'match:watch-replay',
   // window 域：窗口控制
   WINDOW_SET_WIDTH: 'window:set-width',
   // live 域：实时对局

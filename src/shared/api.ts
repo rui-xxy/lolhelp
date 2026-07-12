@@ -829,6 +829,8 @@ export interface PlayerMatchDetail {
   queueName: string;
   gameCreation: number;
   gameDuration: number;
+  gameVersion?: string;
+  gameType?: string;
   championId: number;
   championName: string;
   championAvatar: string; // 英雄头像 URL（ddragon，由 main 的 heroData 算好）
@@ -957,6 +959,27 @@ export interface SavedMatchesState {
   followAlerts?: SavedMatchFollowAlert[];
 }
 
+export interface ReplayActionResult {
+  success: boolean;
+  message: string;
+}
+
+export interface ReplayAvailability {
+  available: boolean;
+  state: string;
+  downloadProgress: number;
+  message: string;
+}
+
+export interface ReplayAvailabilityRequest {
+  gameId: number;
+  queueId: number;
+  gameCreation: number;
+  gameDuration: number;
+  gameVersion?: string;
+  gameType?: string;
+}
+
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
@@ -975,6 +998,9 @@ export interface MatchApi {
   setSavedMatchAccountFollow: (accountId: string, enabled: boolean) => Promise<SavedMatchesState>;
   deleteSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount[]>;
   deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchAccount[]>;
+  getReplayAvailability: (request: ReplayAvailabilityRequest) => Promise<ReplayAvailability>;
+  downloadReplay: (gameId: number) => Promise<ReplayActionResult>;
+  watchReplay: (gameId: number) => Promise<ReplayActionResult>;
   // 返回英雄列表（给前端英雄选择器用）
   getChampions: () => Promise<ChampionSummary[]>;
 }
@@ -1055,6 +1081,27 @@ export interface ScoutHit {
   totalChampionGames: number; // 该高手用指定英雄的总场次（统计参考）
 }
 
+export type ScoutPlayerState = 'queued' | 'checking' | 'checked' | 'matched' | 'failed';
+
+// 单个真实候选玩家的搜索状态。前端用它绘制搜索关系网络，不生成虚假节点。
+export interface ScoutPlayerEvent {
+  puuid: string;
+  parentPuuid?: string;
+  depth: number;
+  source: 'seed' | 'candidate';
+  state: ScoutPlayerState;
+  profile?: PlayerProfile;
+  recentChampionId?: number;
+  recentChampionName?: string;
+  recentChampionAvatar?: string;
+  recentKda?: number;
+  recentKills?: number;
+  recentDeaths?: number;
+  recentAssists?: number;
+  checkedMatches?: number;
+  qualifyingMatches?: number;
+}
+
 // 进度推送（main → renderer，达标一个推一个）
 export interface ScoutProgress {
   phase: 'seeding' | 'scanning' | 'done' | 'aborted' | 'error';
@@ -1063,6 +1110,8 @@ export interface ScoutProgress {
   target: number; // 目标人数
   seedQueueRemaining: number; // 剩余待扩散种子数
   latestHit?: ScoutHit; // 最新达标者（前端立即渲染一张卡）
+  latestPlayer?: ScoutPlayerEvent; // 最新候选状态（前端实时绘制搜索动画）
+  playerEvents?: ScoutPlayerEvent[]; // 同一轮发现的候选批量推送，减少高密度 IPC 刷新
 }
 
 // 最终结果

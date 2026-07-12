@@ -14,7 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
-import type { ScoutHit, ScoutProgress } from '../../shared/api';
+import type { ScoutHit, ScoutPlayerEvent, ScoutProgress } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import { GameIcon } from './match/GameIcon';
 
@@ -73,6 +73,15 @@ function getScoutHitDisplayName(hit: ScoutHit | null | undefined): string {
   return riotId.split('#')[0] || riotId || '搜寻中';
 }
 
+function getScoutPlayerRiotId(player: ScoutPlayerEvent | null | undefined): string {
+  return player?.profile?.riotId?.trim() || '';
+}
+
+function getScoutPlayerDisplayName(player: ScoutPlayerEvent | null | undefined): string {
+  const riotId = getScoutPlayerRiotId(player);
+  return riotId.split('#')[0] || riotId || '搜寻中';
+}
+
 function formatScoutElapsed(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const seconds = totalSeconds % 60;
@@ -111,11 +120,19 @@ function SidebarScoutStatus({
   if (!status || (!status.running && !status.progress && status.hits.length === 0)) return null;
 
   const latestHit = status.progress?.latestHit ?? status.hits[status.hits.length - 1] ?? null;
-  const latestRiotId = getScoutHitRiotId(latestHit);
+  const latestPlayer = status.progress?.latestPlayer ?? null;
+  const latestProfile = latestHit?.profile ?? null;
+  const latestChampionAvatar = latestPlayer?.recentChampionAvatar || '';
+  const latestChampionName = latestPlayer?.recentChampionName || '最近英雄';
+  const latestRiotId = getScoutHitRiotId(latestHit) || getScoutPlayerRiotId(latestPlayer);
   const latestMatch = latestHit?.qualifyingMatches[0];
   const latestScore = latestMatch
     ? `${latestMatch.kills}/${latestMatch.deaths}/${latestMatch.assists}`
-    : '';
+    : latestPlayer?.recentKills !== undefined &&
+        latestPlayer.recentDeaths !== undefined &&
+        latestPlayer.recentAssists !== undefined
+      ? `${latestPlayer.recentKills}/${latestPlayer.recentDeaths}/${latestPlayer.recentAssists}`
+      : '';
   const foundCount = status.hits.length;
   const elapsedMs = status.startedAt
     ? Math.max(0, (status.running ? now : (status.finishedAt ?? now)) - status.startedAt)
@@ -139,6 +156,8 @@ function SidebarScoutStatus({
   };
   const displayName = latestHit
     ? getScoutHitDisplayName(latestHit)
+    : latestPlayer?.profile
+      ? getScoutPlayerDisplayName(latestPlayer)
     : status.running
       ? '正在搜寻高手'
       : '暂无命中';
@@ -154,12 +173,20 @@ function SidebarScoutStatus({
           className={`sidebar-scout-compact ${status.running ? 'sidebar-scout-compact--running' : ''}`}
         >
           <span className="sidebar-scout-compact__pulse" aria-hidden="true" />
-          {latestHit ? (
+          {latestProfile ? (
             <ProfileIcon
-              iconId={latestHit.profile.profileIconId}
-              src={latestHit.profile.profileIconUrl}
-              alt={getScoutHitDisplayName(latestHit)}
+              iconId={latestProfile.profileIconId}
+              src={latestProfile.profileIconUrl}
+              alt={displayName}
               size={30}
+              className="relative z-10 ring-2 ring-white"
+            />
+          ) : latestChampionAvatar ? (
+            <GameIcon
+              src={latestChampionAvatar}
+              alt={latestChampionName}
+              size={30}
+              rounded
               className="relative z-10 ring-2 ring-white"
             />
           ) : (
@@ -180,12 +207,20 @@ function SidebarScoutStatus({
         className="sidebar-scout-player"
       >
         <span className="sidebar-scout-avatar">
-          {latestHit ? (
+          {latestProfile ? (
             <ProfileIcon
-              iconId={latestHit.profile.profileIconId}
-              src={latestHit.profile.profileIconUrl}
-              alt={getScoutHitDisplayName(latestHit)}
+              iconId={latestProfile.profileIconId}
+              src={latestProfile.profileIconUrl}
+              alt={displayName}
               size={34}
+              className="sidebar-scout-avatar__image"
+            />
+          ) : latestChampionAvatar ? (
+            <GameIcon
+              src={latestChampionAvatar}
+              alt={latestChampionName}
+              size={34}
+              rounded
               className="sidebar-scout-avatar__image"
             />
           ) : (
@@ -198,10 +233,17 @@ function SidebarScoutStatus({
             {displayName}
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-app-muted">
-            {latestMatch ? (
+            {latestMatch || latestPlayer?.recentChampionAvatar ? (
               <>
-                <GameIcon src={latestMatch.championAvatar} alt={latestMatch.championName} size={14} rounded />
-                <span className="truncate">{latestMatch.championName}</span>
+                <GameIcon
+                  src={latestMatch?.championAvatar || latestPlayer?.recentChampionAvatar || ''}
+                  alt={latestMatch?.championName || latestPlayer?.recentChampionName || '最近英雄'}
+                  size={14}
+                  rounded
+                />
+                <span className="truncate">
+                  {latestMatch?.championName || latestPlayer?.recentChampionName || '正在检查'}
+                </span>
                 <span className="sidebar-scout-score">{latestScore}</span>
               </>
             ) : (

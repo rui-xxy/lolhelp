@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Search, Square, Star } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Crosshair, Pencil, Search, Square, Star } from 'lucide-react';
 import { ChampionPickerDialog } from './ChampionPickerDialog';
 import { GameIcon } from '../match/GameIcon';
 import { ScoutHitCard } from './ScoutHitCard';
@@ -9,10 +9,12 @@ import type {
   ChampionSummary,
   ScoutConfig,
   ScoutHit,
+  ScoutPlayerEvent,
   ScoutProgress,
 } from '../../../shared/api';
 import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
 import { LOL_REGIONS } from '../../../shared/constants';
+import { ScoutSearchVisualizer } from './ScoutSearchVisualizer';
 
 interface ScoutPageProps {
   onPlayerSearch: (name: string, region?: string) => void;
@@ -33,6 +35,13 @@ interface ScoutPageProps {
 const KDA_THRESHOLD_MIN = 10;
 const KDA_THRESHOLD_MAX = 25;
 const KDA_THRESHOLD_STEP = 0.5;
+const MAX_LIVE_SCOUT_PLAYERS = 240;
+
+type ScoutPlayerStateCounts = Record<ScoutPlayerEvent['state'], number>;
+
+function makeEmptyScoutPlayerStateCounts(): ScoutPlayerStateCounts {
+  return { queued: 0, checking: 0, checked: 0, matched: 0, failed: 0 };
+}
 
 // 默认配置
 const DEFAULT_CONFIG: ScoutConfig = {
@@ -58,6 +67,14 @@ const QUEUE_OPTIONS = [
 
 // 时间窗快捷档（小时）
 const HOUR_OPTIONS = [1, 2, 3, 6, 12, 24];
+
+const SCOUT_PHASE_LABELS: Record<ScoutProgress['phase'], string> = {
+  seeding: '正在建立关系网',
+  scanning: '正在筛选候选玩家',
+  done: '搜索完成',
+  aborted: '搜索已停止',
+  error: '搜索遇到问题',
+};
 
 function clampKdaThreshold(value: number | undefined): number {
   const numeric = Number(value ?? KDA_THRESHOLD_MIN);
@@ -89,6 +106,58 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
   return merged;
 }
 
+const SCOUT_PLAYER_STATE_PRIORITY: Record<ScoutPlayerEvent['state'], number> = {
+  queued: 0,
+  checking: 1,
+  checked: 2,
+  failed: 2,
+  matched: 3,
+};
+
+function mergeScoutPlayers(
+  players: ScoutPlayerEvent[],
+  nextPlayers: ScoutPlayerEvent[],
+): ScoutPlayerEvent[] {
+  if (nextPlayers.length === 0) return players;
+  const byPuuid = new Map(players.map((player) => [player.puuid, player]));
+  for (const nextPlayer of nextPlayers) {
+    const current = byPuuid.get(nextPlayer.puuid);
+    if (!current) {
+      byPuuid.set(nextPlayer.puuid, nextPlayer);
+      continue;
+    }
+
+    const keepCurrentState =
+      SCOUT_PLAYER_STATE_PRIORITY[current.state] > SCOUT_PLAYER_STATE_PRIORITY[nextPlayer.state];
+    const merged: ScoutPlayerEvent = {
+      ...current,
+      ...nextPlayer,
+      state: keepCurrentState ? current.state : nextPlayer.state,
+      profile: nextPlayer.profile ?? current.profile,
+      parentPuuid: nextPlayer.parentPuuid ?? current.parentPuuid,
+    };
+    byPuuid.delete(nextPlayer.puuid);
+    byPuuid.set(nextPlayer.puuid, merged);
+  }
+  const mergedPlayers = [...byPuuid.values()];
+  if (mergedPlayers.length <= MAX_LIVE_SCOUT_PLAYERS) return mergedPlayers;
+
+  const matchedPlayers = mergedPlayers.filter((player) => player.state === 'matched');
+  const matchedIds = new Set(matchedPlayers.map((player) => player.puuid));
+  const recentCapacity = Math.max(0, MAX_LIVE_SCOUT_PLAYERS - matchedPlayers.length);
+  const recentPlayers: ScoutPlayerEvent[] = [];
+  for (
+    let index = mergedPlayers.length - 1;
+    index >= 0 && recentPlayers.length < recentCapacity;
+    index -= 1
+  ) {
+    const player = mergedPlayers[index];
+    if (!matchedIds.has(player.puuid)) recentPlayers.push(player);
+  }
+  recentPlayers.reverse();
+  return [...matchedPlayers, ...recentPlayers];
+}
+
 export function ScoutPage({
   onPlayerSearch,
   currentRegionName,
@@ -109,6 +178,14 @@ export function ScoutPage({
 
   const [running, setRunning] = useState(false);
   const [hits, setHits] = useState<ScoutHit[]>([]);
+  const [searchedPlayers, setSearchedPlayers] = useState<ScoutPlayerEvent[]>([]);
+  const [searchedPlayerTotal, setSearchedPlayerTotal] = useState(0);
+  const [playerStateCounts, setPlayerStateCounts] = useState<ScoutPlayerStateCounts>(
+    makeEmptyScoutPlayerStateCounts,
+  );
+  const [visualRunId, setVisualRunId] = useState(0);
+  const playerStatesRef = useRef(new Map<string, ScoutPlayerEvent['state']>());
+  const playerStateCountsRef = useRef<ScoutPlayerStateCounts>(makeEmptyScoutPlayerStateCounts());
   const [progress, setProgress] = useState<ScoutProgress | null>(null);
   const [finalSummary, setFinalSummary] = useState<string>('');
   const [error, setError] = useState('');
@@ -293,6 +370,13 @@ export function ScoutPage({
       setBatchStarts((prev) => (prev.includes(baseHits.length) ? prev : [...prev, baseHits.length]));
     } else {
       setHits([]);
+      setSearchedPlayers([]);
+      setSearchedPlayerTotal(0);
+      const emptyCounts = makeEmptyScoutPlayerStateCounts();
+      playerStatesRef.current.clear();
+      playerStateCountsRef.current = emptyCounts;
+      setPlayerStateCounts({ ...emptyCounts });
+      setVisualRunId((value) => value + 1);
       setBatchStarts([0]);
     }
     setProgress(null);
@@ -303,14 +387,65 @@ export function ScoutPage({
     // 持久化本次配置
     persistSettings({ ...settings, scoutDefaults: config });
 
-    try {
-      const result = await window.lolHelper.scout.find(runConfig, (p) => {
-        setProgress(p);
-        const latest = p.latestHit;
-        if (latest) {
-          setHits((prev) => mergeHits(prev, [latest]));
+    let pendingProgress: ScoutProgress | null = null;
+    let pendingPlayerEvents: ScoutPlayerEvent[] = [];
+    let pendingHits: ScoutHit[] = [];
+    let progressFlushTimer: number | null = null;
+    const flushProgress = () => {
+      if (progressFlushTimer !== null) {
+        window.clearTimeout(progressFlushTimer);
+        progressFlushTimer = null;
+      }
+      if (pendingProgress) {
+        setProgress(pendingProgress);
+        pendingProgress = null;
+      }
+      if (pendingPlayerEvents.length > 0) {
+        const events = pendingPlayerEvents;
+        pendingPlayerEvents = [];
+        const stateByPlayer = playerStatesRef.current;
+        const counts = playerStateCountsRef.current;
+        for (const playerEvent of events) {
+          const currentState = stateByPlayer.get(playerEvent.puuid);
+          if (
+            currentState &&
+            SCOUT_PLAYER_STATE_PRIORITY[currentState] >
+              SCOUT_PLAYER_STATE_PRIORITY[playerEvent.state]
+          ) {
+            continue;
+          }
+          if (currentState && currentState !== playerEvent.state) counts[currentState] -= 1;
+          if (!currentState || currentState !== playerEvent.state) counts[playerEvent.state] += 1;
+          stateByPlayer.set(playerEvent.puuid, playerEvent.state);
         }
-      });
+        setSearchedPlayerTotal(stateByPlayer.size);
+        setPlayerStateCounts({ ...counts });
+        setSearchedPlayers((prev) => mergeScoutPlayers(prev, events));
+      }
+      if (pendingHits.length > 0) {
+        const newHits = pendingHits;
+        pendingHits = [];
+        setHits((prev) => mergeHits(prev, newHits));
+      }
+    };
+    const queueProgress = (nextProgress: ScoutProgress) => {
+      pendingProgress = nextProgress;
+      const latestPlayer = nextProgress.latestPlayer;
+      const playerEvents = nextProgress.playerEvents?.length
+        ? nextProgress.playerEvents
+        : latestPlayer
+          ? [latestPlayer]
+          : [];
+      if (playerEvents.length > 0) pendingPlayerEvents.push(...playerEvents);
+      if (nextProgress.latestHit) pendingHits.push(nextProgress.latestHit);
+      if (progressFlushTimer === null) {
+        progressFlushTimer = window.setTimeout(flushProgress, 60);
+      }
+    };
+
+    try {
+      const result = await window.lolHelper.scout.find(runConfig, queueProgress);
+      flushProgress();
       const nextHits = mergeHits(baseHits, result.hits);
       setHits((prev) => (continuing ? mergeHits(prev, result.hits) : nextHits));
       const reason = result.aborted
@@ -319,13 +454,14 @@ export function ScoutPage({
           ? '（已达目标）'
           : '（关系网已扫完，未凑满目标）';
       setFinalSummary(
-        `${continuing ? '继续找到' : '找到'} ${result.hits.length} 个达标者${reason} · 当前共 ${nextHits.length} 个 · 扩散 ${result.stats.totalSeeds} 种子 · ` +
-          `${result.stats.totalCandidates} 候选 · 深度 ${result.stats.depth} · ${result.stats.totalRequests} 次请求`,
+        `${continuing ? '本批新增' : '本次找到'} ${result.hits.length} 位高手${reason}，当前共 ${nextHits.length} 位`,
       );
       if (result.error) setError(result.error);
     } catch (err) {
+      flushProgress();
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      flushProgress();
       setSearchFinishedAt(Date.now());
       setRunning(false);
     }
@@ -385,6 +521,15 @@ export function ScoutPage({
     if (!canMinimizeConfigPanel) return;
     onConfigPanelMinimize?.();
   }, [canMinimizeConfigPanel, onConfigPanelMinimize]);
+  const checkedCount = progress?.checked ?? 0;
+  const progressTarget = Math.max(1, progress?.target ?? config.targetCount);
+  const progressPercent = Math.min(100, Math.round((hits.length / progressTarget) * 100));
+  const resultStatus = running
+    ? SCOUT_PHASE_LABELS[progress?.phase ?? 'seeding']
+    : hits.length > 0
+      ? `已找到 ${hits.length} 位符合条件的玩家`
+      : finalSummary || '等待开始搜索';
+  const showSearchNetwork = running || searchedPlayerTotal > 0;
 
   return (
     <div className={`scout-page flex h-full ${configPanelMinimized ? 'scout-page--panel-minimized' : ''}`}>
@@ -393,191 +538,163 @@ export function ScoutPage({
         aria-hidden={configPanelMinimized}
         onClick={handleConfigPanelClick}
         title={canMinimizeConfigPanel ? '点击收起到侧边栏' : undefined}
-        className={`scout-config-panel flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-app-border p-4 ${
+        className={`scout-config-panel ${
           canMinimizeConfigPanel ? 'scout-config-panel--clickable' : ''
         }`}
       >
-        {/* 标题 */}
-        <div className="flex items-center gap-2">
-          <Search className="size-4 text-app-primary" />
-          <h2 className="truncate text-sm font-semibold">高手雷达</h2>
-        </div>
-        <p className="text-[11px] leading-relaxed text-app-subtle">
-          输入种子玩家 → 沿对局关系网扩散，找出指定英雄、近期手感火热的高手。
-        </p>
+        <header className="scout-config-heading">
+          <span className="scout-config-heading__icon"><Search className="size-4" /></span>
+          <span className="min-w-0">
+            <strong>高手雷达</strong>
+            <small>{running ? '搜索进行中' : `${selectedChampions.length} 个指定英雄`}</small>
+          </span>
+        </header>
 
-        {/* 大区 */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-app-text">目标大区</label>
-          <select
-            value={config.region ?? ''}
-            onChange={(e) => updateConfig({ region: e.target.value })}
-            disabled={running}
-            className="scout-control"
-          >
-            {regionOptions.map((region) => (
-              <option key={region.key} value={region.key}>
-                {region.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* 种子 ID */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-app-text">种子召唤师</label>
-          <input
-            type="text"
-            value={config.seedId}
-            onChange={(e) => updateConfig({ seedId: e.target.value })}
-            placeholder="名字#编号"
-            disabled={running}
-            className="scout-control"
-          />
-        </div>
-
-        {/* 模式 */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-app-text">游戏模式</label>
-          <select
-            value={config.tag}
-            onChange={(e) => updateConfig({ tag: e.target.value })}
-            disabled={running}
-            className="scout-control"
-          >
-            {QUEUE_OPTIONS.map((q) => (
-              <option key={q.tag} value={q.tag}>
-                {q.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* 指定英雄 */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-app-text">
-              指定英雄
-              {config.championIds.length > 0 && (
-                <span className="ml-1 text-app-subtle">（{config.championIds.length}）</span>
-              )}
-            </label>
-            {favoriteIds.length > 0 && (
-              <button
-                onClick={() => updateConfig({ championIds: [...favoriteIds] })}
-                disabled={running}
-                className="flex items-center gap-1 text-[11px] text-app-primary transition-colors hover:underline disabled:opacity-60"
-              >
-                <Star className="size-3 fill-app-primary" />
-                用收藏({favoriteIds.length})
-              </button>
-            )}
+        <div className="scout-config-fields">
+          <div className="scout-field scout-field--seed">
+            <label>种子召唤师</label>
+            <input
+              type="text"
+              value={config.seedId}
+              onChange={(e) => updateConfig({ seedId: e.target.value })}
+              placeholder="名字#编号"
+              disabled={running}
+              className="scout-control"
+            />
           </div>
 
-          {/* 已选英雄摘要：整个区域可点击打开选择弹窗 */}
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            disabled={running}
-            className="scout-hero-picker"
-          >
-            {selectedChampions.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {selectedChampions.map((c) => (
-                  <GameIcon
-                    key={c.id}
-                    src={c.avatar}
-                    alt={c.title || c.name}
-                    title={c.title || c.name}
-                    size={28}
-                    rounded
-                  />
+          <div className="scout-field-row">
+            <div className="scout-field">
+              <label>目标大区</label>
+              <select
+                value={config.region ?? ''}
+                onChange={(e) => updateConfig({ region: e.target.value })}
+                disabled={running}
+                className="scout-control"
+              >
+                {regionOptions.map((region) => (
+                  <option key={region.key} value={region.key}>{region.name}</option>
                 ))}
-              </div>
-            ) : (
-              <div className="flex min-h-[54px] items-center justify-center gap-2 text-xs font-medium text-app-muted">
-                <Pencil className="size-3.5" />
-                点击选择英雄
-              </div>
-            )}
-          </button>
-          {/* 加载/错误状态提示 */}
-          {championsLoading && (
-            <p className="text-[11px] text-app-subtle">英雄列表加载中…</p>
-          )}
-          {championsError && !championsLoading && (
-            <p className="text-[11px] text-app-danger">{championsError}</p>
-          )}
-        </div>
-
-        {/* KDA 阈值 */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-app-text">KDA 达标阈值</label>
-            <span className="text-xs font-semibold tabular-nums text-app-primary">
-              {config.kdaThreshold.toFixed(1)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={KDA_THRESHOLD_MIN}
-            max={KDA_THRESHOLD_MAX}
-            step={KDA_THRESHOLD_STEP}
-            value={config.kdaThreshold}
-            onChange={(e) => updateConfig({ kdaThreshold: Number(e.target.value) })}
-            disabled={running}
-            className="scout-range"
-          />
-          <div className="flex justify-between font-mono text-[10px] text-app-subtle">
-            <span>{KDA_THRESHOLD_MIN}</span>
-            <span>15</span>
-            <span>20</span>
-            <span>{KDA_THRESHOLD_MAX}+</span>
-          </div>
-        </div>
-
-        {/* 时间窗 */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-app-text">达标时间窗（最近）</label>
-          <div className="flex gap-1">
-            {HOUR_OPTIONS.map((h) => (
-              <button
-                key={h}
-                onClick={() => updateConfig({ hoursWindow: h })}
+              </select>
+            </div>
+            <div className="scout-field">
+              <label>游戏模式</label>
+              <select
+                value={config.tag}
+                onChange={(e) => updateConfig({ tag: e.target.value })}
                 disabled={running}
-                className={`flex-1 rounded-xs border px-1 py-1 text-[11px] tabular-nums transition-colors disabled:opacity-60 ${
-                  config.hoursWindow === h
-                    ? 'border-app-primary bg-app-primary text-white'
-                    : 'border-app-border bg-app-surface-soft text-app-muted hover:border-app-primary'
-                }`}
+                className="scout-control"
               >
-                {h}h
-              </button>
-            ))}
+                {QUEUE_OPTIONS.map((queue) => (
+                  <option key={queue.tag} value={queue.tag}>{queue.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="scout-field">
+            <div className="scout-field-heading">
+              <label>指定英雄 <span>{config.championIds.length}</span></label>
+              {favoriteIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => updateConfig({ championIds: [...favoriteIds] })}
+                  disabled={running}
+                  className="scout-favorite-action"
+                >
+                  <Star className="size-3 fill-current" />
+                  收藏
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              disabled={running}
+              className="scout-hero-picker"
+            >
+              {selectedChampions.length > 0 ? (
+                <span className="scout-selected-champions">
+                  {selectedChampions.map((champion) => (
+                    <GameIcon
+                      key={champion.id}
+                      src={champion.avatar}
+                      alt={champion.title || champion.name}
+                      title={champion.title || champion.name}
+                      size={26}
+                      rounded
+                    />
+                  ))}
+                </span>
+              ) : (
+                <span className="scout-hero-picker__empty">
+                  <Pencil className="size-3.5" />
+                  选择英雄
+                </span>
+              )}
+            </button>
+            {championsLoading && <p className="scout-field-note">英雄列表加载中…</p>}
+            {championsError && !championsLoading && <p className="scout-field-note scout-field-note--error">{championsError}</p>}
+          </div>
+
+          <div className="scout-field scout-threshold-field">
+            <div className="scout-field-heading">
+              <label>KDA 阈值</label>
+              <strong>{config.kdaThreshold.toFixed(1)}</strong>
+            </div>
+            <input
+              type="range"
+              min={KDA_THRESHOLD_MIN}
+              max={KDA_THRESHOLD_MAX}
+              step={KDA_THRESHOLD_STEP}
+              value={config.kdaThreshold}
+              onChange={(e) => updateConfig({ kdaThreshold: Number(e.target.value) })}
+              disabled={running}
+              className="scout-range"
+            />
+            <div className="scout-range-scale">
+              <span>{KDA_THRESHOLD_MIN}</span><span>15</span><span>20</span><span>{KDA_THRESHOLD_MAX}+</span>
+            </div>
+          </div>
+
+          <div className="scout-field">
+            <label>最近时间</label>
+            <div className="scout-time-options">
+              {HOUR_OPTIONS.map((hours) => (
+                <button
+                  type="button"
+                  key={hours}
+                  onClick={() => updateConfig({ hoursWindow: hours })}
+                  disabled={running}
+                  className={config.hoursWindow === hours ? 'is-active' : ''}
+                >
+                  {hours}h
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="scout-target-field">
+            <span><b>目标人数</b><small>最多 50 人</small></span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={config.targetCount}
+              onChange={(e) => updateConfig({ targetCount: Math.max(1, Number(e.target.value) || 1) })}
+              disabled={running}
+              className="scout-control scout-target-control"
+            />
           </div>
         </div>
 
-        {/* 目标人数 */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-app-text">目标人数</label>
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={config.targetCount}
-            onChange={(e) => updateConfig({ targetCount: Math.max(1, Number(e.target.value) || 1) })}
-            disabled={running}
-            className="scout-control"
-          />
-        </div>
-
-        {/* 开始 / 取消 */}
-        <div className="flex gap-2">
+        <footer className="scout-config-footer">
           {!running ? (
             <button
               onClick={handleStart}
               disabled={!canStart}
-              className="flex-1 rounded-sm bg-app-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className="scout-start-button"
             >
               {canContinue ? '继续搜索下一批' : '开始搜索'}
             </button>
@@ -587,46 +704,82 @@ export function ScoutPage({
                 event.stopPropagation();
                 void handleCancel();
               }}
-              className="scout-cancel-button flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-app-border bg-app-surface px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-soft"
+              className="scout-cancel-button"
             >
               <Square className="size-3 fill-current" />
               取消
             </button>
           )}
-        </div>
-        {!canStart && !running && (
-          <p className="text-[11px] text-app-subtle">
-            请填种子 ID 并至少选 1 个英雄
-          </p>
-        )}
+          {!canStart && !running && <p>补全种子 ID 和指定英雄后即可开始</p>}
+        </footer>
       </aside>
 
       {/* ===== 右侧：结果区 ===== */}
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* 达标者流 */}
-        <div className="flex-1 overflow-y-auto bg-app-bg p-4">
+      <section className="scout-results">
+        <header className="scout-results-header">
+          <div className="scout-results-title">
+            <span className={running ? 'is-running' : ''} aria-hidden="true" />
+            <div>
+              <strong>雷达结果</strong>
+              <small>{resultStatus}</small>
+            </div>
+          </div>
+          <div className="scout-results-metrics">
+            <span>找到 <b>{hits.length}</b></span>
+            <span>已检查 <b>{checkedCount}</b></span>
+            <span>目标 <b>{progressTarget}</b></span>
+          </div>
+          <div className="scout-results-progress" aria-label={`搜索进度 ${progressPercent}%`}>
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+        </header>
+
+        <div className="scout-results-body">
           {error && (
-            <div className="mb-3 rounded-sm border border-app-loss-border bg-app-loss-bg px-3 py-2 text-xs text-app-text">
+            <div className="scout-results-error">
               {error}
             </div>
           )}
 
-          {hits.length === 0 && !running ? (
-            <div className="flex h-full items-center justify-center text-center text-xs text-app-subtle">
-              {finalSummary || '配置好条件后点「开始搜索」，达标的高手会在这里逐个出现'}
+          {showSearchNetwork && (
+            <ScoutSearchVisualizer
+              players={searchedPlayers}
+              totalPlayerCount={searchedPlayerTotal}
+              stateCounts={playerStateCounts}
+              runId={visualRunId}
+              running={running}
+              phase={progress?.phase ?? null}
+              checkedCount={checkedCount}
+              hitCount={hits.length}
+              onPlayerClick={(riotId) => onPlayerSearch(riotId, config.region ?? '')}
+            />
+          )}
+
+          {hits.length === 0 && !running && searchedPlayers.length === 0 ? (
+            <div className="scout-results-empty">
+              <span><Crosshair className="size-5" /></span>
+              <strong>还没有搜索结果</strong>
+              <p>设置好种子玩家和英雄后开始搜索</p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {hits.length === 0 && !running && (
+                <div className="scout-results-no-hits">本轮已检查 {checkedCount} 位玩家，暂时没有符合条件的人</div>
+              )}
+              {hits.length > 0 && (
+                <div className="scout-results-section-title">
+                  <strong>达标玩家</strong>
+                  <span>{hits.length}</span>
+                </div>
+              )}
+              <div className="scout-results-grid">
                 {hits.map((hit, idx) => {
                   const batchNumber = batchStarts.indexOf(idx) + 1;
                   return (
                     <Fragment key={`${hit.profile.puuid || hit.profile.riotId}-${idx}`}>
                       {idx > 0 && batchStartSet.has(idx) && (
-                        <div className="col-span-full flex items-center gap-3 pt-1 text-[11px] text-app-subtle">
-                          <div className="h-px flex-1 bg-app-border" />
-                          <span className="shrink-0 tabular-nums">第 {batchNumber} 批</span>
-                          <div className="h-px flex-1 bg-app-border" />
+                        <div className="scout-batch-divider">
+                          <span>第 {batchNumber} 批</span>
                         </div>
                       )}
                       <ScoutHitCard
@@ -639,17 +792,6 @@ export function ScoutPage({
                   );
                 })}
               </div>
-              {running && (
-                <div className="mt-4 flex items-center justify-center gap-2 py-4 text-xs text-app-subtle">
-                  <span className="inline-block size-2 animate-pulse rounded-full bg-app-primary" />
-                  正在扩散搜索…{progress && `（已查 ${progress.checked} 人）`}
-                </div>
-              )}
-              {finalSummary && !running && (
-                <div className="mt-4 rounded-sm border border-app-border bg-app-surface px-3 py-2 text-[11px] text-app-muted">
-                  {finalSummary}
-                </div>
-              )}
             </>
           )}
         </div>

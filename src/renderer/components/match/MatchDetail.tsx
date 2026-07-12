@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { CirclePlay, Download, LoaderCircle } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { RankEmblem } from '../RankEmblem';
 import badgeLegendary from '../../assets/match-badges/legendary.png';
@@ -20,6 +21,8 @@ import type {
   PlayerMatchDetail,
   PlayerRankSummary,
   PlayerRuneSummary,
+  ReplayAvailability,
+  ReplayAvailabilityRequest,
 } from '../../../shared/api';
 import type { RecurringMate } from './MatchList';
 
@@ -395,7 +398,108 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
   const [activeTab, setActiveTab] = useState<DetailTab>('scoreboard');
   const [chartMetricKey, setChartMetricKey] = useState(CHART_METRICS[0].key);
   const [rankByPuuid, setRankByPuuid] = useState<Record<string, PlayerRankSummary[]>>({});
+  const [replayPhase, setReplayPhase] = useState<'idle' | 'download' | 'watch'>('idle');
+  const [replayNotice, setReplayNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [replayAvailability, setReplayAvailability] = useState<ReplayAvailability | null>(null);
   const useRiftScoreboard = shouldUseRiftScoreboard(match.queueId);
+  const replayRequest = useMemo<ReplayAvailabilityRequest>(() => ({
+    gameId: match.gameId,
+    queueId: match.queueId,
+    gameCreation: match.gameCreation,
+    gameDuration: match.gameDuration,
+    gameVersion: match.gameVersion,
+    gameType: match.gameType,
+  }), [
+    match.gameCreation,
+    match.gameDuration,
+    match.gameId,
+    match.gameType,
+    match.gameVersion,
+    match.queueId,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReplayPhase('idle');
+    setReplayNotice(null);
+    setReplayAvailability(null);
+    void window.lolHelper.match.getReplayAvailability(replayRequest).then((availability) => {
+      if (!cancelled) setReplayAvailability(availability);
+    }).catch(() => {
+      if (!cancelled) setReplayAvailability(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [replayRequest]);
+
+  useEffect(() => {
+    if (!['checking', 'downloading'].includes(replayAvailability?.state ?? '')) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void window.lolHelper.match.getReplayAvailability(replayRequest).then((availability) => {
+        if (!cancelled) setReplayAvailability(availability);
+      });
+    }, 1_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [replayAvailability?.state, replayRequest]);
+
+  useEffect(() => {
+    if (!replayNotice) return;
+    const timer = window.setTimeout(() => setReplayNotice(null), 5_000);
+    return () => window.clearTimeout(timer);
+  }, [replayNotice]);
+
+  const handleReplayAction = async () => {
+    if (replayPhase !== 'idle' || !replayAvailability?.available || replayAvailability.state === 'downloading') return;
+    setReplayNotice(null);
+
+    try {
+      const alreadyDownloaded = ['found', 'watch'].includes(replayAvailability.state);
+      if (!alreadyDownloaded) {
+        setReplayPhase('download');
+        const downloadResult = await window.lolHelper.match.downloadReplay(match.gameId);
+        if (!downloadResult.success) {
+          setReplayNotice({ type: 'error', text: downloadResult.message });
+          return;
+        }
+        setReplayAvailability((current) => current
+          ? {
+              ...current,
+              state: 'downloading',
+              downloadProgress: 0,
+              message: '回放正在下载',
+            }
+          : current);
+        setReplayNotice({ type: 'success', text: '回放已开始下载' });
+        return;
+      }
+
+      setReplayPhase('watch');
+      const watchResult = await window.lolHelper.match.watchReplay(match.gameId);
+      if (!watchResult.success) {
+        setReplayNotice({
+          type: 'error',
+          text: watchResult.message,
+        });
+        return;
+      }
+      setReplayAvailability((current) => current
+        ? { ...current, state: 'watch', downloadProgress: 100 }
+        : current);
+      setReplayNotice({ type: 'success', text: watchResult.message });
+    } catch (error) {
+      setReplayNotice({
+        type: 'error',
+        text: error instanceof Error ? error.message : '回放启动失败，请稍后重试',
+      });
+    } finally {
+      setReplayPhase('idle');
+    }
+  };
 
   const participants = useMemo(
     () => match.participants
@@ -443,6 +547,17 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
   const selectedChartMetric =
     CHART_METRICS.find((metric) => metric.key === chartMetricKey) ?? CHART_METRICS[0];
+  const replayReady = ['found', 'watch'].includes(replayAvailability?.state ?? '');
+  const replayBusy = replayPhase !== 'idle' || replayAvailability?.state === 'downloading';
+  const replayControlLabel = replayAvailability?.state === 'downloading'
+    ? `下载 ${Math.round(replayAvailability.downloadProgress)}%`
+    : replayPhase === 'download'
+      ? '正在下载'
+      : replayPhase === 'watch'
+        ? '正在启动'
+        : replayReady
+          ? '播放回放'
+          : '下载回放';
 
   if (!target) {
     return <div className="lol-postgame lol-postgame-empty">暂无这场对局的详细数据</div>;
@@ -463,6 +578,34 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
             {tab.label}
           </button>
         ))}
+        {(replayAvailability?.available || replayNotice) && <div className="lol-postgame-replay">
+          {replayNotice && (
+            <span className={`lol-postgame-replay__notice lol-postgame-replay__notice--${replayNotice.type}`}>
+              {replayNotice.text}
+            </span>
+          )}
+          {replayAvailability?.available && <button
+            type="button"
+            className={`lol-postgame-replay__button ${
+              replayReady
+                ? 'lol-postgame-replay__button--ready'
+                : 'lol-postgame-replay__button--download'
+            }`}
+            disabled={replayBusy}
+            onClick={() => void handleReplayAction()}
+            title={replayControlLabel}
+            aria-label={replayControlLabel}
+          >
+            {replayBusy ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : replayReady ? (
+              <CirclePlay className="size-4" strokeWidth={1.8} />
+            ) : (
+              <Download className="size-3.5" strokeWidth={1.9} />
+            )}
+            <span>{replayControlLabel}</span>
+          </button>}
+        </div>}
       </div>
 
       <div className="lol-postgame-content">

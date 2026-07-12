@@ -16,6 +16,7 @@ import type {
   PlayerRankSummary,
   ScoutConfig,
   ScoutHit,
+  ScoutPlayerEvent,
   ScoutProgress,
   ScoutResult,
 } from '../../shared/api';
@@ -95,12 +96,18 @@ async function enrichHitRank(hit: ScoutHit, deps: ScoutDeps): Promise<ScoutHit> 
 
 export interface ScoutSessionState {
   initialized: boolean;
-  queue: Array<{ puuid: string; depth: number }>;
+  queue: ScoutQueueNode[];
   visited: Set<string>;
   queued: Set<string>;
-  pendingCandidates: string[];
+  pendingCandidates: ScoutQueueNode[];
   candidateQueued: Set<string>;
   candidateChecked: Set<string>;
+}
+
+interface ScoutQueueNode {
+  puuid: string;
+  depth: number;
+  parentPuuid?: string;
 }
 
 export function createScoutSessionState(): ScoutSessionState {
@@ -127,16 +134,30 @@ export function getScoutSessionKey(config: ScoutConfig): string {
   });
 }
 
-function enqueueSeed(session: ScoutSessionState, puuid: string, depth: number) {
-  if (!puuid || session.visited.has(puuid) || session.queued.has(puuid)) return;
+function enqueueSeed(
+  session: ScoutSessionState,
+  puuid: string,
+  depth: number,
+  parentPuuid?: string,
+): boolean {
+  if (!puuid || session.visited.has(puuid) || session.queued.has(puuid)) return false;
   session.queued.add(puuid);
-  session.queue.push({ puuid, depth });
+  session.queue.push({ puuid, depth, parentPuuid });
+  return true;
 }
 
-function enqueueCandidate(session: ScoutSessionState, puuid: string) {
-  if (!puuid || session.candidateChecked.has(puuid) || session.candidateQueued.has(puuid)) return;
+function enqueueCandidate(
+  session: ScoutSessionState,
+  puuid: string,
+  depth: number,
+  parentPuuid?: string,
+): boolean {
+  if (!puuid || session.candidateChecked.has(puuid) || session.candidateQueued.has(puuid)) {
+    return false;
+  }
   session.candidateQueued.add(puuid);
-  session.pendingCandidates.push(puuid);
+  session.pendingCandidates.push({ puuid, depth, parentPuuid });
+  return true;
 }
 
 // 主入口
@@ -163,14 +184,53 @@ export async function runScoutSession(
   const hits: ScoutHit[] = [];
   const cancel = () => (shouldCancel?.() ?? false);
 
-  const pushProgress = (phase: ScoutProgress['phase'], latestHit?: ScoutHit) => {
+  const makePlayerEvent = (
+    node: ScoutQueueNode,
+    source: ScoutPlayerEvent['source'],
+    state: ScoutPlayerEvent['state'],
+    matches: PlayerMatchDetail[] = [],
+    profile?: PlayerProfile,
+    qualifyingMatches = 0,
+  ): ScoutPlayerEvent => {
+    const recentMatch =
+      matches.find((match) => config.championIds.includes(match.championId)) ?? matches[0];
+    return {
+      puuid: node.puuid,
+      parentPuuid: node.parentPuuid,
+      depth: node.depth,
+      source,
+      state,
+      profile,
+      recentChampionId: recentMatch?.championId,
+      recentChampionName: recentMatch?.championName,
+      recentChampionAvatar: recentMatch?.championAvatar,
+      recentKda: recentMatch?.kda,
+      recentKills: recentMatch?.kills,
+      recentDeaths: recentMatch?.deaths,
+      recentAssists: recentMatch?.assists,
+      checkedMatches: matches.length,
+      qualifyingMatches,
+    };
+  };
+
+  const pushProgress = (
+    phase: ScoutProgress['phase'],
+    detail: {
+      latestHit?: ScoutHit;
+      latestPlayer?: ScoutPlayerEvent;
+      playerEvents?: ScoutPlayerEvent[];
+    } = {},
+  ) => {
+    const latestPlayer = detail.latestPlayer ?? detail.playerEvents?.at(-1);
     onProgress?.({
       phase,
       checked: stats.totalCandidates,
       hits: hits.length,
       target: targetCount,
       seedQueueRemaining: session.queue.length,
-      latestHit,
+      latestHit: detail.latestHit,
+      latestPlayer,
+      playerEvents: detail.playerEvents,
     });
   };
 
@@ -179,28 +239,63 @@ export async function runScoutSession(
       { length: Math.min(CONCURRENCY, session.pendingCandidates.length) },
       async () => {
         while (!cancel() && hits.length < targetCount && session.pendingCandidates.length > 0) {
-          const candPuuid = session.pendingCandidates.shift();
-          if (!candPuuid || session.candidateChecked.has(candPuuid)) continue;
+          const candidate = session.pendingCandidates.shift();
+          if (!candidate || session.candidateChecked.has(candidate.puuid)) continue;
 
-          session.candidateChecked.add(candPuuid);
+          session.candidateChecked.add(candidate.puuid);
           stats.totalCandidates++;
+          pushProgress('scanning', {
+            latestPlayer: makePlayerEvent(candidate, 'candidate', 'checking'),
+          });
 
           let candMatches: PlayerMatchDetail[];
           try {
-            candMatches = await deps.fetchMatches(candPuuid, CANDIDATE_FETCH_COUNT, config.tag);
+            candMatches = await deps.fetchMatches(
+              candidate.puuid,
+              CANDIDATE_FETCH_COUNT,
+              config.tag,
+            );
             stats.totalRequests++;
           } catch {
+            pushProgress('scanning', {
+              latestPlayer: makePlayerEvent(candidate, 'candidate', 'failed'),
+            });
             continue;
           }
 
+          const profile = deriveProfile(candidate.puuid, candMatches);
           const qualifying = filterQualifying(candMatches, config, now);
-          if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(candPuuid)) {
+          if (
+            qualifying.length > 0 &&
+            hits.length < targetCount &&
+            !excludedPuuids.has(candidate.puuid)
+          ) {
             const hit = await enrichHitRank(
-              buildHit(candPuuid, candMatches, qualifying, config.championIds),
+              buildHit(candidate.puuid, candMatches, qualifying, config.championIds),
               deps,
             );
             hits.push(hit);
-            pushProgress('scanning', hit);
+            pushProgress('scanning', {
+              latestHit: hit,
+              latestPlayer: makePlayerEvent(
+                candidate,
+                'candidate',
+                'matched',
+                candMatches,
+                hit.profile,
+                qualifying.length,
+              ),
+            });
+          } else {
+            pushProgress('scanning', {
+              latestPlayer: makePlayerEvent(
+                candidate,
+                'candidate',
+                'checked',
+                candMatches,
+                profile,
+              ),
+            });
           }
         }
       },
@@ -220,7 +315,11 @@ export async function runScoutSession(
         stats,
       };
     }
+    const seedNode: ScoutQueueNode = { puuid: seed.puuid, depth: 0 };
     enqueueSeed(session, seed.puuid, 0);
+    pushProgress('seeding', {
+      latestPlayer: makePlayerEvent(seedNode, 'seed', 'queued'),
+    });
     session.initialized = true;
   }
 
@@ -238,18 +337,30 @@ export async function runScoutSession(
     session.visited.add(node.puuid);
     stats.totalSeeds++;
     if (node.depth > stats.depth) stats.depth = node.depth;
+    const shouldCheckSeed = !session.candidateChecked.has(node.puuid);
+    if (shouldCheckSeed) {
+      session.candidateChecked.add(node.puuid);
+      stats.totalCandidates++;
+      pushProgress('scanning', {
+        latestPlayer: makePlayerEvent(node, 'seed', 'checking'),
+      });
+    }
 
     let seedMatches: PlayerMatchDetail[];
     try {
       seedMatches = await deps.fetchMatches(node.puuid, SEED_FETCH_COUNT, config.tag);
       stats.totalRequests++;
     } catch {
+      if (shouldCheckSeed) {
+        pushProgress('scanning', {
+          latestPlayer: makePlayerEvent(node, 'seed', 'failed'),
+        });
+      }
       continue;
     }
 
-    if (!session.candidateChecked.has(node.puuid)) {
-      session.candidateChecked.add(node.puuid);
-      stats.totalCandidates++;
+    if (shouldCheckSeed) {
+      const profile = deriveProfile(node.puuid, seedMatches);
       const qualifying = filterQualifying(seedMatches, config, now);
       if (qualifying.length > 0 && hits.length < targetCount && !excludedPuuids.has(node.puuid)) {
         const hit = await enrichHitRank(
@@ -257,18 +368,55 @@ export async function runScoutSession(
           deps,
         );
         hits.push(hit);
-        pushProgress('scanning', hit);
+        pushProgress('scanning', {
+          latestHit: hit,
+          latestPlayer: makePlayerEvent(
+            node,
+            'seed',
+            'matched',
+            seedMatches,
+            hit.profile,
+            qualifying.length,
+          ),
+        });
+      } else {
+        pushProgress('scanning', {
+          latestPlayer: makePlayerEvent(node, 'seed', 'checked', seedMatches, profile),
+        });
       }
     }
 
+    const discoveredPlayers: ScoutPlayerEvent[] = [];
     for (const candPuuid of collectCandidates(seedMatches, config.championIds, node.puuid)) {
-      enqueueCandidate(session, candPuuid);
+      const candidateDepth = node.depth + 1;
+      if (enqueueCandidate(session, candPuuid, candidateDepth, node.puuid)) {
+        discoveredPlayers.push(
+          makePlayerEvent(
+            { puuid: candPuuid, depth: candidateDepth, parentPuuid: node.puuid },
+            'candidate',
+            'queued',
+          ),
+        );
+      }
     }
 
     for (const m of seedMatches) {
       for (const seedPuuid of pickSeeds(m, topN)) {
-        enqueueSeed(session, seedPuuid, node.depth + 1);
+        const seedDepth = node.depth + 1;
+        if (enqueueSeed(session, seedPuuid, seedDepth, node.puuid)) {
+          discoveredPlayers.push(
+            makePlayerEvent(
+              { puuid: seedPuuid, depth: seedDepth, parentPuuid: node.puuid },
+              'seed',
+              'queued',
+            ),
+          );
+        }
       }
+    }
+
+    if (discoveredPlayers.length > 0) {
+      pushProgress('scanning', { playerEvents: discoveredPlayers });
     }
 
     pushProgress('scanning');

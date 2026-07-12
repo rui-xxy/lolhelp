@@ -219,7 +219,8 @@ export function ChatSessionDialog({
   const [emojiPageIndex, setEmojiPageIndex] = useState(0);
   const loadingRef = useRef(false);
   const selectedAccountKeyRef = useRef('');
-  const messageEndRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const followLatestMessageRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -365,6 +366,7 @@ export function ChatSessionDialog({
         setSendError(result.message);
         return;
       }
+      followLatestMessageRef.current = true;
       setDraft('');
       await loadConversations(false);
     } catch (sendFailure) {
@@ -398,10 +400,38 @@ export function ChatSessionDialog({
     });
   }, [draft]);
 
+  const selectedConversationId = selectedConversation?.id ?? '';
+  const selectedLastMessage = selectedConversation?.messages.at(-1);
+  const selectedMessageVersion = selectedConversationId
+    ? [
+        selectedConversationId,
+        selectedConversation?.messages.length ?? 0,
+        selectedLastMessage?.id ?? '',
+        selectedLastMessage?.timestamp ?? '',
+      ].join(':')
+    : '';
+
+  const scrollMessagesToBottom = useCallback(() => {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+    messageList.scrollTop = messageList.scrollHeight;
+    followLatestMessageRef.current = true;
+  }, []);
+
   useEffect(() => {
-    if (!selectedConversation) return;
-    messageEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [selectedConversation, selectedConversation?.messages.length]);
+    if (!open || !selectedConversationId) return undefined;
+    followLatestMessageRef.current = true;
+    const frame = window.requestAnimationFrame(scrollMessagesToBottom);
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, scrollMessagesToBottom, selectedConversationId]);
+
+  useEffect(() => {
+    if (!open || !selectedMessageVersion || !followLatestMessageRef.current) {
+      return undefined;
+    }
+    const frame = window.requestAnimationFrame(scrollMessagesToBottom);
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, scrollMessagesToBottom, selectedMessageVersion]);
 
   if (!open) return null;
 
@@ -641,7 +671,18 @@ export function ChatSessionDialog({
 
           {selectedConversation ? (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg-soft px-6 py-5">
+              <div
+                ref={messageListRef}
+                className="min-h-0 flex-1 overflow-y-auto bg-app-bg-soft px-6 py-5"
+                onScroll={(event) => {
+                  const messageList = event.currentTarget;
+                  const distanceToBottom =
+                    messageList.scrollHeight
+                    - messageList.scrollTop
+                    - messageList.clientHeight;
+                  followLatestMessageRef.current = distanceToBottom <= 48;
+                }}
+              >
                 <div className="mx-auto max-w-[680px] space-y-4">
                   {selectedConversation.messages.map((message) => (
                     <MessageBubble
@@ -650,7 +691,6 @@ export function ChatSessionDialog({
                       conversation={selectedConversation}
                     />
                   ))}
-                  <div ref={messageEndRef} />
                 </div>
               </div>
               <div className="shrink-0 border-t border-app-border bg-app-surface p-4">
