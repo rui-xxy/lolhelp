@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Bell,
+  Bookmark,
   Folder,
   FolderPlus,
   Trash2,
   Users,
-  X,
 } from 'lucide-react';
 import type { ChampionSummary, PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
 import { LOL_REGIONS } from '../../../shared/constants';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
 import { GameIcon } from './GameIcon';
+import { LargeDialog } from '../ui/large-dialog';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import {
   createSavedMatchGroup,
   deleteSavedMatchAccount,
@@ -145,6 +147,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   const [groupName, setGroupName] = useState('');
   const [notice, setNotice] = useState('');
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
 
   const refresh = async () => {
     const state = await loadSavedMatchesState();
@@ -167,6 +170,12 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
       window.clearInterval(timer);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(''), 3_500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (activeGroup === 'all' || activeGroup === 'ungrouped') return;
@@ -231,6 +240,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 
   const deleteAccount = async (accountId: string) => {
     setAccounts(await deleteSavedMatchAccount(accountId));
+    setDeleteAccountId(null);
     setNotice('保存账号已删除');
   };
 
@@ -249,32 +259,18 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 [-webkit-app-region:no-drag]"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <>
+    <LargeDialog
+      open={open}
+      onClose={onClose}
+      title="保存战绩"
+      description={`${accounts.length} 个保存账号 · 按分组管理并随时重新打开`}
+      icon={<Bookmark className="size-4" />}
+      notice={notice}
+      className="h-[660px] w-[1020px]"
     >
-      <section className="relative flex h-[620px] w-[960px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-airbnb">
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-          {notice && <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs text-app-primary shadow-sm">{notice}</span>}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-full bg-white/85 text-app-subtle shadow-sm transition-colors hover:bg-app-surface-soft hover:text-app-text"
-            title="关闭"
-            aria-label="关闭"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="flex min-h-0 flex-1">
-          <aside className="flex w-64 shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
+        <div className="flex h-full min-h-0">
+          <aside className="flex w-[270px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft/80">
             <div className="shrink-0 border-b border-app-border p-3">
               <nav className="space-y-1">
                 <GroupButton
@@ -331,7 +327,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {filteredAccounts.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
                   {filteredAccounts.map((account) => (
                     <AccountListItem
                       key={account.id}
@@ -345,17 +341,17 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                   ))}
                 </div>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-sm border border-dashed border-app-border bg-app-surface px-3 text-center text-xs text-app-muted">
+                <div className="flex h-full items-center justify-center px-3 text-center text-xs text-app-muted">
                   这里还没有保存账号
                 </div>
               )}
             </div>
           </aside>
 
-          <main className="flex min-w-0 flex-1 flex-col bg-app-bg">
+          <main className="flex min-w-0 flex-1 flex-col bg-app-surface">
             {activeAccount ? (
               <>
-                <div className="shrink-0 border-b border-app-border bg-gradient-to-r from-app-primary-soft/70 via-app-surface to-app-surface px-5 py-4">
+                <div className="shrink-0 border-b border-app-border bg-app-surface px-5 py-4">
                   <div className="flex items-start gap-3.5">
                     <ProfileIcon
                       iconId={activeAccount.profile.profileIconId}
@@ -368,7 +364,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                         <h3 className="truncate text-lg font-semibold text-app-text">
                           {getFullRiotId(activeAccount.profile.riotId)}
                         </h3>
-                        <span className="shrink-0 rounded-full border border-app-primary/20 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-app-primary shadow-sm">
+                        <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-1 text-[10px] font-medium text-app-primary">
                           {getRegionName(activeAccount)}
                         </span>
                       </div>
@@ -392,7 +388,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       <select
                         value={activeAccount.groupId ?? ''}
                         onChange={(event) => void moveAccount(activeAccount.id, event.target.value)}
-                        className="h-8 w-28 rounded-full border border-app-border bg-white/85 px-3 text-xs text-app-text outline-none focus:border-app-primary"
+                        className="h-8 w-28 rounded-sm border border-app-border bg-app-surface px-2.5 text-xs text-app-text outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10"
                       >
                         <option value="">未分组</option>
                         {groups.map((group) => (
@@ -404,10 +400,10 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       <button
                         type="button"
                         onClick={() => void toggleFollow(activeAccount.id, !activeAccount.follow?.enabled)}
-                        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-colors ${
+                        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-sm px-3 text-xs font-medium transition-colors ${
                           activeAccount.follow?.enabled
-                            ? 'bg-app-primary-soft text-app-primary hover:bg-white'
-                            : 'bg-white/80 text-app-muted hover:bg-app-surface hover:text-app-primary'
+                            ? 'bg-app-primary-soft text-app-primary hover:bg-app-primary-soft/70'
+                            : 'border border-app-border bg-app-surface text-app-muted hover:text-app-primary'
                         }`}
                         title={activeAccount.follow?.enabled ? '取消关注这个账号' : '关注这个账号'}
                       >
@@ -424,14 +420,14 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                           onSelect(activeAccount);
                           onClose();
                         }}
-                        className="h-8 shrink-0 rounded-full bg-app-primary px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-app-primary-hover"
+                        className="h-8 shrink-0 rounded-sm bg-app-primary px-4 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover"
                       >
                         打开战绩
                       </button>
                       <button
                         type="button"
-                        onClick={() => void deleteAccount(activeAccount.id)}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
+                        onClick={() => setDeleteAccountId(activeAccount.id)}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-sm text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
                         title="删除这个保存账号"
                         aria-label="删除这个保存账号"
                       >
@@ -443,7 +439,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                   {activeTab === 'info' ? (
-                    <AccountInfoPanel />
+                    <AccountInfoPanel account={activeAccount} />
                   ) : (
                     <SavedMatchesPanel account={activeAccount} championMap={championMap} />
                   )}
@@ -459,8 +455,21 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
             )}
           </main>
         </div>
-      </section>
-    </div>
+    </LargeDialog>
+    <ConfirmDialog
+      open={Boolean(deleteAccountId)}
+      title="删除保存账号"
+      description="该账号保存的战绩、分组和关注状态都会被删除。此操作无法撤销。"
+      confirmLabel="删除账号"
+      destructive
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setDeleteAccountId(null);
+      }}
+      onConfirm={() => {
+        if (deleteAccountId) void deleteAccount(deleteAccountId);
+      }}
+    />
+    </>
   );
 }
 
@@ -477,10 +486,10 @@ function AccountListItem({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors ${
+      className={`flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors ${
         active
-          ? 'border-app-primary-soft bg-app-surface text-app-text shadow-sm ring-1 ring-app-primary/10'
-          : 'border-transparent text-app-muted hover:border-app-border hover:bg-app-surface'
+          ? 'bg-app-primary-soft/60 text-app-text'
+          : 'text-app-muted hover:bg-app-bg-soft hover:text-app-text'
       }`}
     >
       <ProfileIcon
@@ -533,8 +542,57 @@ function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
   );
 }
 
-function AccountInfoPanel() {
-  return <div className="h-full" />;
+function AccountInfoPanel({ account }: { account: SavedMatchAccount }) {
+  const wins = account.matches.filter((match) => match.win).length;
+  const losses = account.matches.length - wins;
+  const winRate = account.matches.length > 0
+    ? Math.round((wins / account.matches.length) * 100)
+    : 0;
+
+  return (
+    <div className="mx-auto max-w-[680px] space-y-6 py-2">
+      <section>
+        <h4 className="mb-2 text-xs font-semibold text-app-text">保存概览</h4>
+        <div className="grid grid-cols-3 overflow-hidden rounded-sm border border-app-border bg-app-surface divide-x divide-app-border">
+          <div className="px-4 py-3">
+            <div className="text-[10px] text-app-muted">保存对局</div>
+            <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">{account.matches.length}</div>
+          </div>
+          <div className="px-4 py-3">
+            <div className="text-[10px] text-app-muted">胜负</div>
+            <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">
+              <span className="text-app-success">{wins}</span>
+              <span className="mx-1 text-app-subtle">/</span>
+              <span className="text-app-danger">{losses}</span>
+            </div>
+          </div>
+          <div className="px-4 py-3">
+            <div className="text-[10px] text-app-muted">胜率</div>
+            <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">{winRate}%</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h4 className="mb-2 text-xs font-semibold text-app-text">账号资料</h4>
+        <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
+          <InfoRow label="Riot ID" value={getFullRiotId(account.profile.riotId)} />
+          <InfoRow label="大区" value={getRegionName(account)} />
+          <InfoRow label="保存时间" value={formatSavedAt(getSavedAt(account))} />
+          <InfoRow label="关注状态" value={account.follow?.enabled ? '已关注' : '未关注'} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-h-10 grid-cols-[120px_minmax(0,1fr)] items-center gap-4 px-3 py-2 text-xs">
+      <span className="text-app-muted">{label}</span>
+      <span className="truncate text-right font-medium text-app-text">{value}</span>
+    </div>
+  );
 }
 
 function SavedMatchesPanel({
@@ -545,14 +603,14 @@ function SavedMatchesPanel({
   championMap: Map<number, ChampionSummary>;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
       {account.matches.map((match) => (
         <div
           key={match.gameId}
-          className={`grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 rounded-xl px-3 py-2.5 shadow-sm ring-1 ${
+          className={`grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 border-l-2 px-3 py-2.5 ${
             match.win
-              ? 'bg-app-win-bg/35 ring-app-win-border'
-              : 'bg-app-loss-bg/35 ring-app-loss-border'
+              ? 'border-l-app-success bg-app-win-bg/20'
+              : 'border-l-app-danger bg-app-loss-bg/20'
           }`}
         >
           <div className="flex min-w-0 items-center gap-2">
@@ -597,10 +655,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`h-8 rounded-full px-4 text-xs font-semibold transition-colors ${
+      className={`h-8 rounded-sm px-3 text-xs font-medium transition-colors ${
         active
-          ? 'bg-app-primary text-white shadow-sm'
-          : 'bg-white/70 text-app-muted hover:bg-app-surface hover:text-app-text'
+          ? 'bg-app-primary-soft text-app-primary'
+          : 'text-app-muted hover:bg-app-bg-soft hover:text-app-text'
       }`}
     >
       {children}
@@ -628,7 +686,7 @@ function GroupButton({
       <button
         type="button"
         onClick={onClick}
-        className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-sm font-medium transition-colors ${
+        className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-left text-sm font-medium transition-colors ${
           active
             ? 'bg-app-surface text-app-text shadow-sm'
             : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'

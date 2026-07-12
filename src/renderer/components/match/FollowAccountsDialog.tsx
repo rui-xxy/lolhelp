@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, ChevronDown, Search, X } from 'lucide-react';
+import { Bell, ChevronDown, Search } from 'lucide-react';
 import type {
   ChampionSummary,
   PlayerMatchDetail,
@@ -9,6 +9,7 @@ import type {
 import { LOL_REGIONS } from '../../../shared/constants';
 import { GameIcon } from './GameIcon';
 import { ProfileIcon } from '../ProfileIcon';
+import { LargeDialog } from '../ui/large-dialog';
 import {
   loadSavedMatchesState,
   saveMatchesForProfile,
@@ -169,6 +170,12 @@ export function FollowAccountsDialog({
   }, [currentRegionKey, open, refresh]);
 
   useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(''), 3_500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
     if (!open || !request || handledRequestNonceRef.current === request.nonce) return;
     handledRequestNonceRef.current = request.nonce;
     const nextRegion = request.region ?? currentRegionKey ?? '';
@@ -180,35 +187,16 @@ export function FollowAccountsDialog({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 [-webkit-app-region:no-drag]"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <LargeDialog
+      open={open}
+      onClose={onClose}
+      title="关注账号"
+      description="每分钟检查一次，发现新的近期战绩后只提醒一次"
+      icon={<Bell className="size-4 fill-app-primary" />}
+      notice={notice}
+      className="h-[660px] w-[980px]"
     >
-      <section className="relative flex h-[640px] w-[920px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-airbnb">
-        <div className="flex shrink-0 items-center gap-3 border-b border-app-border bg-gradient-to-r from-app-primary-soft/70 via-app-surface to-app-surface px-5 py-3">
-          <div className="flex size-9 items-center justify-center rounded-full bg-white text-app-primary shadow-sm">
-            <Bell className="size-4.5 fill-app-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold text-app-text">关注账号</div>
-          </div>
-          {notice && <span className="max-w-72 truncate rounded-full bg-white/85 px-3 py-1 text-xs text-app-primary shadow-sm">{notice}</span>}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-full bg-white/85 text-app-subtle shadow-sm transition-colors hover:bg-app-surface-soft hover:text-app-text"
-            title="关闭"
-            aria-label="关闭"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col border-r border-app-border bg-app-bg-soft p-3">
             <form
               className="flex h-10 shrink-0 items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-colors focus-within:border-app-primary"
@@ -254,7 +242,7 @@ export function FollowAccountsDialog({
               <span className="font-semibold text-app-text">已关注</span>
               <span className="text-app-muted">{followedAccounts.length}</span>
             </div>
-            <div className="mt-2 min-h-0 flex-1 overflow-y-auto space-y-2 pr-1">
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
               {followedAccounts.length > 0 ? (
                 followedAccounts.map((account) => (
                   <FollowAccountCard
@@ -264,7 +252,7 @@ export function FollowAccountsDialog({
                   />
                 ))
               ) : (
-                <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-app-border bg-app-surface px-3 text-center text-xs text-app-muted">
+                <div className="flex h-40 items-center justify-center px-3 text-center text-xs text-app-muted">
                   暂无关注
                 </div>
               )}
@@ -275,14 +263,14 @@ export function FollowAccountsDialog({
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold text-app-text">新战绩</div>
               {alerts.length > 0 && (
-                <span className="rounded-full bg-app-primary-soft px-2.5 py-1 text-xs font-semibold text-app-primary">
+                <span className="rounded-sm bg-app-primary-soft px-2 py-1 text-[11px] font-medium text-app-primary">
                   {alerts.length}
                 </span>
               )}
             </div>
 
             {alerts.length > 0 ? (
-              <div className="space-y-2">
+              <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
                 {alerts.map((alert) => (
                   <FollowAlertRow key={alert.id} alert={alert} championMap={championMap} />
                 ))}
@@ -290,7 +278,7 @@ export function FollowAccountsDialog({
             ) : (
               <div className="flex h-[440px] items-center justify-center">
                 <div className="flex flex-col items-center gap-2 text-app-muted">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-app-primary-soft/70 text-app-primary/70">
+                  <div className="flex size-9 items-center justify-center rounded-sm bg-app-primary-soft/70 text-app-primary/70">
                     <Bell className="size-4" />
                   </div>
                   <span className="text-xs">暂无新战绩</span>
@@ -299,8 +287,7 @@ export function FollowAccountsDialog({
             )}
           </main>
         </div>
-      </section>
-    </div>
+    </LargeDialog>
   );
 }
 
@@ -314,7 +301,7 @@ function FollowAccountCard({
   const match = latestMatch(account);
   const latestGameText = match ? ` · 最近游戏 ${formatFullTime(match.gameCreation)}` : '';
   return (
-    <div className="rounded-xl border border-app-border bg-app-surface p-2.5 shadow-sm">
+    <div className="px-3 py-2.5 transition-colors hover:bg-app-bg-soft/65">
       <div className="flex items-center gap-2">
         <ProfileIcon
           iconId={account.profile.profileIconId}
@@ -331,7 +318,7 @@ function FollowAccountCard({
         <button
           type="button"
           onClick={onUnfollow}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
+          className="flex size-7 shrink-0 items-center justify-center rounded-sm text-app-subtle transition-colors hover:bg-app-danger/10 hover:text-app-danger"
           title="取消关注"
           aria-label="取消关注"
         >
@@ -355,10 +342,10 @@ function FollowAlertRow({
   const match = alert.match;
   return (
     <div
-      className={`grid grid-cols-[minmax(0,1fr)_94px_88px] items-center gap-3 rounded-xl px-3 py-2.5 shadow-sm ring-1 ${
+      className={`grid grid-cols-[minmax(0,1fr)_94px_88px] items-center gap-3 border-l-2 px-3 py-2.5 ${
         match.win
-          ? 'bg-app-win-bg/35 ring-app-win-border'
-          : 'bg-app-loss-bg/35 ring-app-loss-border'
+          ? 'border-l-app-success bg-app-win-bg/20'
+          : 'border-l-app-danger bg-app-loss-bg/20'
       }`}
     >
       <div className="flex min-w-0 items-center gap-2.5">

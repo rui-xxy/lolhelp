@@ -1,11 +1,11 @@
 import {
   ChevronDown,
   MessageCircleMore,
+  MessagesSquare,
   RefreshCw,
   Search,
   SendHorizontal,
   Smile,
-  X,
 } from 'lucide-react';
 import {
   useCallback,
@@ -20,6 +20,7 @@ import type {
   ChatMessage,
 } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
+import { LargeDialog } from '../ui/large-dialog';
 
 const CHAT_REFRESH_INTERVAL_MS = 5_000;
 const EMOJI_PAGES = [
@@ -436,20 +437,22 @@ export function ChatSessionDialog({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) closeDialog();
-      }}
+    <LargeDialog
+      open={open}
+      onClose={closeDialog}
+      title="聊天记录"
+      description={`${accounts.length} 个账号 · 本地记录与当前客户端会话`}
+      icon={<MessagesSquare className="size-4" />}
+      className="h-[700px] w-[1060px]"
     >
-      <section className="flex h-[680px] max-h-[88vh] w-[1040px] max-w-[94vw] overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
-        <aside className="flex w-[330px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
+      <div className="flex h-full min-h-0">
+        <aside className="flex w-[310px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft/80">
           <header className="border-b border-app-border px-4 py-3">
             <div ref={accountMenuRef} className="relative mb-2">
               <button
                 type="button"
                 onClick={() => setAccountMenuOpen((current) => !current)}
-                className="flex h-8 w-full items-center gap-2 rounded-sm border border-app-border bg-app-surface px-2 text-left transition-colors hover:border-app-primary/60"
+                className="flex h-8 w-full items-center gap-2 rounded-sm border border-app-border bg-app-surface px-2 text-left transition-colors hover:border-app-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-primary/10"
               >
                 {selectedAccount && (
                   <ProfileIcon
@@ -471,7 +474,7 @@ export function ChatSessionDialog({
                 <ChevronDown className="size-3.5 shrink-0 text-app-subtle" />
               </button>
               {accountMenuOpen && (
-                <div className="absolute top-9 left-0 z-30 max-h-72 w-full overflow-y-auto rounded-md border border-app-border bg-app-surface p-1 shadow-airbnb">
+                <div className="absolute top-9 left-0 z-30 max-h-72 w-full overflow-y-auto rounded-sm border border-app-border bg-app-surface p-1 shadow-airbnb">
                   {accounts.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-app-muted">暂无保存账号</div>
                   ) : (
@@ -491,7 +494,7 @@ export function ChatSessionDialog({
                         }}
                         className={`flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left transition-colors ${
                           selectedAccountKey === account.key
-                            ? 'bg-app-primary-soft text-app-primary'
+                            ? 'bg-app-primary-soft/70 text-app-primary'
                             : 'text-app-text hover:bg-app-nav-hover'
                         }`}
                       >
@@ -579,7 +582,7 @@ export function ChatSessionDialog({
                     }}
                     className={`flex w-full items-center gap-3 border-b border-app-border/70 px-3 py-3 text-left transition-colors ${
                       selectedId === conversation.id
-                        ? 'bg-app-surface'
+                        ? 'bg-app-primary-soft/55'
                         : 'hover:bg-app-nav-hover'
                     }`}
                   >
@@ -611,7 +614,7 @@ export function ChatSessionDialog({
                       </div>
                       <div className="mt-1 flex min-w-0 items-center gap-1.5">
                         {statusText && (
-                          <span className="shrink-0 rounded-full bg-app-primary-soft px-1.5 py-0.5 text-[9px] font-medium text-app-primary">
+                          <span className="shrink-0 rounded-sm bg-app-primary-soft px-1.5 py-0.5 text-[9px] font-medium text-app-primary">
                             {statusText}
                           </span>
                         )}
@@ -627,8 +630,8 @@ export function ChatSessionDialog({
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col bg-app-bg">
-          <header className="flex h-[65px] shrink-0 items-center gap-3 border-b border-app-border px-5">
+        <div className="flex min-w-0 flex-1 flex-col bg-app-surface">
+          <header className="flex h-[58px] shrink-0 items-center gap-3 border-b border-app-border px-5">
             {selectedConversation ? (
               <>
                 <ProfileIcon
@@ -645,7 +648,7 @@ export function ChatSessionDialog({
                       {selectedConversation.riotId}
                     </div>
                     {conversationStatusText(selectedConversation) && (
-                      <span className="shrink-0 rounded-full bg-app-primary-soft px-2 py-0.5 text-[10px] font-medium text-app-primary">
+                      <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-0.5 text-[10px] font-medium text-app-primary">
                         {conversationStatusText(selectedConversation)}
                       </span>
                     )}
@@ -658,15 +661,6 @@ export function ChatSessionDialog({
             ) : (
               <div className="flex-1 text-sm font-semibold text-app-text">聊天内容</div>
             )}
-            <button
-              type="button"
-              onClick={closeDialog}
-              title="关闭会话管理"
-              aria-label="关闭会话管理"
-              className="flex size-8 items-center justify-center rounded-sm text-app-muted hover:bg-app-surface-soft hover:text-app-text"
-            >
-              <X className="size-4" />
-            </button>
           </header>
 
           {selectedConversation ? (
@@ -826,7 +820,7 @@ export function ChatSessionDialog({
             </>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-app-bg-soft">
+              <div className="flex size-12 items-center justify-center rounded-sm bg-app-bg-soft">
                 <MessageCircleMore className="size-6 text-app-border-strong" />
               </div>
               <div>
@@ -838,7 +832,7 @@ export function ChatSessionDialog({
             </div>
           )}
         </div>
-      </section>
-    </div>
+      </div>
+    </LargeDialog>
   );
 }
