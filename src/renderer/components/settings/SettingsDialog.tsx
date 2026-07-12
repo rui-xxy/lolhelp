@@ -10,8 +10,13 @@ import {
 } from 'react';
 import {
   Check,
+  ChevronDown,
   FolderOpen,
   FolderSearch,
+  Gamepad2,
+  Keyboard,
+  Library,
+  MonitorCog,
   RefreshCw,
   Search,
   Settings,
@@ -19,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import type {
   LolClientConfigValues,
   LolConfigState,
@@ -69,6 +75,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [deleteProfileConfirmOpen, setDeleteProfileConfirmOpen] = useState(false);
 
   const profiles = state?.profiles ?? [];
   const selectedProfile = useMemo(
@@ -273,13 +280,13 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const deleteProfile = useCallback(async () => {
     if (!selectedProfileId || !selectedProfile) return;
-    if (!window.confirm(`删除方案“${selectedProfile.name}”？`)) return;
     setBusy('delete-profile');
     setNotice(null);
     try {
       const nextProfiles = await window.lolHelper.config.deleteProfile(selectedProfileId);
       setState((current) => (current ? { ...current, profiles: nextProfiles } : current));
       setSelectedProfileId(nextProfiles[0]?.id ?? '');
+      setDeleteProfileConfirmOpen(false);
       setNotice({ type: 'success', text: '方案已删除' });
     } catch (err) {
       setNotice({ type: 'error', text: err instanceof Error ? err.message : '删除方案失败' });
@@ -292,97 +299,78 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 backdrop-blur-[1px]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="flex h-[640px] w-[980px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
-          <div className="flex size-8 items-center justify-center rounded-sm bg-app-surface-soft text-app-primary">
+      <section className="flex h-[680px] max-h-[90vh] w-[1060px] max-w-[94vw] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-app-border px-5">
+          <div className="flex size-8 items-center justify-center rounded-sm bg-app-primary-soft text-app-primary">
             <Settings className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-app-text">设置同步</h2>
-            <p className="truncate text-xs text-app-muted">{rootPath}</p>
+            <h2 className="text-sm font-semibold text-app-text">设置</h2>
+            <p className="mt-0.5 truncate text-[11px] text-app-muted">同步英雄联盟客户端与游戏内配置</p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-app-muted">
+            <span className={`size-1.5 rounded-full ${state?.found ? 'bg-app-success' : 'bg-app-danger'}`} />
+            {state?.found ? '已读取配置' : '等待配置目录'}
           </div>
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="关闭设置">
             <X className="size-4" />
           </Button>
         </header>
 
-        <div className="border-b border-app-border bg-app-bg-soft px-4 py-3">
-          <div className="flex items-center gap-2">
-            <FolderSearch className="size-4 shrink-0 text-app-muted" />
-            <input
-              value={rootPath}
-              onChange={(e) => setRootPath(e.target.value)}
-              className="h-8 min-w-0 flex-1 rounded-sm border border-app-border bg-app-surface px-2 text-xs text-app-text outline-none focus:border-app-primary"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={detectRoots}
-              disabled={Boolean(busy)}
-            >
-              <Search className={`size-3.5 ${busy === 'detect-root' ? 'animate-pulse' : ''}`} />
-              自动检测
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={chooseRoot}
-              disabled={Boolean(busy)}
-            >
-              <FolderOpen className="size-3.5" />
-              选择文件夹
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refresh(rootPath)}
-              disabled={Boolean(busy)}
-            >
-              <RefreshCw className={`size-3.5 ${busy === 'read' ? 'animate-spin' : ''}`} />
-              读取
-            </Button>
-            <Button size="sm" onClick={applyDraft} disabled={!draft || Boolean(busy)}>
-              <Upload className="size-3.5" />
-              写入当前
-            </Button>
-          </div>
-          {notice && (
-            <div
-              className={`mt-2 flex items-center gap-2 rounded-sm border px-2 py-1.5 text-xs ${
-                notice.type === 'success'
-                  ? 'border-app-success/25 bg-app-success/5 text-app-success'
-                  : 'border-app-danger/25 bg-app-danger/5 text-app-danger'
-              }`}
-            >
-              {notice.type === 'success' ? <Check className="size-3.5" /> : <X className="size-3.5" />}
-              <span>{notice.text}</span>
-            </div>
-          )}
-        </div>
-
-        <nav className="hidden">
-          <TabButton active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
-          <TabButton active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
-          <TabButton active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
-          <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
-        </nav>
-
         <div className="flex min-h-0 flex-1">
-          <aside className="w-40 shrink-0 border-r border-app-border bg-app-bg-soft p-3">
+          <aside className="flex w-[188px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft/80 p-3">
+            <div className="mb-2 px-2 text-[10px] font-medium text-app-subtle">设置分类</div>
             <nav className="space-y-1">
-              <TabButton active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
-              <TabButton active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
-              <TabButton active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
-              <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
+              <TabButton icon={<MonitorCog className="size-4" />} description="客户端外观与行为" active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
+              <TabButton icon={<Gamepad2 className="size-4" />} description="画面、声音与界面" active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
+              <TabButton icon={<Keyboard className="size-4" />} description="按键与快捷施法" active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
+              <TabButton icon={<Library className="size-4" />} description="保存和切换配置" active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
             </nav>
+            <div className="mt-auto border-t border-app-border/70 px-2 pt-3 text-[10px] leading-4 text-app-subtle">
+              更改会先保存在当前面板，点击“应用设置”后写入游戏。
+            </div>
           </aside>
 
-        <main data-settings-scroll className="scrollbar-none min-w-0 flex-1 overflow-y-auto p-4">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="shrink-0 border-b border-app-border bg-app-surface px-5 py-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-app-border bg-app-bg-soft/60 px-3 transition-colors focus-within:border-app-primary/45 focus-within:ring-2 focus-within:ring-app-primary/10">
+                  <FolderSearch className="size-3.5 shrink-0 text-app-muted" />
+                  <input
+                    value={rootPath}
+                    onChange={(e) => setRootPath(e.target.value)}
+                    className="min-w-0 flex-1 bg-transparent text-xs text-app-text outline-none"
+                    aria-label="英雄联盟配置目录"
+                  />
+                </div>
+                <Button variant="outline" size="icon-sm" onClick={detectRoots} disabled={Boolean(busy)} title="自动检测目录">
+                  <Search className={`size-3.5 ${busy === 'detect-root' ? 'animate-pulse' : ''}`} />
+                </Button>
+                <Button variant="outline" size="icon-sm" onClick={chooseRoot} disabled={Boolean(busy)} title="选择文件夹">
+                  <FolderOpen className="size-3.5" />
+                </Button>
+                <Button variant="outline" size="icon-sm" onClick={() => refresh(rootPath)} disabled={Boolean(busy)} title="重新读取">
+                  <RefreshCw className={`size-3.5 ${busy === 'read' ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button size="sm" onClick={applyDraft} disabled={!draft || Boolean(busy)}>
+                  <Upload className="size-3.5" />
+                  应用设置
+                </Button>
+              </div>
+              {notice && (
+                <div className={`mt-2 flex min-h-7 items-center gap-2 rounded-sm px-2 text-[11px] ${notice.type === 'success' ? 'bg-app-success/5 text-app-success' : 'bg-app-danger/5 text-app-danger'}`}>
+                  {notice.type === 'success' ? <Check className="size-3.5" /> : <X className="size-3.5" />}
+                  <span className="truncate">{notice.text}</span>
+                </div>
+              )}
+            </div>
+
+        <main data-settings-scroll className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
           {!draft ? (
             <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-app-muted">
               <span>{busy === 'read' ? '正在读取配置...' : '配置读取失败'}</span>
@@ -411,15 +399,26 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   setSelectedProfileId={setSelectedProfileId}
                   onSaveProfile={saveProfile}
                   onApplyProfile={applyProfile}
-                  onDeleteProfile={deleteProfile}
+                  onDeleteProfile={() => setDeleteProfileConfirmOpen(true)}
                   busy={busy}
                 />
               )}
             </>
           )}
         </main>
+          </div>
         </div>
       </section>
+      <ConfirmDialog
+        open={deleteProfileConfirmOpen}
+        title="删除配置方案"
+        description={`将删除“${selectedProfile?.name ?? ''}”。此操作不会修改当前游戏设置，但无法撤销。`}
+        confirmLabel="删除方案"
+        destructive
+        busy={busy === 'delete-profile'}
+        onOpenChange={setDeleteProfileConfirmOpen}
+        onConfirm={() => void deleteProfile()}
+      />
     </div>
   );
 }
@@ -427,23 +426,31 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 function TabButton({
   active,
   onClick,
+  icon,
+  description,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: ReactNode;
+  description: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-9 w-full items-center rounded-sm px-3 text-left text-sm font-medium transition-colors ${
+      className={`group flex min-h-[48px] w-full items-center gap-2.5 rounded-sm px-3 py-2 text-left transition-[background-color,color,box-shadow] ${
         active
-          ? 'bg-app-surface text-app-text shadow-sm'
+          ? 'bg-app-surface text-app-text shadow-sm ring-1 ring-app-border/70'
           : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
       }`}
     >
-      {children}
+      <span className={active ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-muted'}>{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-xs font-medium">{children}</span>
+        <span className="mt-0.5 block truncate text-[9px] font-normal text-app-subtle">{description}</span>
+      </span>
     </button>
   );
 }
@@ -493,7 +500,7 @@ function HotkeySettings({
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[720px] grid-cols-[minmax(0,1fr)_32px] gap-4 pb-8">
+    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
       <div className="min-w-0 space-y-8">
         {categories.map((category) => (
           <HotkeyCategoryPanel
@@ -561,8 +568,8 @@ function HotkeyCategoryPanel({
         <span className="min-w-0">
           <span className="block text-base font-semibold text-app-text">{category.label}</span>
         </span>
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-app-bg-soft text-lg font-semibold text-app-muted">
-          {open ? '-' : '+'}
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-sm text-app-muted transition-colors group-hover:bg-app-bg-soft">
+          <ChevronDown className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
         </span>
       </button>
       {open && <div className="pt-2">{children}</div>}
@@ -601,8 +608,8 @@ function HeroHotkeyOverview({
   };
 
   return (
-    <div className="space-y-6 rounded-sm bg-app-bg-soft px-5 py-5">
-      <div className="mx-auto grid h-16 max-w-[560px] grid-cols-2 rounded-sm bg-app-surface p-1">
+    <div className="space-y-5 rounded-sm border border-app-border bg-app-bg-soft/55 px-4 py-4">
+      <div className="mx-auto grid h-9 max-w-[440px] grid-cols-2 rounded-sm border border-app-border bg-app-surface p-0.5">
         <button type="button" className="rounded-sm bg-app-primary/15 text-sm font-semibold text-app-text">
           全局
         </button>
@@ -611,7 +618,7 @@ function HeroHotkeyOverview({
         </button>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_190px] gap-x-6 gap-y-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-x-5 gap-y-4">
         <div className="space-y-5">
           {groups.filter((group) => group.label === '英雄技能' || group.label === '道具').map((group) => (
             <HeroHotkeyGroup
@@ -707,15 +714,15 @@ function HeroHotkeyBox({
   const compact = displayValue.length > 6;
 
   return (
-    <div className="w-[82px]">
+    <div className="w-[76px]">
       <button
         type="button"
         onClick={onCapture}
-        className="flex h-[74px] w-full flex-col overflow-hidden rounded-sm bg-app-surface text-app-text shadow-sm ring-1 ring-app-border transition hover:ring-app-primary"
+        className="flex h-[58px] w-full flex-col overflow-hidden rounded-sm bg-app-surface text-app-text shadow-sm ring-1 ring-app-border transition hover:ring-app-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-primary/25"
         aria-label={`修改${label}`}
       >
         <span className="flex min-h-0 flex-1 items-center justify-center px-1">
-          <span className={`truncate font-semibold ${compact ? 'text-sm' : 'text-3xl'}`}>
+          <span className={`truncate font-mono font-semibold ${compact ? 'text-xs' : 'text-xl'}`}>
             {displayValue}
           </span>
         </span>
@@ -747,7 +754,7 @@ function HotkeyRows({
   onCapture: (binding: HotkeyBinding) => void;
 }) {
   return (
-    <div className="max-w-[560px] space-y-1">
+    <div className="max-w-[680px] overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
       {bindings.map((binding) => (
         <HotkeyRow
           key={`${binding.section}-${binding.key}`}
@@ -773,7 +780,7 @@ function KeyBindingButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-8 min-w-0 rounded-sm bg-app-bg-soft px-3 text-left text-sm font-medium text-app-text outline-none ring-1 ring-app-border transition hover:ring-app-primary focus-visible:ring-app-primary"
+      className="h-8 min-w-0 rounded-sm bg-app-bg-soft px-3 text-left font-mono text-xs font-medium text-app-text outline-none ring-1 ring-app-border transition hover:ring-app-primary/55 focus-visible:ring-2 focus-visible:ring-app-primary/20"
     >
       <span className="block truncate">{displayHotkeyValue(value)}</span>
     </button>
@@ -826,9 +833,9 @@ function HotkeyCaptureDialog({
           onKeyDown={captureKeyboard}
           onMouseDown={captureMouse}
           onContextMenu={(event) => event.preventDefault()}
-          className="mt-4 flex h-28 cursor-crosshair items-center justify-center rounded-sm bg-app-bg-soft px-4 text-center outline-none ring-1 ring-app-border focus:ring-app-primary"
+          className="mt-4 flex h-24 cursor-crosshair items-center justify-center rounded-sm bg-app-bg-soft px-4 text-center outline-none ring-1 ring-app-border focus:ring-2 focus:ring-app-primary/25"
         >
-          <span className="text-2xl font-semibold text-app-text">{displayHotkeyValue(captured)}</span>
+          <span className="font-mono text-xl font-semibold text-app-text">{displayHotkeyValue(captured)}</span>
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
           <Button variant="ghost" size="sm" onClick={() => setCaptured('[<Unbound>]')}>
@@ -864,7 +871,7 @@ function HotkeyRow({
   const label = hotkeyLabel(bindingKey);
 
   return (
-    <div className="grid grid-cols-[220px_260px] items-center gap-3 py-1.5">
+    <div className="grid min-h-10 grid-cols-[minmax(190px,1fr)_minmax(180px,260px)] items-center gap-4 px-3 py-1.5">
       <div className="min-w-0">
         <div className="truncate text-sm text-app-body" title={label}>{label}</div>
       </div>

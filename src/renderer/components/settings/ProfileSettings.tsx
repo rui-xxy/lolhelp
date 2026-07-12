@@ -1,4 +1,4 @@
-import { Download, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, Download, Save, Trash2 } from 'lucide-react';
 import type {
   LolConfigProfileSummary,
   LolConfigState,
@@ -39,13 +39,13 @@ export function ProfileSettings({
   busy: string | null;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+    <div className="mx-auto grid w-full max-w-[760px] gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
       <Panel title="方案">
         <div className="space-y-2">
           <input
             value={profileName}
             onChange={(event) => setProfileName(event.target.value)}
-            className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-2 text-sm outline-none focus:border-app-primary"
+            className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10"
           />
           <Button className="w-full" onClick={onSaveProfile} disabled={Boolean(busy)}>
             <Save className="size-4" />
@@ -54,21 +54,24 @@ export function ProfileSettings({
         </div>
 
         <div className="mt-4 space-y-2">
-          <select
-            value={selectedProfileId}
-            onChange={(event) => setSelectedProfileId(event.target.value)}
-            className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-2 text-sm outline-none focus:border-app-primary"
-          >
-            {profiles.length === 0 ? (
-              <option value="">暂无方案</option>
-            ) : (
-              profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profileLabel(profile)}
-                </option>
-              ))
-            )}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedProfileId}
+              onChange={(event) => setSelectedProfileId(event.target.value)}
+              className="h-9 w-full appearance-none rounded-sm border border-app-border bg-app-surface px-3 pr-8 text-sm outline-none transition focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10"
+            >
+              {profiles.length === 0 ? (
+                <option value="">暂无方案</option>
+              ) : (
+                profiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profileLabel(profile)}
+                  </option>
+                ))
+              )}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-app-muted" />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Button onClick={onApplyProfile} disabled={!selectedProfileId || Boolean(busy)}>
               <Download className="size-4" />
@@ -88,10 +91,11 @@ export function ProfileSettings({
 
       <Panel title="文件">
         <div className="space-y-2">
+          <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
           {(state?.files ?? []).map((file) => (
             <div
               key={file.key}
-              className="grid grid-cols-[1fr_auto] gap-3 rounded-sm border border-app-border bg-app-bg-soft px-3 py-2"
+              className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2.5 transition-colors hover:bg-app-bg-soft/55"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -110,6 +114,7 @@ export function ProfileSettings({
               </div>
             </div>
           ))}
+          </div>
         </div>
         {state?.warnings.length ? (
           <div className="mt-3 rounded-sm border border-app-danger/25 bg-app-danger/5 px-3 py-2 text-xs text-app-danger">

@@ -34,7 +34,7 @@ export function FriendsSection({
     updater: (current: Set<string>) => Set<string>,
   ) => void;
   refreshFriends: () => Promise<void>;
-  deleteSelectedFriends: () => Promise<void>;
+  deleteSelectedFriends: () => void;
   setOperationState: (message: string) => void;
 }) {
   return (
@@ -83,28 +83,38 @@ export function FriendsSection({
         title={`好友管理（${friends.length}）`}
         description="可查看状态、观战游戏中的好友，或批量删除。"
       >
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <ActionButton onClick={() => void refreshFriends()}>刷新好友</ActionButton>
+          <span className="ml-auto text-[11px] text-app-muted">
+            已选择 {selectedFriendIds.size} 位
+          </span>
           <button
             type="button"
-            onClick={() => void deleteSelectedFriends()}
-            className="rounded-sm border border-app-danger px-4 py-2 text-xs font-semibold text-app-danger hover:bg-red-50"
+            onClick={deleteSelectedFriends}
+            disabled={selectedFriendIds.size === 0}
+            className="h-8 rounded-sm px-3 text-xs font-medium text-app-danger transition-colors hover:bg-app-danger/5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             删除选中
           </button>
         </div>
-        <div className="grid max-h-[360px] gap-2 overflow-y-auto md:grid-cols-2">
+        <div className="max-h-[390px] overflow-y-auto rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
+          {friends.length === 0 && (
+            <div className="flex h-28 items-center justify-center text-xs text-app-muted">
+              暂未读取到好友
+            </div>
+          )}
           {friends.map((friend) => {
             const riotId = friend.gameTag
               ? `${friend.gameName}#${friend.gameTag}`
               : friend.gameName;
             return (
-              <div
+              <label
                 key={friend.id}
-                className="flex items-center gap-2 rounded-sm border border-app-border bg-app-bg-soft p-2"
+                className="group flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 transition-colors hover:bg-app-bg-soft/80"
               >
                 <input
                   type="checkbox"
+                  className="size-3.5 accent-app-primary"
                   checked={selectedFriendIds.has(friend.id)}
                   onChange={(event) => setSelectedFriendIds((current) => {
                     const next = new Set(current);
@@ -114,24 +124,28 @@ export function FriendsSection({
                   })}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium text-app-text">
+                  <div className="truncate text-xs font-medium text-app-text group-hover:text-app-primary">
                     {friend.note || riotId}
                   </div>
                   <div className="truncate text-[11px] text-app-muted">
+                    {riotId !== (friend.note || riotId) ? `${riotId} · ` : ''}
                     {friend.lol?.gameQueueName || friend.lol?.gameStatus || friend.availability}
                   </div>
                 </div>
                 {friend.lol?.gameStatus === 'inGame' && (
                   <button
                     type="button"
-                    onClick={() => void window.lolHelper.lcu.spectateFriend(friend.puuid)
-                      .then((result) => setOperationState(result.message))}
-                    className="text-[11px] font-medium text-app-link"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void window.lolHelper.lcu.spectateFriend(friend.puuid)
+                        .then((result) => setOperationState(result.message));
+                    }}
+                    className="h-7 rounded-sm px-2 text-[11px] font-medium text-app-link hover:bg-app-primary-soft"
                   >
                     观战
                   </button>
                 )}
-              </div>
+              </label>
             );
           })}
         </div>

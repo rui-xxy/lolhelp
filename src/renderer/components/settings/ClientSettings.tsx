@@ -51,7 +51,7 @@ export function ClientSettings({
   }, []);
 
   return (
-    <div className="mx-auto grid w-full max-w-[580px] grid-cols-[minmax(0,1fr)_32px] gap-4 pb-8">
+    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
       <div className="min-w-0 space-y-8">
         <SettingsSection prefix="client" id="general" title="综合">
           <div className="space-y-7">

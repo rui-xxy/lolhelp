@@ -103,7 +103,7 @@ export function GameSettings({
   }, []);
 
   return (
-    <div className="mx-auto grid w-full max-w-[580px] grid-cols-[minmax(0,1fr)_32px] gap-4 pb-8">
+    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
       <div className="min-w-0 space-y-8">
         <SettingsSection prefix="game" id="controls" title="控制">
           <SettingsGroup>
@@ -157,12 +157,12 @@ export function GameSettings({
         <SettingsSection prefix="game" id="video" title="画面">
           <SettingsGroup>
             <SelectRow label="窗口模式" value={values.windowMode} options={WINDOW_MODES} onChange={(value) => onChange('windowMode', value)} />
-            <div className="grid grid-cols-[120px_1fr] items-center gap-3 py-1.5">
+            <div className="grid min-h-10 grid-cols-[minmax(150px,1fr)_minmax(300px,1.4fr)] items-center gap-4 py-2">
               <span className="text-sm text-app-body">分辨率</span>
               <div className="flex flex-wrap items-center gap-2">
-                <input type="number" value={values.width} onChange={(event) => onChange('width', Number(event.target.value))} className="h-8 w-24 rounded-sm border border-app-border bg-app-surface px-2 text-sm" />
+                <input type="number" value={values.width} onChange={(event) => onChange('width', Number(event.target.value))} className="h-8 w-20 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10" />
                 <span className="text-xs text-app-muted">x</span>
-                <input type="number" value={values.height} onChange={(event) => onChange('height', Number(event.target.value))} className="h-8 w-24 rounded-sm border border-app-border bg-app-surface px-2 text-sm" />
+                <input type="number" value={values.height} onChange={(event) => onChange('height', Number(event.target.value))} className="h-8 w-20 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10" />
                 <select
                   value={`${values.width}x${values.height}`}
                   onChange={(event) => {
@@ -170,7 +170,7 @@ export function GameSettings({
                     onChange('width', width);
                     onChange('height', height);
                   }}
-                  className="h-8 rounded-sm border border-app-border bg-app-surface px-2 text-xs"
+                  className="h-8 min-w-28 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10"
                 >
                   {RESOLUTION_PRESETS.map(([width, height]) => (
                     <option key={`${width}x${height}`} value={`${width}x${height}`}>

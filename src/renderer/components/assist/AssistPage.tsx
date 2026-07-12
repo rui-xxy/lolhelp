@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertCircle,
   Bot,
+  CheckCircle2,
   Gift,
+  LoaderCircle,
   PackageOpen,
   ShieldAlert,
   Sparkles,
   UserRoundCog,
   Users,
   WandSparkles,
+  X,
 } from 'lucide-react';
 import type {
   AppSettings,
@@ -21,6 +25,8 @@ import type {
 } from '../../../shared/api';
 import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
 import { ChampionPickerDialog } from '../scout/ChampionPickerDialog';
+import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import {
   AccountSection,
   BlacklistSection,
@@ -54,16 +60,17 @@ type SectionKey =
 const sections: Array<{
   key: SectionKey;
   label: string;
+  description: string;
   icon: typeof Sparkles;
 }> = [
-  { key: 'automation', label: '自动操作', icon: Bot },
-  { key: 'champions', label: '英雄禁选', icon: WandSparkles },
-  { key: 'builds', label: '符文装备', icon: Sparkles },
-  { key: 'friends', label: '好友管理', icon: Users },
-  { key: 'loot', label: '碎片分解', icon: PackageOpen },
-  { key: 'rewards', label: '奖励获取', icon: Gift },
-  { key: 'account', label: '账号展示', icon: UserRoundCog },
-  { key: 'blacklist', label: '黑名单', icon: ShieldAlert },
+  { key: 'automation', label: '自动操作', description: '对局接受、结算返回与队友点赞', icon: Bot },
+  { key: 'champions', label: '英雄禁选', description: '按模式和位置管理选用与禁用', icon: WandSparkles },
+  { key: 'builds', label: '符文装备', description: '自动应用装备方案与符文配置', icon: Sparkles },
+  { key: 'friends', label: '好友管理', description: '在线展示、签名与好友批量操作', icon: Users },
+  { key: 'loot', label: '碎片分解', description: '查看英雄碎片并进行批量分解', icon: PackageOpen },
+  { key: 'rewards', label: '奖励获取', description: '集中查看并领取可用奖励', icon: Gift },
+  { key: 'account', label: '账号展示', description: '段位、头像、生涯背景与装饰', icon: UserRoundCog },
+  { key: 'blacklist', label: '黑名单', description: '记录玩家标签并快速查询战绩', icon: ShieldAlert },
 ];
 
 const emptySettings: AppSettings = {
@@ -90,6 +97,8 @@ export function AssistPage({
   const [profileIcons, setProfileIcons] = useState<AssistProfileIcon[]>([]);
   const [profileIconPickerOpen, setProfileIconPickerOpen] = useState(false);
   const [profileIconSearch, setProfileIconSearch] = useState('');
+  const [friendDeleteConfirmOpen, setFriendDeleteConfirmOpen] = useState(false);
+  const [deletingFriends, setDeletingFriends] = useState(false);
   const [blacklistDraft, setBlacklistDraft] = useState({
     riotId: '',
     region: '',
@@ -266,19 +275,30 @@ export function AssistPage({
     }
   };
 
-  const deleteSelectedFriends = async () => {
+  const requestDeleteSelectedFriends = () => {
     if (selectedFriendIds.size === 0) {
       setOperationState('请先选择要删除的好友');
       return;
     }
-    if (!window.confirm(`确定删除选中的 ${selectedFriendIds.size} 位好友吗？`)) return;
-    const results = await Promise.all(
-      [...selectedFriendIds].map((id) => window.lolHelper.lcu.deleteFriend(id)),
-    );
-    const successCount = results.filter((result) => result.success).length;
-    setOperationState(`已删除 ${successCount}/${results.length} 位好友`);
-    setSelectedFriendIds(new Set());
-    await refreshFriends();
+    setFriendDeleteConfirmOpen(true);
+  };
+
+  const deleteSelectedFriends = async () => {
+    setDeletingFriends(true);
+    try {
+      const results = await Promise.all(
+        [...selectedFriendIds].map((id) => window.lolHelper.lcu.deleteFriend(id)),
+      );
+      const successCount = results.filter((result) => result.success).length;
+      setOperationState(`已删除 ${successCount}/${results.length} 位好友`);
+      setSelectedFriendIds(new Set());
+      setFriendDeleteConfirmOpen(false);
+      await refreshFriends();
+    } catch (error) {
+      setOperationState(`删除好友失败：${String(error)}`);
+    } finally {
+      setDeletingFriends(false);
+    }
   };
 
   const openProfileIconPicker = async () => {
@@ -300,17 +320,15 @@ export function AssistPage({
   }
 
   const assist = settings.assist;
+  const activeSectionMeta = sections.find((section) => section.key === activeSection) ?? sections[0];
+  const saveFailed = saveState.includes('失败');
+  const savePending = saveState.includes('中') || saveState.includes('正在');
+  const operationFailed = /失败|错误|×|请先|请输入/.test(operationState);
 
   return (
-    <div className="grid h-full grid-cols-[190px_minmax(0,1fr)] overflow-hidden bg-app-bg-soft">
-      <aside className="border-r border-app-border bg-app-surface p-3">
-        <div className="mb-3 px-3 py-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-app-text">
-            <Sparkles className="size-4 text-app-primary" />
-            辅助功能
-          </div>
-          <div className="mt-1 text-[11px] text-app-muted">{saveState}</div>
-        </div>
+    <div className="grid h-full grid-cols-[208px_minmax(0,1fr)] overflow-hidden bg-app-surface">
+      <aside className="flex min-h-0 flex-col border-r border-app-border bg-app-bg-soft/80 px-3 py-4">
+        <div className="mb-3 px-2 text-[11px] font-medium text-app-subtle">功能分类</div>
         <nav className="space-y-1">
           {sections.map((section) => {
             const Icon = section.icon;
@@ -319,42 +337,66 @@ export function AssistPage({
                 key={section.key}
                 type="button"
                 onClick={() => setActiveSection(section.key)}
-                className={`flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition-colors ${
+                className={`group relative flex h-9 w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm transition-[background-color,color,box-shadow] ${
                   activeSection === section.key
-                    ? 'bg-app-primary-soft text-app-primary'
-                    : 'text-app-muted hover:bg-app-surface-soft hover:text-app-text'
+                    ? 'bg-app-surface text-app-text shadow-sm ring-1 ring-app-border/70'
+                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
                 }`}
               >
-                <Icon className="size-4" />
-                {section.label}
+                <Icon className={`size-4 ${activeSection === section.key ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-muted'}`} />
+                <span className="truncate">{section.label}</span>
               </button>
             );
           })}
         </nav>
+        <div className="mt-auto border-t border-app-border/70 px-2 pt-3 text-[10px] leading-4 text-app-subtle">
+          设置变更会自动保存
+        </div>
       </aside>
 
-      <main className="overflow-y-auto p-6">
-        <div className="mx-auto max-w-4xl space-y-4">
-          {operationState && (
-            <div
-              role="status"
-              className="flex items-center gap-3 rounded-sm border border-app-primary/25 bg-app-primary-soft/45 px-4 py-3 text-xs text-app-body"
-            >
-              <span className="min-w-0 flex-1">{operationState}</span>
-              {operationState !== '正在执行…' && (
-                <button
-                  type="button"
-                  aria-label="关闭提示"
-                  title="关闭提示"
-                  onClick={() => setOperationState('')}
-                  className="shrink-0 rounded px-1 text-base leading-none text-app-muted hover:bg-app-surface hover:text-app-text"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
+      <section className="flex min-h-0 min-w-0 flex-col">
+        <header className="flex h-[58px] shrink-0 items-center gap-4 border-b border-app-border px-6">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold text-app-text">{activeSectionMeta.label}</h2>
+            <p className="mt-0.5 truncate text-[11px] text-app-muted">{activeSectionMeta.description}</p>
+          </div>
+          <div className={`flex shrink-0 items-center gap-2 text-[11px] ${saveFailed ? 'text-app-danger' : 'text-app-muted'}`}>
+            {savePending ? (
+              <LoaderCircle className="size-3.5 animate-spin text-app-primary" />
+            ) : (
+              <span className={`size-1.5 rounded-full ${saveFailed ? 'bg-app-danger' : 'bg-app-success'}`} />
+            )}
+            <span>{saveState}</span>
+          </div>
+        </header>
 
+        {operationState && (
+          <div
+            role="status"
+            className={`mx-6 mt-4 flex min-h-9 items-center gap-2 rounded-sm border px-3 text-xs ${
+              operationFailed
+                ? 'border-app-danger/20 bg-app-danger/5 text-app-danger'
+                : 'border-app-success/20 bg-app-success/5 text-app-body'
+            }`}
+          >
+            {operationState === '正在执行…' ? (
+              <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+            ) : operationFailed ? (
+              <AlertCircle className="size-3.5 shrink-0" />
+            ) : (
+              <CheckCircle2 className="size-3.5 shrink-0 text-app-success" />
+            )}
+            <span className="min-w-0 flex-1 truncate">{operationState}</span>
+            {operationState !== '正在执行…' && (
+              <Button variant="ghost" size="icon-xs" onClick={() => setOperationState('')} aria-label="关闭提示">
+                <X className="size-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div className="mx-auto max-w-[896px] space-y-7 pb-8">
           {activeSection === 'automation' && (
             <AutomationSection
               assist={assist}
@@ -391,7 +433,7 @@ export function AssistPage({
               selectedFriendIds={selectedFriendIds}
               setSelectedFriendIds={setSelectedFriendIds}
               refreshFriends={refreshFriends}
-              deleteSelectedFriends={deleteSelectedFriends}
+              deleteSelectedFriends={requestDeleteSelectedFriends}
               setOperationState={setOperationState}
             />
           )}
@@ -425,8 +467,9 @@ export function AssistPage({
               setEditingBlacklistId={setEditingBlacklistId}
             />
           )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </section>
 
       {picker && (
         <ChampionPickerDialog
@@ -450,16 +493,19 @@ export function AssistPage({
 
       {profileIconPickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-8"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-8 backdrop-blur-[1px]"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setProfileIconPickerOpen(false);
             }
           }}
         >
-          <div className="flex max-h-[78vh] w-[720px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
-            <div className="flex items-center gap-3 border-b border-app-border p-4">
-              <div className="text-sm font-semibold text-app-text">选择玩家头像</div>
+          <div className="flex max-h-[78vh] w-[760px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
+            <div className="flex h-14 items-center gap-3 border-b border-app-border px-5">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-app-text">选择玩家头像</div>
+                <div className="mt-0.5 text-[10px] text-app-muted">点击头像后立即应用</div>
+              </div>
               <div className="ml-auto w-56">
                 <TextInput
                   value={profileIconSearch}
@@ -467,15 +513,11 @@ export function AssistPage({
                   onChange={setProfileIconSearch}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => setProfileIconPickerOpen(false)}
-                className="text-sm text-app-muted"
-              >
-                关闭
-              </button>
+              <Button variant="ghost" size="icon-sm" onClick={() => setProfileIconPickerOpen(false)} aria-label="关闭">
+                <X className="size-4" />
+              </Button>
             </div>
-            <div className="grid min-h-0 flex-1 grid-cols-8 gap-2 overflow-y-auto p-4">
+            <div className="grid min-h-0 flex-1 grid-cols-9 gap-2 overflow-y-auto bg-app-bg-soft/45 p-4">
               {profileIcons
                 .filter((icon) => {
                   const query = profileIconSearch.trim().toLowerCase();
@@ -493,7 +535,7 @@ export function AssistPage({
                       updateAssist((next) => ({ ...next, profileIconId: icon.id }));
                       setProfileIconPickerOpen(false);
                     }}
-                    className={`rounded-sm border p-1 hover:border-app-primary ${
+                    className={`rounded-sm border bg-app-surface p-1 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-app-primary/50 hover:shadow-sm ${
                       assist.profileIconId === icon.id
                         ? 'border-app-primary bg-app-primary-soft'
                         : 'border-app-border'
@@ -513,6 +555,17 @@ export function AssistPage({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={friendDeleteConfirmOpen}
+        title="删除选中的好友"
+        description={`将从客户端好友列表中删除选中的 ${selectedFriendIds.size} 位好友。此操作无法直接撤销。`}
+        confirmLabel="删除好友"
+        destructive
+        busy={deletingFriends}
+        onOpenChange={setFriendDeleteConfirmOpen}
+        onConfirm={() => void deleteSelectedFriends()}
+      />
     </div>
   );
 }

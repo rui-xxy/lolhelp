@@ -100,10 +100,14 @@ export function AccountSection({
       </SettingCard>
 
       <SettingCard title="头像、生涯背景和装饰">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-sm border border-app-border p-3">
-            <div className="mb-2 text-xs text-app-muted">玩家头像</div>
-            <div className="flex items-center gap-3">
+        <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
+          <button
+            type="button"
+            onClick={() => void openProfileIconPicker()}
+            className="flex min-h-[72px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-app-bg-soft/75"
+          >
+            <div className="w-32 shrink-0 text-xs font-medium text-app-body">玩家头像</div>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               {assist.profileIconId > 0 ? (
                 <img
                   src={`https://game.gtimg.cn/images/lol/act/img/profileicon/${assist.profileIconId}.png`}
@@ -113,48 +117,40 @@ export function AccountSection({
               ) : (
                 <div className="size-12 rounded-full bg-app-bg-soft" />
               )}
-              <div>
-                <div className="text-xs text-app-body">
+              <div className="min-w-0">
+                <div className="truncate text-xs text-app-body">
                   {assist.profileIconId ? `头像 ${assist.profileIconId}` : '未选择'}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void openProfileIconPicker()}
-                  className="mt-1 text-xs font-medium text-app-link"
-                >
-                  选择头像
-                </button>
+                <div className="mt-1 text-[11px] text-app-muted">点击整行选择</div>
               </div>
             </div>
-          </div>
+          </button>
 
-          <div className="rounded-sm border border-app-border p-3">
-            <div className="mb-2 text-xs text-app-muted">生涯背景英雄</div>
-            <div className="truncate text-sm text-app-body">
+          <button
+            type="button"
+            onClick={() => openPicker(
+              '选择生涯背景英雄',
+              assist.profileBackgroundChampionId
+                ? [assist.profileBackgroundChampionId]
+                : [],
+              1,
+              (ids) => updateAssist((next) => ({
+                ...next,
+                profileBackgroundChampionId: ids.at(-1) ?? 0,
+              })),
+            )}
+            className="flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-app-bg-soft/75"
+          >
+            <div className="w-32 shrink-0 text-xs font-medium text-app-body">生涯背景英雄</div>
+            <div className="min-w-0 flex-1 truncate text-sm text-app-body">
               {championSummary(
                 assist.profileBackgroundChampionId
                   ? [assist.profileBackgroundChampionId]
                   : [],
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => openPicker(
-                '选择生涯背景英雄',
-                assist.profileBackgroundChampionId
-                  ? [assist.profileBackgroundChampionId]
-                  : [],
-                1,
-                (ids) => updateAssist((next) => ({
-                  ...next,
-                  profileBackgroundChampionId: ids.at(-1) ?? 0,
-                })),
-              )}
-              className="mt-2 text-xs font-medium text-app-link"
-            >
-              选择英雄
-            </button>
-          </div>
+            <span className="text-[11px] text-app-muted">点击修改</span>
+          </button>
         </div>
         <ToggleRow
           label="一键卸下徽章"
@@ -256,11 +252,9 @@ export function BlacklistSection({
       <SettingCard title={`黑名单（${settings.blacklist.length}）`}>
         {settings.blacklist.length === 0 ? (
           <div className="py-8 text-center text-sm text-app-muted">暂无黑名单玩家</div>
-        ) : settings.blacklist.map((entry) => (
-          <div
-            key={entry.id}
-            className="flex items-start gap-3 rounded-sm border border-app-border bg-app-bg-soft p-3"
-          >
+        ) : <div className="overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
+          {settings.blacklist.map((entry) => (
+          <div key={entry.id} className="flex min-h-14 items-center gap-3 px-3 py-2.5 hover:bg-app-bg-soft/60">
             <div className="min-w-0 flex-1">
               <div className="font-medium text-app-text">{entry.riotId}</div>
               <div className="mt-1 text-xs text-app-muted">
@@ -303,7 +297,8 @@ export function BlacklistSection({
               删除
             </button>
           </div>
-        ))}
+          ))}
+        </div>}
       </SettingCard>
     </>
   );

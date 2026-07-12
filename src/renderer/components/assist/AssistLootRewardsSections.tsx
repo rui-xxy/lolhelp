@@ -9,6 +9,7 @@ import {
   ActionButton,
   SettingCard,
 } from './AssistControls';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 function resultMessage(results: { success: boolean; message: string }[]): string {
   if (results.length === 0) return '没有需要执行的项目';
@@ -41,6 +42,7 @@ export function LootDisenchantSection({
   const [selectedLootIds, setSelectedLootIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [busyLootId, setBusyLootId] = useState('');
+  const [disenchantConfirmation, setDisenchantConfirmation] = useState<AssistChampionShard[] | null>(null);
 
   const selectedShards = useMemo(
     () => loot.shards.filter((shard) => selectedLootIds.has(shard.lootId)),
@@ -80,32 +82,14 @@ export function LootDisenchantSection({
     setSelectedLootIds(checked ? new Set(loot.shards.map((shard) => shard.lootId)) : new Set());
   };
 
-  const disenchantShard = async (shard: AssistChampionShard) => {
-    if (!window.confirm(`确定分解 ${shard.count} 个「${shard.name}」英雄碎片吗？`)) return;
-    setBusyLootId(shard.lootId);
-    try {
-      const result = await window.lolHelper.assist.disenchantChampionShard({
-        lootId: shard.lootId,
-        count: shard.count,
-      });
-      setOperationState(result.message);
-      await refresh();
-    } finally {
-      setBusyLootId('');
-    }
-  };
-
-  const disenchantSelected = async () => {
-    if (selectedShards.length === 0) {
-      setOperationState('请先选择要分解的英雄碎片');
-      return;
-    }
-    const totalCount = selectedShards.reduce((sum, shard) => sum + shard.count, 0);
-    if (!window.confirm(`确定分解选中的 ${selectedShards.length} 种、共 ${totalCount} 个英雄碎片吗？`)) return;
-    setLoading(true);
+  const performDisenchant = async () => {
+    const shards = disenchantConfirmation ?? [];
+    if (shards.length === 0) return;
+    if (shards.length === 1) setBusyLootId(shards[0].lootId);
+    else setLoading(true);
     try {
       const results = [];
-      for (const shard of selectedShards) {
+      for (const shard of shards) {
         results.push(await window.lolHelper.assist.disenchantChampionShard({
           lootId: shard.lootId,
           count: shard.count,
@@ -113,13 +97,28 @@ export function LootDisenchantSection({
       }
       setOperationState(resultMessage(results));
       setSelectedLootIds(new Set());
+      setDisenchantConfirmation(null);
       await refresh();
     } finally {
+      setBusyLootId('');
       setLoading(false);
     }
   };
 
+  const disenchantShard = (shard: AssistChampionShard) => {
+    setDisenchantConfirmation([shard]);
+  };
+
+  const disenchantSelected = async () => {
+    if (selectedShards.length === 0) {
+      setOperationState('请先选择要分解的英雄碎片');
+      return;
+    }
+    setDisenchantConfirmation(selectedShards);
+  };
+
   return (
+    <>
     <SettingCard
       title="碎片分解"
       description="读取战利品里的英雄碎片，可单个分解，也可以勾选后批量分解。分解会直接消耗碎片，请确认后再操作。"
@@ -199,6 +198,21 @@ export function LootDisenchantSection({
         </div>
       </div>
     </SettingCard>
+    <ConfirmDialog
+      open={Boolean(disenchantConfirmation)}
+      title="确认分解英雄碎片"
+      description={disenchantConfirmation
+        ? `将分解 ${disenchantConfirmation.length} 种、共 ${disenchantConfirmation.reduce((sum, shard) => sum + shard.count, 0)} 个英雄碎片。分解后无法恢复。`
+        : ''}
+      confirmLabel="确认分解"
+      destructive
+      busy={loading || Boolean(busyLootId)}
+      onOpenChange={(open) => {
+        if (!open) setDisenchantConfirmation(null);
+      }}
+      onConfirm={() => void performDisenchant()}
+    />
+    </>
   );
 }
 
