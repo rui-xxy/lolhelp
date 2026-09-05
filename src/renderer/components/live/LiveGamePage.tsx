@@ -21,6 +21,18 @@ function battleRosterKey(myTeam: LiveBattlePlayer[], enemyTeam: LiveBattlePlayer
   return `${myTeam.map(playerKey).join('|')}::${enemyTeam.map(playerKey).join('|')}`;
 }
 
+function identifiedPlayerCount(players: LiveBattlePlayer[]) {
+  return players.filter((player) => {
+    if (player.puuid || player.summonerId > 0) return true;
+    const riotId = player.riotId.trim();
+    const gameName = player.gameName.trim();
+    return Boolean(
+      (riotId && !/^玩家(?:\?|？)?$/.test(riotId))
+      || (gameName && !/^玩家(?:\?|？)?$/.test(gameName)),
+    );
+  }).length;
+}
+
 function loadedCardSet(total: number) {
   return new Set(Array.from({ length: total }, (_, index) => index));
 }
@@ -33,70 +45,22 @@ function currentPartyKey(player: LiveBattlePlayer) {
   return player.premadeId ? `${player.teamId}:${player.premadeId}` : '';
 }
 
-function buildSharedPlayColors(players: LiveBattlePlayer[]) {
+function buildPremadeColors(players: LiveBattlePlayer[]) {
   const colors = new Map<string, string>();
-  const groupedPlayerIndexes = new Set<number>();
   let colorIndex = 0;
 
-  const playersByCurrentParty = new Map<string, number[]>();
-  players.forEach((player, index) => {
+  const playersByParty = new Map<string, LiveBattlePlayer[]>();
+  players.forEach((player) => {
     const key = currentPartyKey(player);
     if (!key) return;
-    playersByCurrentParty.set(key, [...(playersByCurrentParty.get(key) ?? []), index]);
+    playersByParty.set(key, [...(playersByParty.get(key) ?? []), player]);
   });
 
-  playersByCurrentParty.forEach((indexes) => {
-    if (indexes.length < 2) return;
+  playersByParty.forEach((partyPlayers) => {
+    if (partyPlayers.length < 2) return;
     const color = SHARED_PLAY_COLORS[colorIndex % SHARED_PLAY_COLORS.length];
     colorIndex += 1;
-    indexes.forEach((index) => {
-      groupedPlayerIndexes.add(index);
-      colors.set(playerIdentity(players[index]), color);
-    });
-  });
-
-  const parent = players.map((_, index) => index);
-  const find = (index: number): number => {
-    if (parent[index] !== index) parent[index] = find(parent[index]);
-    return parent[index];
-  };
-  const union = (a: number, b: number) => {
-    const rootA = find(a);
-    const rootB = find(b);
-    if (rootA !== rootB) parent[rootB] = rootA;
-  };
-
-  const playersByPastTeam = new Map<string, number[]>();
-  players.forEach((player, playerIndex) => {
-    if (groupedPlayerIndexes.has(playerIndex)) return;
-    const seenKeys = new Set<string>();
-    player.history.forEach((history) => {
-      if (!history.gameId || !history.teamId) return;
-      seenKeys.add(`${player.teamId}:${history.gameId}:${history.teamId}`);
-    });
-    seenKeys.forEach((key) => {
-      const indexes = playersByPastTeam.get(key) ?? [];
-      indexes.push(playerIndex);
-      playersByPastTeam.set(key, indexes);
-    });
-  });
-
-  playersByPastTeam.forEach((indexes) => {
-    if (indexes.length < 2) return;
-    indexes.slice(1).forEach((index) => union(indexes[0], index));
-  });
-
-  const groups = new Map<number, number[]>();
-  players.forEach((_, index) => {
-    const root = find(index);
-    groups.set(root, [...(groups.get(root) ?? []), index]);
-  });
-
-  groups.forEach((indexes) => {
-    if (indexes.length < 2) return;
-    const color = SHARED_PLAY_COLORS[colorIndex % SHARED_PLAY_COLORS.length];
-    colorIndex += 1;
-    indexes.forEach((index) => colors.set(playerIdentity(players[index]), color));
+    partyPlayers.forEach((player) => colors.set(playerIdentity(player), color));
   });
 
   return colors;
@@ -176,13 +140,16 @@ function TarotCard({
   isLoaded,
   index,
   sharedColor,
+  onPlayerSearch,
 }: {
   player: LiveBattlePlayer;
   isLoaded: boolean;
   index: number;
   sharedColor?: string;
+  onPlayerSearch?: (riotId: string) => void;
 }) {
   const champIcon = championIcon(player.championAlias);
+  const searchableRiotId = player.riotId || player.gameName;
   const visibleHistory = player.history.slice(0, HISTORY_PAGE_SIZE);
   const recentWins = visibleHistory.filter((history) => history.win).length;
   const recentLosses = visibleHistory.length - recentWins;
@@ -218,20 +185,20 @@ function TarotCard({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="live-player-name-line">
-                  <strong
-                    style={sharedColor ? { color: sharedColor } : undefined}
-                    title={sharedColor ? '组队或近期同队' : player.gameName}
+                  <button
+                    type="button"
+                    className="live-player-name-button"
+                    title={`查看 ${searchableRiotId} 的战绩`}
+                    onClick={() => onPlayerSearch?.(searchableRiotId)}
+                    disabled={!searchableRiotId || !onPlayerSearch}
                   >
                     {player.gameName}
-                  </strong>
+                  </button>
                   {sharedColor && (
-                    <span className="live-player-party" title="组队或近期同队">
+                    <span className="live-player-party" title="本局双排或多排">
                       <UsersRound className="size-2.5" />
                     </span>
                   )}
-                </div>
-                <div className="live-player-champion-name" title={player.championName}>
-                  {player.championName}
                 </div>
               </div>
             </div>
@@ -312,9 +279,10 @@ function TarotCard({
 
 interface LiveGamePageProps {
   onTitleChange?: (title: string) => void;
+  onPlayerSearch?: (riotId: string) => void;
 }
 
-export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
+export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProps) {
   const [loading, setLoading] = useState(false);
   const [myTeam, setMyTeam] = useState<LiveBattlePlayer[]>([]);
   const [enemyTeam, setEnemyTeam] = useState<LiveBattlePlayer[]>([]);
@@ -326,6 +294,8 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
   const cardTimerIds = useRef<number[]>([]);
   const fetchSeqRef = useRef(0);
   const battleRosterKeyRef = useRef('');
+  const displayedPlayerCountRef = useRef(0);
+  const displayedIdentifiedPlayerCountRef = useRef(0);
   const loadedCardCountRef = useRef(0);
   const previewModeRef = useRef(false);
 
@@ -337,7 +307,6 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
   const fetchBattle = useCallback(async () => {
     const requestId = fetchSeqRef.current + 1;
     fetchSeqRef.current = requestId;
-    clearCardTimers();
     setLoading(true);
     setError('');
 
@@ -346,22 +315,36 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
     try {
       const info = await window.lolHelper.live.getBattle();
       if (!isCurrentRequest()) return;
-      setInGame(info.inGame);
       setPhase(info.phase);
       if (info.error) setError(info.error);
 
       if (info.inGame) {
         const nextRosterKey = battleRosterKey(info.myTeam, info.enemyTeam);
         const total = info.myTeam.length + info.enemyTeam.length;
-        const sameRoster = nextRosterKey === battleRosterKeyRef.current;
-        const alreadyLoaded = sameRoster && loadedCardCountRef.current >= total;
+        const identifiedTotal = identifiedPlayerCount([...info.myTeam, ...info.enemyTeam]);
+        const previousRosterKey = battleRosterKeyRef.current;
+        const hadDisplayedRoster = Boolean(previousRosterKey);
 
+        if (
+          hadDisplayedRoster
+          && (total === 0 || total < displayedPlayerCountRef.current)
+          && identifiedTotal <= displayedIdentifiedPlayerCountRef.current
+        ) {
+          setInGame(true);
+          return;
+        }
+
+        const sameRoster = nextRosterKey === previousRosterKey;
+        setInGame(true);
         battleRosterKeyRef.current = nextRosterKey;
+        displayedPlayerCountRef.current = total;
+        displayedIdentifiedPlayerCountRef.current = identifiedTotal;
         setMyTeam(info.myTeam);
         setEnemyTeam(info.enemyTeam);
+        clearCardTimers();
 
-        if (alreadyLoaded) {
-          setLoadedCards((current) => (current.size === total ? current : loadedCardSet(total)));
+        if (sameRoster || hadDisplayedRoster) {
+          setLoadedCards(loadedCardSet(total));
           loadedCardCountRef.current = total;
           return;
         }
@@ -380,15 +363,19 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
           cardTimerIds.current.push(timerId);
         }
       } else {
+        setInGame(false);
         battleRosterKeyRef.current = '';
+        displayedPlayerCountRef.current = 0;
+        displayedIdentifiedPlayerCountRef.current = 0;
         loadedCardCountRef.current = 0;
+        clearCardTimers();
         setLoadedCards(new Set());
         setMyTeam([]);
         setEnemyTeam([]);
       }
     } catch (err) {
       if (!isCurrentRequest()) return;
-      setInGame(false);
+      setInGame(Boolean(battleRosterKeyRef.current));
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       if (isCurrentRequest()) setLoading(false);
@@ -404,18 +391,9 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
     return window.lolHelper.live.onStateChanged((event) => {
       if (previewModeRef.current) return;
       setPhase(event.phase);
-      if (!event.inGame) {
-        clearCardTimers();
-        battleRosterKeyRef.current = '';
-        loadedCardCountRef.current = 0;
-        setLoadedCards(new Set());
-        setMyTeam([]);
-        setEnemyTeam([]);
-        setInGame(false);
-      }
       void fetchBattle();
     });
-  }, [clearCardTimers, fetchBattle]);
+  }, [fetchBattle]);
 
   const loadRealBattle = useCallback(() => {
     previewModeRef.current = false;
@@ -440,12 +418,13 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
     setMyTeam(LIVE_PREVIEW_MY_TEAM);
     setEnemyTeam(LIVE_PREVIEW_ENEMY_TEAM);
     battleRosterKeyRef.current = battleRosterKey(LIVE_PREVIEW_MY_TEAM, LIVE_PREVIEW_ENEMY_TEAM);
+    displayedPlayerCountRef.current = 10;
     loadedCardCountRef.current = 10;
     setLoadedCards(loadedCardSet(10));
   }, [clearCardTimers, loadRealBattle]);
 
   const allPlayers = useMemo(() => [...myTeam, ...enemyTeam], [myTeam, enemyTeam]);
-  const sharedPlayColors = useMemo(() => buildSharedPlayColors(allPlayers), [allPlayers]);
+  const premadeColors = useMemo(() => buildPremadeColors(allPlayers), [allPlayers]);
   const myTeamSummary = useMemo(() => summarizeTeam(myTeam), [myTeam]);
   const enemyTeamSummary = useMemo(() => summarizeTeam(enemyTeam), [enemyTeam]);
   const hasBattle = inGame && allPlayers.length > 0;
@@ -512,7 +491,8 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
                       player={player}
                       isLoaded={loadedCards.has(idx)}
                       index={idx}
-                      sharedColor={sharedPlayColors.get(playerIdentity(player))}
+                      sharedColor={premadeColors.get(playerIdentity(player))}
+                      onPlayerSearch={onPlayerSearch}
                     />
                   ))}
                 </div>
@@ -532,7 +512,8 @@ export function LiveGamePage({ onTitleChange }: LiveGamePageProps) {
                       player={player}
                       isLoaded={loadedCards.has(idx + myTeam.length)}
                       index={idx + myTeam.length}
-                      sharedColor={sharedPlayColors.get(playerIdentity(player))}
+                      sharedColor={premadeColors.get(playerIdentity(player))}
+                      onPlayerSearch={onPlayerSearch}
                     />
                   ))}
                 </div>

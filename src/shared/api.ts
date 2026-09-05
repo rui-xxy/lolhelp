@@ -31,6 +31,7 @@ export interface LcuConnection {
 export interface LcuRegion {
   key: string;
   name: string;
+  sessionId?: string;
   error?: string;
 }
 
@@ -73,6 +74,19 @@ export interface FriendInfo {
 export interface FriendActionResult {
   success: boolean;
   message: string;
+}
+
+export interface FriendRequestInfo {
+  id: string;
+  puuid: string;
+  gameName: string;
+  gameTag: string;
+  summonerId: number;
+  icon: number;
+  iconUrl?: string;
+  iconUrls?: string[];
+  direction: 'in' | 'out' | 'both';
+  note: string;
 }
 
 export interface ChatMessage {
@@ -143,6 +157,10 @@ export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
   getFriends: () => Promise<FriendInfo[]>;
+  getFriendRequests: () => Promise<FriendRequestInfo[]>;
+  addFriend: (riotId: string) => Promise<FriendActionResult>;
+  acceptFriendRequest: (puuid: string) => Promise<FriendActionResult>;
+  deleteFriendRequest: (puuid: string) => Promise<FriendActionResult>;
   getChatConversations: (accountKey?: string) => Promise<ChatConversationsResponse>;
   sendChatMessage: (
     conversationId: string,
@@ -249,7 +267,6 @@ export interface AssistBlacklistEntry {
   updatedAt: number;
 }
 
-export type AssistOverlayName = 'helper' | 'match' | 'spells';
 export type AssistRecommendationStrategy = 'winRate' | 'pickRate';
 
 export interface AssistRecommendationRequest {
@@ -322,7 +339,6 @@ export interface AssistRuntimeStatus {
   position: string;
   lastAction: string;
   lastError: string;
-  overlays: Record<AssistOverlayName, boolean>;
 }
 
 export interface AssistOperationResult {
@@ -405,7 +421,6 @@ export interface AssistLiveData {
 }
 
 export interface AssistApi {
-  getStatus: () => Promise<AssistRuntimeStatus>;
   getRecommendation: (
     request?: AssistRecommendationRequest,
   ) => Promise<AssistRecommendation>;
@@ -427,8 +442,6 @@ export interface AssistApi {
   claimRewards: (
     requests: AssistClaimRewardRequest[],
   ) => Promise<AssistOperationResult[]>;
-  toggleOverlay: (name: AssistOverlayName) => Promise<boolean>;
-  setOverlayPinned: (name: AssistOverlayName, pinned: boolean) => Promise<boolean>;
   getLiveData: () => Promise<AssistLiveData>;
   exportBlacklist: () => Promise<string | null>;
 }
@@ -1053,8 +1066,174 @@ export interface ChampionRankingResult {
   error?: string;
 }
 
+export type MayhemChampionRole = 'assassin' | 'fighter' | 'mage' | 'marksman' | 'support' | 'tank';
+export type MayhemChampionTier = 'S+' | 'S' | 'A' | 'B' | 'C' | 'D';
+export type MayhemAugmentRarity = 'prismatic' | 'gold' | 'silver';
+export type MayhemItemGroupKey = 'starting' | 'boots' | 'core' | 'late';
+
+export interface MayhemChampionEntry {
+  id: number;
+  slug: string;
+  name: string;
+  image: string;
+  rank: number;
+  tier: MayhemChampionTier;
+  roles: MayhemChampionRole[];
+  winRate: number;
+  pickRate: number;
+  trend: number | null;
+}
+
+export interface MayhemTierListResult {
+  entries: MayhemChampionEntry[];
+  meta: {
+    patch: string;
+    updatedAt: string;
+    source: string;
+  };
+  error?: string;
+}
+
+export type MayhemAugmentAvailability = 'live' | 'removed';
+
+export interface MayhemAugmentChampionRef {
+  id: number;
+  name: string;
+  icon: string;
+}
+
+export interface MayhemAugmentRankingEntry {
+  slug: string;
+  name: string;
+  icon: string;
+  rarity: MayhemAugmentRarity;
+  availability: MayhemAugmentAvailability;
+  rank: number;
+  allRank: number;
+  winRate: number | null;
+  pickRate: number | null;
+  isNew: boolean;
+  topChampions: MayhemAugmentChampionRef[];
+}
+
+export interface MayhemAugmentRankingResult {
+  entries: MayhemAugmentRankingEntry[];
+  meta: {
+    updatedAt: string;
+    activeCount: number;
+    removedCount: number;
+    rarityCounts: Record<MayhemAugmentRarity, number>;
+    source: string;
+  };
+  error?: string;
+}
+
+export type MayhemComboTier = 'S+' | 'S' | 'A' | 'B' | 'C';
+
+export interface MayhemComboEntry {
+  id: string;
+  slug: string;
+  rank: number;
+  tier: MayhemComboTier;
+  types: string[];
+  description: string;
+  votes: number;
+  rankScore: number;
+  curated: boolean;
+  champion: {
+    id: number;
+    slug: string;
+    name: string;
+    icon: string;
+  };
+  augment: {
+    slug: string;
+    name: string;
+    icon: string;
+  };
+  sourceUrl: string;
+}
+
+export interface MayhemComboResult {
+  entries: MayhemComboEntry[];
+  meta: {
+    totalCount: number;
+    championCount: number;
+    featuredCount: number;
+    pageSize: number;
+    pageCount: number;
+    source: string;
+  };
+  error?: string;
+}
+
+export interface MayhemBalanceModifier {
+  direction: 'up' | 'down' | 'neutral';
+  label: string;
+  value: string;
+}
+
+export interface MayhemBuildItem {
+  name: string;
+  icon: string;
+}
+
+export interface MayhemItemBuildOption {
+  items: MayhemBuildItem[];
+  pickRate: number;
+  winRate: number;
+}
+
+export interface MayhemSkillSequence {
+  sequence: string;
+  pickRate: number;
+  winRate: number;
+}
+
+export interface MayhemSkillOrder {
+  priority: string;
+  pickRate: number;
+  winRate: number;
+  sequences: MayhemSkillSequence[];
+}
+
+export interface MayhemAugmentRecommendation {
+  slug: string;
+  name: string;
+  rarity: MayhemAugmentRarity;
+  icon: string;
+  winRate: number;
+  effect: string;
+}
+
+export interface MayhemChampionBuild {
+  slug: string;
+  name: string;
+  alias: string;
+  image: string;
+  tier: MayhemChampionTier;
+  roles: string[];
+  winRate: number;
+  pickRate: number;
+  patch: string;
+  balance: MayhemBalanceModifier[];
+  skillOrders: MayhemSkillOrder[];
+  itemGroups: Record<MayhemItemGroupKey, MayhemItemBuildOption[]>;
+  augments: MayhemAugmentRecommendation[];
+  sourceUrl: string;
+}
+
+export interface MayhemChampionBuildResult {
+  build: MayhemChampionBuild | null;
+  error?: string;
+}
+
 export interface RankingApi {
   getChampions: (request: ChampionRankingRequest) => Promise<ChampionRankingResult>;
+  getMayhemTierList: (refresh?: boolean) => Promise<MayhemTierListResult>;
+  getMayhemBuild: (slug: string, refresh?: boolean) => Promise<MayhemChampionBuildResult>;
+  getMayhemAugmentRanking: (refresh?: boolean) => Promise<MayhemAugmentRankingResult>;
+  getMayhemCombos: (refresh?: boolean) => Promise<MayhemComboResult>;
 }
 
 // ============================================================================
@@ -1074,11 +1253,34 @@ export interface ScoutConfig {
   excludePuuids?: string[]; // 继续搜索时排除已展示过的达标者
 }
 
+export interface ScoutDuoSignal {
+  partnerPuuid: string;
+  partnerRiotId: string;
+  gamesTogether: number;
+  checkedMatches: number;
+  evidence: 'premade' | 'recurring';
+  fixed: boolean;
+  partySize: number;
+}
+
+export interface ScoutBehaviorShiftSignal {
+  confidence: 'medium' | 'high';
+  reasons: string[];
+  recentMatches: number;
+  baselineMatches: number;
+}
+
+export interface ScoutSignals {
+  duo?: ScoutDuoSignal;
+  behaviorShift?: ScoutBehaviorShiftSignal;
+}
+
 // 单个达标者（一个高手）
 export interface ScoutHit {
   profile: PlayerProfile;
   qualifyingMatches: PlayerMatchDetail[]; // 该高手的达标场次（用指定英雄 + 时间窗内 + KDA 达标）
   totalChampionGames: number; // 该高手用指定英雄的总场次（统计参考）
+  signals?: ScoutSignals;
 }
 
 export type ScoutPlayerState = 'queued' | 'checking' | 'checked' | 'matched' | 'failed';

@@ -12,11 +12,25 @@ import {
 } from './components/match/savedMatchesStore';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
-import { ChampionRankingPage } from './components/ranking/ChampionRankingPage';
+import {
+  ChampionRankingPage,
+  RankingChapterSwitch,
+  type RankingChapter,
+} from './components/ranking/ChampionRankingPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { AssistPage } from './components/assist/AssistPage';
 import { ChatSessionDialog } from './components/chat/ChatSessionDialog';
+import { FriendManagerDialog } from './components/friends/FriendManagerDialog';
+import {
+  createAcceptedAlerts,
+  loadFriendAcceptedAlerts,
+  loadTrackedOutgoingRequests,
+  mergeAcceptedAlerts,
+  saveFriendAcceptedAlerts,
+  saveTrackedOutgoingRequests,
+  type FriendAcceptedAlert,
+} from './components/friends/friendRequestTracking';
 import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
 // 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
@@ -25,14 +39,41 @@ const PAGE_TITLES: Record<View, string> = {
   matches: '', // 战绩页标题栏放搜索框，标题留空
   live: '',
   scout: '高手雷达',
-  ranking: '英雄排行',
+  ranking: '',
   assist: '辅助功能',
 };
 
 const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
 const HIDDEN_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
 const FRIEND_PANEL_ANIMATION_MS = 220;
+const FRIEND_REQUEST_CHECK_INTERVAL_MS = 10_000;
 const FOLLOW_ALERTS_READ_STORAGE_KEY = 'lolhelp:follow-alerts-read:v1';
+const APP_SESSION_STORAGE_KEY = 'lolhelp:ui-session:v1';
+const APP_VIEWS: View[] = ['home', 'matches', 'live', 'scout', 'ranking', 'assist'];
+const RANKING_CHAPTERS: RankingChapter[] = ['mayhem', 'ranking'];
+
+interface AppSessionState {
+  activeView?: View;
+  matchSearchName?: string;
+  matchRegion?: string;
+  rankingChapter?: RankingChapter;
+}
+
+function loadAppSessionState(): AppSessionState {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(APP_SESSION_STORAGE_KEY) ?? '{}') as AppSessionState;
+    return {
+      activeView: APP_VIEWS.includes(parsed.activeView as View) ? parsed.activeView : undefined,
+      matchSearchName: typeof parsed.matchSearchName === 'string' ? parsed.matchSearchName : undefined,
+      matchRegion: typeof parsed.matchRegion === 'string' ? parsed.matchRegion : undefined,
+      rankingChapter: RANKING_CHAPTERS.includes(parsed.rankingChapter as RankingChapter)
+        ? parsed.rankingChapter
+        : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
 
 function loadReadFollowAlertIds(): Set<string> {
   try {
@@ -52,19 +93,40 @@ function saveReadFollowAlertIds(ids: Set<string>): void {
   }
 }
 
+async function showFriendAcceptedNotification(alerts: FriendAcceptedAlert[]): Promise<void> {
+  if (alerts.length === 0 || !('Notification' in window)) return;
+  try {
+    let permission = Notification.permission;
+    if (permission === 'default') permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const body = alerts.length === 1
+      ? `${alerts[0].riotId} 已经通过你的好友申请`
+      : `${alerts.length} 位玩家已经通过你的好友申请`;
+    new Notification('好友已添加', { body });
+  } catch {
+    // The toolbar badge remains available when native notifications are disabled.
+  }
+}
+
 export function App() {
-  const [activeView, setActiveView] = useState<View>('home');
-  const [matchSearchName, setMatchSearchName] = useState('');
-  const [matchRegion, setMatchRegion] = useState('');
-  const [matchSearchTrigger, setMatchSearchTrigger] = useState(0); // 自增触发搜索
+  const [initialSession] = useState(loadAppSessionState);
+  const [activeView, setActiveView] = useState<View>(initialSession.activeView ?? 'home');
+  const [matchSearchName, setMatchSearchName] = useState(initialSession.matchSearchName ?? '');
+  const [matchRegion, setMatchRegion] = useState(initialSession.matchRegion ?? '');
+  const [matchSearchTrigger, setMatchSearchTrigger] = useState(
+    initialSession.activeView === 'matches' && initialSession.matchSearchName ? 1 : 0,
+  ); // 自增触发搜索
   const [livePageTitle, setLivePageTitle] = useState('未进入对局');
   const [currentRegionKey, setCurrentRegionKey] = useState('');
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
+  const [clientSessionId, setClientSessionId] = useState('');
   const [friendPanelHidden, setFriendPanelHidden] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatSessionsOpen, setChatSessionsOpen] = useState(false);
   const [savedPickerOpen, setSavedPickerOpen] = useState(false);
   const [followAccountsOpen, setFollowAccountsOpen] = useState(false);
+  const [friendManagerOpen, setFriendManagerOpen] = useState(false);
+  const [friendAcceptedAlerts, setFriendAcceptedAlerts] = useState(loadFriendAcceptedAlerts);
   const [followAlertCount, setFollowAlertCount] = useState(0);
   const [followAccountRequest, setFollowAccountRequest] = useState<FollowAccountRequest | null>(null);
   const [savedAccountRequest, setSavedAccountRequest] = useState<{
@@ -73,36 +135,125 @@ export function App() {
   } | null>(null);
   const [scoutSidebarStatus, setScoutSidebarStatus] = useState<ScoutSidebarStatus | null>(null);
   const [scoutPanelMinimized, setScoutPanelMinimized] = useState(false);
+  const [rankingChapter, setRankingChapter] = useState<RankingChapter>(
+    initialSession.rankingChapter ?? 'mayhem',
+  );
   const friendPanelTimerRef = useRef<number | null>(null);
+  const trackedOutgoingRequestsRef = useRef(loadTrackedOutgoingRequests());
+  const friendRequestCheckInFlightRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(APP_SESSION_STORAGE_KEY, JSON.stringify({
+        activeView,
+        matchSearchName,
+        matchRegion,
+        rankingChapter,
+      } satisfies AppSessionState));
+    } catch {
+      // Session restore is best-effort; normal app behavior does not depend on it.
+    }
+  }, [activeView, matchRegion, matchSearchName, rankingChapter]);
 
   useEffect(() => {
     let cancelled = false;
-    let retryTimer: number | undefined;
+    let refreshInFlight = false;
 
     const refreshRegion = async () => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
       try {
         const region = await window.lolHelper.lcu.getCurrentRegion();
         if (cancelled) return;
         if (region.name && !region.error) {
           setCurrentRegionKey(region.key ?? '');
           setCurrentRegionName(region.name);
-          return;
+          if (region.sessionId) setClientSessionId(region.sessionId);
         }
       } catch {
-        // 等下一轮重试。这里不展示错误文案，避免标题栏出现“未知大区”。
-      }
-
-      if (!cancelled) {
-        retryTimer = window.setTimeout(refreshRegion, 2500);
+        // 保留上一次成功读取到的区域，下一轮继续检查。
+      } finally {
+        refreshInFlight = false;
       }
     };
 
+    const handleWindowFocus = () => void refreshRegion();
     void refreshRegion();
+    const refreshTimer = window.setInterval(() => void refreshRegion(), 3_000);
+    window.addEventListener('focus', handleWindowFocus);
     return () => {
       cancelled = true;
-      if (retryTimer) window.clearTimeout(retryTimer);
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [activeView]);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkFriendRequests = async () => {
+      if (friendRequestCheckInFlightRef.current) return;
+      friendRequestCheckInFlightRef.current = true;
+      try {
+        const status = await window.lolHelper.lcu.detectClient();
+        if (!status.connected || cancelled) return;
+        const requests = await window.lolHelper.lcu.getFriendRequests();
+        if (cancelled) return;
+        const outgoing = requests.filter((request) => request.direction === 'out');
+        const outgoingPuuids = new Set(outgoing.map((request) => request.puuid));
+        const removed = trackedOutgoingRequestsRef.current.filter(
+          (request) => !outgoingPuuids.has(request.puuid),
+        );
+
+        if (removed.length > 0) {
+          const friends = await window.lolHelper.lcu.getFriends();
+          if (cancelled) return;
+          const accepted = createAcceptedAlerts(
+            removed,
+            new Set(friends.map((friend) => friend.puuid)),
+          );
+          if (accepted.length > 0) {
+            setFriendAcceptedAlerts((current) => {
+              const next = mergeAcceptedAlerts(current, accepted);
+              saveFriendAcceptedAlerts(next);
+              return next;
+            });
+            void showFriendAcceptedNotification(accepted);
+            window.dispatchEvent(new CustomEvent('lolhelp:friends-changed'));
+          }
+        }
+
+        trackedOutgoingRequestsRef.current = outgoing;
+        saveTrackedOutgoingRequests(outgoing);
+      } catch {
+        // Keep the last snapshot and retry after the client is available again.
+      } finally {
+        friendRequestCheckInFlightRef.current = false;
+      }
+    };
+
+    const handleFocus = () => void checkFriendRequests();
+    const handleFriendRequestsChanged = () => void checkFriendRequests();
+    void checkFriendRequests();
+    const timer = window.setInterval(() => void checkFriendRequests(), FRIEND_REQUEST_CHECK_INTERVAL_MS);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('lolhelp:friend-requests-changed', handleFriendRequestsChanged);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('lolhelp:friend-requests-changed', handleFriendRequestsChanged);
+    };
+  }, []);
+
+  const markFriendAcceptedAlertsRead = useCallback(() => {
+    setFriendAcceptedAlerts((current) => {
+      if (current.every((alert) => alert.read)) return current;
+      const next = current.map((alert) => ({ ...alert, read: true }));
+      saveFriendAcceptedAlerts(next);
+      return next;
+    });
+  }, []);
 
   const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
   const formatRegionOption = (region: (typeof regions)[number]) => region.name;
@@ -170,6 +321,7 @@ export function App() {
     setSavedPickerOpen(false);
     setChatSessionsOpen(false);
     setSettingsOpen(false);
+    setFriendManagerOpen(false);
     setFollowAccountsOpen(true);
     setFollowAccountRequest({ riotId, region, nonce: Date.now() });
   }, []);
@@ -261,6 +413,9 @@ export function App() {
   }, [friendPanelHidden, setWindowWidth]);
 
   const scoutPanelActuallyMinimized = scoutPanelMinimized && scoutSidebarStatus !== null;
+  const headerExtra = matchSearchBar ?? (activeView === 'ranking' ? (
+    <RankingChapterSwitch value={rankingChapter} onChange={setRankingChapter} />
+  ) : null);
 
   return (
     <AppShell
@@ -268,12 +423,14 @@ export function App() {
       activeView={activeView}
       onNavigate={setActiveView}
       fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'ranking' || activeView === 'assist'}
-      headerExtra={matchSearchBar}
+      headerExtra={headerExtra}
       friendPanelHidden={friendPanelHidden}
       onToggleFriendPanel={toggleFriendPanelHidden}
       chatSessionsOpen={chatSessionsOpen}
       savedMatchesOpen={savedPickerOpen}
       followAccountsOpen={followAccountsOpen}
+      friendManagerOpen={friendManagerOpen}
+      friendRequestAlertCount={friendAcceptedAlerts.filter((alert) => !alert.read).length}
       followAlertCount={followAlertCount}
       scoutStatus={scoutPanelActuallyMinimized ? scoutSidebarStatus : null}
       onScoutPlayerSearch={handlePlayerSearch}
@@ -285,12 +442,14 @@ export function App() {
         setChatSessionsOpen(false);
         setSettingsOpen(false);
         setFollowAccountsOpen(false);
+        setFriendManagerOpen(false);
         setSavedPickerOpen(true);
       }}
       onOpenFollowAccounts={() => {
         setSavedPickerOpen(false);
         setChatSessionsOpen(false);
         setSettingsOpen(false);
+        setFriendManagerOpen(false);
         setFollowAccountsOpen(true);
         void markCurrentFollowAlertsRead();
       }}
@@ -298,12 +457,22 @@ export function App() {
         setSavedPickerOpen(false);
         setFollowAccountsOpen(false);
         setSettingsOpen(false);
+        setFriendManagerOpen(false);
         setChatSessionsOpen(true);
+      }}
+      onOpenFriendManager={() => {
+        setSavedPickerOpen(false);
+        setChatSessionsOpen(false);
+        setFollowAccountsOpen(false);
+        setSettingsOpen(false);
+        setFriendManagerOpen(true);
+        markFriendAcceptedAlertsRead();
       }}
       onOpenSettings={() => {
         setSavedPickerOpen(false);
         setChatSessionsOpen(false);
         setFollowAccountsOpen(false);
+        setFriendManagerOpen(false);
         setSettingsOpen(true);
       }}
       settingsOpen={settingsOpen}
@@ -319,6 +488,7 @@ export function App() {
       </div>
       <div className={activeView === 'matches' ? 'h-full' : 'hidden'}>
         <MatchHistoryPage
+          key={clientSessionId || 'client-session'}
           searchName={matchSearchName}
           searchTrigger={matchSearchTrigger}
           region={matchRegion}
@@ -329,7 +499,10 @@ export function App() {
         />
       </div>
       <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
-        <LiveGamePage onTitleChange={setLivePageTitle} />
+        <LiveGamePage
+          onTitleChange={setLivePageTitle}
+          onPlayerSearch={(riotId) => handlePlayerSearch(riotId, currentRegionKey)}
+        />
       </div>
       <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
         <ScoutPage
@@ -341,7 +514,7 @@ export function App() {
         />
       </div>
       <div className={activeView === 'ranking' ? 'h-full' : 'hidden'}>
-        <ChampionRankingPage />
+        <ChampionRankingPage chapter={rankingChapter} />
       </div>
       <div className={activeView === 'assist' ? 'h-full' : 'hidden'}>
         <AssistPage
@@ -366,6 +539,11 @@ export function App() {
         currentRegionKey={currentRegionKey}
         currentRegionName={currentRegionName}
         request={followAccountRequest}
+      />
+      <FriendManagerDialog
+        open={friendManagerOpen}
+        onClose={() => setFriendManagerOpen(false)}
+        acceptedAlerts={friendAcceptedAlerts}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AppShell>

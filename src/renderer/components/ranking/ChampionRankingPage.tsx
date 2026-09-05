@@ -23,6 +23,9 @@ import type {
   ChampionRankingRegion,
   ChampionRankingResult,
 } from '../../../shared/api';
+import { MayhemGuidePage } from './MayhemGuidePage';
+
+export type RankingChapter = 'mayhem' | 'ranking';
 
 interface MenuOption<T extends string> {
   value: T;
@@ -84,6 +87,39 @@ const ROLE_NAMES: Record<string, string> = {
 };
 
 const HERO_TONES = ['#d85d6f', '#2f8f78', '#4d7fc1', '#9a68b4', '#d28a3f', '#477f91'];
+
+export function RankingChapterSwitch({
+  value,
+  onChange,
+}: {
+  value: RankingChapter;
+  onChange: (value: RankingChapter) => void;
+}) {
+  return (
+    <div className="ranking-chapter-switch" role="tablist" aria-label="排行章节">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === 'mayhem'}
+        className={value === 'mayhem' ? 'is-active' : ''}
+        onClick={() => onChange('mayhem')}
+      >
+        <Gem className="size-4" />
+        <strong>海克斯大乱斗</strong>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === 'ranking'}
+        className={value === 'ranking' ? 'is-active' : ''}
+        onClick={() => onChange('ranking')}
+      >
+        <Layers3 className="size-4" />
+        <strong>英雄排行</strong>
+      </button>
+    </div>
+  );
+}
 
 function FilterMenu<T extends string>({
   value,
@@ -356,7 +392,7 @@ function RankingSkeleton() {
   );
 }
 
-export function ChampionRankingPage() {
+export function ChampionRankingPage({ chapter }: { chapter: RankingChapter }) {
   const [mode, setMode] = useState<ChampionRankingMode>('ranked');
   const [region, setRegion] = useState<ChampionRankingRegion>('global');
   const [tier, setTier] = useState('all');
@@ -396,8 +432,8 @@ export function ChampionRankingPage() {
   }, [mode, position, region, tier]);
 
   useEffect(() => {
-    void load(false);
-  }, [load]);
+    if (chapter === 'ranking') void load(false);
+  }, [chapter, load]);
 
   const visibleEntries = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase();
@@ -413,7 +449,6 @@ export function ChampionRankingPage() {
     return entries.find((entry) => entry.champion.id === selectedId) ?? visibleEntries[0] ?? null;
   }, [result?.entries, selectedId, visibleEntries]);
 
-  const modeLabel = MODE_OPTIONS.find((option) => option.value === mode)?.label ?? '英雄排行';
   const primaryLabel = mode === 'arena' ? '前二率' : '胜率';
   const thirdLabel = mode === 'arena' ? '第一率' : '禁用率';
   const canChooseRegion = mode !== 'hextech';
@@ -422,22 +457,13 @@ export function ChampionRankingPage() {
   const fixedRegionOptions: MenuOption<ChampionRankingRegion>[] = [{ value: 'global', label: '统一数据' }];
   const fixedTierOptions: MenuOption<string>[] = [{ value: 'all', label: '全部段位' }];
   const fixedPositionOptions: MenuOption<ChampionRankingPosition>[] = [{ value: 'ALL', label: '全部位置' }];
+  if (chapter === 'mayhem') {
+    return <MayhemGuidePage />;
+  }
 
   return (
     <section className="ranking-page">
       <header className="ranking-toolbar">
-        <div className="ranking-heading">
-          <span className="ranking-heading-mark"><Layers3 className="size-4" /></span>
-          <div>
-            <h1>英雄排行</h1>
-            <p>
-              {modeLabel}
-              {result?.meta.version ? ` · ${result.meta.version}` : ''}
-              {result?.meta.matchCount ? ` · ${formatCompactNumber(result.meta.matchCount)} 场` : ''}
-            </p>
-          </div>
-        </div>
-
         <div className="ranking-filters">
           <FilterMenu value={mode} options={MODE_OPTIONS} onChange={setMode} wide />
           <FilterMenu

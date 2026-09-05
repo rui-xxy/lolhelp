@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, Pencil, Search, Square, Star } from 'lucide-react';
 import { ChampionPickerDialog } from './ChampionPickerDialog';
 import { GameIcon } from '../match/GameIcon';
@@ -9,39 +9,34 @@ import type {
   ChampionSummary,
   ScoutConfig,
   ScoutHit,
-  ScoutPlayerEvent,
   ScoutProgress,
 } from '../../../shared/api';
 import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
 import { LOL_REGIONS } from '../../../shared/constants';
-import { ScoutSearchVisualizer } from './ScoutSearchVisualizer';
+
+interface ScoutPageStatus {
+  running: boolean;
+  progress: ScoutProgress | null;
+  hits: ScoutHit[];
+  targetCount: number;
+  region?: string;
+  startedAt?: number | null;
+  finishedAt?: number | null;
+}
 
 interface ScoutPageProps {
   onPlayerSearch: (name: string, region?: string) => void;
   currentRegionName: string;
   configPanelMinimized?: boolean;
   onConfigPanelMinimize?: () => void;
-  onStatusChange?: (status: {
-    running: boolean;
-    progress: ScoutProgress | null;
-    hits: ScoutHit[];
-    targetCount: number;
-    region?: string;
-    startedAt?: number | null;
-    finishedAt?: number | null;
-  } | null) => void;
+  onStatusChange?: (status: ScoutPageStatus | null) => void;
 }
 
 const KDA_THRESHOLD_MIN = 10;
 const KDA_THRESHOLD_MAX = 25;
 const KDA_THRESHOLD_STEP = 0.5;
-const MAX_LIVE_SCOUT_PLAYERS = 240;
-
-type ScoutPlayerStateCounts = Record<ScoutPlayerEvent['state'], number>;
-
-function makeEmptyScoutPlayerStateCounts(): ScoutPlayerStateCounts {
-  return { queued: 0, checking: 0, checked: 0, matched: 0, failed: 0 };
-}
+const SCOUT_UI_FLUSH_MS = 250;
+const SCOUT_SIDEBAR_FLUSH_MS = 500;
 
 // 默认配置
 const DEFAULT_CONFIG: ScoutConfig = {
@@ -106,58 +101,6 @@ function mergeHits(baseHits: ScoutHit[], nextHits: ScoutHit[]): ScoutHit[] {
   return merged;
 }
 
-const SCOUT_PLAYER_STATE_PRIORITY: Record<ScoutPlayerEvent['state'], number> = {
-  queued: 0,
-  checking: 1,
-  checked: 2,
-  failed: 2,
-  matched: 3,
-};
-
-function mergeScoutPlayers(
-  players: ScoutPlayerEvent[],
-  nextPlayers: ScoutPlayerEvent[],
-): ScoutPlayerEvent[] {
-  if (nextPlayers.length === 0) return players;
-  const byPuuid = new Map(players.map((player) => [player.puuid, player]));
-  for (const nextPlayer of nextPlayers) {
-    const current = byPuuid.get(nextPlayer.puuid);
-    if (!current) {
-      byPuuid.set(nextPlayer.puuid, nextPlayer);
-      continue;
-    }
-
-    const keepCurrentState =
-      SCOUT_PLAYER_STATE_PRIORITY[current.state] > SCOUT_PLAYER_STATE_PRIORITY[nextPlayer.state];
-    const merged: ScoutPlayerEvent = {
-      ...current,
-      ...nextPlayer,
-      state: keepCurrentState ? current.state : nextPlayer.state,
-      profile: nextPlayer.profile ?? current.profile,
-      parentPuuid: nextPlayer.parentPuuid ?? current.parentPuuid,
-    };
-    byPuuid.delete(nextPlayer.puuid);
-    byPuuid.set(nextPlayer.puuid, merged);
-  }
-  const mergedPlayers = [...byPuuid.values()];
-  if (mergedPlayers.length <= MAX_LIVE_SCOUT_PLAYERS) return mergedPlayers;
-
-  const matchedPlayers = mergedPlayers.filter((player) => player.state === 'matched');
-  const matchedIds = new Set(matchedPlayers.map((player) => player.puuid));
-  const recentCapacity = Math.max(0, MAX_LIVE_SCOUT_PLAYERS - matchedPlayers.length);
-  const recentPlayers: ScoutPlayerEvent[] = [];
-  for (
-    let index = mergedPlayers.length - 1;
-    index >= 0 && recentPlayers.length < recentCapacity;
-    index -= 1
-  ) {
-    const player = mergedPlayers[index];
-    if (!matchedIds.has(player.puuid)) recentPlayers.push(player);
-  }
-  recentPlayers.reverse();
-  return [...matchedPlayers, ...recentPlayers];
-}
-
 export function ScoutPage({
   onPlayerSearch,
   currentRegionName,
@@ -178,15 +121,10 @@ export function ScoutPage({
 
   const [running, setRunning] = useState(false);
   const [hits, setHits] = useState<ScoutHit[]>([]);
-  const [searchedPlayers, setSearchedPlayers] = useState<ScoutPlayerEvent[]>([]);
-  const [searchedPlayerTotal, setSearchedPlayerTotal] = useState(0);
-  const [playerStateCounts, setPlayerStateCounts] = useState<ScoutPlayerStateCounts>(
-    makeEmptyScoutPlayerStateCounts,
-  );
-  const [visualRunId, setVisualRunId] = useState(0);
-  const playerStatesRef = useRef(new Map<string, ScoutPlayerEvent['state']>());
-  const playerStateCountsRef = useRef<ScoutPlayerStateCounts>(makeEmptyScoutPlayerStateCounts());
   const [progress, setProgress] = useState<ScoutProgress | null>(null);
+  const pendingSidebarStatusRef = useRef<ScoutPageStatus | null>(null);
+  const sidebarStatusTimerRef = useRef<number | null>(null);
+  const publishedSidebarRunningRef = useRef<boolean | null>(null);
   const [finalSummary, setFinalSummary] = useState<string>('');
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -370,13 +308,6 @@ export function ScoutPage({
       setBatchStarts((prev) => (prev.includes(baseHits.length) ? prev : [...prev, baseHits.length]));
     } else {
       setHits([]);
-      setSearchedPlayers([]);
-      setSearchedPlayerTotal(0);
-      const emptyCounts = makeEmptyScoutPlayerStateCounts();
-      playerStatesRef.current.clear();
-      playerStateCountsRef.current = emptyCounts;
-      setPlayerStateCounts({ ...emptyCounts });
-      setVisualRunId((value) => value + 1);
       setBatchStarts([0]);
     }
     setProgress(null);
@@ -388,7 +319,6 @@ export function ScoutPage({
     persistSettings({ ...settings, scoutDefaults: config });
 
     let pendingProgress: ScoutProgress | null = null;
-    let pendingPlayerEvents: ScoutPlayerEvent[] = [];
     let pendingHits: ScoutHit[] = [];
     let progressFlushTimer: number | null = null;
     const flushProgress = () => {
@@ -396,50 +326,23 @@ export function ScoutPage({
         window.clearTimeout(progressFlushTimer);
         progressFlushTimer = null;
       }
-      if (pendingProgress) {
-        setProgress(pendingProgress);
-        pendingProgress = null;
-      }
-      if (pendingPlayerEvents.length > 0) {
-        const events = pendingPlayerEvents;
-        pendingPlayerEvents = [];
-        const stateByPlayer = playerStatesRef.current;
-        const counts = playerStateCountsRef.current;
-        for (const playerEvent of events) {
-          const currentState = stateByPlayer.get(playerEvent.puuid);
-          if (
-            currentState &&
-            SCOUT_PLAYER_STATE_PRIORITY[currentState] >
-              SCOUT_PLAYER_STATE_PRIORITY[playerEvent.state]
-          ) {
-            continue;
-          }
-          if (currentState && currentState !== playerEvent.state) counts[currentState] -= 1;
-          if (!currentState || currentState !== playerEvent.state) counts[playerEvent.state] += 1;
-          stateByPlayer.set(playerEvent.puuid, playerEvent.state);
+      startTransition(() => {
+        if (pendingProgress) {
+          setProgress(pendingProgress);
+          pendingProgress = null;
         }
-        setSearchedPlayerTotal(stateByPlayer.size);
-        setPlayerStateCounts({ ...counts });
-        setSearchedPlayers((prev) => mergeScoutPlayers(prev, events));
-      }
-      if (pendingHits.length > 0) {
-        const newHits = pendingHits;
-        pendingHits = [];
-        setHits((prev) => mergeHits(prev, newHits));
-      }
+        if (pendingHits.length > 0) {
+          const newHits = pendingHits;
+          pendingHits = [];
+          setHits((prev) => mergeHits(prev, newHits));
+        }
+      });
     };
     const queueProgress = (nextProgress: ScoutProgress) => {
       pendingProgress = nextProgress;
-      const latestPlayer = nextProgress.latestPlayer;
-      const playerEvents = nextProgress.playerEvents?.length
-        ? nextProgress.playerEvents
-        : latestPlayer
-          ? [latestPlayer]
-          : [];
-      if (playerEvents.length > 0) pendingPlayerEvents.push(...playerEvents);
       if (nextProgress.latestHit) pendingHits.push(nextProgress.latestHit);
       if (progressFlushTimer === null) {
-        progressFlushTimer = window.setTimeout(flushProgress, 60);
+        progressFlushTimer = window.setTimeout(flushProgress, SCOUT_UI_FLUSH_MS);
       }
     };
 
@@ -488,19 +391,38 @@ export function ScoutPage({
 
   useEffect(() => {
     const shouldShowStatus = running || Boolean(progress) || hits.length > 0;
-    onStatusChange?.(
-      shouldShowStatus
-        ? {
-            running,
-            progress,
-            hits,
-            targetCount: config.targetCount,
-            region: config.region ?? '',
-            startedAt: searchStartedAt,
-            finishedAt: searchFinishedAt,
-          }
-        : null,
-    );
+    const nextStatus: ScoutPageStatus | null = shouldShowStatus
+      ? {
+          running,
+          progress,
+          hits,
+          targetCount: config.targetCount,
+          region: config.region ?? '',
+          startedAt: searchStartedAt,
+          finishedAt: searchFinishedAt,
+        }
+      : null;
+    pendingSidebarStatusRef.current = nextStatus;
+
+    const publishStatus = () => {
+      sidebarStatusTimerRef.current = null;
+      const status = pendingSidebarStatusRef.current;
+      publishedSidebarRunningRef.current = status?.running ?? null;
+      onStatusChange?.(status);
+    };
+    const nextRunning = nextStatus?.running ?? null;
+    if (nextRunning !== publishedSidebarRunningRef.current) {
+      if (sidebarStatusTimerRef.current !== null) {
+        window.clearTimeout(sidebarStatusTimerRef.current);
+        sidebarStatusTimerRef.current = null;
+      }
+      publishStatus();
+    } else if (sidebarStatusTimerRef.current === null) {
+      sidebarStatusTimerRef.current = window.setTimeout(
+        publishStatus,
+        SCOUT_SIDEBAR_FLUSH_MS,
+      );
+    }
   }, [
     config.region,
     config.targetCount,
@@ -513,7 +435,13 @@ export function ScoutPage({
   ]);
 
   useEffect(() => {
-    return () => onStatusChange?.(null);
+    return () => {
+      if (sidebarStatusTimerRef.current !== null) {
+        window.clearTimeout(sidebarStatusTimerRef.current);
+        sidebarStatusTimerRef.current = null;
+      }
+      onStatusChange?.(null);
+    };
   }, [onStatusChange]);
 
   const canMinimizeConfigPanel = Boolean(onConfigPanelMinimize && running);
@@ -529,8 +457,6 @@ export function ScoutPage({
     : hits.length > 0
       ? `已找到 ${hits.length} 位符合条件的玩家`
       : finalSummary || '等待开始搜索';
-  const showSearchNetwork = running || searchedPlayerTotal > 0;
-
   return (
     <div className={`scout-page flex h-full ${configPanelMinimized ? 'scout-page--panel-minimized' : ''}`}>
       {/* ===== 左侧：配置面板 ===== */}
@@ -741,21 +667,13 @@ export function ScoutPage({
             </div>
           )}
 
-          {showSearchNetwork && (
-            <ScoutSearchVisualizer
-              players={searchedPlayers}
-              totalPlayerCount={searchedPlayerTotal}
-              stateCounts={playerStateCounts}
-              runId={visualRunId}
-              running={running}
-              phase={progress?.phase ?? null}
-              checkedCount={checkedCount}
-              hitCount={hits.length}
-              onPlayerClick={(riotId) => onPlayerSearch(riotId, config.region ?? '')}
-            />
+          {running && (
+            <div className="scout-results-no-hits">
+              正在筛选玩家，已检查 {checkedCount} 位
+            </div>
           )}
 
-          {hits.length === 0 && !running && searchedPlayers.length === 0 ? (
+          {hits.length === 0 && !running && !progress && !finalSummary ? (
             <div className="scout-results-empty">
               <span><Crosshair className="size-5" /></span>
               <strong>还没有搜索结果</strong>

@@ -12,6 +12,7 @@ const POLL_INTERVAL_MS = 2_500;
 const RECONNECT_DELAY_MS = 2_000;
 const CHAMP_SELECT_REFRESH_THROTTLE_MS = 900;
 const LIVE_HEARTBEAT_MS = 10_000;
+const POLL_FAILURE_GRACE_MS = 8_000;
 
 let running = false;
 let socket: WebSocket | null = null;
@@ -21,6 +22,7 @@ let champSelectRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 let connectedCredentialKey = '';
 let lastPhase = 'None';
 let lastLiveHeartbeatAt = 0;
+let firstPollFailureAt = 0;
 
 function normalizePhase(value: unknown): string {
   if (typeof value !== 'string') return 'None';
@@ -88,6 +90,7 @@ async function pollPhase(source: LiveStateChangeEvent['source'] = 'poll'): Promi
   const creds = getCachedCredentials();
   if (!creds) {
     connectedCredentialKey = '';
+    firstPollFailureAt = 0;
     disposeSocket();
     emitPhaseIfChanged('None', source);
     return;
@@ -103,8 +106,14 @@ async function pollPhase(source: LiveStateChangeEvent['source'] = 'poll'): Promi
   try {
     const client = new LcuClient(creds);
     const phase = await client.get<string>(GAMEFLOW_PHASE_URI);
+    firstPollFailureAt = 0;
     emitPhaseIfChanged(phase, source);
   } catch {
+    const now = Date.now();
+    if (!firstPollFailureAt) firstPollFailureAt = now;
+    if (isLivePhase(lastPhase) && now - firstPollFailureAt < POLL_FAILURE_GRACE_MS) {
+      return;
+    }
     emitPhaseIfChanged('None', source);
   }
 }

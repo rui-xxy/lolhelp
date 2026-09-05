@@ -1,7 +1,4 @@
-import type {
-  AssistOverlayName,
-  AssistRuntimeStatus,
-} from '../../shared/api';
+import type { AssistRuntimeStatus } from '../../shared/api';
 
 const status: AssistRuntimeStatus = {
   connected: false,
@@ -11,11 +8,6 @@ const status: AssistRuntimeStatus = {
   position: '',
   lastAction: '',
   lastError: '',
-  overlays: {
-    helper: false,
-    match: false,
-    spells: false,
-  },
 };
 
 export function getAssistRuntimeStatus(): AssistRuntimeStatus {
@@ -23,13 +15,9 @@ export function getAssistRuntimeStatus(): AssistRuntimeStatus {
 }
 
 export function updateAssistRuntimeStatus(
-  patch: Partial<Omit<AssistRuntimeStatus, 'overlays'>>,
+  patch: Partial<AssistRuntimeStatus>,
 ): void {
   Object.assign(status, patch);
-}
-
-export function setAssistOverlayStatus(name: AssistOverlayName, visible: boolean): void {
-  status.overlays[name] = visible;
 }
 
 export function reportAssistAction(action: string): void {

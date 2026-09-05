@@ -16,9 +16,6 @@ import {
   reportAssistError,
   updateAssistRuntimeStatus,
 } from './runtime';
-import {
-  syncAssistGlobalShortcuts,
-} from './windows';
 
 interface ChampSelectSession {
   actions?: ChampSelectAction[][];
@@ -316,8 +313,6 @@ async function pollAssist(): Promise<void> {
   polling = true;
   try {
     const settings = getSettings().assist;
-    syncAssistGlobalShortcuts(settings.globalHotkeysEnabled, settings.hotkeys);
-
     const creds = getCachedCredentials();
     if (!creds) {
       clearAcceptTimer();

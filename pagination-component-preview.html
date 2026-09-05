@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>战绩分页组件设计预览</title>
+  <style>
+    :root {
+      --bg: #f2f2f2;
+      --panel: #ffffff;
+      --list: #f4f4f4;
+      --list-deep: #ececec;
+      --text: #222222;
+      --muted: #6a6a6a;
+      --subtle: #9a9a9a;
+      --border: #dddddd;
+      --primary: #ff385c;
+      --primary-soft: #ffd1da;
+      --shadow: 0 12px 34px rgba(20, 20, 20, 0.11);
+      --soft-shadow: 0 6px 18px rgba(20, 20, 20, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(255, 56, 92, 0.08), transparent 26%),
+        linear-gradient(135deg, #ffffff 0%, #f2f2f2 52%, #e9e9e9 100%);
+      color: var(--text);
+      font-family:
+        "Microsoft YaHei",
+        "PingFang SC",
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .recommend {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--text);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      overflow: hidden;
+      border: 1px solid rgba(221, 221, 221, 0.84);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 10px 30px rgba(20, 20, 20, 0.06);
+    }
+
+    .card--wide {
+      grid-column: 1 / -1;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid rgba(221, 221, 221, 0.62);
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(247, 247, 247, 0.75));
+    }
+
+    .card-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .card-title strong {
+      font-size: 15px;
+    }
+
+    .card-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tag {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .mock {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 42%),
+        var(--list);
+      padding: 16px;
+    }
+
+    .mock-shell {
+      position: relative;
+      overflow: hidden;
+      width: 300px;
+      min-height: 408px;
+      border-right: 1px solid var(--border);
+      background: var(--list);
+      box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .mock-shell--full {
+      width: 100%;
+      min-height: 358px;
+      border-right: 0;
+      border-radius: 16px;
+      box-shadow: inset 0 0 0 1px rgba(221, 221, 221, 0.8);
+    }
+
+    .match-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 10px 8px 76px;
+    }
+
+    .match {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      min-height: 52px;
+      overflow: hidden;
+      border-radius: 12px;
+      padding: 7px 8px;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.58)),
+        linear-gradient(135deg, rgba(255, 56, 92, 0.08), transparent 70%);
+    }
+
+    .match:nth-child(2n) {
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.42)),
+        linear-gradient(135deg, rgba(239, 124, 26, 0.1), transparent 70%);
+    }
+
+    .match.is-active {
+      background:
+        linear-gradient(90deg, rgba(255, 229, 238, 0.92), rgba(255, 255, 255, 0.58)),
+        linear-gradient(135deg, rgba(255, 56, 92, 0.18), transparent 68%);
+      box-shadow: inset 0 0 0 1px rgba(255, 56, 92, 0.14);
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 24%, #ffe9f0 0 15%, transparent 16%),
+        linear-gradient(135deg, #6d2cff, #ff385c 48%, #ffb347);
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.72);
+    }
+
+    .avatar.b {
+      background: linear-gradient(135deg, #00b2ff, #6847ff, #00c389);
+    }
+
+    .avatar.c {
+      background: linear-gradient(135deg, #282828, #a96bff, #ffcf53);
+    }
+
+    .avatar.d {
+      background: linear-gradient(135deg, #006a4e, #89e84a, #f2c94c);
+    }
+
+    .match-main {
+      min-width: 0;
+    }
+
+    .mode {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .mode span:first-child {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .result {
+      border: 1px solid #f4aa2a;
+      border-radius: 4px;
+      padding: 0 3px;
+      color: #9c6100;
+      font-size: 9px;
+      font-style: italic;
+      font-weight: 900;
+      line-height: 14px;
+    }
+
+    .result.loss {
+      border-color: #ef9ab0;
+      color: #c91f48;
+    }
+
+    .kda {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .time {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .footer-slot {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      border-top: 1px solid rgba(221, 221, 221, 0.7);
+    }
+
+    .footer-slot--float {
+      pointer-events: none;
+      border-top: 0;
+      background: linear-gradient(180deg, transparent, rgba(242, 242, 242, 0.96) 62%);
+      padding: 32px 12px 12px;
+    }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      height: 38px;
+      padding: 0 10px;
+    }
+
+    .pager button {
+      border: 0;
+      font: inherit;
+      cursor: default;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .arrow:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.74);
+    }
+
+    .pages {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .page-btn {
+      min-width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      tab-size: 4;
+    }
+
+    .page-btn.active {
+      background: #1f1f1f;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(20, 20, 20, 0.16);
+    }
+
+    .demo-note {
+      padding: 12px 16px 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    /* 方案 A：嵌入融合条 */
+    .pager-embedded {
+      background: rgba(242, 242, 242, 0.96);
+    }
+
+    .pager-embedded .pages {
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.64);
+      padding: 2px;
+      box-shadow: inset 0 0 0 1px rgba(221, 221, 221, 0.58);
+    }
+
+    /* 方案 B：半透明悬浮 */
+    .pager-glass {
+      pointer-events: auto;
+      width: max-content;
+      max-width: calc(100% - 12px);
+      height: 36px;
+      margin: 0 auto;
+      padding: 4px 7px;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.68);
+      box-shadow: 0 10px 28px rgba(20, 20, 20, 0.14);
+      backdrop-filter: blur(14px);
+    }
+
+    .pager-glass .page-btn {
+      min-width: 24px;
+      height: 24px;
+      font-size: 11px;
+    }
+
+    .pager-glass .arrow {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* 方案 C：极简透明 */
+    .pager-minimal {
+      height: 38px;
+      background: linear-gradient(180deg, rgba(242, 242, 242, 0.75), rgba(242, 242, 242, 0.96));
+    }
+
+    .pager-minimal .page-btn {
+      color: #737373;
+      background: transparent;
+    }
+
+    .pager-minimal .page-btn.active {
+      min-width: 21px;
+      width: 21px;
+      height: 21px;
+      color: #fff;
+      font-size: 11px;
+    }
+
+    /* 方案 D：当前页/总页数 */
+    .pager-compact {
+      justify-content: center;
+      background: rgba(242, 242, 242, 0.94);
+    }
+
+    .page-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 86px;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: inset 0 0 0 1px rgba(221, 221, 221, 0.58);
+    }
+
+    /* 方案 E：点状分页 */
+    .pager-dots {
+      justify-content: center;
+      background: rgba(242, 242, 242, 0.94);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #bdbdbd;
+    }
+
+    .dot.active {
+      width: 18px;
+      border-radius: 999px;
+      background: #222;
+    }
+
+    .dots {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+    }
+
+    /* 方案 F：LOL 深色金线 */
+    .mock-dark {
+      background:
+        radial-gradient(circle at 84% 18%, rgba(0, 200, 255, 0.14), transparent 30%),
+        linear-gradient(135deg, #031019 0%, #071c25 58%, #02070c 100%);
+    }
+
+    .mock-dark .match {
+      color: #d9d2bd;
+      background:
+        linear-gradient(90deg, rgba(4, 21, 29, 0.92), rgba(4, 21, 29, 0.54)),
+        linear-gradient(135deg, rgba(200, 155, 60, 0.12), transparent 60%);
+    }
+
+    .mock-dark .match.is-active {
+      box-shadow: inset 2px 0 0 #c89b3c, inset 0 0 0 1px rgba(200, 155, 60, 0.3);
+    }
+
+    .mock-dark .mode,
+    .mock-dark .time {
+      color: #f0e6d2;
+    }
+
+    .mock-dark .kda {
+      color: #9aa7a7;
+    }
+
+    .pager-lol {
+      background: rgba(2, 10, 15, 0.88);
+      border-top: 1px solid rgba(200, 155, 60, 0.3);
+    }
+
+    .pager-lol .arrow,
+    .pager-lol .page-btn {
+      color: #9aa7a7;
+    }
+
+    .pager-lol .pages {
+      border: 1px solid rgba(200, 155, 60, 0.24);
+      border-radius: 0;
+      background: rgba(0, 0, 0, 0.16);
+      padding: 1px;
+    }
+
+    .pager-lol .page-btn {
+      border-radius: 0;
+    }
+
+    .pager-lol .page-btn.active {
+      background: linear-gradient(180deg, #c89b3c, #785a28);
+      color: #0a1428;
+      box-shadow: 0 0 16px rgba(200, 155, 60, 0.28);
+    }
+
+    .mock-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+      background: var(--list);
+    }
+
+    .mini {
+      position: relative;
+      min-height: 188px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: var(--list);
+      box-shadow: inset 0 0 0 1px rgba(221, 221, 221, 0.75);
+    }
+
+    .mini .match-list {
+      padding-bottom: 54px;
+      gap: 5px;
+    }
+
+    .mini .match {
+      min-height: 38px;
+      grid-template-columns: 26px 1fr auto;
+      border-radius: 10px;
+      padding: 5px 7px;
+    }
+
+    .mini .avatar {
+      width: 26px;
+      height: 26px;
+    }
+
+    .mini .mode {
+      font-size: 11px;
+    }
+
+    .mini .kda,
+    .mini .time {
+      font-size: 10px;
+    }
+
+    .mini .pager {
+      height: 34px;
+    }
+
+    .mini .page-btn,
+    .mini .arrow {
+      min-width: 22px;
+      width: 22px;
+      height: 22px;
+      font-size: 10px;
+    }
+
+    @media (max-width: 860px) {
+      .grid,
+      .mock-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .mock-shell {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>战绩分页组件设计预览</h1>
+        <p>
+          下面把几种分页方案都放在战绩列表背景里看。重点是避免纯白块割裂，让分页像列表的一部分。
+        </p>
+      </div>
+      <span class="recommend">我推荐：半透明悬浮款</span>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <strong>方案 A：嵌入融合条</strong>
+            <span>最稳妥，底部是列表灰底延伸，不突兀。</span>
+          </div>
+          <span class="tag">当前实现方向</span>
+        </div>
+        <div class="mock">
+          <div class="mock-shell">
+            <div class="match-list">
+              <div class="match"><div class="avatar"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result loss">LOSE</span></div><div class="kda">5/9/6</div></div><div class="time">15小时</div></div>
+              <div class="match"><div class="avatar b"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">21/3/9</div></div><div class="time">16小时</div></div>
+              <div class="match is-active"><div class="avatar c"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">12/7/22</div></div><div class="time">16小时</div></div>
+              <div class="match"><div class="avatar d"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">14/4/6</div></div><div class="time">17小时</div></div>
+              <div class="match"><div class="avatar"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">15/3/7</div></div><div class="time">6/27</div></div>
+            </div>
+            <div class="footer-slot">
+              <div class="pager pager-embedded">
+                <button class="arrow">‹</button>
+                <div class="pages">
+                  <button class="page-btn">7</button>
+                  <button class="page-btn">8</button>
+                  <button class="page-btn active">9</button>
+                  <button class="page-btn">10</button>
+                  <button class="page-btn">11</button>
+                </div>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-note">优点：实现简单、稳定、不遮挡内容。缺点：仍然是一条底部区域。</div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <strong>方案 B：半透明悬浮款</strong>
+            <span>最像现代 App，底部渐隐，分页像浮在列表上。</span>
+          </div>
+          <span class="tag">推荐</span>
+        </div>
+        <div class="mock">
+          <div class="mock-shell">
+            <div class="match-list">
+              <div class="match"><div class="avatar"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result loss">LOSE</span></div><div class="kda">5/9/6</div></div><div class="time">15小时</div></div>
+              <div class="match"><div class="avatar b"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">21/3/9</div></div><div class="time">16小时</div></div>
+              <div class="match is-active"><div class="avatar c"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">12/7/22</div></div><div class="time">16小时</div></div>
+              <div class="match"><div class="avatar d"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">14/4/6</div></div><div class="time">17小时</div></div>
+              <div class="match"><div class="avatar"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">15/3/7</div></div><div class="time">6/27</div></div>
+            </div>
+            <div class="footer-slot footer-slot--float">
+              <div class="pager pager-glass">
+                <button class="arrow">‹</button>
+                <button class="page-btn">7</button>
+                <button class="page-btn">8</button>
+                <button class="page-btn active">9</button>
+                <button class="page-btn">10</button>
+                <button class="page-btn">11</button>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-note">优点：最轻、最有设计感。缺点：如果列表最后一条信息很多，要注意留底部安全距离。</div>
+      </article>
+
+      <article class="card card--wide">
+        <div class="card-head">
+          <div class="card-title">
+            <strong>其他组件方案合集</strong>
+            <span>如果你想更极简、LOL 风，或者只保留当前页，也可以选下面这些。</span>
+          </div>
+        </div>
+        <div class="mock-strip">
+          <div class="mini">
+            <div class="match-list">
+              <div class="match"><div class="avatar b"></div><div class="match-main"><div class="mode"><span>极简透明</span></div><div class="kda">不抢视线</div></div><div class="time">15h</div></div>
+              <div class="match is-active"><div class="avatar"></div><div class="match-main"><div class="mode"><span>轻量页码</span></div><div class="kda">7/8/9</div></div><div class="time">16h</div></div>
+            </div>
+            <div class="footer-slot">
+              <div class="pager pager-minimal">
+                <button class="arrow">‹</button>
+                <div class="pages">
+                  <button class="page-btn">7</button>
+                  <button class="page-btn">8</button>
+                  <button class="page-btn active">9</button>
+                  <button class="page-btn">10</button>
+                  <button class="page-btn">11</button>
+                </div>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini">
+            <div class="match-list">
+              <div class="match"><div class="avatar c"></div><div class="match-main"><div class="mode"><span>当前页模式</span></div><div class="kda">省空间</div></div><div class="time">15h</div></div>
+              <div class="match is-active"><div class="avatar d"></div><div class="match-main"><div class="mode"><span>只看页数</span></div><div class="kda">第 9 页</div></div><div class="time">16h</div></div>
+            </div>
+            <div class="footer-slot">
+              <div class="pager pager-compact">
+                <button class="arrow">‹</button>
+                <div class="page-indicator">第 9 / 11 页</div>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini">
+            <div class="match-list">
+              <div class="match"><div class="avatar"></div><div class="match-main"><div class="mode"><span>点状分页</span></div><div class="kda">最安静</div></div><div class="time">15h</div></div>
+              <div class="match is-active"><div class="avatar b"></div><div class="match-main"><div class="mode"><span>不显示数字</span></div><div class="kda">适合少页</div></div><div class="time">16h</div></div>
+            </div>
+            <div class="footer-slot">
+              <div class="pager pager-dots">
+                <button class="arrow">‹</button>
+                <div class="dots">
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                  <span class="dot active"></span>
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                </div>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card card--wide">
+        <div class="card-head">
+          <div class="card-title">
+            <strong>方案 F：LOL 深色金线款</strong>
+            <span>如果以后战绩详情整体偏英雄联盟客户端风，可以考虑这个方向。</span>
+          </div>
+        </div>
+        <div class="mock mock-dark">
+          <div class="mock-shell mock-shell--full">
+            <div class="match-list">
+              <div class="match"><div class="avatar c"></div><div class="match-main"><div class="mode"><span>单双排位</span><span class="result">WIN</span></div><div class="kda">21/3/9</div></div><div class="time">16小时</div></div>
+              <div class="match is-active"><div class="avatar"></div><div class="match-main"><div class="mode"><span>海克斯大乱斗</span><span class="result loss">LOSE</span></div><div class="kda">12/9/22</div></div><div class="time">17小时</div></div>
+              <div class="match"><div class="avatar b"></div><div class="match-main"><div class="mode"><span>灵活组排</span><span class="result">WIN</span></div><div class="kda">15/3/7</div></div><div class="time">6/27</div></div>
+            </div>
+            <div class="footer-slot">
+              <div class="pager pager-lol">
+                <button class="arrow">‹</button>
+                <div class="pages">
+                  <button class="page-btn">7</button>
+                  <button class="page-btn">8</button>
+                  <button class="page-btn active">9</button>
+                  <button class="page-btn">10</button>
+                  <button class="page-btn">11</button>
+                </div>
+                <button class="arrow">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-note">优点：很 LOL。缺点：和当前白色主界面不是一个风格，除非整块战绩面板一起往 LOL 风改。</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

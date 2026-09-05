@@ -1,5 +1,6 @@
 import './safeConsole';
 import { app, BrowserWindow, Menu } from 'electron';
+import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
@@ -7,16 +8,35 @@ import { registerIpcHandlers } from './ipc';
 import { preloadGameData } from './lcu/gameData';
 import { APP_LAYOUT } from '../shared/constants';
 import { startAssistEngine, stopAssistEngine } from './assist/engine';
-import {
-  configureAssistWindows,
-  disposeAssistWindows,
-} from './assist/windows';
 import { startLiveWatcher, stopLiveWatcher } from './live/liveWatcher';
 import { startSavedMatchFollowWatcher, stopSavedMatchFollowWatcher } from './match/savedMatchFollowWatcher';
 
 const APP_WINDOW_TITLE = 'LOL助手';
 const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
 const MIN_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
+
+function writeRendererExitLog(
+  details: { reason: string; exitCode: number },
+  url: string,
+): void {
+  try {
+    const logDirectory = path.join(app.getPath('userData'), 'logs');
+    mkdirSync(logDirectory, { recursive: true });
+    const metrics = app.getAppMetrics().map((metric) => ({
+      pid: metric.pid,
+      type: metric.type,
+      memory: metric.memory,
+      cpu: metric.cpu,
+    }));
+    appendFileSync(
+      path.join(logDirectory, 'renderer-exits.jsonl'),
+      `${JSON.stringify({ at: new Date().toISOString(), url, details, metrics })}\n`,
+      'utf8',
+    );
+  } catch {
+    // Diagnostics must never interfere with renderer recovery.
+  }
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -85,17 +105,31 @@ const createWindow = () => {
     );
   }
 
-  configureAssistWindows(
-    {
-      preloadPath: path.join(__dirname, 'preload.js'),
-      devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
-      rendererDirectory: path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`),
-    },
-    mainWindow,
-  );
-
   closeLegacyFriendWindows(mainWindow);
+  let rendererRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastRendererRecoveryAt = 0;
   mainWindow.webContents.once('did-finish-load', () => closeLegacyFriendWindows(mainWindow));
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    writeRendererExitLog(details, mainWindow.webContents.getURL());
+    console.error('[main] renderer process gone', details);
+    if (
+      details.reason === 'clean-exit' ||
+      mainWindow.isDestroyed() ||
+      rendererRecoveryTimer !== null ||
+      Date.now() - lastRendererRecoveryAt < 60_000
+    ) {
+      return;
+    }
+
+    lastRendererRecoveryAt = Date.now();
+    rendererRecoveryTimer = setTimeout(() => {
+      rendererRecoveryTimer = null;
+      if (!mainWindow.isDestroyed()) mainWindow.reload();
+    }, 350);
+  });
+  mainWindow.once('closed', () => {
+    if (rendererRecoveryTimer !== null) clearTimeout(rendererRecoveryTimer);
+  });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const currentUrl = mainWindow.webContents.getURL();
@@ -104,7 +138,7 @@ const createWindow = () => {
 
   // 仅开发环境自动打开 DevTools；打包后（app.isPackaged === true）不再弹。
   // 用 'detach' 模式：DevTools 作为独立浮窗，不 dock 在应用窗口内（避免占用右侧/底部布局空间）。
-  if (!app.isPackaged) {
+  if (!app.isPackaged && process.env.LOLHELP_OPEN_DEVTOOLS === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 };
@@ -143,7 +177,6 @@ app.on('before-quit', () => {
   stopAssistEngine();
   stopLiveWatcher();
   stopSavedMatchFollowWatcher();
-  disposeAssistWindows();
 });
 
 app.on('activate', () => {

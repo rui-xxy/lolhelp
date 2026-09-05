@@ -8,6 +8,10 @@ export const IPC_CHANNELS = {
   LCU_DETECT_CLIENT: 'lcu:detect-client',
   LCU_GET_CURRENT_REGION: 'lcu:get-current-region',
   LCU_GET_FRIENDS: 'lcu:get-friends',
+  LCU_GET_FRIEND_REQUESTS: 'lcu:get-friend-requests',
+  LCU_ADD_FRIEND: 'lcu:add-friend',
+  LCU_ACCEPT_FRIEND_REQUEST: 'lcu:accept-friend-request',
+  LCU_DELETE_FRIEND_REQUEST: 'lcu:delete-friend-request',
   LCU_GET_CHAT_CONVERSATIONS: 'lcu:get-chat-conversations',
   LCU_SEND_CHAT_MESSAGE: 'lcu:send-chat-message',
   LCU_SPECTATE_FRIEND: 'lcu:spectate-friend',
@@ -16,7 +20,6 @@ export const IPC_CHANNELS = {
   DB_GET_SETTINGS: 'db:get-settings',
   DB_SAVE_SETTINGS: 'db:save-settings',
   DB_UPDATE_SETTINGS: 'db:update-settings',
-  ASSIST_GET_STATUS: 'assist:get-status',
   ASSIST_GET_RECOMMENDATION: 'assist:get-recommendation',
   ASSIST_APPLY_RECOMMENDATION: 'assist:apply-recommendation',
   ASSIST_GET_CHAMPION_GUIDE: 'assist:get-champion-guide',
@@ -28,8 +31,6 @@ export const IPC_CHANNELS = {
   ASSIST_GET_REWARDS: 'assist:get-rewards',
   ASSIST_CLAIM_REWARD: 'assist:claim-reward',
   ASSIST_CLAIM_REWARDS: 'assist:claim-rewards',
-  ASSIST_TOGGLE_OVERLAY: 'assist:toggle-overlay',
-  ASSIST_SET_OVERLAY_PINNED: 'assist:set-overlay-pinned',
   ASSIST_GET_LIVE_DATA: 'assist:get-live-data',
   ASSIST_EXPORT_BLACKLIST: 'assist:export-blacklist',
   // config 域：League 客户端/游戏内配置读取、保存和一键应用
@@ -68,6 +69,10 @@ export const IPC_CHANNELS = {
   MATCH_GET_CHAMPIONS: 'match:get-champions',
   // ranking 域：第三方英雄排行数据统一由主进程请求和整理。
   RANKING_GET_CHAMPIONS: 'ranking:get-champions',
+  RANKING_GET_MAYHEM_TIER_LIST: 'ranking:get-mayhem-tier-list',
+  RANKING_GET_MAYHEM_BUILD: 'ranking:get-mayhem-build',
+  RANKING_GET_MAYHEM_AUGMENTS: 'ranking:get-mayhem-augments',
+  RANKING_GET_MAYHEM_COMBOS: 'ranking:get-mayhem-combos',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

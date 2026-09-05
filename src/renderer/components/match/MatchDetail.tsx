@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CirclePlay, Download, LoaderCircle } from 'lucide-react';
 import { GameIcon } from './GameIcon';
+import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
 import badgeLegendary from '../../assets/match-badges/legendary.png';
 import badgeMaxAssist from '../../assets/match-badges/max-assist.png';
@@ -515,29 +516,23 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
 
   useEffect(() => {
     if (!useRiftScoreboard) return;
-    const puuids = Array.from(new Set(participants.map((participant) => participant.puuid).filter(Boolean)));
+    const puuids = Array.from(new Set(
+      participants
+        .filter((participant) => !participant.rank && (participant.ranks?.length ?? 0) === 0)
+        .map((participant) => participant.puuid)
+        .filter((puuid) => puuid && !Object.prototype.hasOwnProperty.call(rankByPuuid, puuid)),
+    ));
     if (puuids.length === 0) return;
 
     let cancelled = false;
-    void Promise.all(
-      puuids.map(async (puuid) => {
-        try {
-          const ranks = await window.lolHelper.match.getPlayerRanks(puuid, region);
-          return [puuid, ranks] as const;
-        } catch {
-          return [puuid, [] as PlayerRankSummary[]] as const;
-        }
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-      setRankByPuuid((prev) => {
-        const next = { ...prev };
-        for (const [puuid, ranks] of entries) {
-          next[puuid] = ranks;
-        }
-        return next;
-      });
-    });
+    for (const puuid of puuids) {
+      void window.lolHelper.match.getPlayerRanks(puuid, region)
+        .catch(() => [] as PlayerRankSummary[])
+        .then((ranks) => {
+          if (cancelled) return;
+          setRankByPuuid((prev) => ({ ...prev, [puuid]: ranks }));
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -654,8 +649,13 @@ function ScoreboardTab({
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
 }) {
+  const maxPlayerDamage = useMemo(
+    () => Math.max(0, ...participants.map((player) => Math.max(0, player.damage || 0))),
+    [participants],
+  );
+
   return (
-    <div className="lol-scoreboard">
+    <div className="lol-scoreboard lol-result-scoreboard">
       {[100, 200].map((id) => (
         <ScoreboardTeam
           key={id}
@@ -664,6 +664,7 @@ function ScoreboardTab({
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
           onPlayerSearch={onPlayerSearch}
+          maxPlayerDamage={maxPlayerDamage}
         />
       ))}
     </div>
@@ -686,9 +687,13 @@ function RiftScoreboardTab({
   rankByPuuid: Record<string, PlayerRankSummary[]>;
 }) {
   const badgesByPuuid = useMemo(() => buildRiftBadges(participants), [participants]);
+  const maxPlayerDamage = useMemo(
+    () => Math.max(0, ...participants.map((player) => Math.max(0, player.damage || 0))),
+    [participants],
+  );
 
   return (
-    <div className="lol-rift-scoreboard">
+    <div className="lol-rift-scoreboard lol-result-scoreboard">
       {[100, 200].map((id) => (
         <RiftScoreboardTeam
           key={id}
@@ -700,6 +705,7 @@ function RiftScoreboardTab({
           queueId={queueId}
           rankByPuuid={rankByPuuid}
           badgesByPuuid={badgesByPuuid}
+          maxPlayerDamage={maxPlayerDamage}
         />
       ))}
     </div>
@@ -715,6 +721,7 @@ function RiftScoreboardTeam({
   queueId,
   rankByPuuid,
   badgesByPuuid,
+  maxPlayerDamage,
 }: {
   teamId: number;
   players: MatchParticipantSummary[];
@@ -724,17 +731,19 @@ function RiftScoreboardTeam({
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
   badgesByPuuid: Map<string, RiftBadge[]>;
+  maxPlayerDamage: number;
 }) {
   const tone = teamTone(teamId);
   const hasRecurringMate = players.some(
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
   const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const won = players[0]?.win ?? false;
 
   return (
-    <section className={`lol-rift-team lol-rift-team--${tone}`}>
+    <section className={`lol-rift-team lol-rift-team--${tone} lol-result-team lol-result-team--${won ? 'win' : 'loss'}`}>
       <div className="lol-rift-grid lol-rift-grid--head">
-        <span>玩家</span>
+        <MatchResultHeading won={won} />
         <span>装备</span>
         <span>KDA</span>
         <span>伤害</span>
@@ -761,6 +770,7 @@ function RiftScoreboardTeam({
               queueId={queueId}
               rankByPuuid={rankByPuuid}
               badges={badgesByPuuid.get(player.puuid) ?? []}
+              damageShare={resolveDamageScale(player, maxPlayerDamage)}
             />
           );
         })}
@@ -778,6 +788,7 @@ function RiftScoreboardRow({
   queueId,
   rankByPuuid,
   badges,
+  damageShare,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
@@ -787,6 +798,7 @@ function RiftScoreboardRow({
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
   badges: RiftBadge[];
+  damageShare: number;
 }) {
   const name = playerName(participant);
   const rank = rankForQueue(participant, queueId, rankByPuuid);
@@ -799,6 +811,7 @@ function RiftScoreboardRow({
       } ${linkTone ? `lol-rift-row--linked lol-rift-row--linked-${linkTone}` : ''}`}
     >
       <div className="lol-rift-player-cell">
+        <DamageEnergyBar damageShare={damageShare} win={participant.win} />
         <div className="lol-rift-loadout">
         <div className="lol-rift-champion">
           <GameIcon
@@ -887,29 +900,40 @@ function RiftScoreboardRow({
   );
 }
 
+function resolveDamageScale(participant: MatchParticipantSummary, maxPlayerDamage: number): number {
+  if (maxPlayerDamage <= 0) return 0;
+  return Math.max(
+    0,
+    Math.min(100, (Math.max(0, participant.damage || 0) / maxPlayerDamage) * 100),
+  );
+}
+
 function ScoreboardTeam({
   teamId,
   players,
   targetPuuid,
   recurringMates,
   onPlayerSearch,
+  maxPlayerDamage,
 }: {
   teamId: number;
   players: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
+  maxPlayerDamage: number;
 }) {
   const tone = teamTone(teamId);
   const hasRecurringMate = players.some(
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
   const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const won = players[0]?.win ?? false;
 
   return (
-    <section className={`lol-score-team lol-score-team--${tone}`}>
+    <section className={`lol-score-team lol-score-team--${tone} lol-result-team lol-result-team--${won ? 'win' : 'loss'}`}>
       <div className="lol-score-grid lol-score-grid--head">
-        <span>玩家</span>
+        <MatchResultHeading won={won} />
         <span>符文 / 强化</span>
         <span>装备</span>
         <span>KDA</span>
@@ -932,10 +956,21 @@ function ScoreboardTeam({
             isRecurring={isRecurring}
             onPlayerSearch={onPlayerSearch}
             linkTone={linkTone}
+            damageShare={resolveDamageScale(player, maxPlayerDamage)}
           />
         );
       })}
     </section>
+  );
+}
+
+function MatchResultHeading({ won }: { won: boolean }) {
+  return (
+    <span className={`lol-result-heading lol-result-heading--${won ? 'win' : 'loss'}`}>
+      <b>{won ? '胜利' : '失败'}</b>
+      <i aria-hidden="true" />
+      <em>玩家</em>
+    </span>
   );
 }
 
@@ -945,12 +980,14 @@ function ScoreboardRow({
   isRecurring,
   onPlayerSearch,
   linkTone,
+  damageShare,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
   linkTone?: LinkTone;
+  damageShare: number;
 }) {
   const slots = itemSlots(participant);
   const enhancements = visibleEnhancements(participant);
@@ -963,6 +1000,9 @@ function ScoreboardRow({
         isRecurring ? 'lol-score-row--recurring' : ''
       }`}
     >
+      <div className="lol-score-damage-track">
+        <DamageEnergyBar damageShare={damageShare} win={participant.win} />
+      </div>
       <div className="lol-score-player">
         <div className="lol-score-spells">
           {participant.spells.map((spell) => (

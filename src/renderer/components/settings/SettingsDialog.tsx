@@ -116,6 +116,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   }, [open]);
 
   useEffect(() => {
+    if (!open || notice?.type !== 'success') return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 3_500);
+    return () => window.clearTimeout(timer);
+  }, [notice, open]);
+
+  useEffect(() => {
     document.querySelector<HTMLElement>('[data-settings-scroll]')?.scrollTo({ top: 0 });
   }, [tab]);
 

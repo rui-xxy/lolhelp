@@ -22,6 +22,7 @@ import type {
 } from '../../shared/api';
 import { pickSeeds } from './scoutScore';
 import { collectCandidates, countChampionGames, filterQualifying } from './scoutFilter';
+import { analyzeScoutSignals } from './scoutSignals';
 
 // 引擎依赖（SGP 细节隔离在外，便于单测注入 mock）
 export interface ScoutDeps {
@@ -75,6 +76,7 @@ function buildHit(
     profile: deriveProfile(puuid, allMatches),
     qualifyingMatches: qualifying,
     totalChampionGames: countChampionGames(allMatches, championIds),
+    signals: analyzeScoutSignals(allMatches, puuid),
   };
 }
 

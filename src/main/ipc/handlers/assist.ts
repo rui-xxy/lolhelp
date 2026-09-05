@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import type {
   AssistClaimRewardRequest,
   AssistDisenchantRequest,
-  AssistOverlayName,
   AssistRecommendationRequest,
 } from '../../../shared/api';
 import { IPC_CHANNELS } from '../../../shared/channels';
@@ -25,17 +24,9 @@ import {
   applyAssistRecommendation,
   getAssistRecommendation,
 } from '../../assist/recommendations';
-import { getAssistRuntimeStatus } from '../../assist/runtime';
-import {
-  setAssistOverlayPinned,
-  toggleAssistOverlay,
-} from '../../assist/windows';
 import { getSettings } from '../../settings/store';
 
-const OVERLAY_NAMES: AssistOverlayName[] = ['helper', 'match', 'spells'];
-
 export function registerAssistHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.ASSIST_GET_STATUS, () => getAssistRuntimeStatus());
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_GET_RECOMMENDATION,
     (_event, request?: AssistRecommendationRequest) =>
@@ -78,20 +69,6 @@ export function registerAssistHandlers(): void {
     IPC_CHANNELS.ASSIST_CLAIM_REWARDS,
     (_event, requests: AssistClaimRewardRequest[]) =>
       claimAssistRewards(Array.isArray(requests) ? requests : []),
-  );
-  ipcMain.handle(
-    IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY,
-    (_event, name: AssistOverlayName) => {
-      if (!OVERLAY_NAMES.includes(name)) throw new Error('悬浮窗类型无效');
-      return toggleAssistOverlay(name);
-    },
-  );
-  ipcMain.handle(
-    IPC_CHANNELS.ASSIST_SET_OVERLAY_PINNED,
-    (_event, name: AssistOverlayName, pinned: boolean) => {
-      if (!OVERLAY_NAMES.includes(name)) throw new Error('无效的悬浮窗类型');
-      return setAssistOverlayPinned(name, Boolean(pinned));
-    },
   );
   ipcMain.handle(IPC_CHANNELS.ASSIST_GET_LIVE_DATA, () => getAssistLiveData());
   ipcMain.handle(IPC_CHANNELS.ASSIST_EXPORT_BLACKLIST, async () => {

@@ -1,9 +1,10 @@
-import { getSgpAuth, invalidateSgpAuth } from '../sgp/auth';
+import { getSgpAuth } from '../sgp/auth';
 import { SgpClient } from '../sgp/client';
 import { getCachedCredentials } from '../lcu/lockfile';
 import { LcuClient } from '../lcu/client';
 import { buildProfileIcon } from '../lcu/gameData';
 import { getRegionConfig } from '../sgp/region';
+import { getSgpHttpStatus, shouldForceRefreshSgpAuth } from '../sgp/sessionPolicy';
 import {
   lookupRiotAccountByRiotId,
   normalizeRiotIdInput,
@@ -71,7 +72,7 @@ const RANK_TIER_NAMES: Record<string, string> = {
   IRON: '黑铁',
 };
 
-// 带凭证失效重试的请求：401/403 时清缓存重新认证。
+// 400 仅在确认本地会话已变化后重试；401/403 强制刷新凭证后重试一次。
 async function requestWithRetry<T>(
   client: SgpClient,
   path: string,
@@ -80,10 +81,21 @@ async function requestWithRetry<T>(
   try {
     return await client.get<T>(path, params);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('401') || msg.includes('403')) {
-      invalidateSgpAuth();
-      const newAuth = await getSgpAuth();
+    if (getSgpHttpStatus(err) === 400) {
+      try {
+        const currentAuth = await getSgpAuth({ validateSession: true });
+        const sessionChanged = currentAuth.puuid !== client.auth.puuid
+          || currentAuth.accessToken !== client.auth.accessToken;
+        if (sessionChanged) {
+          const newClient = new SgpClient({ ...currentAuth, region: client.auth.region });
+          return await newClient.get<T>(path, params);
+        }
+      } catch {
+        // 保留最初的 SGP 错误，避免认证刷新错误掩盖真正的请求结果。
+      }
+    }
+    if (shouldForceRefreshSgpAuth(err)) {
+      const newAuth = await getSgpAuth({ forceRefresh: true });
       const newClient = new SgpClient({ ...newAuth, region: client.auth.region });
       return await newClient.get<T>(path, params);
     }
@@ -91,8 +103,8 @@ async function requestWithRetry<T>(
   }
 }
 
-async function getSgpAuthForRegion(region?: string) {
-  let auth = await getSgpAuth();
+async function getSgpAuthForRegion(region?: string, validateSession = false) {
+  let auth = await getSgpAuth({ validateSession });
   if (region) {
     const targetRegion = getRegionConfig(region);
     if (targetRegion) {
@@ -402,6 +414,7 @@ const playerRankCache = new Map<
   string,
   { value: PlayerRankSummary[]; expiresAt: number }
 >();
+const playerRankRequests = new Map<string, Promise<PlayerRankSummary[]>>();
 
 function cachePlayerRanks(puuid: string, value: PlayerRankSummary[]): void {
   if (playerRankCache.size >= PLAYER_RANK_CACHE_MAX_ENTRIES) {
@@ -428,40 +441,56 @@ export async function fetchPlayerRanksByPuuid(
     playerRankCache.delete(cacheKey);
   }
 
-  if (region) {
-    try {
-      const auth = await getSgpAuthForRegion(region);
-      const ranks = await fetchSgpRanksByPuuid(auth, puuid);
-      cachePlayerRanks(cacheKey, ranks);
-      return ranks;
-    } catch {
-      // Fall back to local LCU below.
-    }
+  const pendingRequest = playerRankRequests.get(cacheKey);
+  if (pendingRequest) {
+    return pendingRequest;
   }
 
-  const creds = getCachedCredentials();
-  if (!creds) {
-    return [];
-  }
+  const request = (async (): Promise<PlayerRankSummary[]> => {
+    if (region) {
+      try {
+        const auth = await getSgpAuthForRegion(region);
+        const ranks = await fetchSgpRanksByPuuid(auth, puuid);
+        cachePlayerRanks(cacheKey, ranks);
+        return ranks;
+      } catch {
+        // Fall back to local LCU below.
+      }
+    }
 
-  const client = new LcuClient(creds);
-  let ranks = await fetchRanksByPuuid(client, puuid);
-  if (ranks.length === 0) {
-    const summonerId = await fetchSummonerIdByPuuid(client, puuid);
-    if (summonerId) {
-      ranks = await fetchRanksByPuuid(client, '', summonerId);
+    const creds = getCachedCredentials();
+    if (!creds) {
+      return [];
+    }
+
+    const client = new LcuClient(creds);
+    let ranks = await fetchRanksByPuuid(client, puuid);
+    if (ranks.length === 0) {
+      const summonerId = await fetchSummonerIdByPuuid(client, puuid);
+      if (summonerId) {
+        ranks = await fetchRanksByPuuid(client, '', summonerId);
+      }
+    }
+    if (ranks.length === 0) {
+      try {
+        const auth = await getSgpAuthForRegion(region);
+        ranks = await fetchSgpRanksByPuuid(auth, puuid);
+      } catch {
+        // Rank is optional.
+      }
+    }
+    cachePlayerRanks(cacheKey, ranks);
+    return ranks;
+  })();
+
+  playerRankRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (playerRankRequests.get(cacheKey) === request) {
+      playerRankRequests.delete(cacheKey);
     }
   }
-  if (ranks.length === 0) {
-    try {
-      const auth = await getSgpAuthForRegion(region);
-      ranks = await fetchSgpRanksByPuuid(auth, puuid);
-    } catch {
-      // Rank is optional.
-    }
-  }
-  cachePlayerRanks(cacheKey, ranks);
-  return ranks;
 }
 
 export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
@@ -620,7 +649,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   // 1. SGP 认证（同时拿到当前账号 puuid + 大区 + entitlements token）
   let auth;
   try {
-    auth = await getSgpAuthForRegion(req.region);
+    auth = await getSgpAuthForRegion(req.region, true);
   } catch (err) {
     return emptyResult(err instanceof Error ? err.message : String(err));
   }
@@ -760,7 +789,7 @@ export async function resolvePuuid(
 ): Promise<{ puuid: string; riotId: string } | null> {
   let auth;
   try {
-    auth = await getSgpAuthForRegion(region);
+    auth = await getSgpAuthForRegion(region, true);
   } catch {
     return null;
   }
@@ -786,7 +815,7 @@ export async function fetchMatchesByPuuid(
 ): Promise<PlayerMatchDetail[]> {
   let auth;
   try {
-    auth = await getSgpAuthForRegion(region);
+    auth = await getSgpAuthForRegion(region, true);
   } catch {
     return [];
   }

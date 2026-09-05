@@ -28,6 +28,13 @@ const AVAILABILITY_COLOR: Record<string, string> = {
 };
 
 const FRIEND_REFRESH_INTERVAL_MS = 5_000;
+const ACTION_SUCCESS_MESSAGE_MS = 2_800;
+const ACTION_ERROR_MESSAGE_MS = 5_000;
+
+type FriendActionNotice = {
+  text: string;
+  type: 'success' | 'error';
+};
 
 const FRIEND_STATUS_CLASS: Record<FriendStatusKind, string> = {
   'ranked-solo': 'friend-status--ranked-solo',
@@ -118,8 +125,35 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
   const [sortByAddedAt, setSortByAddedAt] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [actionFriendId, setActionFriendId] = useState('');
-  const [actionMessage, setActionMessage] = useState('');
+  const [actionNotice, setActionNotice] = useState<FriendActionNotice | null>(null);
   const refreshingRef = useRef(false);
+  const actionNoticeTimerRef = useRef<number | null>(null);
+
+  const clearActionNoticeTimer = useCallback(() => {
+    if (actionNoticeTimerRef.current === null) return;
+    window.clearTimeout(actionNoticeTimerRef.current);
+    actionNoticeTimerRef.current = null;
+  }, []);
+
+  const dismissActionNotice = useCallback(() => {
+    clearActionNoticeTimer();
+    setActionNotice(null);
+  }, [clearActionNoticeTimer]);
+
+  const showActionNotice = useCallback((
+    text: string,
+    success: boolean,
+  ) => {
+    clearActionNoticeTimer();
+    setActionNotice({
+      text,
+      type: success ? 'success' : 'error',
+    });
+    actionNoticeTimerRef.current = window.setTimeout(() => {
+      actionNoticeTimerRef.current = null;
+      setActionNotice(null);
+    }, success ? ACTION_SUCCESS_MESSAGE_MS : ACTION_ERROR_MESSAGE_MS);
+  }, [clearActionNoticeTimer]);
 
   const loadFriends = useCallback(async (showLoading = true) => {
     if (refreshingRef.current) return;
@@ -141,13 +175,22 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
     const timer = window.setInterval(() => {
       void loadFriends(false);
     }, FRIEND_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(timer);
+    const handleFriendsChanged = () => void loadFriends(false);
+    window.addEventListener('lolhelp:friends-changed', handleFriendsChanged);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('lolhelp:friends-changed', handleFriendsChanged);
+    };
   }, [loadFriends]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime((time) => time + 1000), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    return clearActionNoticeTimer;
+  }, [clearActionNoticeTimer]);
 
   useEffect(() => {
     if (!actionFriendId) return undefined;
@@ -222,7 +265,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
 
   const handleSpectate = async (friend: FriendInfo) => {
     const result = await window.lolHelper.lcu.spectateFriend(friend.puuid);
-    setActionMessage(result.message);
+    showActionNotice(result.message, result.success);
     if (result.success) setActionFriendId('');
   };
 
@@ -230,7 +273,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
     const displayName = friend.note || friend.gameName;
     if (!window.confirm(`确定删除好友“${displayName}”吗？`)) return;
     const result = await window.lolHelper.lcu.deleteFriend(friend.id);
-    setActionMessage(result.message);
+    showActionNotice(result.message, result.success);
     if (result.success) {
       setActionFriendId('');
       await loadFriends(false);
@@ -259,13 +302,18 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
         className="min-h-0 flex-1 overflow-y-auto p-1.5"
         onScroll={() => setActionFriendId('')}
       >
-        {actionMessage && (
+        {actionNotice && (
           <button
             type="button"
-            onClick={() => setActionMessage('')}
-            className="mb-1 w-full rounded-sm bg-app-primary-soft px-2 py-1.5 text-left text-[11px] text-app-body"
+            onClick={dismissActionNotice}
+            className={`mb-1 w-full rounded-sm px-2 py-1.5 text-left text-[11px] ${
+              actionNotice.type === 'success'
+                ? 'bg-app-success/5 text-app-success'
+                : 'bg-app-danger/5 text-app-danger'
+            }`}
+            title="点击关闭提示"
           >
-            {actionMessage}
+            {actionNotice.text}
           </button>
         )}
         {loading && friends.length === 0 ? (

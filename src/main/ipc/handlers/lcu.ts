@@ -6,6 +6,7 @@ import { getCurrentRegionFromLog, getSgpAuth } from '../../sgp/auth';
 import type {
   FriendActionResult,
   FriendInfo,
+  FriendRequestInfo,
   LcuConnection,
   LcuRegion,
 } from '../../../shared/api';
@@ -21,6 +22,7 @@ import {
   sendChatMessage,
 } from '../../lcu/chatSessions';
 import { readChatArchiveForDisplay } from '../../lcu/chatArchive';
+import { splitRiotId } from '../../riot/playerAccount';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -117,6 +119,44 @@ function readFriendSince(source: Record<string, unknown>): string | number | nul
     'timestamp',
   ]);
   return value === '' ? null : value;
+}
+
+function mapFriendRequest(source: Record<string, unknown>): FriendRequestInfo {
+  const icon = Number(source.icon ?? source.profileIconId ?? 0);
+  const iconUrls = buildProfileIconCandidates(icon);
+  const directionValue = String(source.direction ?? 'out').toLowerCase();
+  const direction: FriendRequestInfo['direction'] = directionValue === 'in'
+    ? 'in'
+    : directionValue === 'both'
+      ? 'both'
+      : 'out';
+  return {
+    id: String(source.id ?? source.puuid ?? source.summonerId ?? ''),
+    puuid: String(source.puuid ?? ''),
+    gameName: String(source.gameName ?? source.name ?? ''),
+    gameTag: String(source.tagLine ?? source.gameTag ?? ''),
+    summonerId: Number(source.summonerId ?? 0),
+    icon,
+    iconUrl: iconUrls[0] ?? '',
+    iconUrls,
+    direction,
+    note: String(source.note ?? ''),
+  };
+}
+
+function friendRequestBody(source: Record<string, unknown>, direction: 'in' | 'out' | 'both') {
+  return {
+    summonerId: Number(source.summonerId ?? 0),
+    icon: Number(source.icon ?? source.profileIconId ?? 0),
+    id: String(source.id ?? source.puuid ?? source.summonerId ?? ''),
+    name: String(source.name ?? source.displayName ?? source.gameName ?? ''),
+    pid: String(source.pid ?? ''),
+    puuid: String(source.puuid ?? ''),
+    gameName: String(source.gameName ?? source.displayName ?? source.name ?? ''),
+    tagLine: String(source.tagLine ?? source.gameTag ?? ''),
+    note: String(source.note ?? ''),
+    direction,
+  };
 }
 
 function getFriendChampionId(rawLol: Record<string, unknown>): number {
@@ -292,15 +332,18 @@ export function registerLcuHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.LCU_GET_CURRENT_REGION,
     async (): Promise<LcuRegion> => {
-      const region = getCurrentRegionFromLog();
-      if (region) {
-        return { key: region.key, name: region.name };
-      }
-
       try {
-        const auth = await getSgpAuth();
-        return { key: auth.region.key, name: auth.region.name };
+        const auth = await getSgpAuth({ validateSession: true });
+        return {
+          key: auth.region.key,
+          name: auth.region.name,
+          sessionId: `${auth.region.key}:${auth.puuid}`,
+        };
       } catch (err) {
+        const region = getCurrentRegionFromLog();
+        if (region) {
+          return { key: region.key, name: region.name };
+        }
         return {
           key: '',
           name: '',
@@ -423,6 +466,136 @@ export function registerLcuHandlers(): void {
       return [];
     }
   });
+
+  ipcMain.handle(IPC_CHANNELS.LCU_GET_FRIEND_REQUESTS, async (): Promise<FriendRequestInfo[]> => {
+    const creds = getCachedCredentials();
+    if (!creds) throw new Error('英雄联盟客户端未连接');
+    const raw = await new LcuClient(creds).get<Record<string, unknown>[]>(
+      '/lol-chat/v2/friend-requests',
+    );
+    return Array.isArray(raw) ? raw.map(mapFriendRequest).filter((request) => request.puuid) : [];
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_ADD_FRIEND,
+    async (_event, riotId: string): Promise<FriendActionResult> => {
+      if (typeof riotId !== 'string') {
+        return { success: false, message: '好友账号格式无效' };
+      }
+      const parsed = splitRiotId(riotId);
+      if (!parsed) {
+        return { success: false, message: '请输入完整 Riot ID，例如：名字#编号' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) return { success: false, message: '英雄联盟客户端未连接' };
+
+      const client = new LcuClient(creds);
+      try {
+        const summoner = await client.get<Record<string, unknown>>(
+          `/lol-summoner/v1/summoners?name=${encodeURIComponent(`${parsed.gameName}#${parsed.tagLine}`)}`,
+        );
+        const puuid = String(summoner.puuid ?? '');
+        if (!puuid) return { success: false, message: '没有找到这个账号' };
+
+        const [friends, requests] = await Promise.all([
+          client.get<Record<string, unknown>[]>('/lol-chat/v1/friends').catch(() => []),
+          client.get<Record<string, unknown>[]>('/lol-chat/v2/friend-requests').catch(() => []),
+        ]);
+        if (friends.some((friend) => String(friend.puuid ?? '') === puuid)) {
+          return { success: false, message: '这个账号已经是你的好友' };
+        }
+        const existing = requests.find((request) => String(request.puuid ?? '') === puuid);
+        if (existing) {
+          const direction = String(existing.direction ?? '').toLowerCase();
+          return {
+            success: false,
+            message: direction === 'in' ? '对方已经发来申请，请在待处理中通过' : '好友申请已经发送，请等待对方通过',
+          };
+        }
+
+        await client.post(
+          '/lol-chat/v2/friend-requests',
+          friendRequestBody({
+            ...summoner,
+            gameName: String(summoner.gameName ?? parsed.gameName),
+            tagLine: String(summoner.tagLine ?? parsed.tagLine),
+          }, 'out'),
+        );
+        return { success: true, message: `已向 ${parsed.gameName}#${parsed.tagLine} 发送好友申请` };
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error && /HTTP 404|HTTP 422/.test(error.message)
+            ? '没有找到这个账号，请检查名字、编号和当前大区'
+            : error instanceof Error ? error.message : '发送好友申请失败',
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_ACCEPT_FRIEND_REQUEST,
+    async (_event, puuid: string): Promise<FriendActionResult> => {
+      if (typeof puuid !== 'string' || !puuid.trim()) {
+        return { success: false, message: '好友申请信息无效' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) return { success: false, message: '英雄联盟客户端未连接' };
+      const client = new LcuClient(creds);
+      try {
+        const requests = await client.get<Record<string, unknown>[]>('/lol-chat/v2/friend-requests');
+        const request = requests.find((item) => String(item.puuid ?? '') === puuid);
+        if (!request) return { success: false, message: '这条好友申请已经不存在' };
+        await client.put(
+          `/lol-chat/v2/friend-requests/${encodeURIComponent(puuid)}`,
+          friendRequestBody(request, 'in'),
+        );
+        return { success: true, message: '已通过好友申请' };
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : '通过好友申请失败',
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_DELETE_FRIEND_REQUEST,
+    async (_event, puuid: string): Promise<FriendActionResult> => {
+      if (typeof puuid !== 'string' || !puuid.trim()) {
+        return { success: false, message: '好友申请信息无效' };
+      }
+      const creds = getCachedCredentials();
+      if (!creds) return { success: false, message: '英雄联盟客户端未连接' };
+      const client = new LcuClient(creds);
+      try {
+        await client.delete(
+          `/lol-chat/v2/friend-requests/${encodeURIComponent(puuid)}`,
+        );
+        return { success: true, message: '好友申请已移除' };
+      } catch (error) {
+        try {
+          const remaining = await client.get<Record<string, unknown>[]>(
+            '/lol-chat/v2/friend-requests',
+          );
+          const stillExists = Array.isArray(remaining)
+            && remaining.some((request) => String(request.puuid ?? '') === puuid);
+          if (!stillExists) {
+            return { success: true, message: '好友申请已移除' };
+          }
+        } catch {
+          // Keep the original operation error when the verification request also fails.
+        }
+        return {
+          success: false,
+          message: error instanceof Error && /timed out/i.test(error.message)
+            ? '取消申请超时，请刷新后确认'
+            : '取消申请失败，请刷新后重试',
+        };
+      }
+    },
+  );
 
   ipcMain.handle(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, async (_event, accountKey?: string) => {
     const creds = getCachedCredentials();

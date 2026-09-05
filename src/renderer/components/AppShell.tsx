@@ -5,6 +5,7 @@ import {
   Crosshair,
   BookmarkCheck,
   Home,
+  MailPlus,
   MessageCircleMore,
   PanelLeft,
   Radar,
@@ -52,10 +53,13 @@ interface AppShellProps {
   chatSessionsOpen?: boolean; // 会话管理窗口是否打开
   savedMatchesOpen?: boolean;
   followAccountsOpen?: boolean;
+  friendManagerOpen?: boolean;
+  friendRequestAlertCount?: number;
   followAlertCount?: number;
   onOpenSavedMatches?: () => void;
   onOpenFollowAccounts?: () => void;
   onOpenChatSessions?: () => void; // 打开会话管理窗口
+  onOpenFriendManager?: () => void;
   friendPanel?: React.ReactNode; // 常驻右侧好友栏
   onOpenSettings?: () => void; // 打开设置窗口
   settingsOpen?: boolean;
@@ -199,65 +203,110 @@ function SidebarScoutStatus({
   }
 
   return (
-    <section className={`sidebar-scout-card ${status.running ? 'sidebar-scout-card--running' : ''}`}>
-      <button
-        type="button"
-        onClick={openLatest}
-        disabled={!canOpenLatest && !onRestore}
-        className="sidebar-scout-player"
-      >
-        <span className="sidebar-scout-avatar">
-          {latestProfile ? (
-            <ProfileIcon
-              iconId={latestProfile.profileIconId}
-              src={latestProfile.profileIconUrl}
-              alt={displayName}
-              size={34}
-              className="sidebar-scout-avatar__image"
-            />
-          ) : latestChampionAvatar ? (
-            <GameIcon
-              src={latestChampionAvatar}
-              alt={latestChampionName}
-              size={34}
-              rounded
-              className="sidebar-scout-avatar__image"
-            />
-          ) : (
-            <span className="sidebar-scout-orb" aria-hidden="true" />
-          )}
-          {status.running && <span className="sidebar-scout-avatar__live" />}
-        </span>
-        <div className="min-w-0 flex-1 text-left">
-          <div className="truncate text-xs font-semibold text-app-text">
-            {displayName}
-          </div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-app-muted">
-            {latestMatch || latestPlayer?.recentChampionAvatar ? (
-              <>
-                <GameIcon
-                  src={latestMatch?.championAvatar || latestPlayer?.recentChampionAvatar || ''}
-                  alt={latestMatch?.championName || latestPlayer?.recentChampionName || '最近英雄'}
-                  size={14}
-                  rounded
-                />
-                <span className="truncate">
-                  {latestMatch?.championName || latestPlayer?.recentChampionName || '正在检查'}
-                </span>
-                <span className="sidebar-scout-score">{latestScore}</span>
-              </>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <section className={`sidebar-scout-card shrink-0 ${status.running ? 'sidebar-scout-card--running' : ''}`}>
+        <button
+          type="button"
+          onClick={openLatest}
+          disabled={!canOpenLatest && !onRestore}
+          className="sidebar-scout-player"
+        >
+          <span className="sidebar-scout-avatar">
+            {latestProfile ? (
+              <ProfileIcon
+                iconId={latestProfile.profileIconId}
+                src={latestProfile.profileIconUrl}
+                alt={displayName}
+                size={34}
+                className="sidebar-scout-avatar__image"
+              />
+            ) : latestChampionAvatar ? (
+              <GameIcon
+                src={latestChampionAvatar}
+                alt={latestChampionName}
+                size={34}
+                rounded
+                className="sidebar-scout-avatar__image"
+              />
             ) : (
-              <span>{status.running ? '实时筛选达标对局' : '命中后显示最新玩家'}</span>
+              <span className="sidebar-scout-orb" aria-hidden="true" />
             )}
+            {status.running && <span className="sidebar-scout-avatar__live" />}
+          </span>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="truncate text-xs font-semibold text-app-text">
+              {displayName}
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-app-muted">
+              {latestMatch || latestPlayer?.recentChampionAvatar ? (
+                <>
+                  <GameIcon
+                    src={latestMatch?.championAvatar || latestPlayer?.recentChampionAvatar || ''}
+                    alt={latestMatch?.championName || latestPlayer?.recentChampionName || '最近英雄'}
+                    size={14}
+                    rounded
+                  />
+                  <span className="truncate">
+                    {latestMatch?.championName || latestPlayer?.recentChampionName || '正在检查'}
+                  </span>
+                  <span className="sidebar-scout-score">{latestScore}</span>
+                </>
+              ) : (
+                <span>{status.running ? '实时筛选达标对局' : '命中后显示最新玩家'}</span>
+              )}
+            </div>
+          </div>
+        </button>
+
+        <div className="sidebar-scout-foot">
+          <span>已找到 <b>{foundCount}</b></span>
+          <span>计时 <b>{elapsedText}</b></span>
+        </div>
+      </section>
+
+      {status.hits.length > 0 && (
+        <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-app-border/70 pt-2">
+          <div className="flex h-6 shrink-0 items-center justify-between px-1 text-[10px] font-semibold text-app-muted">
+            <span>已找到的高手</span>
+            <span>{status.hits.length}</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+            {[...status.hits].reverse().map((hit) => {
+              const riotId = getScoutHitRiotId(hit);
+              const match = hit.qualifyingMatches[0];
+              const score = match ? `${match.kills}/${match.deaths}/${match.assists}` : '';
+              return (
+                <button
+                  key={hit.profile.puuid || riotId}
+                  type="button"
+                  disabled={!riotId || !onPlayerSearch}
+                  onClick={() => onPlayerSearch?.(riotId, status.region)}
+                  title={riotId ? `查看 ${riotId} 的战绩` : undefined}
+                  className="group flex h-11 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left transition-colors hover:bg-app-nav-hover disabled:cursor-default"
+                >
+                  <ProfileIcon
+                    iconId={hit.profile.profileIconId}
+                    src={hit.profile.profileIconUrl}
+                    alt={riotId || '高手'}
+                    size={28}
+                    className="ring-1 ring-app-border"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] font-semibold text-app-text group-hover:text-app-primary">
+                      {getScoutHitDisplayName(hit)}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-app-muted">
+                      <span>{hit.qualifyingMatches.length} 场达标</span>
+                      {score && <span className="font-semibold text-app-primary">{score}</span>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </button>
-
-      <div className="sidebar-scout-foot">
-        <span>已找到 <b>{foundCount}</b></span>
-        <span>计时 <b>{elapsedText}</b></span>
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
 
@@ -285,10 +334,13 @@ export function AppShell({
   chatSessionsOpen = false,
   savedMatchesOpen = false,
   followAccountsOpen = false,
+  friendManagerOpen = false,
+  friendRequestAlertCount = 0,
   followAlertCount = 0,
   onOpenSavedMatches,
   onOpenFollowAccounts,
   onOpenChatSessions,
+  onOpenFriendManager,
   friendPanel,
   onOpenSettings,
   settingsOpen = false,
@@ -332,7 +384,7 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-hidden p-2">
+        <nav className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
           {NAV_ITEMS.map((item, index) => {
             const Icon = item.icon;
             const active = activeView === item.view;
@@ -398,13 +450,13 @@ export function AppShell({
           ) : (
             <span className="text-sm font-medium text-app-text">{title}</span>
           )}
-          {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onToggleFriendPanel) && (
+          {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onOpenFriendManager || onToggleFriendPanel) && (
             <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
               {onOpenSavedMatches && (
                 <button
                   type="button"
                   onClick={onOpenSavedMatches}
-                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
+                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
                     savedMatchesOpen
                       ? 'bg-app-selected text-app-text'
                       : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
@@ -448,6 +500,26 @@ export function AppShell({
                   aria-label="会话管理"
                 >
                   <MessageCircleMore className="size-4" />
+                </button>
+              )}
+              {onOpenFriendManager && (
+                <button
+                  type="button"
+                  onClick={onOpenFriendManager}
+                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
+                    friendManagerOpen
+                      ? 'bg-app-selected text-app-text'
+                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+                  }`}
+                  title="好友申请"
+                  aria-label="好友申请"
+                >
+                  <MailPlus className="size-4" />
+                  {friendRequestAlertCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-app-surface">
+                      {friendRequestAlertCount > 99 ? '99+' : friendRequestAlertCount}
+                    </span>
+                  )}
                 </button>
               )}
               {onToggleFriendPanel && (

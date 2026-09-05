@@ -1,9 +1,14 @@
+import https from 'node:https';
 import { getCachedCredentials } from '../lcu/lockfile';
 import { LcuClient } from '../lcu/client';
-import { getHeroByKey } from '../lcu/heroData';
+import { getAllHeroes, getHeroByKey } from '../lcu/heroData';
 import { getQueueName } from '../match/queueNames';
 import { fetchPlayerRankByPuuid } from '../match/matchService';
 import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
+import {
+  stabilizeLiveBattle,
+  type StableLiveBattleSnapshot,
+} from './liveBattleStability';
 
 // 实时对局服务：检测你是否在游戏中，拿 10 人骨架 + 并行战绩。
 // 全程走 LCU 本地端点（不走 SGP/2999），因为只有你自己客户端知道你自己的对局。
@@ -19,11 +24,13 @@ import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
 const RECENT_MATCH_COUNT = 24;
 const LIVE_BATTLE_CACHE_TTL_MS = 15_000;
 const LIVE_BATTLE_EMPTY_CACHE_TTL_MS = 2_000;
+const LIVE_BATTLE_STALE_TTL_MS = 30_000;
 const PLAYER_STATS_CACHE_TTL_MS = 120_000;
 const PLAYER_STATS_QUICK_TIMEOUT_MS = 4_500;
 const PLAYER_RANK_QUICK_TIMEOUT_MS = 3_200;
 let liveBattleCache: { expiresAt: number; value: LiveBattleInfo } | null = null;
 let liveBattleInFlight: Promise<LiveBattleInfo> | null = null;
+let stableLiveBattle: StableLiveBattleSnapshot | null = null;
 let liveBattleCacheVersion = 0;
 
 type PlayerStatsSummary = {
@@ -189,8 +196,126 @@ interface PlayerSkeleton {
   summonerId: number;
   championId: number;
   teamId: number;
+  riotIdHint?: string;
+  gameNameHint?: string;
   premadeId?: string;
   position?: string;
+}
+
+interface LiveClientPlayer {
+  team?: string;
+  championName?: string;
+  riotId?: string;
+  summonerName?: string;
+}
+
+function fetchLiveClientPlayers(): Promise<LiveClientPlayer[]> {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        hostname: '127.0.0.1',
+        port: 2999,
+        path: '/liveclientdata/playerlist',
+        method: 'GET',
+        rejectUnauthorized: false,
+      },
+      (response) => {
+        let raw = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk: string) => {
+          raw += chunk;
+        });
+        response.on('end', () => {
+          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+            reject(new Error(`Live Client Data HTTP ${response.statusCode ?? 0}`));
+            return;
+          }
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            resolve(Array.isArray(parsed) ? parsed as LiveClientPlayer[] : []);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+
+    request.setTimeout(1_500, () => request.destroy(new Error('Live Client Data timeout')));
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+function liveChampionId(player: LiveClientPlayer): number {
+  const name = String(player.championName ?? '').trim();
+  if (!name) return 0;
+  return getAllHeroes().find((hero) => hero.name === name || hero.alias === name)?.id ?? 0;
+}
+
+function liveRiotId(player: LiveClientPlayer): string {
+  const riotId = String(player.riotId ?? '').trim();
+  if (riotId && riotId !== '#' && !riotId.startsWith('#')) return riotId;
+
+  const summonerName = String(player.summonerName ?? '').trim();
+  return summonerName.includes('#') && !summonerName.startsWith('#') ? summonerName : '';
+}
+
+function supplementTeamFromLiveClient(
+  skeletons: PlayerSkeleton[],
+  livePlayers: LiveClientPlayer[],
+  teamId: number,
+): PlayerSkeleton[] {
+  const usedLivePlayers = new Set<number>();
+
+  for (const skeleton of skeletons) {
+    const matchIndex = livePlayers.findIndex(
+      (player, index) => !usedLivePlayers.has(index) && liveChampionId(player) === skeleton.championId,
+    );
+    if (matchIndex >= 0) usedLivePlayers.add(matchIndex);
+  }
+
+  const supplemented = [...skeletons];
+  livePlayers.forEach((player, index) => {
+    if (usedLivePlayers.has(index)) return;
+    const championId = liveChampionId(player);
+    const riotIdHint = liveRiotId(player);
+    supplemented.push({
+      puuid: '',
+      summonerId: 0,
+      championId,
+      teamId,
+      riotIdHint,
+      gameNameHint: riotIdHint.split('#')[0] || '身份隐藏',
+    });
+  });
+
+  return supplemented.slice(0, livePlayers.length || skeletons.length);
+}
+
+function supplementTeamsFromLiveClient(
+  myTeam: PlayerSkeleton[],
+  enemyTeam: PlayerSkeleton[],
+  livePlayers: LiveClientPlayer[],
+): { myTeam: PlayerSkeleton[]; enemyTeam: PlayerSkeleton[] } {
+  const order = livePlayers.filter((player) => player.team === 'ORDER');
+  const chaos = livePlayers.filter((player) => player.team === 'CHAOS');
+  if (order.length === 0 || chaos.length === 0) return { myTeam, enemyTeam };
+
+  const myChampionIds = new Set(myTeam.map((player) => player.championId).filter(Boolean));
+  const overlap = (players: LiveClientPlayer[]) => players.reduce(
+    (count, player) => count + (myChampionIds.has(liveChampionId(player)) ? 1 : 0),
+    0,
+  );
+  const orderOverlap = overlap(order);
+  const chaosOverlap = overlap(chaos);
+  if (orderOverlap === chaosOverlap) return { myTeam, enemyTeam };
+
+  const myLiveTeam = orderOverlap > chaosOverlap ? order : chaos;
+  const enemyLiveTeam = orderOverlap > chaosOverlap ? chaos : order;
+  return {
+    myTeam: supplementTeamFromLiveClient(myTeam, myLiveTeam, myTeam[0]?.teamId ?? 100),
+    enemyTeam: supplementTeamFromLiveClient(enemyTeam, enemyLiveTeam, enemyTeam[0]?.teamId ?? 200),
+  };
 }
 
 function currentPartyId(player: Record<string, unknown>): string | undefined {
@@ -269,9 +394,27 @@ async function enrichPlayers(
   const enriched = await Promise.all(
     skeletons.map(async (s): Promise<LiveBattlePlayer> => {
       // 默认值
-      let gameName = `玩家${s.summonerId || '?'}`;
+      let gameName = s.gameNameHint || `玩家${s.summonerId || '?'}`;
+      const hintSeparator = s.riotIdHint?.lastIndexOf('#') ?? -1;
+      let tagLine = hintSeparator > 0 ? s.riotIdHint?.slice(hintSeparator + 1) ?? '' : '';
+      if (hintSeparator > 0) gameName = s.riotIdHint?.slice(0, hintSeparator) || gameName;
       let championName = `英雄${s.championId}`;
       let summonerLevel = 0;
+
+      if (s.summonerId <= 0 && s.riotIdHint) {
+        try {
+          const sum = await client.get<Record<string, unknown>>(
+            `/lol-summoner/v1/summoners?name=${encodeURIComponent(s.riotIdHint)}`,
+          );
+          s.summonerId = Number(sum.summonerId ?? sum.id ?? 0);
+          s.puuid = String(sum.puuid ?? s.puuid);
+          gameName = (sum.gameName as string) || (sum.name as string) || gameName;
+          tagLine = (sum.tagLine as string) || tagLine;
+          summonerLevel = Number(sum.summonerLevel ?? 0);
+        } catch {
+          // The live game API may intentionally hide an opponent's identity.
+        }
+      }
 
       // 召唤师名（通过 summonerId）
       if (s.summonerId > 0) {
@@ -280,23 +423,28 @@ async function enrichPlayers(
             `/lol-summoner/v1/summoners/${s.summonerId}`,
           );
           gameName = (sum.gameName as string) || (sum.name as string) || gameName;
+          tagLine = (sum.tagLine as string) || tagLine;
           summonerLevel = Number(sum.summonerLevel ?? 0);
           if (!s.puuid) s.puuid = (sum.puuid as string) ?? s.puuid;
         } catch {
-          // 回退：通过 puuid 查
-          if (s.puuid) {
-            try {
-              const sum = await client.get<Record<string, unknown>>(
-                `/lol-summoner/v2/summoners/puuid/${s.puuid}`,
-              );
-              gameName = (sum.gameName as string) || gameName;
-              summonerLevel = Number(sum.summonerLevel ?? 0);
-            } catch {
-              // 放弃
-            }
-          }
+          // 下方统一通过 PUUID 回退。
         }
       }
+
+      // 部分客户端的 summonerId 接口只给名字，不给 tagLine。
+      if (s.puuid && !tagLine && !gameName.includes('#')) {
+        try {
+          const sum = await client.get<Record<string, unknown>>(
+            `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(s.puuid)}`,
+          );
+          gameName = (sum.gameName as string) || (sum.name as string) || gameName;
+          tagLine = (sum.tagLine as string) || tagLine;
+          summonerLevel = Number(sum.summonerLevel ?? summonerLevel);
+        } catch {
+          // 保留 summonerId 接口已经拿到的名字。
+        }
+      }
+      const riotId = tagLine && !gameName.includes('#') ? `${gameName}#${tagLine}` : gameName;
 
       // 英雄名
       const hero = getHeroByKey(s.championId);
@@ -333,7 +481,7 @@ async function enrichPlayers(
       return {
         puuid: s.puuid,
         summonerId: s.summonerId,
-        riotId: gameName,
+        riotId,
         gameName,
         championId: s.championId,
         championName,
@@ -374,7 +522,14 @@ async function loadLiveBattle(): Promise<LiveBattleInfo> {
   try {
     phase = await client.get<string>('/lol-gameflow/v1/gameflow-phase');
   } catch {
-    phase = 'None';
+    return {
+      inGame: false,
+      phase: 'Unavailable',
+      queueName: '',
+      myTeam: [],
+      enemyTeam: [],
+      error: '实时对局状态暂时不可用',
+    };
   }
 
   // 去引号（LCU 可能返回带引号的字符串）
@@ -426,6 +581,21 @@ async function loadLiveBattle(): Promise<LiveBattleInfo> {
     } catch {
       // 继续
     }
+
+    if (myTeamSkeletons.length + enemyTeamSkeletons.length < 10) {
+      try {
+        const livePlayers = await fetchLiveClientPlayers();
+        const supplemented = supplementTeamsFromLiveClient(
+          myTeamSkeletons,
+          enemyTeamSkeletons,
+          livePlayers,
+        );
+        myTeamSkeletons = supplemented.myTeam;
+        enemyTeamSkeletons = supplemented.enemyTeam;
+      } catch {
+        // Port 2999 is only available after the game process is ready.
+      }
+    }
   }
 
   // 4-5. 并行补全 10 人信息 + 战绩
@@ -451,13 +621,25 @@ export async function getLiveBattle(): Promise<LiveBattleInfo> {
     const version = liveBattleCacheVersion;
     liveBattleInFlight = loadLiveBattle()
       .then((value) => {
+        const stabilized = stabilizeLiveBattle(
+          value,
+          stableLiveBattle,
+          Date.now(),
+          LIVE_BATTLE_STALE_TTL_MS,
+        );
+        stableLiveBattle = stabilized.stable;
+
         if (version === liveBattleCacheVersion) {
           liveBattleCache = {
-            expiresAt: Date.now() + (value.inGame ? LIVE_BATTLE_CACHE_TTL_MS : LIVE_BATTLE_EMPTY_CACHE_TTL_MS),
-            value,
+            expiresAt: Date.now() + (
+              stabilized.value.inGame
+                ? LIVE_BATTLE_CACHE_TTL_MS
+                : LIVE_BATTLE_EMPTY_CACHE_TTL_MS
+            ),
+            value: stabilized.value,
           };
         }
-        return value;
+        return stabilized.value;
       })
       .finally(() => {
         liveBattleInFlight = null;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, MailPlus, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
@@ -9,7 +9,7 @@ import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesSto
 import { LOL_REGIONS } from '../../../shared/constants';
 
 const PAGE_SIZE = 12;
-const SGP_BATCH = 100;
+const SGP_BATCH = 50;
 
 interface MatchHistoryPageProps {
   searchName: string;
@@ -404,11 +404,18 @@ export function MatchHistoryPage({
   const [profilePanelTabId, setProfilePanelTabId] = useState<string | null>(null);
   const [saveModeTabId, setSaveModeTabId] = useState<string | null>(null);
   const [saveSelections, setSaveSelections] = useState<Record<string, number[]>>({});
+  const [addingFriendTabId, setAddingFriendTabId] = useState<string | null>(null);
+  const [friendNotice, setFriendNotice] = useState<{
+    tabId: string;
+    message: string;
+    success: boolean;
+  } | null>(null);
 
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
   const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const tabLoadSeqRef = useRef<Record<string, number>>({});
+  const friendNoticeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -424,6 +431,12 @@ export function MatchHistoryPage({
       window.removeEventListener('blur', clearPressedTab);
     };
   }, [pressedTabId]);
+
+  useEffect(() => () => {
+    if (friendNoticeTimerRef.current !== null) {
+      window.clearTimeout(friendNoticeTimerRef.current);
+    }
+  }, []);
 
   const updateTab = (tabId: string, updater: (tab: MatchTab) => MatchTab) => {
     setTabs((currentTabs) => currentTabs.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
@@ -689,6 +702,28 @@ export function MatchHistoryPage({
     setSaveModeTabId(null);
   };
 
+  const handleAddCurrentPlayerFriend = async () => {
+    if (!activeTab?.result?.profile.riotId || addingFriendTabId) return;
+    const tabId = activeTab.id;
+    setAddingFriendTabId(tabId);
+    try {
+      const result = await window.lolHelper.lcu.addFriend(activeTab.result.profile.riotId);
+      setFriendNotice({ tabId, message: result.message, success: result.success });
+      if (result.success) {
+        window.dispatchEvent(new CustomEvent('lolhelp:friend-requests-changed'));
+      }
+      if (friendNoticeTimerRef.current !== null) {
+        window.clearTimeout(friendNoticeTimerRef.current);
+      }
+      friendNoticeTimerRef.current = window.setTimeout(() => {
+        friendNoticeTimerRef.current = null;
+        setFriendNotice((current) => (current?.tabId === tabId ? null : current));
+      }, 4_000);
+    } finally {
+      setAddingFriendTabId(null);
+    }
+  };
+
   // 切换模式筛选：重新向 SGP 查询该模式的战绩（不是前端过滤）
   const handleFilterChange = (queueKey: string) => {
     if (!activeTab) return;
@@ -923,7 +958,7 @@ export function MatchHistoryPage({
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
         <div className="flex w-[292px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           {activeTab && (
-            <div className="shrink-0 border-b border-app-border bg-app-surface px-3 py-3">
+            <div className="relative shrink-0 border-b border-app-border bg-app-surface px-3 py-3">
               <div className="flex items-center gap-2">
                 {activeTab.result?.profile ? (
                   <button
@@ -979,6 +1014,18 @@ export function MatchHistoryPage({
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {!isSaveMode && activeTab.result?.profile.riotId && (
+                    <button
+                      type="button"
+                      disabled={addingFriendTabId === activeTab.id}
+                      onClick={() => void handleAddCurrentPlayerFriend()}
+                      className="flex h-6 items-center gap-1 rounded-sm px-1.5 text-[11px] font-medium text-app-muted transition-colors hover:bg-app-primary-soft hover:text-app-primary disabled:opacity-50"
+                      title="添加好友"
+                    >
+                      <MailPlus className="size-3" />
+                      {addingFriendTabId === activeTab.id ? '发送中' : '加好友'}
+                    </button>
+                  )}
                   {isSaveMode ? (
                     <>
                       <button
@@ -1015,6 +1062,17 @@ export function MatchHistoryPage({
                   )}
                 </div>
               </div>
+              {friendNotice?.tabId === activeTab.id && (
+                <div
+                  className={`absolute right-3 top-[calc(100%_-_2px)] z-30 max-w-[250px] rounded-sm border px-2.5 py-1.5 text-[11px] shadow-md ${
+                    friendNotice.success
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-app-danger/20 bg-app-danger/10 text-app-danger'
+                  }`}
+                >
+                  {friendNotice.message}
+                </div>
+              )}
             </div>
           )}
 

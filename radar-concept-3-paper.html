@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>搜索雷达背景方案三 - 纸张压纹空间</title>
+  <link rel="stylesheet" href="./radar-concept-shared.css">
+</head>
+<body data-theme="paper">
+  <main class="preview-page">
+    <header class="preview-head">
+      <div class="preview-title">
+        <span class="preview-mark" aria-hidden="true"></span>
+        <div>
+          <h1>方案三 · 纸张压纹空间</h1>
+          <p>延续软件暖白底色，用纸纤维和凹凸压纹建立空间</p>
+        </div>
+      </div>
+      <div class="preview-actions" aria-label="切换球体状态">
+        <button class="state-button" data-state="alert" aria-pressed="true">警戒</button>
+        <button class="state-button" data-state="angry" aria-pressed="false">愤怒</button>
+        <button class="state-button" data-state="excited" aria-pressed="false">兴奋</button>
+      </div>
+    </header>
+    <section class="preview-stage">
+      <canvas id="radar-canvas"></canvas>
+      <div class="energy-core-layer" id="energy-core" aria-hidden="true"></div>
+      <div class="stage-meta"><i></i><span>警戒扫描中</span></div>
+      <div class="scheme-note">
+        <strong>EMBOSSED PAPER</strong>
+        <span>网格像压在纸里的纹路，球体与玩家节点成为纸面上唯一发光的元素。</span>
+      </div>
+      <div class="stage-counter"><b>0</b><span>/ 20 个玩家节点</span></div>
+    </section>
+  </main>
+  <script src="./radar-concept-shared.js"></script>
+  <script src="./radar-concept-energy-core.js"></script>
+</body>
+</html>

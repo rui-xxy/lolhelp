@@ -48,7 +48,9 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
+    "@types/three": "^0.180.0",
     "bufferutil": "^4.1.0",
+    "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron-squirrel-startup": "^1.0.1",
@@ -58,6 +60,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwind-merge": "^3.6.0",
+    "three": "^0.180.0",
     "utf-8-validate": "^6.0.6",
     "ws": "^8.21.0"
   }

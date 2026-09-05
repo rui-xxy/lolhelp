@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>颜文字 Kaomoji 图鉴 · (づ｡◕‿‿◕｡)づ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --mint:  #7eddc1;
+    --sakura:#ffb7c5;
+    --cream: #fffaf3;
+    --ink:   #3a3a4a;
+    --muted: #9a9ab0;
+    --shadow: 0 8px 28px rgba(120, 110, 140, .12);
+  }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans", sans-serif;
+    background: var(--cream);
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255,183,197,.25), transparent 40%),
+      radial-gradient(circle at 88% 12%, rgba(126,221,193,.25), transparent 40%);
+    color: var(--ink);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* 颜文字专用等宽字体，保证对齐 */
+  .mono, .kao {
+    font-family: "MS PGothic","MS Gothic","Hiragino Maru Gothic Pro",
+                 "Yu Gothic",Meiryo,"Noto Sans JP",monospace;
+  }
+
+  /* ---------- 顶部 ---------- */
+  header {
+    text-align: center;
+    padding: 56px 20px 36px;
+  }
+  .big-kao {
+    font-size: 3.4rem;
+    margin-bottom: 14px;
+    letter-spacing: 2px;
+    animation: bob 2.6s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(-8px) rotate(-2deg); } }
+  header h1 {
+    font-size: 2.2rem; font-weight: 800;
+    background: linear-gradient(120deg, #ff8fab, #7eddc1 70%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header p { margin-top: 8px; color: var(--muted); }
+
+  .stats {
+    margin: 22px auto 0; display:flex; gap:14px;
+    justify-content:center; flex-wrap:wrap;
+  }
+  .stat {
+    background: #fff; padding: 12px 26px; border-radius: 18px;
+    box-shadow: var(--shadow); font-weight: 700;
+  }
+  .stat span { font-size: 1.4rem; color:#ff6f91; }
+  .stat small { display:block; font-size:.72rem; color:var(--muted); font-weight:500; }
+
+  /* ---------- 工具栏 ---------- */
+  .toolbar {
+    position: sticky; top: 0; z-index: 60;
+    background: rgba(255,250,243,.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    padding: 12px 16px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center; align-items: center;
+  }
+  .toolbar input {
+    flex: 1; min-width: 200px; max-width: 360px;
+    padding: 10px 16px; border: 2px solid #eee;
+    border-radius: 30px; font-size: .95rem; outline: none;
+    transition: border-color .2s;
+  }
+  .toolbar input:focus { border-color: var(--mint); }
+  .btn {
+    padding: 9px 18px; border: none; border-radius: 30px;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    background: #fff; color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    transition: all .2s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .btn.rand { background: linear-gradient(120deg,#ff8fab,#7eddc1); color:#fff; }
+
+  /* ---------- 分类导航 ---------- */
+  .cats-nav {
+    position: sticky; top: 60px; z-index: 50;
+    background: rgba(255,250,243,.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0,0,0,.05);
+    padding: 10px 12px;
+    display: flex; gap: 8px; overflow-x: auto;
+    justify-content: flex-start;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+  .cats-nav::-webkit-scrollbar { height: 6px; }
+  .cats-nav::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .cat-link {
+    padding: 6px 14px; border-radius: 20px; font-size: .85rem;
+    background: #fff; color: var(--ink); cursor: pointer;
+    border: 1px solid #eee; transition: all .2s; flex: none;
+  }
+  .cat-link:hover { background: var(--sakura); color:#fff; border-color: var(--sakura); }
+
+  /* ---------- 分类区块 ---------- */
+  .group {
+    max-width: 1200px; margin: 0 auto; padding: 30px 20px 10px;
+    scroll-margin-top: 120px;
+  }
+  .group h2 {
+    font-size: 1.35rem; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .group h2 .ic {
+    font-size: 1.1rem; color: var(--sakura);
+  }
+  .group h2 .cnt {
+    font-size: .8rem; color: var(--muted); font-weight: 500;
+    background: #fff; padding: 2px 12px; border-radius: 12px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .kao-card {
+    background: #fff; border-radius: 16px; padding: 18px 14px;
+    text-align: center; cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04);
+    border: 2px solid transparent;
+    transition: all .18s;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 64px;
+  }
+  .kao-card .kao {
+    font-size: 1.15rem; letter-spacing: 0;
+    word-break: break-all;
+  }
+  .kao-card:hover {
+    transform: translateY(-4px) scale(1.03);
+    border-color: var(--mint);
+    box-shadow: var(--shadow);
+  }
+  .kao-card.copied {
+    background: linear-gradient(120deg,#e8fbe f0,#fff0f4);
+    border-color: var(--sakura);
+  }
+
+  .hidden { display: none !important; }
+
+  footer {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    font-size: .85rem;
+  }
+  footer .mono { font-size: 1.3rem; display:block; margin-bottom:8px; }
+
+  #toast {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #3a3a4a; color: #fff; padding: 12px 26px;
+    border-radius: 30px; font-size: .9rem; opacity: 0;
+    transition: all .3s; z-index: 999; pointer-events: none;
+    max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast .mono { font-size: 1rem; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.6rem; }
+    .big-kao { font-size: 2.4rem; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .kao-card .kao { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="big-kao mono">(づ｡◕‿‿◕｡)づ</div>
+  <h1>颜文字 Kaomoji 图鉴</h1>
+  <p>用字符拼出的表情 · 点击任意颜文字即可复制</p>
+  <div class="stats">
+    <div class="stat"><span id="cntKao">0</span><small>颜文字数量</small></div>
+    <div class="stat"><span id="cntCat">0</span><small>分类数量</small></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="🔍 搜索分类，如：开心 / 哭泣 / 翻桌 / 动物…">
+  <button class="btn rand" id="randBtn">🎲 随机一个</button>
+</div>
+
+<nav class="cats-nav" id="catsNav"></nav>
+
+<main id="main"></main>
+
+<footer>
+  <span class="mono">( ˘ ³˘)❤  ヾ(＾∇＾)ノ  ✧◝(⁰▿⁰)◜✧</span>
+  所有颜文字由 Unicode 字符拼成 · 纯静态离线页面 · 点击即复制
+</footer>
+
+<div id="toast"></div>
+
+<script>
+/* ============ 颜文字数据库 ============ */
+/* 注意：半角反斜杠 \ 在 JS 字符串里写成 \\ */
+const DATA = {
+  "🥰 开心 / 大笑": [
+    "(≧▽≦)","(*^▽^*)","٩(◕‿◕)۶","o(≧▽≦)o","╰(*°▽°*)╯",
+    "o(*￣▽￣*)ブ","(￣▽￣)~*","♪(^∇^*)","ヾ(＾-＾)ノ","(*￣︶￣)",
+    "╮(￣▽￣)╭","ヽ(✿ﾟ▽ﾟ)ノ","(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧","(★^O^★)","ε=ε=ε=(~￣▽￣)~",
+    "(❁´◡`❁)","(o^▽^o)","(≧∀≦)","ψ(｀∇´)ψ","＼(￣▽￣)／"
+  ],
+  "🌸 卖萌 / 可爱": [
+    "(づ｡◕‿‿◕｡)づ","(◕ᴗ◕✿)","(｡･ω･｡)ﾉ♡","(*´∇｀*)","(✿◡‿◡)",
+    "ヽ(♡‿♡)ノ","(｡♥‿♥｡)","(´｡• ᵕ •｡`)","(◍•ᴗ•◍)","(✯◡✯)",
+    "(◍•ᴗ•◍)❤","(´• ω •`)","( ˘ ³˘)❤","｡◕‿◕｡","(*≧ω≦*)",
+    "(˶‾᷄ ⁻̫ ‾᷅˵)","(◕(‘ 人 ‘) ◕)","♡(˃͈ દ ˂͈ ༶ )","(●´ω｀●)","(✿ Brain✿)"
+  ],
+  "😢 难过 / 哭泣": [
+    "(╥_╥)","o(TヘTo)","(；´д｀)","(╯︵╰,)","(ㄒoㄒ)",
+    "(ノ_<。)","(Ｔ▽Ｔ)","(ಥ_ಥ)","(◞‸◟ㆀ)","o(╥﹏╥)o",
+    "˚‧º·(˚ ˃̣̣̥⌓˂̣̣̥ )‧º·˚","(つ╥﹏╥つ)","( p_q)","(ノAヽ)","(ノ﹏ヽ)"
+  ],
+  "😡 生气 / 愤怒": [
+    "(╬ Ò﹏Ó)","凸(｀0´)凸","ヽ(`Д´)ﾉ","(≖_≖ )","(눈‸눈)",
+    "(ಠ_ಠ)","(¬_¬)","(◣_◢)","(｀Д´)","(¬▂¬)",
+    "(҂‾ ▵ ‾)","(╬￣皿￣)","(ಠ ∩ ಠ)","(¬､¬)","(ノ｀Д´)ノ"
+  ],
+  "💥 翻桌系列": [
+    "(╯°□°)╯︵ ┻━┻","(╯‵□′)╯︵┻━┻","(ノಠ益ಠ)ノ彡┻━┻",
+    "┻━┻ ︵ヽ(`Д´)ﾉ︵ ┻━┻","(ノ^_^)ノ彡┻━┻","(╯°Д°)╯︵ ┻━┻",
+    "(ノTДT)ノ ┻━┻","(╯‿□‿)╯︵ ┻━┻","┬─┬ ノ( ゜-゜ノ)",
+    "┻━┻ ︵╰(｡╯▽╰｡)╯︵ ┻━┻"
+  ],
+  "🤷 摊手 / 无奈": [
+    "¯\\_(ツ)_/¯","╮(╯_╰)╭","┐(￣ー￣)┌","¯\\(°_o)/¯",
+    "╮(￣⊿￣)╭","╮(╯▽╰)╭","┐(￣ヮ￣)┌","(´･_･`)",
+    "Σ(°ロ°)","┐(￣ー￣)┌","╮(╯-╰)╭","(´・_・`)"
+  ],
+  "😳 害羞 / 脸红": [
+    "(//ω//)","(*/ω＼*)","(/ω＼)","(⁄ ⁄•⁄ω⁄•⁄ ⁄)","(*ﾉωﾉ)",
+    "(〃▽〃)","(>///<)","(///￣ ￣///)","(´///ω///`)","(/。\\)",
+    "(˶˃ ᵕ ˂˶)","( ﾟ▽ﾟ)/","(⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄)"
+  ],
+  "😲 惊讶 / 震惊": [
+    "Σ(っ °Д °;)っ","(⊙o⊙)","w(°o°)w","∑(O_O;)","(°ロ°)",
+    "(☉_☉)","⊙△⊙","(O_O)?","∑(O_O；)","(⊙_⊙)",
+    "(O_O;)","Σ(ﾟДﾟ;)","(°△°)","w(°o°)w"
+  ],
+  "😎 得意 / 酷": [
+    "(¬‿¬)","(⌐■_■)","(•̀ᴗ•́)و ̑̑","(✧ω✧)","ᕦᕤ",
+    "( ̄︶ ̄)","(^_-)","(⌐■_■)y-～","(￣ω￣)","( ︶︶)","( •̀ ω •́ )y"
+  ],
+  "💪 加油 / 奋斗": [
+    "(ง •̀_•́)ง","(•̀ᴗ•́)و ̑̑","ᕙ(⇀‸↼‶)ᕗ","٩( 'ω' )و",
+    "(ง •̀ω•́)ง✧","(p^-^)p","d(^^)b","(ง'̀-'́)ง","(•̀ᴗ•́)","(っ˘ω˘ς )"
+  ],
+  "🤗 抱抱 / 爱心": [
+    "(づ￣ 3￣)づ","(っ˘̩╭╮˘̩)っ","⊂(´･ω･｀)つ","(っ´ω`)っ",
+    "(つ≧▽≦)つ","(づ◡﹏◡)づ","d=(￣▽￣*)b","＼(^o^)／",
+    "ヾ(＾∇＾)","⊂(◉‿◉)つ","(づ￣ ³￣)づ","(っ⇀`(♥)´ↄツ)"
+  ],
+  "😴 睡觉 / 困": [
+    "( -_-)旦~","(︶.︶)","(∪.∪ )...zzz","(－ω－) zzZ",
+    "(ᴗ˳ᴗ)","(￣o￣) zZ","( _ _).。oO","(◡˛◡✿)","(ᴗ_ᴗ)","(￣o￣)..."
+  ],
+  "🍜 吃 / 喝": [
+    "( ˘▽˘)っ♨","(っ˘ڡ˘ς)","(・∀・)つ⑩","(￣﹃￣)",
+    "ᕕ( ᐛ )ᕗ","( ´ ▽ ` )","(・ε・)","( ˘ ³˘)♥",
+    "( ´ ▽ ` )ﾉ ♨","(￣▽￣)y-～","( ˘ω˘ )","(◍•ᴗ•◍)っ🍙"
+  ],
+  "👋 打招呼 / 再见": [
+    "( ´ ▽ ` )ﾉ","(*´∀`)~♥","ヾ(￣▽￣)","( ￣ー￣)ﾉ",
+    "(o´∀`)o","( ﾟ▽ﾟ)/","(*・ω・)ﾉ","( ´_ゝ`)ノ",
+    "(^_^)/~~","( ^-^)_旦","(・∀・)ﾉ","ヾ(･ω･`｡)"
+  ],
+  "🐶 动物": [
+    "(=^･ω･^=)","(=^･ｪ･^=)","ฅ^•ﻌ•^ฅ","ฅ(• ɪ •)ฅ",
+    "/(•^-^•)/","ヾ(=｀･ω･´=)ノ","∠( ᐛ 」∠)＿","(ↀᴥↀ)",
+    "(◉ω◉)","ʕ•ᴥ•ʔ","ʕᴥʔ","ミ๏ｖ๏彡",
+    "૮( ᵒ̌ ᴥ ᵒ̌ )ა","(◕(‘ 人 ‘) ◕)","(=^･ω･^)= ζ","(•́ ω •̀)ฅ"
+  ],
+  "👀 Lenny Face": [
+    "( ͡° ͜ʖ ͡°)","( ͡ᵔ ͜ʖ ͡ᵔ)","( ͡° ͜ ʖ ͡°)","( ͡⚆ ͜ʖ ͡⚆)",
+    "( ͡~ ͜ʖ ͡°)","ᕦ( ͡° ͜ʖ ͡°)ᕤ","(͠° ͟ʖ ͡°)","( ͡°ᴥ ͡°)",
+    "( ͡° ͜ʖ ͡°)つ━━☆)","( ͡o ͜ʖ ͡o)","( ͡° ͜ʖ ͡°)ﾉ","( ͡❛ ͜ʖ ͡❛)"
+  ],
+  "😱 颤抖 / 害怕": [
+    "((( ；ﾟДﾟ)))","(꒪⌓꒪)","(°◇°)","(∵)","(|||￣ー￣、)",
+    "(ll ﾛ ll)","(°Δ°)","(◊_◊)","(つ﹏⊂)","( ; ω ; )","(°̥̥̥̥̥̥̥̥ω°̥̥̥̥̥̥̥̥)"
+  ],
+  "🤔 思考 / 疑惑": [
+    "(・_・)","(￣ヘ￣)","(´・_・`)","(ーー;)","( ˘･з･)",
+    "( ˘•ω•˘ )","( ・_・)","(´∀；)","(･･;)","( ̄ω ̄;)","( ´ ∀ ` )"
+  ],
+  "😜 鬼脸 / 搞怪": [
+    "( ⇀_⇀ )","(≧﹏≦)","(；¬＿¬)","(´ω`)","( ﾟ∀ﾟ)・∵",
+    "( ´ ∩ `)","( ˘･з･)","(✧ω✧)","(￣ε(#￣)","(╬￣皿￣)q"
+  ],
+  "✨ 装饰 / 节日": [
+    "❅(´・ω・`)❅","✧*｡٩(ˊᗜˋ*)و✧*｡","ヽ(♥o♥)ﾉ","(˶‾᷄ ⁻̫ ‾᷅˵)",
+    "❀◕ ‿ ◕❀","✿.｡.:* ☆ **:**.:*.｡.✿","✧◝(⁰▿⁰)◜✧","(❁´◡`❁)",
+    "｡ﾟ(ﾟ´ω`ﾟ)ﾟ｡","✧(≖ ◡ ≖✿)","ヽ(´▽`)/","(✿╹◡╹)ノ"
+  ]
+};
+
+/* ============ 渲染 ============ */
+const main = document.getElementById('main');
+const catsNav = document.getElementById('catsNav');
+let totalCount = 0;
+
+function slug(s){ return s.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,''); }
+
+function render(){
+  let catCount = 0;
+  Object.entries(DATA).forEach(([title, list]) => {
+    catCount++;
+    totalCount += list.length;
+    const id = 'cat-' + catCount;
+
+    // 导航链接
+    const link = document.createElement('a');
+    link.className = 'cat-link';
+    link.textContent = title;
+    link.href = '#' + id;
+    catsNav.appendChild(link);
+
+    // 分类区块
+    const sec = document.createElement('section');
+    sec.className = 'group';
+    sec.id = id;
+    sec.dataset.title = title;
+
+    const cards = list.map(k => {
+      return `<div class="kao-card"><span class="kao"></span></div>`;
+    }).join('');
+
+    sec.innerHTML = `
+      <h2><span class="ic">❀</span> ${title}
+        <span class="cnt">${list.length} 个</span></h2>
+      <div class="grid">${cards}</div>
+    `;
+    main.appendChild(sec);
+
+    // 用 textContent 填入颜文字，避免转义/注入问题
+    const cells = sec.querySelectorAll('.kao');
+    list.forEach((k, i) => { cells[i].textContent = k; });
+  });
+
+  document.getElementById('cntKao').textContent = totalCount;
+  document.getElementById('cntCat').textContent = catCount;
+}
+
+render();
+
+/* ============ 搜索过滤 ============ */
+const search = document.getElementById('search');
+search.addEventListener('input', () => {
+  const q = search.value.trim().toLowerCase();
+  document.querySelectorAll('.group').forEach(sec => {
+    const title = sec.dataset.title.toLowerCase();
+    const show = !q || title.includes(q);
+    sec.classList.toggle('hidden', !show);
+  });
+  // 导航链接同步
+  document.querySelectorAll('.cat-link').forEach(link => {
+    const t = link.textContent.toLowerCase();
+    link.classList.toggle('hidden', q && !t.includes(q));
+  });
+});
+
+/* ============ 点击复制 ============ */
+const toast = document.getElementById('toast');
+let toastTimer;
+function showToast(text){
+  toast.innerHTML = '已复制 <span class="mono"></span>';
+  toast.querySelector('.mono').textContent = text;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1400);
+}
+
+main.addEventListener('click', e => {
+  const card = e.target.closest('.kao-card');
+  if (!card) return;
+  const text = card.querySelector('.kao').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    card.classList.add('copied');
+    setTimeout(() => card.classList.remove('copied'), 700);
+    showToast(text);
+  }).catch(() => {
+    // 降级方案
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast(text); } catch(_){}
+    document.body.removeChild(ta);
+  });
+});
+
+/* ============ 随机一个颜文字 ============ */
+document.getElementById('randBtn').addEventListener('click', () => {
+  const all = [];
+  Object.values(DATA).forEach(arr => all.push(...arr));
+  const k = all[Math.floor(Math.random() * all.length)];
+  navigator.clipboard.writeText(k).then(() => showToast(k)).catch(() => showToast(k));
+});
+
+/* ============ 导航点击平滑滚动 ============ */
+catsNav.addEventListener('click', e => {
+  const link = e.target.closest('.cat-link');
+  if (!link) return;
+  e.preventDefault();
+  const target = document.querySelector(link.getAttribute('href'));
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+</script>
+</body>
+</html>

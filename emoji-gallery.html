@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unicode Emoji 图鉴 · 常用 / 非常用</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --common-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --rare-grad:   linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --text: #2d2d44;
+    --muted: #8a8aa3;
+    --shadow: 0 6px 24px rgba(40, 40, 90, .08);
+  }
+
+  body {
+    font-family: -apple-system, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ---------- 顶部 ---------- */
+  header {
+    background: linear-gradient(135deg, #667eea 0%, #f5576c 60%, #f093fb 100%);
+    color: #fff;
+    padding: 48px 20px 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  header h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; }
+  header p  { margin-top: 10px; opacity: .92; font-size: 1rem; }
+
+  .stats {
+    margin: 24px auto 0;
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: rgba(255,255,255,.18);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.3);
+    padding: 10px 22px;
+    border-radius: 14px;
+    font-weight: 600;
+  }
+  .stat span { font-size: 1.3rem; font-weight: 800; }
+  .stat small { display:block; font-size: .72rem; opacity:.85; font-weight: 500; }
+
+  /* ---------- 工具栏 ---------- */
+  .toolbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #ececf2;
+    padding: 12px 20px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center; align-items: center;
+  }
+  .toolbar input[type=text] {
+    flex: 1; min-width: 220px; max-width: 420px;
+    padding: 10px 16px; border: 2px solid #e3e3ee;
+    border-radius: 12px; font-size: 1rem; outline: none;
+    transition: border-color .2s;
+  }
+  .toolbar input:focus { border-color: #764ba2; }
+  .btn {
+    padding: 10px 18px; border: none; border-radius: 12px;
+    font-size: .92rem; font-weight: 600; cursor: pointer;
+    background: #eeeaf4; color: #555; transition: all .2s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .btn.active-common { background: var(--common-grad); color: #fff; }
+  .btn.active-rare   { background: var(--rare-grad);   color: #fff; }
+
+  /* ---------- 区块 ---------- */
+  .group {
+    max-width: 1300px; margin: 36px auto; padding: 0 20px;
+  }
+  .group-title {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 22px;
+  }
+  .badge {
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; color: #fff;
+  }
+  .badge.common { background: var(--common-grad); }
+  .badge.rare   { background: var(--rare-grad); }
+  .group-title h2 { font-size: 1.5rem; }
+  .group-title small { color: var(--muted); font-size: .85rem; }
+
+  .cat {
+    margin-bottom: 30px;
+  }
+  .cat h3 {
+    font-size: 1.05rem; margin-bottom: 12px;
+    padding-left: 12px; border-left: 4px solid #c9c9d8;
+    color: #555;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+    gap: 6px;
+  }
+  .emoji {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.7rem; cursor: pointer; border-radius: 10px;
+    background: var(--card); transition: all .15s;
+    user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .emoji:hover {
+    transform: translateY(-3px) scale(1.15);
+    background: #f0eefb; z-index: 5;
+    box-shadow: var(--shadow);
+  }
+  .emoji.copied { background: #d4f7d4; transform: scale(1.1); }
+
+  footer {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    font-size: .85rem;
+  }
+
+  /* 提示气泡 */
+  #toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #333; color: #fff; padding: 12px 24px; border-radius: 30px;
+    font-size: .9rem; opacity: 0; transition: all .3s; z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.7rem; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); }
+    .emoji { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>😀 Unicode Emoji 图鉴</h1>
+  <p>完整展示 Unicode 表情符号，分为「常用」与「非常用」两组 · 点击任意表情即可复制</p>
+  <div class="stats">
+    <div class="stat"><span id="cntCommon">0</span><small>常用表情</small></div>
+    <div class="stat"><span id="cntRare">0</span><small>非常用表情</small></div>
+    <div class="stat"><span id="cntTotal">0</span><small>表情总数</small></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="🔍 搜索分类，如：笑脸 / 动物 / 心 / 旗帜…">
+  <button class="btn active-common" data-filter="all">全部</button>
+  <button class="btn" data-filter="common">只看常用</button>
+  <button class="btn" data-filter="rare">只看非常用</button>
+</div>
+
+<main id="main"></main>
+
+<footer>
+  数据基于 Unicode Emoji 标准 · 本页为离线静态展示 · 点击表情复制到剪贴板
+</footer>
+
+<div id="toast">已复制 ✓</div>
+
+<script>
+/* ============ 数据：常用表情（按分类） ============ */
+const COMMON = {
+  "😀 笑脸与情感": "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 ☺️ 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 😒 😣 😞 😟 😢 😭 😤 😠 😡 🤬 🥺 😨 😰 😱 😖 😞 😓 😩 😫 🥱 😵 😲 😳 🤔 🫡 😴 💤 😬 🙄 😏 😬 🤥 😌 😔 😋".split(/\s+/).filter(Boolean),
+  "❤️ 心形与情感符号": "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ♥️ 💋 💌 😘 😍 🥰 💑 👩‍❤️‍👨 💏 💆 💇 🧖 🧖‍♀️ 🧖‍♂️ 🫂 🤝 🤗".split(/\s+/).filter(Boolean),
+  "👋 手势与肢体": "👋 🤚 🖐 ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🙏 ✍️ 💅 🤝 💪 🦾 🦿 🦵 🦶 👂 👃 🧠 🦷 🦴 👀 👁 👅 👄".split(/\s+/).filter(Boolean),
+  "🐶 动物与自然": "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🐣 🐥 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🦟 🦗 🕷 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🦧 🐘 🦛 🦏 🐪 🐫 🦒 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🦮 🐈 🐓 🦃 🦚 🦜 🦢 🐇 🦝 🦦 🦥 🐁 🐀 🐿 🦔 🌵 🎄 🌲 🌳 🌴 🌱 🌿 ☘️ 🍀 🍁 🍂 🍃 🌺 🌻 🌹 🌷 🌸 🏵 🌼 🌞 🌝 🌛 🌜 🌚 🌕 🌖 🌗 🌘 🌑 🌒 🌓 🌔 ⭐ 🌟 ✨ ⚡ ☄️ 🔥 🌪 🌈 ☀️ 🌤 ⛅ 🌧 ⛈ ❄️ ☃️ ⛄ 💧 🌊".split(/\s+/).filter(Boolean),
+  "🍔 美食与饮品": "🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌶 🌽 🥕 🧄 🧅 🥔 🍠 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🦴 🌭 🍔 🍟 🍕 🥪 🥙 🧆 🌮 🌯 🫔 🥗 🥘 🫕 🥫 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🦪 🍤 🍙 🍚 🍘 🍥 🥠 🥮 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍩 🍪 🌰 🥜 🍯 🥛 🍼 ☕ 🫖 🍵 🧃 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊 🥄 🍴 🍽 🥣 🥡 🥢".split(/\s+/).filter(Boolean),
+  "🚗 旅行与地点": "🚗 🚕 🚙 🚌 🚎 🏎 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍 🚲 🛴 🚨 🚔 🚍 🚘 🚖 🚡 🚠 🚟 🚃 🚋 🚞 🚝 🚄 🚅 🚈 🚂 🚆 🚇 🚊 🚉 ✈️ 🛫 🛬 🛩 💺 🛰 🚀 🛸 🚁 🛶 ⛵ 🚤 🛥 🛳 ⛴ 🚢 ⚓ ⛽ 🚧 🚦 🚥 🚏 🗺 🗿 🗽 🗼 🏰 🏯 🏟 🎡 🎢 🎠 ⛲ ⛱ 🏖 🏝 🏜 🌋 ⛰ 🏔 🗻 🏕 ⛺ 🛖 🏠 🏡 🏘 🏚 🏗 🏭 🏢 🏬 🏣 🏤 🏥 🏦 🏨 🏪 🏫 🏩 💒 🏛 ⛪ 🕌 🕍 🛕 🕋 ☦️ 🛗 🗿 🌉 🏞 🌅 🌄 🌠 🎇 🎆 🌇 🌆 🏙 🌃 🌌 🌉 🌁 ⌚ 📱 📲 💻 ⌨️ 🖥 🖨 🖱 🖲 🕹 🗜 💽 💾 💿 📀 📷 📸 📹 🎥 📽 🎞 📞 ☎️ 📟 📠 📺 📻 🎙 🎚 🎛 🧭 ⏱ ⏲ ⏰ 🕰 ⌛ ⏳ 📡 🔋 🔌 💡 🔦 🕯 🪔 🧯 🛢 💸 💵 💴 💶 💷 💰 💳 💎 ⚖️ 🔧 🔨 ⚒ 🛠 ⛏ 🔩 ⚙️ 🔗 ⛓ 🧰 🧲".split(/\s+/).filter(Boolean),
+  "⚽ 活动与运动": "⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🪀 🏓 🏸 🏒 🏑 🥍 🏏 🪃 🥅 ⛳ 🪁 🎣 🤿 🎽 🥌 🛷 🎿 ⛷ 🏂 🪂 🏋️ 🤼 🤸 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖 🏵 🎗 🎫 🎟 🎪 🤹 🎭 🩰 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🪕 🎻 🎲 ♟ 🎯 🎳 🎮 🎰 🧩 🎇 🎆 🎑 🎏 🎐 🎎 🎋 🎀 🎁 🎗".split(/\s+/).filter(Boolean),
+  "💡 物品与符号": "💡 🔦 🕯 📱 💻 ⌨️ 🖥 🖨 📷 📸 🕐 🕑 🕒 🕓 🕔 🕕 🕖 🕗 🕘 🕙 🕚 🕛 🕜 🕞 🕟 🕠 🕡 🕢 🕣 🕤 🕥 🕦 🕧 ⌚ ⏰ ⏳ ⌛ 🔔 🔕 🎵 🎶 🎼 🎤 🎧 📻 🎹 🥁 🎸 🎺 🎷 🎻 🎮 🕹 🎲 🎯 🎳 🧩 🎁 🎀 🎈 🎉 🎊 🎏 🎐 🎎 🎋 🎇 🎆 🎑 🔥 ✨ 💫 ⭐ 🌟 💥 💢 💧 💦 🌟 ☀️ 🌤 ⛅ 🌧 ⛈ ❄️ ⛄ 💯 🔥 🔥 ⚡ 🌈 ☘️ 🍀 ♻️ ❇️ ✅ ❌ ❎ ✔️ ✖️ ➕ ➖ ➗ ➰ ➿ 〽️ ✳️ ✴️ ❇️ ‼️ ⁉️ ⁉ ❓ ❔ ❕ ❗ 〰️ ©️ ®️ ™️ #️⃣ *️⃣ 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔠 🔡 🔢 🔣 🔤 🅰 🅱 🆎 🆑 🅾 🆘 🆔 🅿️ 🆚 🆕 🆓 🔼 🔽 ➡️ ⬅️ ⬆️ ⬇️ ◀️ ▶️ 🔼 🔽 🔁 🔂 🔄 🔃 🎵 🎶 🔅 🔆 📶 📳 📴 ♻️".split(/\s+/).filter(Boolean)
+};
+
+/* ============ 数据：非常用表情（按分类） ============ */
+const RARE = {
+  "🧑‍🎤 复合职业人物 (ZWJ 序列)": "🧑‍🌾 🧑‍🍳 🧑‍🔧 🧑‍🏭 🧑‍💻 🧑‍💼 🧑‍🔬 🧑‍🎨 🧑‍🚒 🧑‍✈️ 🧑‍🚀 🧑‍⚖️ 👩‍🌾 👨‍🌾 👩‍🍳 👨‍🍳 👩‍🔧 👨‍🔧 👩‍🏭 👨‍🏭 👩‍💻 👨‍💻 👩‍💼 👨‍💼 👩‍🔬 👨‍🔬 👩‍🎨 👨‍🎨 👩‍🚒 👨‍🚒 👩‍✈️ 👨‍✈️ 👩‍🚀 👨‍🚀 👩‍⚖️ 👨‍⚖️ 👰‍♀️ 👰‍♂️ 🤵‍♀️ 🤵‍♂️ 👸 🤴 🥷 🦸 🦸‍♀️ 🦸‍♂️ 🦹 🦹‍♀️ 🦹‍♂️ 🧙 🧙‍♀️ 🧙‍♂️ 🧚 🧚‍♀️ 🧚‍♂️ 🧛 🧛‍♀️ 🧛‍♂️ 🧜 🧜‍♀️ 🧜‍♂️ 🧝 🧝‍♀️ 🧝‍♂️ 🧞 🧞‍♀️ 🧞‍♂️ 🧟 🧟‍♀️ 🧟‍♂️".split(/\s+/).filter(Boolean),
+  "💑 家庭与伴侣组合": "💑 👩‍❤️‍👨 👨‍❤️‍👨 👩‍❤️‍👩 👩‍❤️‍💋‍👨 👨‍❤️‍💋‍👨 👩‍❤️‍💋‍👩 👪 👨‍👩‍👦 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧 👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👦 👩‍👧 👩‍👧‍👦 👩‍👦‍👦 👩‍👧‍👧 👨‍👦 👨‍👧 👨‍👧‍👦 👨‍👦‍👦 👨‍👧‍👧 🤱 👩‍🍼 👨‍🍼 🧑‍🍼".split(/\s+/).filter(Boolean),
+  "🧑‍🦽 残障辅助与身体细节": "🧑‍🦯 👨‍🦯 👩‍🦯 🧑‍🦼 👨‍🦼 👩‍🦼 🧑‍🦽 👨‍🦽 👩‍🦽 🦮 🦯 🦽 🦼 🛺 🧏 🧏‍♀️ 🧏‍♂️ 🧎 🧎‍♀️ 🧎‍♂️ 🧑‍🦰 👨‍🦰 👩‍🦰 🧑‍🦱 👨‍🦱 👩‍🦱 🧑‍🦳 👨‍🦳 👩‍🦳 🧑‍🦲 👨‍🦲 👩‍🦲".split(/\s+/).filter(Boolean),
+  "🪐 深空与小众自然": "🪐 🌌 🌠 ☄️ 🛰 🛸 🦖 🦕 🪶 🐚 🪸 🪨 🪵 🌱 🌿 🍀 🍁 🍂 🍃 🪴 🌵 🎄 🌲 🌳 🌴 🎍 🪴 🌾 💐 🌷 🌹 🥀 🌺 🌸 🌼 🌻 🌞 🌝 🌛 🌜 🌚 🌕 🌖 🌗 🌘 🌑 🌒 🌓 🌔".split(/\s+/).filter(Boolean),
+  "🦠 微生物与小众动物": "🦠 🦠 🦠 🦗 🪲 🪳 🪰 🪱 🦠 🐌 🦟 🦗 🕷 🕸 🦂 🦟 🪲 🪳 🪰 🪱 🐾 🐉 🐲 🦕 🦖 🦠 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🦧 🦣 🐘 🦛 🦏 🐪 🐫 🦒 🦘 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🦮 🐕‍🦺 🐈 🐈‍⬛ 🐓 🦃 🦚 🦜 🦢 🦩 🕊 🐇 🦝 🦨 🦡 🦦 🦥 🐁 🐀 🐿 🦔 🐾 🟢 🟡 🟠 🔴 🟣 🟤 ⚫ ⚪ 🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛ ⬜ ◼️ ◻️ ▪️ ▫️".split(/\s+/).filter(Boolean),
+  "🧆 小众食物与新食物": "🧆 🫔 🫕 🫓 🫖 🫗 🧋 🧃 🫙 🧄 🧅 🥭 🫐 🫒 🫑 🥥 🫓 🧆 🫔 🫕 🧇 🥓 🫓 🧈 🧂 🫙".split(/\s+/).filter(Boolean),
+  "🆔 字母与数字符号": "🆔 🅰 🅱 🆎 🅾 🆑 🅿️ 🆘 🆚 🆕 🆓 🆒 🆙 🏧 ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ ⛎ 🔀 🔁 🔂 ▶️ ◀️ 🔼 🔽 ⏫ ⏬ ⏪ ⏩ ⏭ ⏮ ⏯ ◀️ 🔼 🔽 🔃 🔄 🔁 🔂 🎵 🎶 🔅 🔆 📶 📳 📴 ♻️ 🔅 🔆 📳 📴 🔀 🔁 🔂 ▶️ ◀️ 🔼 🔽 🔃 🔄 🔄 🔁 🔂 🆔 🅰 🅱 🆎 🅾 🆑 🅿️ 🆘 🆚 🆕 🆓 🆒 🆙 🏧 ™️ ©️ ®️".split(/\s+/).filter(Boolean),
+  "♈ 星座与占星": "♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ ⛎ 🌟 🔯 🕉 ☸️ ✡️ ☪️ ☯️ ☦️ 🕎 ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓".split(/\s+/).filter(Boolean),
+  "♿ 无障碍与公益符号": "♿ 🦮 🦯 🦽 🦼 🛺 ♿ ♿ ♿ 🦮 🦯 🦽 🦼 🛺 ♻️ ⚠️ 🚸 ⛔ 🚫 🚭 🚯 🚱 🚷 📵 📵 🔞 📵 🏳️ 🏴 🚩 🏁 🚲 🛴 🛹 🛼".split(/\s+/).filter(Boolean),
+  "🏳️ 彩虹旗与多元标志": "🏳️ 🏴 🏁 🚩 🏴‍☠️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️ 🏴‍☠️ 🏳️‍🌈 🏳️‍⚧️ 🏴 🏁 🚩".split(/\s+/).filter(Boolean),
+  "🚩 区域旗帜 (国家/地区)": "🇨🇳 🇭🇰 🇲🇴 🇹🇼 🇯🇵 🇰🇷 🇰🇵 🇺🇸 🇬🇧 🇫🇷 🇩🇪 🇮🇹 🇪🇸 🇵🇹 🇷🇺 🇮🇳 🇧🇷 🇨🇦 🇦🇺 🇳🇿 🇲🇽 🇦🇷 🇿🇦 🇪🇬 🇸🇦 🇦🇪 🇹🇷 🇬🇷 🇳🇱 🇧🇪 🇨🇭 🇸🇪 🇳🇴 🇫🇮 🇩🇰 🇮🇪 🇵🇱 🇨🇿 🇭🇺 🇷🇴 🇧🇬 🇭🇷 🇷🇸 🇸🇰 🇸🇮 🇺🇦 🇧🇾 🇱🇹 🇱🇻 🇪🇪 🇮🇸 🇮🇱 🇹🇭 🇻🇳 🇲🇾 🇸🇬 🇮🇩 🇵🇭 🇨🇱 🇨🇴 🇵🇪 🇻🇪 🇨🇺 🇯🇲 🇵🇦 🇨🇷 🇬🇹 🇸🇻 🇭🇳 🇳🇮 🇧🇴 🇵🇾 🇪🇨 🇺🇾 🇲🇦 🇩🇿 🇹🇳 🇱🇾 🇳🇬 🇬🇭 🇨🇮 🇰🇪 🇪🇹 🇹🇿 🇨🇲 🇸🇳 🇿🇼 🇶🇦 🇰🇼 🇧🇭 🇯🇴 🇱🇧 🇮🇶 🇮🇷 🇦🇫 🇵🇰 🇧🇩 🇱🇰 🇲🇲 🇰🇭 🇱🇦 🇲🇳 🇰🇿 🇺🇿 🇹🇲 🇦🇲 🇦🇿 🇬🇪".split(/\s+/).filter(Boolean),
+  "🔲 几何与图形符号": "🔴 🟠 🟡 🟢 🔵 🟣 🟤 ⚫ ⚪ 🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛ ⬜ ◼️ ◻️ ▪️ ▫️ 🔶 🔷 🔸 🔹 🔺 🔻 💠 🔘 🔲 🔳 🏁 🚩 🎌 🏴 🏳️ ⬛ ⬜ ◼️ ◻️ ▪️ ▫️ ◾ ◽ ■ □ ▪ ▫ ● ○ ◉ ◎ ⊙ ❍ ◯ ⭕ ✅ ❌ ❎ ✔️ ✖️ ✖ 🗹 ❎ ❌ ✖ 〽️".split(/\s+/).filter(Boolean),
+  "⌚ 钟表全部时刻": "🕐 🕑 🕒 🕓 🕔 🕕 🕖 🕗 🕘 🕙 🕚 🕛 🕜 🕝 🕞 🕟 🕠 🕡 🕢 🕣 🕤 🕥 🕦 🕧 ⌚ ⏰ ⏱ ⏲ ⌛ ⏳ 🕰️".split(/\s+/).filter(Boolean),
+  "🕝 新增 / 较少使用的物品": "🪡 🪢 🪣 🪥 🪒 🧴 🧷 🧹 🧺 🧻 🧼 🧽 🧯 🛗 🪞 🪟 🛏 🛋 🪑 🚪 🛎 🧸 🪆 🖼 🪆 🧭 🧱 🪨 🪵 🛖 🏚 🏚 🏚 🏚 🏚 🪵 🪨 🧱 🛖 🛗 🪟 🪞 🪟 🪟 🛎 🚪 🪑 🛋 🛏 🧸 🪆 🖼".split(/\s+/).filter(Boolean),
+  "🆎 杂项罕用符号": "🏧 🚮 🚰 ♿ 🚹 🚺 🚻 🚼 🚾 🛂 🛃 🛄 🛅 ⚠️ 🚸 ⛔ 🚫 🚭 🚯 🚱 🚷 📵 🔞 📵 🏧 ♻️ ❇️ ✳️ ✴️ 💠 ❇️ ✳️ ✴️ ⚜️ 🔯 ❇️ ✳️ ✴️ ♻️ 🔱 🏮 🎌 🏮 🎌 🏮 🎌 🎴 🀄 🎴 🀄 🎏 🎐 🎑 🎀 🎁 🎈 🎉 🎊 🎋 🎌 🎍 🎎 🎏 🎐 🎑 🎒 🎓 🎓 🎓 🎓 🎓".split(/\s+/).filter(Boolean)
+};
+
+/* ============ 渲染逻辑 ============ */
+const main = document.getElementById('main');
+let currentFilter = 'all';
+
+function dedupe(arr){
+  return [...new Set(arr)];
+}
+
+function renderGroup(groupName, data, badgeClass){
+  const group = document.createElement('section');
+  group.className = 'group';
+  group.dataset.type = badgeClass;
+
+  const label = groupName === 'common' ? '常用表情' : '非常用表情';
+  const icon  = groupName === 'common' ? '🔥' : '🌌';
+  const desc  = groupName === 'common'
+      ? '日常聊天、社交、网络中最常出现的表情'
+      : '区域旗帜、复合人物序列、占星、几何、小众物件等使用频率较低的符号';
+
+  let total = 0;
+  const catsHTML = Object.entries(data).map(([title, emojis]) => {
+    const list = dedupe(emojis);
+    total += list.length;
+    const cells = list.map(e => `<span class="emoji" data-e="${e}">${e}</span>`).join('');
+    return `<div class="cat"><h3>${title}</h3><div class="grid">${cells}</div></div>`;
+  }).join('');
+
+  group.innerHTML = `
+    <div class="group-title">
+      <div class="badge ${badgeClass}">${icon}</div>
+      <div><h2>${label}</h2><small>${desc}</small></div>
+    </div>
+    ${catsHTML}
+  `;
+  main.appendChild(group);
+  return total;
+}
+
+function render(){
+  main.innerHTML = '';
+  let cTotal = 0, rTotal = 0;
+  if (currentFilter === 'all' || currentFilter === 'common') cTotal = renderGroup('common', COMMON, 'common');
+  if (currentFilter === 'all' || currentFilter === 'rare')   rTotal = renderGroup('rare',   RARE,   'rare');
+  document.getElementById('cntCommon').textContent = cTotal;
+  document.getElementById('cntRare').textContent   = rTotal;
+  document.getElementById('cntTotal').textContent  = cTotal + rTotal;
+  applySearch();
+}
+
+/* ============ 交互：过滤 / 搜索 / 复制 ============ */
+document.querySelectorAll('.btn[data-filter]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.btn[data-filter]').forEach(x => {
+      x.classList.remove('active-common','active-rare');
+    });
+    const f = b.dataset.filter;
+    b.classList.add(f === 'rare' ? 'active-rare' : 'active-common');
+    currentFilter = f;
+    render();
+  });
+});
+
+const searchInput = document.getElementById('search');
+function applySearch(){
+  const q = searchInput.value.trim().toLowerCase();
+  document.querySelectorAll('.cat').forEach(cat => {
+    const title = cat.querySelector('h3').textContent.toLowerCase();
+    const matchedTitle = !q || title.includes(q);
+    let visibleCells = 0;
+    cat.querySelectorAll('.emoji').forEach(cell => {
+      const show = !q || matchedTitle;
+      cell.style.display = show ? '' : 'none';
+      if (show) visibleCells++;
+    });
+    cat.style.display = visibleCells > 0 ? '' : 'none';
+  });
+}
+searchInput.addEventListener('input', applySearch);
+
+/* 点击复制 */
+const toast = document.getElementById('toast');
+main.addEventListener('click', e => {
+  const cell = e.target.closest('.emoji');
+  if (!cell) return;
+  const text = cell.dataset.e;
+  navigator.clipboard.writeText(text).then(() => {
+    cell.classList.add('copied');
+    toast.textContent = `已复制 ${text}`;
+    toast.classList.add('show');
+    setTimeout(() => cell.classList.remove('copied'), 600);
+    setTimeout(() => toast.classList.remove('show'), 1200);
+  }).catch(() => {
+    toast.textContent = '复制失败，请手动选择';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1200);
+  });
+});
+
+render();
+</script>
+</body>
+</html>

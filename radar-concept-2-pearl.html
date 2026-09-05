@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>搜索雷达背景方案二 - 珍珠母贝光场</title>
+  <link rel="stylesheet" href="./radar-concept-shared.css">
+</head>
+<body data-theme="pearl">
+  <main class="preview-page">
+    <header class="preview-head">
+      <div class="preview-title">
+        <span class="preview-mark" aria-hidden="true"></span>
+        <div>
+          <h1>方案二 · 珍珠母贝光场</h1>
+          <p>白色仍是主体，用低饱和干涉色承接不同情绪</p>
+        </div>
+      </div>
+      <div class="preview-actions" aria-label="切换球体状态">
+        <button class="state-button" data-state="alert" aria-pressed="true">警戒</button>
+        <button class="state-button" data-state="angry" aria-pressed="false">愤怒</button>
+        <button class="state-button" data-state="excited" aria-pressed="false">兴奋</button>
+      </div>
+    </header>
+    <section class="preview-stage">
+      <canvas id="radar-canvas"></canvas>
+      <div class="energy-core-layer" id="energy-core" aria-hidden="true"></div>
+      <div class="stage-meta"><i></i><span>警戒扫描中</span></div>
+      <div class="scheme-note">
+        <strong>PEARL FIELD</strong>
+        <span>极淡青、粉、紫随视线缓慢漂移，节点和球体像浮在珠光涂层之上。</span>
+      </div>
+      <div class="stage-counter"><b>0</b><span>/ 20 个玩家节点</span></div>
+    </section>
+  </main>
+  <script src="./radar-concept-shared.js"></script>
+  <script src="./radar-concept-energy-core.js"></script>
+</body>
+</html>

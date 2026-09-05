@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   AppSettings,
-  AssistOverlayName,
   AssistClaimRewardRequest,
   AssistDisenchantRequest,
   AssistRecommendationRequest,
@@ -29,6 +28,13 @@ const lolHelper: LolHelper = {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
     getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
     getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
+    getFriendRequests: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIEND_REQUESTS),
+    addFriend: (riotId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_ADD_FRIEND, riotId),
+    acceptFriendRequest: (puuid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_ACCEPT_FRIEND_REQUEST, puuid),
+    deleteFriendRequest: (puuid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_DELETE_FRIEND_REQUEST, puuid),
     getChatConversations: (accountKey?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CHAT_CONVERSATIONS, accountKey),
     sendChatMessage: (conversationId: string, body: string) =>
@@ -82,6 +88,14 @@ const lolHelper: LolHelper = {
   ranking: {
     getChampions: (request: ChampionRankingRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_CHAMPIONS, request),
+    getMayhemTierList: (refresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_TIER_LIST, refresh),
+    getMayhemBuild: (slug: string, refresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_BUILD, slug, refresh),
+    getMayhemAugmentRanking: (refresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_AUGMENTS, refresh),
+    getMayhemCombos: (refresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_COMBOS, refresh),
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
@@ -105,7 +119,6 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.DB_UPDATE_SETTINGS, patch),
   },
   assist: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_STATUS),
     getRecommendation: (request?: AssistRecommendationRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_RECOMMENDATION, request),
     applyRecommendation: (request?: AssistRecommendationRequest) =>
@@ -131,10 +144,6 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_CLAIM_REWARD, request),
     claimRewards: (requests: AssistClaimRewardRequest[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_CLAIM_REWARDS, requests),
-    toggleOverlay: (name: AssistOverlayName) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_TOGGLE_OVERLAY, name),
-    setOverlayPinned: (name: AssistOverlayName, pinned: boolean) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_SET_OVERLAY_PINNED, name, pinned),
     getLiveData: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_LIVE_DATA),
     exportBlacklist: () => ipcRenderer.invoke(IPC_CHANNELS.ASSIST_EXPORT_BLACKLIST),
   },
