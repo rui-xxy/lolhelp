@@ -1,6 +1,7 @@
 import { getSettings } from '../settings/store';
 import { LcuClient } from '../lcu/client';
 import { getCachedCredentials } from '../lcu/lockfile';
+import { getCurrentGameflowPhase, subscribeGameflowActivity } from '../live/liveWatcher';
 import {
   findLocalAction,
   firstAvailableChampion,
@@ -50,12 +51,15 @@ interface EndOfGameStats {
   }>;
 }
 
-const POLL_INTERVAL_MS = 1000;
+const FALLBACK_POLL_INTERVAL_MS = 10_000;
 const HONOR_CATEGORIES = ['COOL', 'SHOTCALLER', 'HEART'] as const;
 
 let pollTimer: NodeJS.Timeout | null = null;
 let acceptTimer: NodeJS.Timeout | null = null;
 let polling = false;
+let pendingPoll = false;
+let pendingPhase: string | undefined;
+let unsubscribeGameflowActivity: (() => void) | null = null;
 let previousPhase = '';
 let lastChampSelectGameId = 0;
 const completedActionIds = new Set<number>();
@@ -308,8 +312,12 @@ async function handleEndOfGame(client: LcuClient): Promise<void> {
   }
 }
 
-async function pollAssist(): Promise<void> {
-  if (polling) return;
+async function pollAssist(knownPhase?: string): Promise<void> {
+  if (polling) {
+    pendingPoll = true;
+    pendingPhase = knownPhase ?? pendingPhase;
+    return;
+  }
   polling = true;
   try {
     const settings = getSettings().assist;
@@ -321,7 +329,7 @@ async function pollAssist(): Promise<void> {
     }
 
     const client = new LcuClient(creds);
-    const phase = await client.get<string>('/lol-gameflow/v1/gameflow-phase');
+    const phase = knownPhase ?? await client.get<string>('/lol-gameflow/v1/gameflow-phase');
     const gameflow = await getQueueId(client);
     updateAssistRuntimeStatus({
       connected: true,
@@ -365,19 +373,30 @@ async function pollAssist(): Promise<void> {
     reportAssistError(error);
   } finally {
     polling = false;
+    if (pendingPoll) {
+      const nextPhase = pendingPhase;
+      pendingPoll = false;
+      pendingPhase = undefined;
+      queueMicrotask(() => void pollAssist(nextPhase));
+    }
   }
 }
 
 export function startAssistEngine(): void {
   if (pollTimer) return;
+  unsubscribeGameflowActivity = subscribeGameflowActivity((phase) => {
+    void pollAssist(phase);
+  });
   pollTimer = setInterval(() => {
-    void pollAssist();
-  }, POLL_INTERVAL_MS);
-  void pollAssist();
+    void pollAssist(getCurrentGameflowPhase());
+  }, FALLBACK_POLL_INTERVAL_MS);
+  void pollAssist(getCurrentGameflowPhase());
 }
 
 export function stopAssistEngine(): void {
   clearAcceptTimer();
+  unsubscribeGameflowActivity?.();
+  unsubscribeGameflowActivity = null;
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
 }

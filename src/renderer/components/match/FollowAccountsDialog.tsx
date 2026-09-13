@@ -2,19 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, ChevronDown, Search } from 'lucide-react';
 import type {
   ChampionSummary,
-  PlayerMatchDetail,
-  SavedMatchAccount,
-  SavedMatchFollowAlert,
+  SavedMatchPreview,
 } from '../../../shared/api';
 import { LOL_REGIONS } from '../../../shared/constants';
 import { GameIcon } from './GameIcon';
 import { ProfileIcon } from '../ProfileIcon';
 import { LargeDialog } from '../ui/large-dialog';
 import {
-  loadSavedMatchesState,
+  loadSavedMatchesCatalog,
   saveMatchesForProfile,
   SAVED_MATCHES_CHANGED_EVENT,
   setSavedMatchAccountFollow,
+  type SavedMatchAccountCatalogEntry,
+  type SavedMatchFollowAlertPreview,
 } from './savedMatchesStore';
 
 export interface FollowAccountRequest {
@@ -61,12 +61,12 @@ function formatRecentAge(timestamp: number | undefined): string {
   return `${Math.floor(minutes / 60)}小时前`;
 }
 
-function getChampionName(match: PlayerMatchDetail, championMap: Map<number, ChampionSummary>): string {
+function getChampionName(match: SavedMatchPreview, championMap: Map<number, ChampionSummary>): string {
   const champion = championMap.get(match.championId);
   return champion?.title || champion?.name || match.championName || '未知英雄';
 }
 
-function latestMatch(account: SavedMatchAccount): PlayerMatchDetail | null {
+function latestMatch(account: SavedMatchAccountCatalogEntry): SavedMatchPreview | null {
   return account.matches[0] ?? null;
 }
 
@@ -77,8 +77,8 @@ export function FollowAccountsDialog({
   currentRegionName,
   request,
 }: FollowAccountsDialogProps) {
-  const [accounts, setAccounts] = useState<SavedMatchAccount[]>([]);
-  const [alerts, setAlerts] = useState<SavedMatchFollowAlert[]>([]);
+  const [accounts, setAccounts] = useState<SavedMatchAccountCatalogEntry[]>([]);
+  const [alerts, setAlerts] = useState<SavedMatchFollowAlertPreview[]>([]);
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
   const [riotId, setRiotId] = useState('');
   const [region, setRegion] = useState('');
@@ -97,7 +97,7 @@ export function FollowAccountsDialog({
   );
 
   const refresh = useCallback(async () => {
-    const state = await loadSavedMatchesState();
+    const state = await loadSavedMatchesCatalog();
     setAccounts(state.accounts);
     setAlerts(state.followAlerts ?? []);
   }, []);
@@ -131,7 +131,7 @@ export function FollowAccountsDialog({
           result.matches,
           regionLabel,
         );
-        const state = await setSavedMatchAccountFollow(saved.id, true);
+        const state = await setSavedMatchAccountFollow(saved.accountId, true);
         setAccounts(state.accounts);
         setAlerts(state.followAlerts ?? []);
         setRiotId('');
@@ -295,7 +295,7 @@ function FollowAccountCard({
   account,
   onUnfollow,
 }: {
-  account: SavedMatchAccount;
+  account: SavedMatchAccountCatalogEntry;
   onUnfollow: () => void;
 }) {
   const match = latestMatch(account);
@@ -336,7 +336,7 @@ function FollowAlertRow({
   alert,
   championMap,
 }: {
-  alert: SavedMatchFollowAlert;
+  alert: SavedMatchFollowAlertPreview;
   championMap: Map<number, ChampionSummary>;
 }) {
   const match = alert.match;

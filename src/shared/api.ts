@@ -156,7 +156,7 @@ export interface ChatConversationsResponse {
 export interface LcuApi {
   detectClient: () => Promise<LcuConnection>;
   getCurrentRegion: () => Promise<LcuRegion>;
-  getFriends: () => Promise<FriendInfo[]>;
+  getFriends: (forceRefresh?: boolean) => Promise<FriendInfo[]>;
   getFriendRequests: () => Promise<FriendRequestInfo[]>;
   addFriend: (riotId: string) => Promise<FriendActionResult>;
   acceptFriendRequest: (puuid: string) => Promise<FriendActionResult>;
@@ -972,6 +972,48 @@ export interface SavedMatchesState {
   followAlerts?: SavedMatchFollowAlert[];
 }
 
+/** Small, frequently-read projection that avoids cloning the complete match archive over IPC. */
+export interface SavedMatchesSummary {
+  followAlertIds: string[];
+}
+
+/** Match fields needed by saved/follow dialogs; excludes participant and item payloads. */
+export interface SavedMatchPreview {
+  gameId: number;
+  queueId: number;
+  queueName: string;
+  gameCreation: number;
+  gameDuration: number;
+  championId: number;
+  championName: string;
+  championAvatar: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  win: boolean;
+  damage: number;
+  cs: number;
+}
+
+export interface SavedMatchAccountCatalogEntry extends Omit<SavedMatchAccount, 'matches'> {
+  matches: SavedMatchPreview[];
+}
+
+export interface SavedMatchFollowAlertPreview extends Omit<SavedMatchFollowAlert, 'match'> {
+  match: SavedMatchPreview;
+}
+
+export interface SavedMatchesCatalog {
+  accounts: SavedMatchAccountCatalogEntry[];
+  groups: SavedMatchGroup[];
+  followAlerts: SavedMatchFollowAlertPreview[];
+}
+
+export interface SavedMatchSaveResult {
+  accountId: string;
+}
+
 export interface ReplayActionResult {
   success: boolean;
   message: string;
@@ -997,20 +1039,22 @@ export interface ReplayAvailabilityRequest {
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
   getPlayerRanks: (puuid: string, region?: string) => Promise<PlayerRankSummary[]>;
-  getSavedMatches: () => Promise<SavedMatchesState>;
+  getSavedMatchesSummary: () => Promise<SavedMatchesSummary>;
+  getSavedMatchesCatalog: () => Promise<SavedMatchesCatalog>;
+  getSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount | null>;
   importSavedMatches: (state: SavedMatchesState) => Promise<SavedMatchesState>;
   saveMatchesForProfile: (
     profile: PlayerProfile,
     region: string,
     matches: PlayerMatchDetail[],
     regionName?: string,
-  ) => Promise<SavedMatchAccount>;
-  createSavedMatchGroup: (name: string) => Promise<SavedMatchesState>;
-  deleteSavedMatchGroup: (groupId: string) => Promise<SavedMatchesState>;
-  setSavedMatchAccountGroup: (accountId: string, groupId?: string) => Promise<SavedMatchAccount[]>;
-  setSavedMatchAccountFollow: (accountId: string, enabled: boolean) => Promise<SavedMatchesState>;
-  deleteSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount[]>;
-  deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchAccount[]>;
+  ) => Promise<SavedMatchSaveResult>;
+  createSavedMatchGroup: (name: string) => Promise<SavedMatchesCatalog>;
+  deleteSavedMatchGroup: (groupId: string) => Promise<SavedMatchesCatalog>;
+  setSavedMatchAccountGroup: (accountId: string, groupId?: string) => Promise<SavedMatchesCatalog>;
+  setSavedMatchAccountFollow: (accountId: string, enabled: boolean) => Promise<SavedMatchesCatalog>;
+  deleteSavedMatchAccount: (accountId: string) => Promise<SavedMatchesCatalog>;
+  deleteSavedMatch: (accountId: string, gameId: number) => Promise<SavedMatchesCatalog>;
   getReplayAvailability: (request: ReplayAvailabilityRequest) => Promise<ReplayAvailability>;
   downloadReplay: (gameId: number) => Promise<ReplayActionResult>;
   watchReplay: (gameId: number) => Promise<ReplayActionResult>;

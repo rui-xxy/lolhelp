@@ -9,12 +9,19 @@ import type {
   SavedMatchFollowAlert,
   SavedMatchFollowSettings,
   SavedMatchGroup,
+  SavedMatchPreview,
+  SavedMatchesCatalog,
   SavedMatchesState,
 } from '../../shared/api';
 
 const SAVED_MATCHES_FILE = 'lolhelper-saved-matches.json';
 const FOLLOW_RECENT_MATCH_WINDOW_MS = 60 * 60 * 1000;
 const FOLLOW_ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+let cachedState: SavedMatchesState | null = null;
+let pendingSerializedState: string | null = null;
+let persistPromise: Promise<void> | null = null;
+let tempFileSequence = 0;
 
 function getStorePath(): string {
   return path.join(app.getPath('userData'), SAVED_MATCHES_FILE);
@@ -142,35 +149,65 @@ function normalizeState(value: unknown): SavedMatchesState {
 }
 
 function readState(): SavedMatchesState {
+  if (cachedState) return cachedState;
   const filePath = getStorePath();
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
-    return normalizeState(JSON.parse(raw));
+    cachedState = normalizeState(JSON.parse(raw));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       backupUnreadableStore(filePath, err);
     }
-    return emptyState();
+    cachedState = emptyState();
   }
+  return cachedState;
 }
 
-function writeState(state: SavedMatchesState): SavedMatchesState {
-  const normalized = normalizeState(state);
+async function persistSerializedState(serialized: string): Promise<void> {
   const filePath = getStorePath();
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.${tempFileSequence++}.tmp`;
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
   try {
-    fs.writeFileSync(tempPath, JSON.stringify(normalized, null, 2), 'utf8');
-    fs.renameSync(tempPath, filePath);
+    await fs.promises.writeFile(tempPath, serialized, 'utf8');
+    await fs.promises.rename(tempPath, filePath);
   } catch (err) {
     try {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      await fs.promises.rm(tempPath, { force: true });
     } catch {
       // Ignore cleanup failure.
     }
     throw err;
   }
-  return normalized;
+}
+
+function queuePersist(serialized: string): Promise<void> {
+  pendingSerializedState = serialized;
+  if (!persistPromise) {
+    persistPromise = (async () => {
+      while (pendingSerializedState !== null) {
+        const nextSerializedState = pendingSerializedState;
+        pendingSerializedState = null;
+        await persistSerializedState(nextSerializedState);
+      }
+    })().finally(() => {
+      persistPromise = null;
+    });
+  }
+  return persistPromise;
+}
+
+async function writeState(state: SavedMatchesState): Promise<SavedMatchesState> {
+  const normalized = normalizeState(state);
+  cachedState = normalized;
+  try {
+    // Compact JSON is the same schema, but materially reduces serialization and disk I/O.
+    await queuePersist(JSON.stringify(normalized));
+    return normalized;
+  } catch (error) {
+    // Do not keep serving state that was not durably persisted.
+    cachedState = null;
+    throw error;
+  }
 }
 
 function backupUnreadableStore(filePath: string, err: unknown): void {
@@ -240,14 +277,59 @@ export function getSavedMatches(): SavedMatchesState {
   return readState();
 }
 
-export function importSavedMatches(state: SavedMatchesState): SavedMatchesState {
+export function getSavedMatchesSummary(): { followAlertIds: string[] } {
+  return {
+    followAlertIds: (readState().followAlerts ?? []).map((alert) => alert.id),
+  };
+}
+
+function toSavedMatchPreview(match: PlayerMatchDetail): SavedMatchPreview {
+  return {
+    gameId: match.gameId,
+    queueId: match.queueId,
+    queueName: match.queueName,
+    gameCreation: match.gameCreation,
+    gameDuration: match.gameDuration,
+    championId: match.championId,
+    championName: match.championName,
+    championAvatar: match.championAvatar,
+    kills: match.kills,
+    deaths: match.deaths,
+    assists: match.assists,
+    kda: match.kda,
+    win: match.win,
+    damage: match.damage,
+    cs: match.cs,
+  };
+}
+
+export function getSavedMatchesCatalog(): SavedMatchesCatalog {
+  const state = readState();
+  return {
+    accounts: state.accounts.map((account) => ({
+      ...account,
+      matches: account.matches.map(toSavedMatchPreview),
+    })),
+    groups: state.groups,
+    followAlerts: (state.followAlerts ?? []).map((alert) => ({
+      ...alert,
+      match: toSavedMatchPreview(alert.match),
+    })),
+  };
+}
+
+export function getSavedMatchAccount(accountId: string): SavedMatchAccount | null {
+  return readState().accounts.find((account) => account.id === accountId) ?? null;
+}
+
+export async function importSavedMatches(state: SavedMatchesState): Promise<SavedMatchesState> {
   const current = readState();
   const incoming = normalizeState(state);
   if (incoming.accounts.length === 0 && incoming.groups.length === 0) return current;
   return writeState(mergeSavedMatchesState(current, incoming));
 }
 
-export function createSavedMatchGroup(name: string): SavedMatchesState {
+export async function createSavedMatchGroup(name: string): Promise<SavedMatchesState> {
   const trimmed = name.trim();
   const state = readState();
   if (!trimmed) return state;
@@ -261,7 +343,7 @@ export function createSavedMatchGroup(name: string): SavedMatchesState {
   });
 }
 
-export function deleteSavedMatchGroup(groupId: string): SavedMatchesState {
+export async function deleteSavedMatchGroup(groupId: string): Promise<SavedMatchesState> {
   const state = readState();
   return writeState({
     ...state,
@@ -274,21 +356,21 @@ export function deleteSavedMatchGroup(groupId: string): SavedMatchesState {
   });
 }
 
-export function setSavedMatchAccountGroup(accountId: string, groupId?: string): SavedMatchAccount[] {
+export async function setSavedMatchAccountGroup(accountId: string, groupId?: string): Promise<SavedMatchAccount[]> {
   const state = readState();
   const validGroupIds = new Set(state.groups.map((group) => group.id));
   const nextGroupId = groupId && validGroupIds.has(groupId) ? groupId : undefined;
-  return writeState({
+  return (await writeState({
     ...state,
     accounts: state.accounts.map((account) =>
       account.id === accountId
         ? { ...account, groupId: nextGroupId, updatedAt: Date.now() }
         : account,
     ),
-  }).accounts;
+  })).accounts;
 }
 
-export function setSavedMatchAccountFollow(accountId: string, enabled: boolean): SavedMatchesState {
+export async function setSavedMatchAccountFollow(accountId: string, enabled: boolean): Promise<SavedMatchesState> {
   const state = readState();
   const now = Date.now();
   return writeState({
@@ -316,16 +398,31 @@ export function setSavedMatchAccountFollow(accountId: string, enabled: boolean):
   });
 }
 
-export function saveSavedMatchFollowPollResult(
-  accountId: string,
-  result: PlayerLookupResult | null,
-  checkedAt: number,
-  error?: string,
-): { state: SavedMatchesState; alert: SavedMatchFollowAlert | null; shouldNotify: boolean } {
-  const state = readState();
+export interface SavedMatchFollowPollInput {
+  accountId: string;
+  result: PlayerLookupResult | null;
+  checkedAt: number;
+  error?: string;
+}
+
+export interface SavedMatchFollowPollSaveResult {
+  accountId: string;
+  alert: SavedMatchFollowAlert | null;
+  shouldNotify: boolean;
+}
+
+function applySavedMatchFollowPollResult(
+  state: SavedMatchesState,
+  input: SavedMatchFollowPollInput,
+): { state: SavedMatchesState; result: SavedMatchFollowPollSaveResult; changed: boolean } {
+  const { accountId, result, checkedAt, error } = input;
   const account = state.accounts.find((item) => item.id === accountId);
   if (!account?.follow?.enabled) {
-    return { state, alert: null, shouldNotify: false };
+    return {
+      state,
+      result: { accountId, alert: null, shouldNotify: false },
+      changed: false,
+    };
   }
 
   const latestMatch = result?.matches[0];
@@ -341,7 +438,14 @@ export function saveSavedMatchFollowPollResult(
   );
 
   const nextProfile = result?.profile?.puuid
-    ? { ...account.profile, ...result.profile }
+    ? {
+        ...account.profile,
+        ...result.profile,
+        rank: result.profile.rank ?? account.profile.rank,
+        ranks: result.profile.ranks?.length ? result.profile.ranks : account.profile.ranks,
+        championCount: result.profile.championCount ?? account.profile.championCount,
+        skinCount: result.profile.skinCount ?? account.profile.skinCount,
+      }
     : account.profile;
   const nextFollow: SavedMatchFollowSettings = {
     ...account.follow,
@@ -383,24 +487,47 @@ export function saveSavedMatchFollowPollResult(
     ? [alert, ...activeAlerts.filter((item) => item.accountId !== accountId)]
     : activeAlerts;
 
-  const nextState = writeState({
+  const nextState = {
     ...state,
     accounts: [
       nextAccount,
       ...state.accounts.filter((item) => item.id !== accountId),
     ],
     followAlerts: nextAlerts,
-  });
+  };
 
-  return { state: nextState, alert, shouldNotify };
+  return {
+    state: nextState,
+    result: { accountId, alert, shouldNotify },
+    changed: true,
+  };
 }
 
-export function saveMatchesForProfile(
+/** Apply one complete follow-watcher cycle and persist it with a single atomic write. */
+export async function saveSavedMatchFollowPollResults(
+  inputs: SavedMatchFollowPollInput[],
+): Promise<SavedMatchFollowPollSaveResult[]> {
+  let nextState = readState();
+  let changed = false;
+  const results: SavedMatchFollowPollSaveResult[] = [];
+
+  for (const input of inputs) {
+    const applied = applySavedMatchFollowPollResult(nextState, input);
+    nextState = applied.state;
+    changed ||= applied.changed;
+    results.push(applied.result);
+  }
+
+  if (changed) await writeState(nextState);
+  return results;
+}
+
+export async function saveMatchesForProfile(
   profile: PlayerProfile,
   region: string,
   matches: PlayerMatchDetail[],
   regionName?: string,
-): SavedMatchAccount {
+): Promise<SavedMatchAccount> {
   const now = Date.now();
   const state = readState();
   const accountId = getAccountId(profile, region);
@@ -426,7 +553,7 @@ export function saveMatchesForProfile(
     updatedAt: now,
   };
 
-  writeState({
+  await writeState({
     ...state,
     accounts: [
       nextAccount,
@@ -436,18 +563,18 @@ export function saveMatchesForProfile(
   return nextAccount;
 }
 
-export function deleteSavedMatchAccount(accountId: string): SavedMatchAccount[] {
+export async function deleteSavedMatchAccount(accountId: string): Promise<SavedMatchAccount[]> {
   const state = readState();
-  return writeState({
+  return (await writeState({
     ...state,
     accounts: state.accounts.filter((account) => account.id !== accountId),
     followAlerts: (state.followAlerts ?? []).filter((alert) => alert.accountId !== accountId),
-  }).accounts;
+  })).accounts;
 }
 
-export function deleteSavedMatch(accountId: string, gameId: number): SavedMatchAccount[] {
+export async function deleteSavedMatch(accountId: string, gameId: number): Promise<SavedMatchAccount[]> {
   const state = readState();
-  return writeState({
+  return (await writeState({
     ...state,
     accounts: state.accounts
       .map((account) =>
@@ -463,5 +590,5 @@ export function deleteSavedMatch(accountId: string, gameId: number): SavedMatchA
     followAlerts: (state.followAlerts ?? []).filter(
       (alert) => !(alert.accountId === accountId && alert.match.gameId === gameId),
     ),
-  }).accounts;
+  })).accounts;
 }

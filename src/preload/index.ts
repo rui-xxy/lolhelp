@@ -27,7 +27,8 @@ const lolHelper: LolHelper = {
   lcu: {
     detectClient: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_DETECT_CLIENT),
     getCurrentRegion: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_CURRENT_REGION),
-    getFriends: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS),
+    getFriends: (forceRefresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIENDS, forceRefresh),
     getFriendRequests: () => ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_FRIEND_REQUESTS),
     addFriend: (riotId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.LCU_ADD_FRIEND, riotId),
@@ -53,8 +54,12 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
     getPlayerRanks: (puuid: string, region?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid, region),
-    getSavedMatches: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES),
+    getSavedMatchesSummary: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_SUMMARY),
+    getSavedMatchesCatalog: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_CATALOG),
+    getSavedMatchAccount: (accountId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCH_ACCOUNT, accountId),
     importSavedMatches: (state) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_IMPORT_SAVED_MATCHES, state),
     saveMatchesForProfile: (profile, region, matches, regionName) =>

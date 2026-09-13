@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Bell, Clock, Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
@@ -15,6 +15,7 @@ import {
 interface FriendPanelProps {
   onFriendClick: (riotId: string) => void;
   onFriendFollow?: (riotId: string) => void;
+  active?: boolean;
 }
 
 const AVAILABILITY_COLOR: Record<string, string> = {
@@ -27,7 +28,7 @@ const AVAILABILITY_COLOR: Record<string, string> = {
   offline: 'bg-gray-400',
 };
 
-const FRIEND_REFRESH_INTERVAL_MS = 5_000;
+const FRIEND_REFRESH_INTERVAL_MS = 10_000;
 const ACTION_SUCCESS_MESSAGE_MS = 2_800;
 const ACTION_ERROR_MESSAGE_MS = 5_000;
 
@@ -118,12 +119,32 @@ function formatFriendAddedTime(friend: FriendInfo, now: number): string {
   return `${exact}（${formatFriendAddedAgo(timestamp, now)}）`;
 }
 
-export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps) {
+function FriendGameDuration({
+  active,
+  startedAt,
+}: {
+  active: boolean;
+  startedAt: string | number | undefined;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!active || !startedAt) return undefined;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [active, startedAt]);
+
+  const duration = formatGameDuration(startedAt, now);
+  return duration ? <span className="friend-row-timer tabular-nums">{duration}</span> : null;
+}
+
+export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: FriendPanelProps) {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [sortByAddedAt, setSortByAddedAt] = useState(false);
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [relativeTime, setRelativeTime] = useState(() => Date.now());
   const [actionFriendId, setActionFriendId] = useState('');
   const [actionNotice, setActionNotice] = useState<FriendActionNotice | null>(null);
   const refreshingRef = useRef(false);
@@ -155,12 +176,12 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
     }, success ? ACTION_SUCCESS_MESSAGE_MS : ACTION_ERROR_MESSAGE_MS);
   }, [clearActionNoticeTimer]);
 
-  const loadFriends = useCallback(async (showLoading = true) => {
+  const loadFriends = useCallback(async (showLoading = true, forceRefresh = showLoading) => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     if (showLoading) setLoading(true);
     try {
-      const list = await window.lolHelper.lcu.getFriends();
+      const list = await window.lolHelper.lcu.getFriends(forceRefresh);
       setFriends(list);
     } catch {
       setFriends([]);
@@ -171,22 +192,30 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
   }, []);
 
   useEffect(() => {
+    if (!active) return undefined;
     void loadFriends(true);
     const timer = window.setInterval(() => {
-      void loadFriends(false);
+      if (document.visibilityState === 'visible') void loadFriends(false);
     }, FRIEND_REFRESH_INTERVAL_MS);
     const handleFriendsChanged = () => void loadFriends(false);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void loadFriends(false);
+    };
     window.addEventListener('lolhelp:friends-changed', handleFriendsChanged);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('lolhelp:friends-changed', handleFriendsChanged);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loadFriends]);
+  }, [active, loadFriends]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTime((time) => time + 1000), 1000);
+    if (!active || !sortByAddedAt) return undefined;
+    setRelativeTime(Date.now());
+    const timer = window.setInterval(() => setRelativeTime(Date.now()), 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [active, sortByAddedAt]);
 
   useEffect(() => {
     return clearActionNoticeTimer;
@@ -216,29 +245,35 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
     };
   }, [actionFriendId]);
 
-  // 按分组归类
-  const groups = new Map<string, FriendInfo[]>();
-  for (const f of friends) {
-    const g = f.groupName || '**Default';
-    const list = groups.get(g) ?? [];
-    list.push(f);
-    groups.set(g, list);
-  }
-  for (const [, list] of groups) {
-    list.sort((a, b) => {
-      if (sortByAddedAt) {
-        const addedDiff = friendAddedTimestamp(b) - friendAddedTimestamp(a);
-        if (addedDiff !== 0) return addedDiff;
+  // Grouping and sorting only need to run when the list or selected sort mode changes.
+  const groups = useMemo(() => {
+    const nextGroups = new Map<string, FriendInfo[]>();
+    for (const friend of friends) {
+      const groupName = friend.groupName || '**Default';
+      const list = nextGroups.get(groupName) ?? [];
+      list.push(friend);
+      nextGroups.set(groupName, list);
+    }
+    for (const list of nextGroups.values()) {
+      list.sort((a, b) => {
+        if (sortByAddedAt) {
+          const addedDiff = friendAddedTimestamp(b) - friendAddedTimestamp(a);
+          if (addedDiff !== 0) return addedDiff;
+          return a.gameName.localeCompare(b.gameName);
+        }
+        const aOnline = a.availability !== 'offline' ? 0 : 1;
+        const bOnline = b.availability !== 'offline' ? 0 : 1;
+        if (aOnline !== bOnline) return aOnline - bOnline;
         return a.gameName.localeCompare(b.gameName);
-      }
-      const aOnline = a.availability !== 'offline' ? 0 : 1;
-      const bOnline = b.availability !== 'offline' ? 0 : 1;
-      if (aOnline !== bOnline) return aOnline - bOnline;
-      return a.gameName.localeCompare(b.gameName);
-    });
-  }
+      });
+    }
+    return nextGroups;
+  }, [friends, sortByAddedAt]);
 
-  const onlineCount = friends.filter((f) => f.availability !== 'offline').length;
+  const onlineCount = useMemo(
+    () => friends.filter((friend) => friend.availability !== 'offline').length,
+    [friends],
+  );
 
   const toggleGroup = (name: string) => {
     setCollapsedGroups((prev) => {
@@ -276,7 +311,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
     showActionNotice(result.message, result.success);
     if (result.success) {
       setActionFriendId('');
-      await loadFriends(false);
+      await loadFriends(false, true);
     }
   };
 
@@ -367,18 +402,15 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
                       const championSplashBackground = championSplashUrls
                         .map((url) => `url("${url}")`)
                         .join(', ');
-                      const gameDuration =
-                        friend.lol?.gameStatus === 'inGame'
-                          ? formatGameDuration(friend.lol.timeStamp, currentTime)
-                          : '';
-                      const addedTime = sortByAddedAt ? formatFriendAddedTime(friend, currentTime) : '';
+                      const inGame = friend.lol?.gameStatus === 'inGame';
+                      const addedTime = sortByAddedAt ? formatFriendAddedTime(friend, relativeTime) : '';
                       return (
                         <div
                           key={friend.puuid}
                           className={`friend-row group flex w-full items-center rounded-sm text-left ${
                             championSplashBackground ? 'friend-row--has-skin' : ''
                           } ${
-                            gameDuration ? 'pr-12' : ''
+                            inGame ? 'pr-12' : ''
                           } ${
                             isOffline ? 'opacity-50' : ''
                           } ${
@@ -430,10 +462,8 @@ export function FriendPanel({ onFriendClick, onFriendFollow }: FriendPanelProps)
                           >
                             <MoreHorizontal className="size-3.5" />
                           </button>
-                          {gameDuration && (
-                            <span className="friend-row-timer tabular-nums">
-                              {gameDuration}
-                            </span>
+                          {inGame && (
+                            <FriendGameDuration active={active} startedAt={friend.lol?.timeStamp} />
                           )}
                           {actionFriendId === friend.id && (
                             <div

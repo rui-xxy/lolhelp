@@ -8,7 +8,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import type { ChampionSummary, PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
+import type { ChampionSummary, PlayerRankSummary, SavedMatchPreview } from '../../../shared/api';
 import { LOL_REGIONS } from '../../../shared/constants';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
@@ -19,11 +19,13 @@ import {
   createSavedMatchGroup,
   deleteSavedMatchAccount,
   deleteSavedMatchGroup,
-  loadSavedMatchesState,
+  loadSavedMatchAccount,
+  loadSavedMatchesCatalog,
   SAVED_MATCHES_CHANGED_EVENT,
   setSavedMatchAccountFollow,
   setSavedMatchAccountGroup,
   type SavedMatchAccount,
+  type SavedMatchAccountCatalogEntry,
   type SavedMatchGroup,
 } from './savedMatchesStore';
 
@@ -46,7 +48,7 @@ function getFullRiotId(riotId: string | undefined): string {
   return riotId?.trim() || '未知 Riot ID';
 }
 
-function getAccountSummary(matches: PlayerMatchDetail[]): string {
+function getAccountSummary(matches: SavedMatchPreview[]): string {
   const wins = matches.filter((match) => match.win).length;
   const losses = matches.length - wins;
   return `${matches.length} 场 · ${wins}胜 ${losses}负`;
@@ -62,7 +64,7 @@ function formatSavedAt(timestamp: number): string {
   });
 }
 
-function getSavedAt(account: SavedMatchAccount): number {
+function getSavedAt(account: SavedMatchAccountCatalogEntry): number {
   return Number.isFinite(account.createdAt) ? account.createdAt : account.updatedAt;
 }
 
@@ -95,7 +97,7 @@ function isUsefulRegionName(regionName: string | undefined): regionName is strin
   return Boolean(normalized && !normalized.includes('读取') && !normalized.includes('无法'));
 }
 
-function getRegionName(account: SavedMatchAccount): string {
+function getRegionName(account: SavedMatchAccountCatalogEntry): string {
   const region = account.region;
   if (!region) {
     const savedRegionName = account.regionName?.trim();
@@ -105,7 +107,7 @@ function getRegionName(account: SavedMatchAccount): string {
   return LOL_REGIONS.find((item) => item.key === region)?.name ?? region;
 }
 
-function getRanks(account: SavedMatchAccount): PlayerRankSummary[] {
+function getRanks(account: SavedMatchAccountCatalogEntry): PlayerRankSummary[] {
   if (account.profile.ranks?.length) return account.profile.ranks;
   return account.profile.rank ? [account.profile.rank] : [];
 }
@@ -133,13 +135,13 @@ function getRankDetailText(rank: PlayerRankSummary): string {
   return withoutQueue || text;
 }
 
-function getChampionName(match: PlayerMatchDetail, championMap: Map<number, ChampionSummary>): string {
+function getChampionName(match: SavedMatchPreview, championMap: Map<number, ChampionSummary>): string {
   const champion = championMap.get(match.championId);
   return champion?.title || champion?.name || match.championName || '未知英雄';
 }
 
 export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPickerDialogProps) {
-  const [accounts, setAccounts] = useState<SavedMatchAccount[]>([]);
+  const [accounts, setAccounts] = useState<SavedMatchAccountCatalogEntry[]>([]);
   const [groups, setGroups] = useState<SavedMatchGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupFilter>('all');
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
@@ -148,9 +150,10 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   const [notice, setNotice] = useState('');
   const [champions, setChampions] = useState<ChampionSummary[]>([]);
   const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [openingAccountId, setOpeningAccountId] = useState<string | null>(null);
 
   const refresh = async () => {
-    const state = await loadSavedMatchesState();
+    const state = await loadSavedMatchesCatalog();
     setAccounts(state.accounts);
     setGroups(state.groups);
   };
@@ -239,13 +242,17 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
   };
 
   const deleteAccount = async (accountId: string) => {
-    setAccounts(await deleteSavedMatchAccount(accountId));
+    const catalog = await deleteSavedMatchAccount(accountId);
+    setAccounts(catalog.accounts);
+    setGroups(catalog.groups);
     setDeleteAccountId(null);
     setNotice('保存账号已删除');
   };
 
   const moveAccount = async (accountId: string, groupId: string) => {
-    setAccounts(await setSavedMatchAccountGroup(accountId, groupId || undefined));
+    const catalog = await setSavedMatchAccountGroup(accountId, groupId || undefined);
+    setAccounts(catalog.accounts);
+    setGroups(catalog.groups);
     setNotice('分组已更新');
   };
 
@@ -254,6 +261,25 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
     setAccounts(state.accounts);
     setGroups(state.groups);
     setNotice(enabled ? '已关注，后台每分钟检查最新战绩' : '已取消关注');
+  };
+
+  const openSavedAccount = async (accountId: string) => {
+    if (openingAccountId) return;
+    setOpeningAccountId(accountId);
+    try {
+      const account = await loadSavedMatchAccount(accountId);
+      if (!account) {
+        setNotice('这个保存账号已不存在，请刷新后重试');
+        await refresh();
+        return;
+      }
+      onSelect(account);
+      onClose();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '打开保存战绩失败');
+    } finally {
+      setOpeningAccountId(null);
+    }
   };
 
   if (!open) return null;
@@ -416,13 +442,11 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          onSelect(activeAccount);
-                          onClose();
-                        }}
-                        className="h-8 shrink-0 rounded-sm bg-app-primary px-4 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover"
+                        onClick={() => void openSavedAccount(activeAccount.id)}
+                        disabled={openingAccountId !== null}
+                        className="h-8 shrink-0 rounded-sm bg-app-primary px-4 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover disabled:opacity-60"
                       >
-                        打开战绩
+                        {openingAccountId === activeAccount.id ? '正在打开…' : '打开战绩'}
                       </button>
                       <button
                         type="button"
@@ -478,7 +502,7 @@ function AccountListItem({
   active,
   onClick,
 }: {
-  account: SavedMatchAccount;
+  account: SavedMatchAccountCatalogEntry;
   active: boolean;
   onClick: () => void;
 }) {
@@ -542,7 +566,7 @@ function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
   );
 }
 
-function AccountInfoPanel({ account }: { account: SavedMatchAccount }) {
+function AccountInfoPanel({ account }: { account: SavedMatchAccountCatalogEntry }) {
   const wins = account.matches.filter((match) => match.win).length;
   const losses = account.matches.length - wins;
   const winRate = account.matches.length > 0
@@ -599,7 +623,7 @@ function SavedMatchesPanel({
   account,
   championMap,
 }: {
-  account: SavedMatchAccount;
+  account: SavedMatchAccountCatalogEntry;
   championMap: Map<number, ChampionSummary>;
 }) {
   return (
@@ -607,7 +631,7 @@ function SavedMatchesPanel({
       {account.matches.map((match) => (
         <div
           key={match.gameId}
-          className={`grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 border-l-2 px-3 py-2.5 ${
+          className={`saved-match-row grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 border-l-2 px-3 py-2.5 ${
             match.win
               ? 'border-l-app-success bg-app-win-bg/20'
               : 'border-l-app-danger bg-app-loss-bg/20'

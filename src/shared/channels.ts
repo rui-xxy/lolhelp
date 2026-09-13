@@ -44,7 +44,9 @@ export const IPC_CHANNELS = {
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
   MATCH_GET_PLAYER_RANKS: 'match:get-player-ranks',
-  MATCH_GET_SAVED_MATCHES: 'match:get-saved-matches',
+  MATCH_GET_SAVED_MATCHES_SUMMARY: 'match:get-saved-matches-summary',
+  MATCH_GET_SAVED_MATCHES_CATALOG: 'match:get-saved-matches-catalog',
+  MATCH_GET_SAVED_MATCH_ACCOUNT: 'match:get-saved-match-account',
   MATCH_IMPORT_SAVED_MATCHES: 'match:import-saved-matches',
   MATCH_SAVE_MATCHES_FOR_PROFILE: 'match:save-matches-for-profile',
   MATCH_CREATE_SAVED_GROUP: 'match:create-saved-group',

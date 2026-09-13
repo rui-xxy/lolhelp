@@ -134,6 +134,7 @@ export function ScoutPage({
   const [batchStarts, setBatchStarts] = useState<number[]>([]);
   const [searchStartedAt, setSearchStartedAt] = useState<number | null>(null);
   const [searchFinishedAt, setSearchFinishedAt] = useState<number | null>(null);
+  const initializedRef = useRef(false);
 
   // 英雄 id → 详情（给已选摘要展示用）
   const championMap = useMemo(() => new Map(champions.map((c) => [c.id, c])), [champions]);
@@ -151,6 +152,8 @@ export function ScoutPage({
 
   // 加载英雄列表 + 设置
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     void (async () => {
       try {
         setChampionsLoading(true);
@@ -440,9 +443,8 @@ export function ScoutPage({
         window.clearTimeout(sidebarStatusTimerRef.current);
         sidebarStatusTimerRef.current = null;
       }
-      onStatusChange?.(null);
     };
-  }, [onStatusChange]);
+  }, []);
 
   const canMinimizeConfigPanel = Boolean(onConfigPanelMinimize && running);
   const handleConfigPanelClick = useCallback(() => {

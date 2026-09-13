@@ -413,6 +413,7 @@ export function MatchHistoryPage({
 
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
+  const lastSavedAccountNonceRef = useRef(0);
   const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const tabLoadSeqRef = useRef<Record<string, number>>({});
   const friendNoticeTimerRef = useRef<number | null>(null);
@@ -623,7 +624,8 @@ export function MatchHistoryPage({
   }, [searchTrigger, searchName, region]);
 
   useEffect(() => {
-    if (!savedAccountRequest) return;
+    if (!savedAccountRequest || savedAccountRequest.nonce === lastSavedAccountNonceRef.current) return;
+    lastSavedAccountNonceRef.current = savedAccountRequest.nonce;
     openSavedAccountTab(savedAccountRequest.account);
   }, [savedAccountRequest?.nonce]);
 

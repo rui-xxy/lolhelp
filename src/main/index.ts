@@ -159,8 +159,8 @@ setTimeout(() => {
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
   createWindow();
-  startAssistEngine();
   startLiveWatcher();
+  startAssistEngine();
   startSavedMatchFollowWatcher();
 });
 

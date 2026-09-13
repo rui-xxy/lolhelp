@@ -28,7 +28,9 @@ const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
 const ACTIVE_GAME_CHAMPION_CACHE_MAX_ENTRIES = 1000;
 const FRIEND_ENRICH_CONCURRENCY = 8;
+const FRIEND_LIST_CACHE_TTL_MS = 9_000;
 const activeGameChampionCache = new Map<string, { championId: number; expiresAt: number }>();
+let friendListCache: { friends: FriendInfo[]; expiresAt: number } | null = null;
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -354,7 +356,10 @@ export function registerLcuHandlers(): void {
   );
 
   // 好友列表：从 LCU lol-chat/v1/friends 拉取，映射成 FriendInfo[]
-  ipcMain.handle(IPC_CHANNELS.LCU_GET_FRIENDS, async () => {
+  ipcMain.handle(IPC_CHANNELS.LCU_GET_FRIENDS, async (_event, forceRefresh = false) => {
+    if (!forceRefresh && friendListCache && friendListCache.expiresAt > Date.now()) {
+      return friendListCache.friends;
+    }
     let creds;
     try {
       creds = getCachedCredentials();
@@ -386,7 +391,7 @@ export function registerLcuHandlers(): void {
       } catch {
         // Some clients/regions may reject the store endpoint. Friend list still works without it.
       }
-      return mapWithConcurrency(raw, FRIEND_ENRICH_CONCURRENCY, async (f) => {
+      const friends = await mapWithConcurrency(raw, FRIEND_ENRICH_CONCURRENCY, async (f) => {
         const icon = Number(f.icon ?? 0);
         const iconUrls = buildProfileIconCandidates(icon);
         const rawLol = readLolPayload(f.lol);
@@ -462,6 +467,11 @@ export function registerLcuHandlers(): void {
           lol,
         };
       });
+      friendListCache = {
+        friends,
+        expiresAt: Date.now() + FRIEND_LIST_CACHE_TTL_MS,
+      };
+      return friends;
     } catch {
       return [];
     }

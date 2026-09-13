@@ -3,7 +3,8 @@ import type { SavedMatchFollowAlert } from '../../shared/api';
 import { searchPlayer } from './matchService';
 import {
   getSavedMatches,
-  saveSavedMatchFollowPollResult,
+  saveSavedMatchFollowPollResults,
+  type SavedMatchFollowPollInput,
 } from './savedMatchesStore';
 
 const FOLLOW_POLL_INTERVAL_MS = 60_000;
@@ -39,7 +40,7 @@ function showFollowNotification(alerts: SavedMatchFollowAlert[]): void {
 async function pollSavedMatchFollowAccounts(): Promise<void> {
   if (polling) return;
   polling = true;
-  const notifyAlerts: SavedMatchFollowAlert[] = [];
+  const pollResults: SavedMatchFollowPollInput[] = [];
 
   try {
     const state = getSavedMatches();
@@ -47,35 +48,44 @@ async function pollSavedMatchFollowAccounts(): Promise<void> {
     for (const account of followedAccounts) {
       const riotId = account.profile.riotId?.trim();
       if (!riotId) {
-        saveSavedMatchFollowPollResult(account.id, null, Date.now(), '账号缺少 Riot ID');
+        pollResults.push({
+          accountId: account.id,
+          result: null,
+          checkedAt: Date.now(),
+          error: '账号缺少 Riot ID',
+        });
         continue;
       }
 
       try {
-        const result = await searchPlayer({
-          name: riotId,
-          region: account.region,
-          pageSize: LATEST_MATCH_COUNT,
-          maxMatches: LATEST_MATCH_COUNT,
-        });
-        const saved = saveSavedMatchFollowPollResult(
-          account.id,
+        const result = await searchPlayer(
+          {
+            name: riotId,
+            region: account.region,
+            pageSize: LATEST_MATCH_COUNT,
+            maxMatches: LATEST_MATCH_COUNT,
+          },
+          { includeProfileDetails: false },
+        );
+        pollResults.push({
+          accountId: account.id,
           result,
-          Date.now(),
-          result.error,
-        );
-        if (saved.shouldNotify && saved.alert) {
-          notifyAlerts.push(saved.alert);
-        }
+          checkedAt: Date.now(),
+          error: result.error,
+        });
       } catch (error) {
-        saveSavedMatchFollowPollResult(
-          account.id,
-          null,
-          Date.now(),
-          error instanceof Error ? error.message : String(error),
-        );
+        pollResults.push({
+          accountId: account.id,
+          result: null,
+          checkedAt: Date.now(),
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
+
+    const savedResults = await saveSavedMatchFollowPollResults(pollResults);
+    const notifyAlerts = savedResults.flatMap((saved) =>
+      saved.shouldNotify && saved.alert ? [saved.alert] : []);
 
     if (notifyAlerts.length > 0) {
       showFollowNotification(notifyAlerts);

@@ -8,7 +8,9 @@ import {
   deleteSavedMatch,
   deleteSavedMatchAccount,
   deleteSavedMatchGroup,
-  getSavedMatches,
+  getSavedMatchAccount,
+  getSavedMatchesCatalog,
+  getSavedMatchesSummary,
   importSavedMatches,
   saveMatchesForProfile,
   setSavedMatchAccountFollow,
@@ -40,8 +42,16 @@ export function registerMatchHandlers(): void {
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES, async () => {
-    return getSavedMatches();
+  ipcMain.handle(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_SUMMARY, async () => {
+    return getSavedMatchesSummary();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_CATALOG, async () => {
+    return getSavedMatchesCatalog();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_GET_SAVED_MATCH_ACCOUNT, async (_event, accountId) => {
+    return getSavedMatchAccount(String(accountId ?? ''));
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_IMPORT_SAVED_MATCHES, async (_event, state) => {
@@ -49,31 +59,38 @@ export function registerMatchHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_SAVE_MATCHES_FOR_PROFILE, async (_event, profile, region, matches, regionName) => {
-    return saveMatchesForProfile(profile, region, matches, regionName);
+    const account = await saveMatchesForProfile(profile, region, matches, regionName);
+    return { accountId: account.id };
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_CREATE_SAVED_GROUP, async (_event, name) => {
-    return createSavedMatchGroup(String(name ?? ''));
+    await createSavedMatchGroup(String(name ?? ''));
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_DELETE_SAVED_GROUP, async (_event, groupId) => {
-    return deleteSavedMatchGroup(String(groupId ?? ''));
+    await deleteSavedMatchGroup(String(groupId ?? ''));
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_GROUP, async (_event, accountId, groupId) => {
-    return setSavedMatchAccountGroup(String(accountId ?? ''), groupId ? String(groupId) : undefined);
+    await setSavedMatchAccountGroup(String(accountId ?? ''), groupId ? String(groupId) : undefined);
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_SET_SAVED_ACCOUNT_FOLLOW, async (_event, accountId, enabled) => {
-    return setSavedMatchAccountFollow(String(accountId ?? ''), Boolean(enabled));
+    await setSavedMatchAccountFollow(String(accountId ?? ''), Boolean(enabled));
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_DELETE_SAVED_ACCOUNT, async (_event, accountId) => {
-    return deleteSavedMatchAccount(String(accountId ?? ''));
+    await deleteSavedMatchAccount(String(accountId ?? ''));
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_DELETE_SAVED_MATCH, async (_event, accountId, gameId) => {
-    return deleteSavedMatch(String(accountId ?? ''), Number(gameId));
+    await deleteSavedMatch(String(accountId ?? ''), Number(gameId));
+    return getSavedMatchesCatalog();
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_GET_REPLAY_AVAILABILITY, async (_event, request) => {

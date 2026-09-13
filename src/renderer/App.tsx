@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Activity, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Globe2, Search } from 'lucide-react';
 import { AppShell, type ScoutSidebarStatus, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
@@ -6,7 +6,7 @@ import { MatchHistoryPage } from './components/match/MatchHistoryPage';
 import { FollowAccountsDialog, type FollowAccountRequest } from './components/match/FollowAccountsDialog';
 import { SavedMatchPickerDialog } from './components/match/SavedMatchPickerDialog';
 import {
-  loadSavedMatchesState,
+  loadSavedMatchesSummary,
   SAVED_MATCHES_CHANGED_EVENT,
   type SavedMatchAccount,
 } from './components/match/savedMatchesStore';
@@ -45,7 +45,15 @@ const PAGE_TITLES: Record<View, string> = {
 
 const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
 const HIDDEN_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
-const FRIEND_PANEL_ANIMATION_MS = 220;
+const FRIEND_PANEL_ANIMATION_MS = 200;
+
+const StableHomePage = memo(HomePage);
+const StableMatchHistoryPage = memo(MatchHistoryPage);
+const StableLiveGamePage = memo(LiveGamePage);
+const StableScoutPage = memo(ScoutPage);
+const StableChampionRankingPage = memo(ChampionRankingPage);
+const StableAssistPage = memo(AssistPage);
+const StableFriendPanel = memo(FriendPanel);
 const FRIEND_REQUEST_CHECK_INTERVAL_MS = 10_000;
 const FOLLOW_ALERTS_READ_STORAGE_KEY = 'lolhelp:follow-alerts-read:v1';
 const APP_SESSION_STORAGE_KEY = 'lolhelp:ui-session:v1';
@@ -179,7 +187,9 @@ export function App() {
 
     const handleWindowFocus = () => void refreshRegion();
     void refreshRegion();
-    const refreshTimer = window.setInterval(() => void refreshRegion(), 3_000);
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshRegion();
+    }, 15_000);
     window.addEventListener('focus', handleWindowFocus);
     return () => {
       cancelled = true;
@@ -317,6 +327,14 @@ export function App() {
     setMatchSearchTrigger((n) => n + 1);
   }, []);
 
+  const handleLivePlayerSearch = useCallback((riotId: string) => {
+    handlePlayerSearch(riotId, currentRegionKey);
+  }, [currentRegionKey, handlePlayerSearch]);
+
+  const handleScoutPanelMinimize = useCallback(() => {
+    setScoutPanelMinimized(true);
+  }, []);
+
   const handleFollowAccount = useCallback((riotId: string, region?: string) => {
     setSavedPickerOpen(false);
     setChatSessionsOpen(false);
@@ -328,8 +346,8 @@ export function App() {
 
   const markCurrentFollowAlertsRead = useCallback(async () => {
     try {
-      const state = await loadSavedMatchesState();
-      saveReadFollowAlertIds(new Set((state.followAlerts ?? []).map((alert) => alert.id)));
+      const summary = await loadSavedMatchesSummary();
+      saveReadFollowAlertIds(new Set(summary.followAlertIds));
       setFollowAlertCount(0);
     } catch {
       setFollowAlertCount(0);
@@ -338,8 +356,7 @@ export function App() {
 
   const refreshFollowAlertCount = useCallback(async () => {
     try {
-      const state = await loadSavedMatchesState();
-      const alertIds = (state.followAlerts ?? []).map((alert) => alert.id);
+      const { followAlertIds: alertIds } = await loadSavedMatchesSummary();
       if (followAccountsOpen) {
         saveReadFollowAlertIds(new Set(alertIds));
         setFollowAlertCount(0);
@@ -477,75 +494,88 @@ export function App() {
       }}
       settingsOpen={settingsOpen}
       friendPanel={
-        <FriendPanel
-          onFriendClick={handleFriendClick}
-          onFriendFollow={handleFollowAccount}
-        />
+         <StableFriendPanel
+           onFriendClick={handleFriendClick}
+           onFriendFollow={handleFollowAccount}
+           active={!friendPanelHidden}
+         />
       }
     >
-      <div className={activeView === 'home' ? '' : 'hidden'}>
-        <HomePage />
-      </div>
-      <div className={activeView === 'matches' ? 'h-full' : 'hidden'}>
-        <MatchHistoryPage
-          key={clientSessionId || 'client-session'}
-          searchName={matchSearchName}
-          searchTrigger={matchSearchTrigger}
-          region={matchRegion}
+      <Activity name="home" mode={activeView === 'home' ? 'visible' : 'hidden'}>
+        <div><StableHomePage /></div>
+      </Activity>
+      <Activity name="matches" mode={activeView === 'matches' ? 'visible' : 'hidden'}>
+        <div className="h-full">
+          <StableMatchHistoryPage
+            key={clientSessionId || 'client-session'}
+            searchName={matchSearchName}
+            searchTrigger={matchSearchTrigger}
+            region={matchRegion}
+            currentRegionKey={currentRegionKey}
+            currentRegionName={currentRegionName}
+            savedAccountRequest={savedAccountRequest}
+            onPlayerSearch={handlePlayerSearch}
+          />
+        </div>
+      </Activity>
+      <Activity name="live" mode={activeView === 'live' ? 'visible' : 'hidden'}>
+        <div className="h-full">
+          <StableLiveGamePage
+            onTitleChange={setLivePageTitle}
+            onPlayerSearch={handleLivePlayerSearch}
+          />
+        </div>
+      </Activity>
+      <Activity
+        name="scout"
+        mode={activeView === 'scout' || scoutSidebarStatus?.running ? 'visible' : 'hidden'}
+      >
+        <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
+          <StableScoutPage
+            currentRegionName={currentRegionName}
+            onPlayerSearch={handlePlayerSearch}
+            onStatusChange={setScoutSidebarStatus}
+            configPanelMinimized={scoutPanelActuallyMinimized}
+            onConfigPanelMinimize={handleScoutPanelMinimize}
+          />
+        </div>
+      </Activity>
+      <Activity name="ranking" mode={activeView === 'ranking' ? 'visible' : 'hidden'}>
+        <div className="h-full"><StableChampionRankingPage chapter={rankingChapter} /></div>
+      </Activity>
+      <Activity name="assist" mode={activeView === 'assist' ? 'visible' : 'hidden'}>
+        <div className="h-full"><StableAssistPage onPlayerSearch={handlePlayerSearch} /></div>
+      </Activity>
+      {chatSessionsOpen && (
+        <ChatSessionDialog open onClose={() => setChatSessionsOpen(false)} />
+      )}
+      {savedPickerOpen && (
+        <SavedMatchPickerDialog
+          open
+          onClose={() => setSavedPickerOpen(false)}
+          onSelect={(account) => {
+            setActiveView('matches');
+            setSavedAccountRequest({ account, nonce: Date.now() });
+          }}
+        />
+      )}
+      {followAccountsOpen && (
+        <FollowAccountsDialog
+          open
+          onClose={() => setFollowAccountsOpen(false)}
           currentRegionKey={currentRegionKey}
           currentRegionName={currentRegionName}
-          savedAccountRequest={savedAccountRequest}
-          onPlayerSearch={handlePlayerSearch}
+          request={followAccountRequest}
         />
-      </div>
-      <div className={activeView === 'live' ? 'h-full' : 'hidden'}>
-        <LiveGamePage
-          onTitleChange={setLivePageTitle}
-          onPlayerSearch={(riotId) => handlePlayerSearch(riotId, currentRegionKey)}
+      )}
+      {friendManagerOpen && (
+        <FriendManagerDialog
+          open
+          onClose={() => setFriendManagerOpen(false)}
+          acceptedAlerts={friendAcceptedAlerts}
         />
-      </div>
-      <div className={activeView === 'scout' ? 'h-full' : 'hidden'}>
-        <ScoutPage
-          currentRegionName={currentRegionName}
-          onPlayerSearch={handlePlayerSearch}
-          onStatusChange={setScoutSidebarStatus}
-          configPanelMinimized={scoutPanelActuallyMinimized}
-          onConfigPanelMinimize={() => setScoutPanelMinimized(true)}
-        />
-      </div>
-      <div className={activeView === 'ranking' ? 'h-full' : 'hidden'}>
-        <ChampionRankingPage chapter={rankingChapter} />
-      </div>
-      <div className={activeView === 'assist' ? 'h-full' : 'hidden'}>
-        <AssistPage
-          onPlayerSearch={handlePlayerSearch}
-        />
-      </div>
-      <ChatSessionDialog
-        open={chatSessionsOpen}
-        onClose={() => setChatSessionsOpen(false)}
-      />
-      <SavedMatchPickerDialog
-        open={savedPickerOpen}
-        onClose={() => setSavedPickerOpen(false)}
-        onSelect={(account) => {
-          setActiveView('matches');
-          setSavedAccountRequest({ account, nonce: Date.now() });
-        }}
-      />
-      <FollowAccountsDialog
-        open={followAccountsOpen}
-        onClose={() => setFollowAccountsOpen(false)}
-        currentRegionKey={currentRegionKey}
-        currentRegionName={currentRegionName}
-        request={followAccountRequest}
-      />
-      <FriendManagerDialog
-        open={friendManagerOpen}
-        onClose={() => setFriendManagerOpen(false)}
-        acceptedAlerts={friendAcceptedAlerts}
-      />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      )}
+      {settingsOpen && <SettingsDialog open onClose={() => setSettingsOpen(false)} />}
     </AppShell>
   );
 }

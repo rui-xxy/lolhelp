@@ -23,6 +23,7 @@ let connectedCredentialKey = '';
 let lastPhase = 'None';
 let lastLiveHeartbeatAt = 0;
 let firstPollFailureAt = 0;
+const activityListeners = new Set<(phase: string) => void>();
 
 function normalizePhase(value: unknown): string {
   if (typeof value !== 'string') return 'None';
@@ -51,6 +52,16 @@ function emitLiveState(event: Omit<LiveStateChangeEvent, 'at'>): void {
   }
 }
 
+function emitActivity(phase: string): void {
+  for (const listener of activityListeners) {
+    try {
+      listener(phase);
+    } catch (error) {
+      console.warn('[live] activity listener failed:', error);
+    }
+  }
+}
+
 function emitPhaseIfChanged(
   phase: string,
   source: LiveStateChangeEvent['source'],
@@ -65,6 +76,7 @@ function emitPhaseIfChanged(
     lastPhase = normalized;
   }
   lastLiveHeartbeatAt = Date.now();
+  emitActivity(normalized);
   emitLiveState({
     phase: normalized,
     inGame: isLivePhase(normalized),
@@ -77,6 +89,7 @@ function scheduleChampSelectRefresh(): void {
   if (champSelectRefreshTimer) return;
   champSelectRefreshTimer = setTimeout(() => {
     champSelectRefreshTimer = null;
+    emitActivity(lastPhase === 'None' ? 'ChampSelect' : lastPhase);
     emitLiveState({
       phase: lastPhase === 'None' ? 'ChampSelect' : lastPhase,
       inGame: true,
@@ -84,6 +97,15 @@ function scheduleChampSelectRefresh(): void {
       uri: CHAMP_SELECT_SESSION_URI,
     });
   }, CHAMP_SELECT_REFRESH_THROTTLE_MS);
+}
+
+export function getCurrentGameflowPhase(): string {
+  return lastPhase;
+}
+
+export function subscribeGameflowActivity(listener: (phase: string) => void): () => void {
+  activityListeners.add(listener);
+  return () => activityListeners.delete(listener);
 }
 
 async function pollPhase(source: LiveStateChangeEvent['source'] = 'poll'): Promise<void> {
@@ -252,4 +274,5 @@ export function stopLiveWatcher(): void {
     champSelectRefreshTimer = null;
   }
   disposeSocket();
+  activityListeners.clear();
 }

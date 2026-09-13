@@ -507,7 +507,7 @@ export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankS
 // 关键：必须传完整 Riot ID（gameName#tagLine），# 编码成 %23。
 // 只传 gameName（不带 #tagLine）会返回 422（之前所有失败的根因）。
 // 返回 { puuid, riotId } 或 null（没找到）。
-async function lookupSummonerByRiotId(riotId: string): Promise<{
+async function lookupSummonerByRiotId(riotId: string, includeProfileDetails = true): Promise<{
   puuid: string;
   riotId: string;
   level: number;
@@ -525,10 +525,12 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{
       const lcuProfile = client
         ? await fetchLcuSummonerProfileByPuuid(client, riotAccount.puuid)
         : null;
-      const ranks = client && lcuProfile
+      const ranks = includeProfileDetails && client && lcuProfile
         ? await fetchRanksByPuuid(client, riotAccount.puuid, lcuProfile.summonerId)
         : [];
-      const counts = await fetchCollectionCounts(riotAccount.puuid);
+      const counts = includeProfileDetails
+        ? await fetchCollectionCounts(riotAccount.puuid)
+        : { championCount: null, skinCount: null };
       return {
         puuid: riotAccount.puuid,
         riotId: lcuProfile?.riotId || riotAccount.riotId,
@@ -563,10 +565,12 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{
       const fullRiotId = summoner.tagLine && !gameName.includes('#')
         ? `${gameName}#${summoner.tagLine}`
         : gameName;
-      const [ranks, counts] = await Promise.all([
-        fetchRanksByPuuid(client, summoner.puuid, summoner.summonerId),
-        fetchCollectionCounts(summoner.puuid),
-      ]);
+      const [ranks, counts] = includeProfileDetails
+        ? await Promise.all([
+            fetchRanksByPuuid(client, summoner.puuid, summoner.summonerId),
+            fetchCollectionCounts(summoner.puuid),
+          ])
+        : [[], { championCount: null, skinCount: null }];
       return {
         puuid: summoner.puuid,
         riotId: fullRiotId,
@@ -584,7 +588,7 @@ async function lookupSummonerByRiotId(riotId: string): Promise<{
   return null;
 }
 
-async function fetchCurrentSummonerProfile(): Promise<{
+async function fetchCurrentSummonerProfile(includeProfileDetails = true): Promise<{
   riotId: string;
   level: number;
   profileIconId: number;
@@ -620,10 +624,12 @@ async function fetchCurrentSummonerProfile(): Promise<{
   const riotId = gameName && summoner.tagLine && !gameName.includes('#')
     ? `${gameName}#${summoner.tagLine}`
     : gameName;
-  const [ranks, counts] = await Promise.all([
-    fetchCurrentRanks(client, summoner.puuid, summoner.summonerId),
-    fetchCollectionCounts(summoner.puuid),
-  ]);
+  const [ranks, counts] = includeProfileDetails
+    ? await Promise.all([
+        fetchCurrentRanks(client, summoner.puuid, summoner.summonerId),
+        fetchCollectionCounts(summoner.puuid),
+      ])
+    : [[], { championCount: null, skinCount: null }];
   return {
     riotId,
     level: summoner.summonerLevel ?? 0,
@@ -638,7 +644,11 @@ async function fetchCurrentSummonerProfile(): Promise<{
 // 主入口：查战绩。
 // 输入为空/自己/我/me → 查当前登录账号；输入"名字#数字" → 查该玩家。
 // 支持翻页：count 是本次拉取条数，startIndex 是偏移（0/100/200...）。
-export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLookupResult> {
+export async function searchPlayer(
+  req: PlayerLookupRequest,
+  options: { includeProfileDetails?: boolean } = {},
+): Promise<PlayerLookupResult> {
+  const includeProfileDetails = options.includeProfileDetails ?? true;
   const count = Math.min(MAX_COUNT, Math.max(1, Math.floor(req.pageSize ?? req.maxMatches ?? DEFAULT_COUNT)));
   const startIndex = Math.max(0, Math.floor(req.startIndex ?? 0));
   // 清洗输入：去不可见字符，统一各种 # 变体为标准 #，去多余空格。
@@ -665,7 +675,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
   let skinCount: number | null = null;
   if (isSelfQuery) {
     try {
-      const selfProfile = await fetchCurrentSummonerProfile();
+      const selfProfile = await fetchCurrentSummonerProfile(includeProfileDetails);
       displayName = selfProfile.riotId;
       level = selfProfile.level;
       profileIconId = selfProfile.profileIconId;
@@ -678,7 +688,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     }
   } else {
     // 输入了 Riot ID → 按 LCU 查 puuid
-    const lookup = await lookupSummonerByRiotId(inputName);
+    const lookup = await lookupSummonerByRiotId(inputName, includeProfileDetails);
     if (!lookup) {
       return emptyResult(`未找到玩家「${inputName}」，请确认 Riot ID 格式为 名字#数字`);
     }
@@ -692,7 +702,7 @@ export async function searchPlayer(req: PlayerLookupRequest): Promise<PlayerLook
     skinCount = lookup.skinCount;
   }
 
-  if (targetPuuid && ranks.length === 0) {
+  if (includeProfileDetails && targetPuuid && ranks.length === 0) {
     ranks = await fetchSgpRanksByPuuid(auth, targetPuuid);
     rank = pickPreferredRank(ranks);
   }
