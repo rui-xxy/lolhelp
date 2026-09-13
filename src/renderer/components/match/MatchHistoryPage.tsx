@@ -933,7 +933,7 @@ export function MatchHistoryPage({
                     {tabLabel}
                   </span>
                   {tab.loading && (
-                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(229,197,140,0.12)]" />
+                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(94,106,210,0.12)]" />
                   )}
                 </button>
                 <button

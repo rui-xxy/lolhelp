@@ -139,7 +139,7 @@ export function FriendManagerDialog({
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-app-border bg-app-bg-soft/60 px-5 py-3.5">
           <form
-            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-[0_0_0_3px_rgba(229,197,140,0.08)]"
+            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-[0_0_0_3px_rgba(94,106,210,0.08)]"
             onSubmit={(event) => {
               event.preventDefault();
               void addFriend();
@@ -244,7 +244,7 @@ export function FriendManagerDialog({
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-semibold text-app-text">{id || '未知玩家'}</div>
                       <div className="mt-1 flex items-center gap-1.5 text-[11px] text-app-muted">
-                        <span className={`size-1.5 rounded-full ${incoming ? 'bg-app-primary' : 'bg-amber-400'}`} />
+                        <span className={`size-1.5 rounded-full ${incoming ? 'bg-app-primary' : 'bg-app-muted'}`} />
                         {incoming ? '对方向你发送了好友申请' : '已发送，等待对方通过'}
                       </div>
                     </div>
