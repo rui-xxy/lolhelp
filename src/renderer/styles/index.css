@@ -1,33 +1,34 @@
 @import "tailwindcss";
 
-/* Gravity-inspired deep-black & champagne-gold work surface. The app-* names stay
-   stable so pages can migrate incrementally while sharing one dark foundation.
-   色板取自「引力之旅」：近黑底 #020304 / 亮金 #e5c58c / 弱金 #d0c4ab / 暗金 #51422b */
+/* Gravity-inspired deep-space UI: blue-tinted black layers (never neutral),
+   champagne-gold primary with a metallic sheen, restrained indigo accent,
+   and ambient aurora glows for depth. 色板源自「引力之旅」金白黑洞。 */
 @theme {
-  --color-app-bg: #0c0d10;
-  --color-app-bg-soft: #111318;
-  --color-app-shell: #08090b;
-  --color-app-sidebar: #08090b;
+  --color-app-bg: #0c0f1a;
+  --color-app-bg-soft: #111624;
+  --color-app-shell: #090b13;
+  --color-app-sidebar: #090b13;
 
-  --color-app-surface: #15171c;
-  --color-app-surface-soft: #1c1f25;
+  --color-app-surface: #161c2c;
+  --color-app-surface-soft: #1e2537;
 
-  --color-app-border: rgba(232, 222, 200, 0.1);
-  --color-app-border-strong: rgba(232, 222, 200, 0.18);
+  --color-app-border: rgba(226, 232, 255, 0.09);
+  --color-app-border-strong: rgba(226, 232, 255, 0.16);
 
   --color-app-nav-hover: rgba(229, 197, 140, 0.06);
   --color-app-selected: rgba(229, 197, 140, 0.1);
-  --color-app-focus: #d5bc82;
+  --color-app-focus: #8b87e8;
 
-  --color-app-text: #e8e3d8;
-  --color-app-body: rgba(232, 227, 216, 0.86);
-  --color-app-muted: rgba(208, 196, 171, 0.75);
-  --color-app-subtle: rgba(208, 196, 171, 0.5);
+  --color-app-text: #e9e8f2;
+  --color-app-body: rgba(233, 232, 242, 0.86);
+  --color-app-muted: rgba(206, 205, 224, 0.75);
+  --color-app-subtle: rgba(206, 205, 224, 0.5);
 
   --color-app-primary: #e5c58c;
   --color-app-primary-hover: #eed9ae;
   --color-app-primary-soft: rgba(229, 197, 140, 0.12);
   --color-app-primary-foreground: #171208;
+  --color-app-accent: #8b87e8;
 
   --color-app-danger: #e2604e;
   --color-app-danger-hover: #ef7a66;
@@ -51,9 +52,9 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  --shadow-ui-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-ui-shell: 0 0 0 1px rgba(232, 222, 200, 0.05), 0 10px 32px -16px rgba(0, 0, 0, 0.55);
-  --shadow-ui-popover: 0 0 0 1px rgba(232, 222, 200, 0.1), 0 12px 36px -10px rgba(0, 0, 0, 0.65);
+  --shadow-ui-sm: 0 1px 2px rgba(2, 4, 12, 0.5);
+  --shadow-ui-shell: 0 0 0 1px rgba(226, 232, 255, 0.05), 0 10px 32px -16px rgba(2, 4, 12, 0.6);
+  --shadow-ui-popover: 0 0 0 1px rgba(226, 232, 255, 0.1), 0 12px 36px -10px rgba(2, 4, 12, 0.7);
 
   --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -158,6 +159,29 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  /* Ambient aurora: indigo bloom top-left, faint gold bloom bottom-right.
+     Sits on background-color via background-image, so every surface above
+     still reads as a floating layer. background-attachment: fixed keeps
+     the glow anchored to the viewport while content scrolls. */
+  .app-ambient {
+    background-image:
+      radial-gradient(46rem 32rem at 8% -10%, rgba(123, 117, 235, 0.11), transparent 62%),
+      radial-gradient(42rem 32rem at 100% 108%, rgba(229, 197, 140, 0.06), transparent 58%);
+    background-attachment: fixed;
+  }
+
+  /* Metallic sheen for every gold fill: a specular highlight over the solid
+     token color, so hover states (which swap background-color) keep the sheen. */
+  .bg-app-primary {
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.24) 0%,
+      rgba(255, 255, 255, 0.07) 42%,
+      rgba(120, 80, 20, 0.1) 100%
+    );
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
   }
 }
 
@@ -6094,7 +6118,7 @@
     left: 15%;
     height: 1px;
     content: "";
-    background: color-mix(in srgb, var(--champion-tone) 18%, #15171c);
+    background: color-mix(in srgb, var(--champion-tone) 18%, #161c2c);
   }
 
   .ranking-counter-portrait {

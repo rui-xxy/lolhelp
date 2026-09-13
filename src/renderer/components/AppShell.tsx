@@ -545,7 +545,7 @@ export function AppShell({
         {/* 主内容区：连续的中性工作画布，承载各功能模块。
             fullBleed=true 时不加 max-w/padding，由内容自己管布局（战绩页双栏全宽）。
             fullBleed=false（默认）时 max-w-5xl 居中。 */}
-        <main className={`flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
+        <main className={`app-ambient flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
           <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
         </main>
         </section>
