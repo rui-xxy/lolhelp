@@ -341,7 +341,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                   <button
                     type="button"
                     onClick={() => void createGroup()}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-app-primary text-white transition-colors hover:bg-app-primary-hover"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-app-primary text-app-primary-foreground transition-colors hover:bg-app-primary-hover"
                     title="新建分组"
                     aria-label="新建分组"
                   >
@@ -444,7 +444,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                         type="button"
                         onClick={() => void openSavedAccount(activeAccount.id)}
                         disabled={openingAccountId !== null}
-                        className="h-8 shrink-0 rounded-sm bg-app-primary px-4 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover disabled:opacity-60"
+                        className="h-8 shrink-0 rounded-sm bg-app-primary px-4 text-xs font-medium text-app-primary-foreground transition-colors hover:bg-app-primary-hover disabled:opacity-60"
                       >
                         {openingAccountId === activeAccount.id ? '正在打开…' : '打开战绩'}
                       </button>

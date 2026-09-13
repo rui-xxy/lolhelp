@@ -457,7 +457,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
                             data-friend-action-menu
                             onClick={() => setActionFriendId((current) =>
                               current === friend.id ? '' : friend.id)}
-                            className="relative z-10 mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-app-subtle opacity-0 transition-opacity hover:bg-white/70 hover:text-app-text group-hover:opacity-100"
+                            className="relative z-10 mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-app-subtle opacity-0 transition-opacity hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100"
                             title="好友操作"
                           >
                             <MoreHorizontal className="size-3.5" />

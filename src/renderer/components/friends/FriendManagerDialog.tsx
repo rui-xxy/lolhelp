@@ -139,7 +139,7 @@ export function FriendManagerDialog({
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-app-border bg-app-bg-soft/60 px-5 py-3.5">
           <form
-            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-[0_0_0_3px_rgba(255,56,92,0.08)]"
+            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-[0_0_0_3px_rgba(229,197,140,0.08)]"
             onSubmit={(event) => {
               event.preventDefault();
               void addFriend();
@@ -156,7 +156,7 @@ export function FriendManagerDialog({
             <button
               type="submit"
               disabled={busyKey === 'add'}
-              className="flex min-w-[88px] items-center justify-center gap-1.5 bg-app-primary px-3 text-xs font-medium text-white transition-colors hover:bg-app-primary-hover disabled:opacity-60"
+              className="flex min-w-[88px] items-center justify-center gap-1.5 bg-app-primary px-3 text-xs font-medium text-app-primary-foreground transition-colors hover:bg-app-primary-hover disabled:opacity-60"
             >
               <Send className="size-3.5" />
               {busyKey === 'add' ? '正在发送' : '发送申请'}

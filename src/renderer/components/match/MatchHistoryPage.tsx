@@ -933,7 +933,7 @@ export function MatchHistoryPage({
                     {tabLabel}
                   </span>
                   {tab.loading && (
-                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(255,52,92,0.12)]" />
+                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(229,197,140,0.12)]" />
                   )}
                 </button>
                 <button
@@ -1034,7 +1034,7 @@ export function MatchHistoryPage({
                         type="button"
                         disabled={selectedSaveCount === 0}
                         onClick={() => void handleSaveSelectedMatches()}
-                        className="h-6 rounded-sm bg-app-primary px-2 text-[11px] font-medium text-white transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
+                        className="h-6 rounded-sm bg-app-primary px-2 text-[11px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
                       >
                         保存{selectedSaveCount > 0 ? selectedSaveCount : ''}
                       </button>

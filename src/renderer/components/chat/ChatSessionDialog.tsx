@@ -183,7 +183,7 @@ function MessageBubble({
         <div
           className={`whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-5 shadow-sm ${
             message.fromSelf
-              ? 'rounded-tr-xs bg-app-primary text-white'
+              ? 'rounded-tr-xs bg-app-primary text-app-primary-foreground'
               : 'rounded-tl-xs border border-app-border bg-app-surface text-app-text'
           }`}
         >
@@ -596,7 +596,7 @@ export function ChatSessionDialog({
                         className="border border-app-border"
                       />
                       {conversation.unreadMessageCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[9px] font-semibold leading-4 text-white">
+                        <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[9px] font-semibold leading-4 text-app-primary-foreground">
                           {conversation.unreadMessageCount > 99
                             ? '99+'
                             : conversation.unreadMessageCount}
@@ -808,7 +808,7 @@ export function ChatSessionDialog({
                         type="button"
                         onClick={() => void submitMessage()}
                         disabled={!draft.trim() || sending || !canSendMessage}
-                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-app-primary px-3 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:bg-app-nav-hover disabled:text-app-subtle"
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm bg-app-primary px-3 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover disabled:cursor-not-allowed disabled:bg-app-nav-hover disabled:text-app-subtle"
                       >
                         <SendHorizontal className="size-3.5" />
                         {sending ? '发送中' : '发送'}

@@ -87,7 +87,7 @@ export function ChampionPickerDialog({
           {/* 底部：确定按钮 */}
           <div className="flex items-center justify-between border-t border-app-border bg-app-surface-soft px-5 py-3">
             <span className="text-[11px] text-app-subtle">点方案可一键套用，点格子选/取消</span>
-            <Dialog.Close className="rounded-sm bg-app-primary px-5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-primary-hover">
+            <Dialog.Close className="rounded-sm bg-app-primary px-5 py-1.5 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover">
               确定（{selectedIds.length}）
             </Dialog.Close>
           </div>

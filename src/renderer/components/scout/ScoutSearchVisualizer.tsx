@@ -1009,7 +1009,7 @@ export function ScoutSearchVisualizer({
         if (!recent && node.event.state !== 'checking' && node.event.state !== 'matched') continue;
         context.strokeStyle =
           node.event.state === 'matched'
-            ? 'rgba(255, 56, 92, 0.22)'
+            ? 'rgba(229,197,140, 0.22)'
             : 'rgba(91, 126, 134, 0.13)';
         context.lineWidth = node.event.state === 'matched' ? 1.1 : 0.7;
         context.beginPath();

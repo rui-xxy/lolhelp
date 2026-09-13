@@ -266,8 +266,8 @@ function SidebarScoutStatus({
 
       {status.hits.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-app-border/70 pt-2">
-          <div className="flex h-6 shrink-0 items-center justify-between px-1 text-[10px] font-semibold text-app-muted">
-            <span>已找到的高手</span>
+          <div className="app-eyebrow flex h-6 shrink-0 items-center justify-between px-1">
+            <span>( 已找到的高手 )</span>
             <span>{status.hits.length}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
@@ -372,9 +372,9 @@ export function AppShell({
             aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
             className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
           >
-            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-border-strong bg-white shadow-[var(--shadow-ui-sm)] transition-colors group-hover:bg-app-selected">
-              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#ff5a70_0_25%,#efb54a_0_50%,#33a780_0_75%,#4c83d6_0)] transition-opacity group-hover:opacity-0" />
-              <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-white transition-opacity group-hover:opacity-0" />
+            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-border-strong bg-app-surface-soft shadow-[var(--shadow-ui-sm)] transition-colors group-hover:bg-app-selected">
+              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#e5c58c_0_25%,#d0c4ab_0_50%,#b2d5f3_0_75%,#e8d5b4_0)] transition-opacity group-hover:opacity-0" />
+              <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-app-surface-soft transition-opacity group-hover:opacity-0" />
               <Sparkles className="absolute size-3.5 text-app-text transition-opacity group-hover:opacity-0" />
               <PanelLeft className="absolute size-4 text-app-text opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
@@ -481,7 +481,7 @@ export function AppShell({
                 >
                   <Bell className="size-4" />
                   {followAlertCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-app-surface">
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-app-primary-foreground shadow-sm ring-2 ring-app-surface">
                       {followAlertCount > 99 ? '99+' : followAlertCount}
                     </span>
                   )}
@@ -516,7 +516,7 @@ export function AppShell({
                 >
                   <MailPlus className="size-4" />
                   {friendRequestAlertCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-app-surface">
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-app-primary-foreground shadow-sm ring-2 ring-app-surface">
                       {friendRequestAlertCount > 99 ? '99+' : friendRequestAlertCount}
                     </span>
                   )}

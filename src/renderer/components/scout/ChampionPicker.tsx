@@ -215,7 +215,7 @@ export function ChampionPicker({
             onClick={() => setCategory(cat.key)}
             className={`rounded-xs px-2.5 py-1 text-[11px] font-medium transition-colors ${
               category === cat.key
-                ? 'bg-app-primary text-white'
+                ? 'bg-app-primary text-app-primary-foreground'
                 : 'bg-app-surface-soft text-app-muted hover:bg-app-nav-hover'
             }`}
           >

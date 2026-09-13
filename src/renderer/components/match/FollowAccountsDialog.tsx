@@ -230,7 +230,7 @@ export function FollowAccountsDialog({
               <button
                 type="submit"
                 disabled={following}
-                className="flex w-10 shrink-0 items-center justify-center bg-app-primary text-white transition-colors hover:bg-app-primary-hover disabled:opacity-60"
+                className="flex w-10 shrink-0 items-center justify-center bg-app-primary text-app-primary-foreground transition-colors hover:bg-app-primary-hover disabled:opacity-60"
                 title="关注"
                 aria-label="关注"
               >
