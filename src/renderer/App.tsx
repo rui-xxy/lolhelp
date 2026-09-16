@@ -33,7 +33,6 @@ import {
 } from './components/friends/friendRequestTracking';
 import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
-// 页面根组件：持有当前视图状态 + 战绩搜索词 + 大区（搜索框在顶部标题栏）。
 const PAGE_TITLES: Record<View, string> = {
   home: '主页',
   matches: '', // 战绩页标题栏放搜索框，标题留空
@@ -268,14 +267,13 @@ export function App() {
   const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
   const formatRegionOption = (region: (typeof regions)[number]) => region.name;
 
-  // 战绩搜索框 + 大区选择器（仅在战绩视图显示，渲染到 AppShell 顶部标题栏左侧）
   const matchSearchBar = activeView === 'matches' ? (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/40 focus-within:bg-app-surface-soft focus-within:shadow-[0_0_0_2px_rgba(94,105,209,0.5)]"
+      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/40 focus-within:bg-app-surface-soft focus-within:shadow-[0_0_0_2px_rgba(213,180,105,0.18)]"
     >
       <div className="relative flex w-32 shrink-0 items-center border-r border-app-border bg-app-shell/45">
         <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary/75" />

@@ -3,8 +3,6 @@ import { Save, Star, Search, X } from 'lucide-react';
 import { GameIcon } from '../match/GameIcon';
 import type { ChampionPreset, ChampionSummary } from '../../../shared/api';
 
-// 英雄选择网格（放在弹窗里）。
-//
 // 数据源 tags 是英文角色定位（Mage/Fighter/Tank/Assassin/Support/Marksman），
 // 一个英雄常有多个 tag。这里按「主定位」(tags[0]) 映射到中文位置分类。
 //
@@ -21,7 +19,6 @@ const POSITION_BY_TAG: Record<string, string> = {
   Marksman: '射手',
 };
 
-// 分类标签（顺序即 tab 顺序）
 const CATEGORIES = [
   { key: 'all', label: '全部' },
   { key: 'Marksman', label: '射手' },
@@ -110,7 +107,6 @@ export function ChampionPicker({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 已选栏 */}
       {selectedChampions.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 rounded-xs border border-app-border bg-app-surface-soft px-2 py-1.5">
           {selectedChampions.map((c) => (
@@ -207,7 +203,6 @@ export function ChampionPicker({
         </div>
       )}
 
-      {/* 分类 Tab */}
       <div className="flex flex-wrap gap-1">
         {CATEGORIES.map((cat) => (
           <button
@@ -224,7 +219,6 @@ export function ChampionPicker({
         ))}
       </div>
 
-      {/* 搜索框 */}
       <div className="relative">
         <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" />
         <input
@@ -236,7 +230,6 @@ export function ChampionPicker({
         />
       </div>
 
-      {/* 英雄网格 */}
       <div className="scout-champion-grid">
         {sorted.map((c) => {
           const selected = selectedSet.has(c.id);

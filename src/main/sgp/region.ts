@@ -52,7 +52,6 @@ export function getRegionConfig(key: string): RegionConfig | null {
   return host ? r(normalized, normalized, host) : null;
 }
 
-// 所有支持的大区（供 UI 大区选择器用）。
 export function getAllRegions(): RegionConfig[] {
   return REGION_LIST;
 }

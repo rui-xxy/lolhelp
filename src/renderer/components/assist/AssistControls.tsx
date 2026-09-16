@@ -63,7 +63,7 @@ export function TextInput({
       value={value}
       placeholder={placeholder}
       onChange={(event) => onChange(event.target.value)}
-      className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-[border-color,box-shadow] placeholder:text-app-subtle hover:border-app-border-strong focus:border-app-primary focus:shadow-[0_0_0_3px_rgba(94,106,210,0.07)]"
+      className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-[border-color,box-shadow] placeholder:text-app-subtle hover:border-app-border-strong focus:border-app-primary focus:shadow-[0_0_0_3px_rgba(213,180,105,0.07)]"
     />
   );
 }
@@ -153,7 +153,7 @@ export function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="h-8 rounded-sm bg-app-primary px-3.5 text-xs font-semibold text-app-primary-foreground transition-[background-color,box-shadow] hover:bg-app-primary-hover hover:shadow-[0_2px_8px_rgba(94,106,210,0.16)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="h-8 rounded-sm bg-app-primary px-3.5 text-xs font-semibold text-app-primary-foreground transition-[background-color,box-shadow] hover:bg-app-primary-hover hover:shadow-[0_2px_8px_rgba(213,180,105,0.16)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>

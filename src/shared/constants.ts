@@ -1,11 +1,13 @@
 export const DEFAULT_LOL_ROOT_PATH = 'D:\\WeGameApps\\英雄联盟';
 
 export const APP_LAYOUT = {
-  workspaceWidth: 1280,
+  workspaceWidth: 1448,
+  windowHeight: 850,
+  minWindowHeight: 760,
   friendPanelWidth: 288,
   hiddenFriendPanelWidth: 0,
-  expandedSidebarWidth: 248,
-  collapsedSidebarWidth: 64,
+  expandedSidebarWidth: 216,
+  collapsedSidebarWidth: 60,
 } as const;
 
 export const LOL_REGIONS = [

@@ -56,7 +56,6 @@ const ACTIVE_RENDER_INTERVAL = 1000 / 60;
 const IDLE_RENDER_INTERVAL = 1000 / 20;
 const MAX_RENDER_PIXEL_RATIO = 1.35;
 
-// Exact visual values from the supplied energy-core.html.
 const EMOTIONS: Record<EmotionKey, EmotionConfig> = {
   calm: {
     colorA: C(0.1, 0.45, 0.95), colorB: C(0.25, 0.85, 1), core: C(0.55, 0.95, 1),
@@ -184,7 +183,6 @@ const SPHERE_FRAGMENT_SHADER = `
       sin(flow*3.0 + uTime*1.6)*0.5+0.5
     );
 
-    // Domain-warped plasma: broad rolling currents with smaller hot cells.
     vec3 plasmaPosition = dir*3.0;
     plasmaPosition += vec3(
       uTime*uFlow*0.6,

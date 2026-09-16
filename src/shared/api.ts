@@ -662,6 +662,37 @@ export interface LolHelper {
 // ============================================================================
 
 // 单个玩家的实时对局数据（含最近战绩摘要）
+export interface LiveMatchPerformanceStats {
+  duration: number;
+  championDamage: number;
+  damageTaken: number;
+  goldEarned: number;
+  cs: number;
+  turretDamage: number;
+  visionScore: number;
+  killParticipation: number;
+  soloKills: number;
+  enemyMissingPings: number;
+  teamVisionPercentage: number;
+  damageGoldEfficiency: number;
+  teamDamagePercentage: number;
+  relativeTeamDamage: number;
+  relativeGlobalDamage: number;
+  teamDamageTakenPercentage: number;
+  relativeTeamDamageTaken: number;
+  relativeGlobalDamageTaken: number;
+  teamGoldPercentage: number;
+  relativeTeamGold: number;
+  relativeGlobalGold: number;
+  csPerMinute: number;
+  teamCsPercentage: number;
+  relativeTeamCs: number;
+  relativeGlobalCs: number;
+  teamTurretDamagePercentage: number;
+  relativeTeamTurretDamage: number;
+  relativeGlobalTurretDamage: number;
+}
+
 export interface LiveBattlePlayer {
   puuid: string;
   summonerId: number;
@@ -673,12 +704,19 @@ export interface LiveBattlePlayer {
   teamId: number;
   premadeId?: string;
   summonerLevel?: number;
+  profileIconId?: number;
+  privacy?: string;
   position?: string;
   rank?: PlayerRankSummary | null;
+  ranks?: PlayerRankSummary[];
   // 统计摘要（从最近 N 场算）
   kda: number;
   winRate: number;
   matchCount: number;
+  loadState?: {
+    history: 'idle' | 'loading' | 'loaded' | 'failed';
+    rank: 'idle' | 'loading' | 'loaded' | 'failed';
+  };
   history: {
     gameId?: number;
     teamId?: number;
@@ -691,6 +729,7 @@ export interface LiveBattlePlayer {
     assists: number;
     win: boolean;
     timeStr: string; // 显示用（如 "3-29" 或 "5时"）
+    performance?: LiveMatchPerformanceStats;
   }[];
 }
 
@@ -699,6 +738,8 @@ export interface LiveBattleInfo {
   inGame: boolean;
   phase: string; // ChampSelect / InProgress / GameStart / None
   queueName: string;
+  mapName?: string;
+  myPuuid?: string;
   myTeam: LiveBattlePlayer[];
   enemyTeam: LiveBattlePlayer[];
   error?: string;
@@ -712,10 +753,17 @@ export interface LiveStateChangeEvent {
   at: number;
 }
 
+export type LiveBattleUpdateEvent =
+  | { type: 'player'; side: 'my' | 'enemy'; puuid: string; player: LiveBattlePlayer }
+  | { type: 'removed'; puuid: string }
+  | { type: 'reset' };
+
 // live 域 API 契约
 export interface LiveApi {
   getBattle: () => Promise<LiveBattleInfo>;
+  getMatchDetail: (gameId: number, puuid: string) => Promise<PlayerMatchDetail | null>;
   onStateChanged: (listener: (event: LiveStateChangeEvent) => void) => () => void;
+  onBattleUpdate: (listener: (event: LiveBattleUpdateEvent) => void) => () => void;
 }
 
 // window 域：窗口控制
@@ -755,8 +803,6 @@ export interface PlayerRuneSummary {
   rarity?: string;
 }
 
-// 单个玩家的赛后统计明细（用于“统计 / 图表”标签）。
-// 字段尽量贴近 LOL 客户端赛后面板，缺失时后端会填 0。
 export interface MatchParticipantStats {
   totalDamageDealtToChampions: number;
   physicalDamageDealtToChampions: number;
@@ -794,6 +840,7 @@ export interface MatchParticipantStats {
 
 // 单个玩家在对局中的完整数据（10 人各一行）
 export interface MatchParticipantSummary {
+  participantId?: number;
   puuid: string;
   riotId: string;
   gameName: string;
@@ -824,6 +871,7 @@ export interface MatchParticipantSummary {
   runes: PlayerRuneSummary[];
   augments: PlayerRuneSummary[];
   stats: MatchParticipantStats;
+  rawStats?: Record<string, number | string | boolean>;
   visionScore?: number;
   largestMultiKill?: number;
   largestKillingSpree?: number; // 最大连杀（≥7 = 超神）
@@ -872,6 +920,82 @@ export interface PlayerMatchDetail {
   largestKillingSpree?: number; // ≥7 = 超神
 }
 
+export interface MatchTimelinePosition {
+  x: number;
+  y: number;
+}
+
+export interface MatchTimelineParticipantFrame {
+  participantId: number;
+  totalGold: number;
+  currentGold: number;
+  level: number;
+  xp: number;
+  minionsKilled: number;
+  jungleMinionsKilled: number;
+  position?: MatchTimelinePosition;
+  damageStats?: Record<string, number>;
+  championStats?: Record<string, number>;
+}
+
+export interface MatchTimelineDamageRecord {
+  participantId?: number;
+  name?: string;
+  type?: string;
+  damage?: number;
+  basic?: boolean;
+  spellName?: string;
+  spellSlot?: number;
+}
+
+export interface MatchTimelineEvent {
+  type: string;
+  timestamp: number;
+  participantId?: number;
+  killerId?: number;
+  victimId?: number;
+  assistingParticipantIds?: number[];
+  itemId?: number;
+  itemName?: string;
+  itemIcon?: string;
+  skillSlot?: number;
+  levelUpType?: string;
+  wardType?: string;
+  monsterType?: string;
+  monsterSubType?: string;
+  buildingType?: string;
+  laneType?: string;
+  teamId?: number;
+  creatorId?: number;
+  beforeId?: number;
+  afterId?: number;
+  bounty?: number;
+  shutdownBounty?: number;
+  winningTeam?: number;
+  multiKillLength?: number;
+  killType?: string;
+  victimDamageReceived?: MatchTimelineDamageRecord[];
+  victimDamageDealt?: MatchTimelineDamageRecord[];
+  position?: MatchTimelinePosition;
+}
+
+export interface MatchTimelineFrame {
+  timestamp: number;
+  participantFrames: Record<string, MatchTimelineParticipantFrame>;
+  events: MatchTimelineEvent[];
+}
+
+export interface MatchTimeline {
+  frameInterval: number;
+  frames: MatchTimelineFrame[];
+}
+
+export interface MatchTimelineResult {
+  available: boolean;
+  timeline: MatchTimeline | null;
+  error?: string;
+}
+
 // 召唤师资料（搜索结果顶部展示）
 export interface PlayerRankSummary {
   queueType: string;
@@ -882,6 +1006,9 @@ export interface PlayerRankSummary {
   wins: number;
   losses: number;
   displayText: string;
+  previousSeasonEndTier?: string;
+  previousSeasonHighestTier?: string;
+  highestTier?: string;
 }
 
 export interface PlayerProfile {
@@ -1058,6 +1185,7 @@ export interface MatchApi {
   getReplayAvailability: (request: ReplayAvailabilityRequest) => Promise<ReplayAvailability>;
   downloadReplay: (gameId: number) => Promise<ReplayActionResult>;
   watchReplay: (gameId: number) => Promise<ReplayActionResult>;
+  getTimeline: (gameId: number, region?: string) => Promise<MatchTimelineResult>;
   // 返回英雄列表（给前端英雄选择器用）
   getChampions: () => Promise<ChampionSummary[]>;
 }

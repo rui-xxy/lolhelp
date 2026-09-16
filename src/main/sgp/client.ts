@@ -16,7 +16,11 @@ export class SgpClient {
 
   // 发 GET 请求到 SGP。path 形如 '/match-history-query/v1/...'。
   // params 作为 query string 拼接。
-  get<T = unknown>(requestPath: string, params?: Record<string, string | number>): Promise<T> {
+  get<T = unknown>(
+    requestPath: string,
+    params?: Record<string, string | number>,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<T> {
     let fullPath = requestPath;
     if (params) {
       const qs = new URLSearchParams();
@@ -37,6 +41,7 @@ export class SgpClient {
             Accept: 'application/json',
           },
           rejectUnauthorized: false, // 腾讯自签名证书
+          signal: options.signal,
         },
         (res) => {
           let data = '';

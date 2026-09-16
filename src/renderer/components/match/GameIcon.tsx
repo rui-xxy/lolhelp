@@ -1,15 +1,11 @@
-// 游戏图标（英雄头像/装备/召唤师技能/符文/召唤师头像）。
-// 统一处理尺寸、加载占位、加载失败回退。
-// 图标 URL 来自 heroData 生成的 ddragon CDN 地址。
-
 import { useEffect, useState } from 'react';
 
 interface GameIconProps {
   src: string;
   alt: string;
-  title?: string; // hover 提示（装备/技能名字）
-  size?: number; // 像素，默认 20
-  rounded?: boolean; // 是否圆角（英雄头像用），默认 false
+  title?: string;
+  size?: number;
+  rounded?: boolean;
   className?: string;
 }
 
@@ -21,7 +17,6 @@ export function GameIcon({ src, alt, title, size = 20, rounded = false, classNam
   }, [src]);
 
   if (!src || failed) {
-    // 无图占位：灰色方块
     return (
       <span
         title={title}

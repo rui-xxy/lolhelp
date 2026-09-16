@@ -42,12 +42,12 @@ export interface ScoutSidebarStatus {
 }
 
 interface AppShellProps {
-  title: string; // 右侧顶部页面标题（占位）
+  title: string;
   activeView: View;
   onNavigate: (view: View) => void; // 点击导航项回调
   children: React.ReactNode; // 主工作区内容
-  fullBleed?: boolean; // true=主区不加 max-w/padding，由内容自己管布局
-  headerExtra?: React.ReactNode; // 顶部标题区右侧自定义内容（如战绩页搜索框）
+  fullBleed?: boolean;
+  headerExtra?: React.ReactNode;
   friendPanelHidden?: boolean; // 好友栏是否隐藏
   onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
   chatSessionsOpen?: boolean; // 会话管理窗口是否打开
@@ -310,18 +310,6 @@ function SidebarScoutStatus({
   );
 }
 
-// 应用外壳：左右分栏 + 自定义顶部标题栏（系统标题栏已隐藏，原生窗口控制按钮由 titleBarOverlay 保留）。
-// 折叠状态是布局状态（非业务数据），故 useState 放这里。
-//
-// 折叠交互：唯一入口在左上角 Logo 区。
-// - 默认展开：显示 Logo 色块 + "LOL助手"
-// - hover：Logo 色块切换成 PanelLeft 图标 + hover 态 + tooltip "切换侧边栏"
-// - 折叠后：只留 Logo 区（窄栏），hover 同样切换图标
-//
-// 颜色分区：
-// - 左侧侧边栏（含左顶部）：app-sidebar 略深略灰暖米色
-// - 右侧主工作区（含右顶部）：app-surface 暖白，主内容区带网格纹理
-// - 右上角 titleBarOverlay 区（约 138px）保留给原生窗口控制按钮
 export function AppShell({
   title,
   activeView,
@@ -349,37 +337,35 @@ export function AppShell({
   onScoutStatusClick,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const sidebarWidth = collapsed
+  const effectiveCollapsed = collapsed;
+  const sidebarWidth = effectiveCollapsed
     ? APP_LAYOUT.collapsedSidebarWidth
     : APP_LAYOUT.expandedSidebarWidth;
   const workspaceWidth = APP_LAYOUT.workspaceWidth - sidebarWidth;
+  const toggleSidebar = () => setCollapsed((value) => !value);
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-app-shell text-app-text">
-      {/* ===== 左侧侧边栏（三段式：顶/中/底）===== */}
       <aside
-        className="relative z-10 flex shrink-0 flex-col bg-app-sidebar pt-11 transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
+        className="relative z-10 flex shrink-0 flex-col border-r border-app-border/70 bg-app-sidebar pt-11 transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
         style={{ width: `${sidebarWidth}px` }}
       >
         <div className="absolute inset-x-0 top-0 h-11 [-webkit-app-region:drag]" aria-hidden="true" />
-        {/* 顶部：Logo 区容器可拖拽移动窗口，里面的 button 设 no-drag 保证点击折叠有效。
-            是侧边栏折叠/展开的唯一入口。
-            默认显示 Logo 色块；hover 时色块切换成 PanelLeft 图标。 */}
         <div className="flex h-12 shrink-0 [-webkit-app-region:drag]">
           <button
-            onClick={() => setCollapsed((c) => !c)}
-            title={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-            aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+            onClick={toggleSidebar}
+            title={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            aria-label={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
             className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
           >
-            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-border-strong bg-app-surface-soft shadow-[var(--shadow-ui-sm)] transition-colors group-hover:bg-app-selected">
-              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#5e6ad2_0_25%,#7a7fad_0_50%,#34343a_0_75%,#62666d_0)] transition-opacity group-hover:opacity-0" />
+            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-primary/25 bg-app-primary-soft shadow-[var(--shadow-ui-sm)] transition-colors group-hover:border-app-primary/45">
+              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#d5b469_0_25%,#8d7442_0_50%,#344255_0_75%,#687586_0)] transition-opacity group-hover:opacity-0" />
               <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-app-surface-soft transition-opacity group-hover:opacity-0" />
-              <Sparkles className="absolute size-3.5 text-app-text transition-opacity group-hover:opacity-0" />
-              <PanelLeft className="absolute size-4 text-app-text opacity-0 transition-opacity group-hover:opacity-100" />
+              <Sparkles className="absolute size-3.5 text-app-primary-foreground transition-opacity group-hover:opacity-0" />
+              <PanelLeft className="absolute size-4 text-app-primary opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
-            {!collapsed && (
-              <span className="truncate text-sm font-semibold">LOL助手</span>
+            {!effectiveCollapsed && (
+              <span className="truncate text-sm font-semibold tracking-tight">LOL助手</span>
             )}
           </button>
         </div>
@@ -393,62 +379,59 @@ export function AppShell({
                 key={item.view}
                 type="button"
                 onClick={() => onNavigate(item.view)}
-                title={collapsed ? item.label : undefined}
+                title={effectiveCollapsed ? item.label : undefined}
                 aria-current={active ? 'page' : undefined}
-                className={`relative flex h-9 w-full items-center gap-3 rounded-sm px-3 text-left text-[13px] font-medium transition-colors ${
+                className={`group relative flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] font-medium transition-colors ${
                   index > 0 ? 'mt-1' : ''
                 } ${
                   active
-                    ? 'bg-app-selected text-app-text'
+                    ? 'bg-app-selected text-app-text before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-app-primary'
                     : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
                 }`}
               >
-                <Icon className="size-4 shrink-0" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                <Icon className={`size-4 shrink-0 transition-colors ${active ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-body'}`} />
+                {!effectiveCollapsed && <span className="truncate">{item.label}</span>}
               </button>
             );
           })}
           <SidebarScoutStatus
             status={scoutStatus}
-            collapsed={collapsed}
+            collapsed={effectiveCollapsed}
             onPlayerSearch={onScoutPlayerSearch}
             onRestore={onScoutStatusClick}
           />
         </nav>
 
-        {/* 底部：设置入口与状态区 */}
         <div className="shrink-0 border-t border-app-border p-2">
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              title={collapsed ? '设置' : undefined}
-              className={`flex h-9 w-full items-center gap-3 rounded-sm px-3 text-left text-[13px] font-medium transition-colors ${
+              title={effectiveCollapsed ? '设置' : undefined}
+              className={`group flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] font-medium transition-colors ${
                 settingsOpen
                   ? 'bg-app-selected text-app-text'
                   : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
               }`}
             >
-              <Settings className="size-4 shrink-0" />
-              {!collapsed && <span className="truncate">设置</span>}
+              <Settings className={`size-4 shrink-0 transition-colors ${settingsOpen ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-body'}`} />
+              {!effectiveCollapsed && <span className="truncate">设置</span>}
             </button>
           )}
         </div>
       </aside>
 
-      {/* ===== 右侧主工作区（顶部标题 + 主内容）===== */}
       <div
         className="relative z-10 flex min-w-0 flex-none pt-11 pr-2 pb-2"
         style={{ width: `${workspaceWidth}px` }}
       >
-        {/* 全局工具栏位于暖色标题栏，白色面板只承载页面内容。 */}
         <header className={`absolute top-0 right-2 left-0 z-30 flex h-11 items-center gap-3 pl-3 [-webkit-app-region:drag] ${
           friendPanelHidden ? 'pr-[138px]' : 'pr-1'
         }`}>
           {headerExtra ? (
             <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
           ) : (
-            <span className="text-sm font-medium text-app-text">{title}</span>
+            <span className="text-[13px] font-semibold tracking-tight text-app-body">{title}</span>
           )}
           {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onOpenFriendManager || onToggleFriendPanel) && (
             <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
@@ -541,10 +524,7 @@ export function AppShell({
           )}
         </header>
 
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-app-border bg-app-surface shadow-[var(--shadow-ui-shell)]">
-        {/* 主内容区：连续的中性工作画布，承载各功能模块。
-            fullBleed=true 时不加 max-w/padding，由内容自己管布局（战绩页双栏全宽）。
-            fullBleed=false（默认）时 max-w-5xl 居中。 */}
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-app-border/80 bg-app-bg shadow-[var(--shadow-ui-shell)]">
         <main className={`flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
           <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
         </main>

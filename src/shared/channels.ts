@@ -58,11 +58,14 @@ export const IPC_CHANNELS = {
   MATCH_GET_REPLAY_AVAILABILITY: 'match:get-replay-availability',
   MATCH_DOWNLOAD_REPLAY: 'match:download-replay',
   MATCH_WATCH_REPLAY: 'match:watch-replay',
+  MATCH_GET_TIMELINE: 'match:get-timeline',
   // window 域：窗口控制
   WINDOW_SET_WIDTH: 'window:set-width',
   // live 域：实时对局
   LIVE_GET_BATTLE: 'live:get-battle',
+  LIVE_GET_MATCH_DETAIL: 'live:get-match-detail',
   LIVE_STATE_CHANGED: 'live:state-changed',
+  LIVE_BATTLE_UPDATE: 'live:battle-update', // 增量推送（main → renderer）
   // scout 域：高手扩散搜索
   SCOUT_FIND: 'scout:find',
   SCOUT_PROGRESS: 'scout:progress', // 进度推送（main → renderer）

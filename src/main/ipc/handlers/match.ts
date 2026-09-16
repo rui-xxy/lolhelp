@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../../shared/channels';
 import { fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
 import { downloadReplay, getReplayAvailability, watchReplay } from '../../match/replayService';
+import { getMatchTimeline } from '../../match/timelineService';
 import {
   createSavedMatchGroup,
   deleteSavedMatch,
@@ -103,6 +104,10 @@ export function registerMatchHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.MATCH_WATCH_REPLAY, async (_event, gameId) => {
     return watchReplay(gameId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MATCH_GET_TIMELINE, async (_event, gameId, region) => {
+    return getMatchTimeline(Number(gameId), typeof region === 'string' ? region : undefined);
   });
 
   ipcMain.handle(IPC_CHANNELS.MATCH_GET_CHAMPIONS, async (): Promise<ChampionSummary[]> => {

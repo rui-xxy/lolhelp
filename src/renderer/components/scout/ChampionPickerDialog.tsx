@@ -2,11 +2,6 @@ import { Dialog } from 'radix-ui';
 import { ChampionPicker } from './ChampionPicker';
 import type { ChampionPreset, ChampionSummary } from '../../../shared/api';
 
-// 英雄选择弹窗：点「选择英雄」按钮触发，弹出大窗选英雄。
-// 用 radix-ui 的 Dialog 原语（项目已有 radix-ui 依赖）。
-//
-// Props 透传给 ChampionPicker：选中态/收藏态由父组件管理。
-
 interface ChampionPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,14 +32,11 @@ export function ChampionPickerDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        {/* 遮罩 */}
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in" />
-        {/* 弹窗主体：居中 */}
         <Dialog.Content
           onPointerDownOutside={() => onOpenChange(false)}
           className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-app-border bg-app-surface shadow-airbnb"
         >
-          {/* 标题栏 */}
           <div className="flex items-center justify-between border-b border-app-border px-5 py-3">
             <Dialog.Title className="flex items-center gap-2 text-sm font-semibold text-app-text">
               选择指定英雄
@@ -63,7 +55,6 @@ export function ChampionPickerDialog({
             </Dialog.Close>
           </div>
 
-          {/* 内容区：英雄网格（可滚动） */}
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {champions.length === 0 ? (
               <div className="flex h-40 items-center justify-center text-xs text-app-subtle">
@@ -84,7 +75,6 @@ export function ChampionPickerDialog({
             )}
           </div>
 
-          {/* 底部：确定按钮 */}
           <div className="flex items-center justify-between border-t border-app-border bg-app-surface-soft px-5 py-3">
             <span className="text-[11px] text-app-subtle">点方案可一键套用，点格子选/取消</span>
             <Dialog.Close className="rounded-sm bg-app-primary px-5 py-1.5 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover">

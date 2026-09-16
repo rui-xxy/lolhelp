@@ -28,6 +28,21 @@ const TIER_NAMES: Record<string, string> = {
   GOLD: '黄金',
 };
 
+const PREVIEW_CHAMPION_POOL = [
+  { id: 222, name: '暴走萝莉', alias: 'Jinx' },
+  { id: 21, name: '赏金猎人', alias: 'MissFortune' },
+  { id: 103, name: '九尾妖狐', alias: 'Ahri' },
+  { id: 86, name: '德玛西亚之力', alias: 'Garen' },
+  { id: 412, name: '魂锁典狱长', alias: 'Thresh' },
+  { id: 111, name: '深海泰坦', alias: 'Nautilus' },
+  { id: 64, name: '盲僧', alias: 'LeeSin' },
+  { id: 234, name: '破败之王', alias: 'Viego' },
+  { id: 51, name: '皮城女警', alias: 'Caitlyn' },
+  { id: 145, name: '虚空之女', alias: 'Kaisa' },
+  { id: 114, name: '无双剑姬', alias: 'Fiora' },
+  { id: 164, name: '青钢影', alias: 'Camille' },
+];
+
 const PLAYER_SPECS: PreviewPlayerSpec[] = [
   {
     gameName: '晚风与金克丝', championId: 222, championName: '暴走萝莉', championAlias: 'Jinx',
@@ -91,10 +106,10 @@ const PLAYER_SPECS: PreviewPlayerSpec[] = [
   },
 ];
 
-function createRank(spec: PreviewPlayerSpec): PlayerRankSummary {
+function createRank(spec: PreviewPlayerSpec, index: number): PlayerRankSummary[] {
   const tierName = TIER_NAMES[spec.tier] ?? spec.tier;
   const division = spec.division ? ` ${spec.division}` : '';
-  return {
+  const solo: PlayerRankSummary = {
     queueType: 'RANKED_SOLO_5x5',
     queueName: '单双',
     tier: spec.tier,
@@ -104,12 +119,36 @@ function createRank(spec: PreviewPlayerSpec): PlayerRankSummary {
     losses: spec.losses,
     displayText: `单双 ${tierName}${division} ${spec.leaguePoints}`,
   };
+
+  const flexTiers = ['SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND'];
+  const flexTier = flexTiers[(index * 3 + 1) % flexTiers.length];
+  const flexDivision = ['I', 'II', 'III', 'IV'][index % 4];
+  const flexLp = 12 + ((index * 17) % 88);
+  const flex: PlayerRankSummary = {
+    queueType: 'RANKED_FLEX_SR',
+    queueName: '灵活',
+    tier: flexTier,
+    division: flexDivision,
+    leaguePoints: flexLp,
+    wins: 40 + ((index * 7) % 60),
+    losses: 38 + ((index * 5) % 50),
+    displayText: `灵活 ${TIER_NAMES[flexTier] ?? flexTier} ${flexDivision} ${flexLp}`,
+  };
+
+  return [solo, flex];
 }
 
 function createPlayer(spec: PreviewPlayerSpec, index: number): LiveBattlePlayer {
   const teamId = index < 5 ? 100 : 200;
+  const ranks = createRank(spec, index);
+  const historyChampions = [
+    ...spec.historyChampions,
+    ...PREVIEW_CHAMPION_POOL.filter((candidate) => (
+      !spec.historyChampions.some((champion) => champion.id === candidate.id)
+    )),
+  ].slice(0, 10);
   const history = Array.from({ length: 24 }, (_, matchIndex) => {
-    const champion = spec.historyChampions[matchIndex % spec.historyChampions.length];
+    const champion = historyChampions[matchIndex % historyChampions.length];
     const win = ((matchIndex * 3 + index * 2) % 10) < spec.winRate / 10;
     const kills = 2 + ((index * 3 + matchIndex * 2) % 12);
     const deaths = 1 + ((index + matchIndex * 3) % 8);
@@ -120,7 +159,7 @@ function createPlayer(spec: PreviewPlayerSpec, index: number): LiveBattlePlayer 
       championId: champion.id,
       championName: champion.name,
       championAlias: champion.alias,
-      queueName: matchIndex % 5 === 4 ? '极地大乱斗' : '单双排位',
+      queueName: '海克斯大乱斗',
       kills,
       deaths,
       assists,
@@ -141,7 +180,8 @@ function createPlayer(spec: PreviewPlayerSpec, index: number): LiveBattlePlayer 
     premadeId: spec.premadeId,
     summonerLevel: spec.level,
     position: spec.position,
-    rank: createRank(spec),
+    rank: ranks[0],
+    ranks,
     kda: spec.kda,
     winRate: spec.winRate,
     matchCount: history.length,

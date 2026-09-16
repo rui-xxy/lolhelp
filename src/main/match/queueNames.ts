@@ -52,7 +52,6 @@ export function getQueueName(queueId: number): string {
   return QUEUE_NAME_MAP[queueId] ?? `模式 ${queueId}`;
 }
 
-// 判断是否为排位赛（用于 UI 强调或筛选）。
 export function isRankedQueue(queueId: number): boolean {
   return [420, 440, 1100, 1130, 1150].includes(queueId);
 }

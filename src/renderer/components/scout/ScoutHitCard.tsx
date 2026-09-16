@@ -3,9 +3,6 @@ import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
 import type { PlayerRankSummary, ScoutHit } from '../../../shared/api';
 
-// 达标者卡片：展示一个高手 + 他的达标场次。
-// 点击卡片 → 查他完整战绩（复用 onPlayerSearch）。
-
 interface ScoutHitCardProps {
   hit: ScoutHit;
   index: number;

@@ -1,7 +1,5 @@
 import type { AppStatus } from '../../shared/api';
 
-// 状态输出框：纯展示组件，不持有状态，由父组件传入数据。
-// 用 app-* token 保持暖白纸感（error 红 / 正常 muted / 占位 subtle）。
 interface StatusOutputProps {
   status: AppStatus | null;
   error: string | null;

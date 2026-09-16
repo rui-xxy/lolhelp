@@ -81,7 +81,7 @@ export function SectionDot({
       <span
         className={`rounded-full transition-all ${
           active
-            ? 'size-2.5 bg-app-primary shadow-[0_0_0_4px_rgba(94,106,210,0.08)]'
+            ? 'size-2.5 bg-app-primary shadow-[0_0_0_4px_rgba(213,180,105,0.08)]'
             : 'size-1.5 bg-app-border-strong/70 group-hover:size-2 group-hover:bg-app-primary/45'
         }`}
       />

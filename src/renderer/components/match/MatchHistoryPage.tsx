@@ -933,7 +933,7 @@ export function MatchHistoryPage({
                     {tabLabel}
                   </span>
                   {tab.loading && (
-                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(94,106,210,0.12)]" />
+                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(213,180,105,0.12)]" />
                   )}
                 </button>
                 <button
@@ -1096,7 +1096,6 @@ export function MatchHistoryPage({
                 selectedIds={selectedSaveIds}
                 onToggleSelection={handleToggleSaveSelection}
                 onMateClick={(riotId) => {
-                  // 点击队友头像 → 用他的 Riot ID 开新搜索
                   setProfilePanelTabId(null);
                   openSearchTab(riotId, activeTab?.region ?? '');
                 }}

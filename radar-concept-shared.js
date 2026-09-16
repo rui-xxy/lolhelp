@@ -334,8 +334,6 @@
       context.stroke();
     }
 
-    // Keep the halo additive, but composite the physical core normally. On a
-    // light canvas, an additive sphere is mathematically washed into white.
     context.globalCompositeOperation = 'source-over';
 
     const sphere = context.createRadialGradient(

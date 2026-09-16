@@ -72,7 +72,7 @@ export function LargeDialog({
             <X className="size-4" />
           </Button>
         </header>
-        <div className="min-h-0 flex-1">{children}</div>
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </section>
     </div>
   );

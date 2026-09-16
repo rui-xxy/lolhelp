@@ -1,65 +1,105 @@
-import https from 'node:https';
-import { getCachedCredentials } from '../lcu/lockfile';
-import { LcuClient } from '../lcu/client';
-import { getAllHeroes, getHeroByKey } from '../lcu/heroData';
+import { getSgpAuth } from '../sgp/auth';
+import { SgpClient } from '../sgp/client';
+import { getHeroByKey } from '../lcu/heroData';
 import { getQueueName } from '../match/queueNames';
-import { fetchPlayerRankByPuuid } from '../match/matchService';
-import type { LiveBattleInfo, LiveBattlePlayer } from '../../shared/api';
+import { fetchMatchesByPuuid, fetchPlayerRanksByPuuid } from '../match/matchService';
+import type {
+  LiveBattleInfo,
+  LiveBattlePlayer,
+  LiveBattleUpdateEvent,
+  PlayerMatchDetail,
+  PlayerRankSummary,
+} from '../../shared/api';
 import {
-  stabilizeLiveBattle,
-  type StableLiveBattleSnapshot,
-} from './liveBattleStability';
+  EMPTY_PLAYER_STATS,
+  LivePlayerStore,
+  type PlayerHistoryEntry,
+  type PlayerStatsSummary,
+} from './liveStore';
+import { LIVE_PRIORITY, LiveQueue, isLiveQueueAbortError } from './liveQueue';
+import {
+  captureRosterSnapshot,
+  clearRosterSnapshot,
+  createLcuClient,
+  fetchLiveClientPlayers,
+  getRosterSnapshot,
+  mergeWithSnapshot,
+  parseRosterFromChampSelect,
+  parseRosterFromGameflow,
+  parseRosterFromLobby,
+  supplementTeamsFromLiveClient,
+  type RosterPlayer,
+} from './liveRoster';
+import { stabilizeLiveBattle, type StableLiveBattleSnapshot } from './liveBattleStability';
 
-// 实时对局服务：检测你是否在游戏中，拿 10 人骨架 + 并行战绩。
-// 全程走 LCU 本地端点（不走 SGP/2999），因为只有你自己客户端知道你自己的对局。
-//
-// 流程（参考 my-app/src/main/playerAnalyzer/liveBattle.ts）：
-// 1. GET /lol-gameflow/v1/gameflow-phase → 检测游戏阶段
-// 2. GET /lol-summoner/v1/current-summoner → 你的 puuid
-// 3. GET /lol-gameflow/v1/session → 10 人骨架（puuid/summonerId/championId/teamId）
-//    或 ChampSelect 阶段 → GET /lol-champ-select/v1/session → myTeam/theirTeam
-// 4. 并行 GET /lol-summoner/v1/summoners/{summonerId} → 10 人 Riot ID
-// 5. 并行 GET /lol-match-history/.../matches → 10 人最近 24 场战绩（算 KDA/胜率 + 前端分页）
+// 会触发预取的阶段（与 liveWatcher 的 PREFETCH_PHASES 对齐）。
+const PREFETCH_PHASES = ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect'];
+// 真正处于对局中的阶段（实时对局页展示这些阶段的数据）。
+const LIVE_PHASES = ['ChampSelect', 'GameStart', 'InProgress', 'Reconnect'];
 
-const RECENT_MATCH_COUNT = 24;
-const LIVE_BATTLE_CACHE_TTL_MS = 15_000;
-const LIVE_BATTLE_EMPTY_CACHE_TTL_MS = 2_000;
+const RECENT_MATCH_COUNT = 50;
 const LIVE_BATTLE_STALE_TTL_MS = 30_000;
-const PLAYER_STATS_CACHE_TTL_MS = 120_000;
-const PLAYER_STATS_QUICK_TIMEOUT_MS = 4_500;
-const PLAYER_RANK_QUICK_TIMEOUT_MS = 3_200;
-let liveBattleCache: { expiresAt: number; value: LiveBattleInfo } | null = null;
-let liveBattleInFlight: Promise<LiveBattleInfo> | null = null;
-let stableLiveBattle: StableLiveBattleSnapshot | null = null;
-let liveBattleCacheVersion = 0;
+const PLAYER_IDENTITY_TIMEOUT_MS = 5_000;
+const PLAYER_STATS_TIMEOUT_MS = 8_000;
+const PLAYER_RANK_TIMEOUT_MS = 5_000;
 
-type PlayerStatsSummary = {
-  kda: number;
-  winRate: number;
-  history: LiveBattlePlayer['history'];
+const QUEUE_LIMITS = { 'match-history': 2, misc: 4 } as const;
+
+const store = new LivePlayerStore();
+const queue = new LiveQueue(QUEUE_LIMITS);
+
+let stableSnapshot: StableLiveBattleSnapshot | null = null;
+let currentPhase = 'None';
+let currentQueueName = '';
+let currentMapName = '';
+let currentMyPuuid = '';
+let currentRoster: { myTeam: RosterPlayer[]; enemyTeam: RosterPlayer[] } = {
+  myTeam: [],
+  enemyTeam: [],
 };
+let loadGeneration = 0;
+let loading = false;
+let pendingPhase: string | null = null;
+const pendingPlayers = new Set<string>();
+const listeners = new Set<(event: LiveBattleUpdateEvent) => void>();
+const matchDetailCache = new Map<string, PlayerMatchDetail>();
 
-const EMPTY_PLAYER_STATS: PlayerStatsSummary = {
-  kda: 0,
-  winRate: 0,
-  history: [],
-};
-
-const playerStatsCache = new Map<string, { expiresAt: number; value: PlayerStatsSummary }>();
-const playerStatsInFlight = new Map<string, Promise<PlayerStatsSummary>>();
-
-export function invalidateLiveBattleCache(): void {
-  liveBattleCache = null;
-  liveBattleCacheVersion += 1;
+function matchDetailKey(gameId: number, puuid: string): string {
+  return `${gameId}:${puuid}`;
 }
 
-function createLcuClient(): LcuClient {
-  const creds = getCachedCredentials();
-  if (!creds) throw new Error('未检测到 LOL 客户端');
-  return new LcuClient(creds);
+// 战绩行点击后再取完整 10 人数据。首次查询写入本次会话缓存，后续重复打开不再请求。
+export async function getLiveMatchDetail(
+  gameId: number,
+  puuid: string,
+): Promise<PlayerMatchDetail | null> {
+  const key = matchDetailKey(gameId, puuid);
+  const cached = matchDetailCache.get(key);
+  if (cached) return cached;
+
+  const matches = await fetchMatchesByPuuid(puuid, RECENT_MATCH_COUNT);
+  const match = matches.find((candidate) => candidate.gameId === gameId) ?? null;
+  if (match) matchDetailCache.set(key, match);
+  return match;
 }
 
-// 计算时间显示（X天前/X小时前/X分钟前）
+export function subscribeLiveBattleUpdates(
+  listener: (event: LiveBattleUpdateEvent) => void,
+): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function emitUpdate(event: LiveBattleUpdateEvent): void {
+  for (const listener of listeners) {
+    try {
+      listener(event);
+    } catch (error) {
+      console.warn('[live] update listener failed:', error);
+    }
+  }
+}
+
 function formatTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const min = Math.floor(diff / 60000);
@@ -73,437 +113,832 @@ function formatTimeAgo(timestamp: number): string {
   return `${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-// 从 match-history 列表计算 KDA/胜率 + 提取历史摘要
-function calcPlayerStats(
-  matches: Array<Record<string, unknown>>,
-  puuid: string,
-): PlayerStatsSummary {
-  let totalKills = 0;
-  let totalDeaths = 0;
-  let totalAssists = 0;
-  let wins = 0;
-  const history: LiveBattlePlayer['history'] = [];
-
-  for (const match of matches) {
-    const participants = (match.participants as Array<Record<string, unknown>>) ?? [];
-    const participantIdentities = (match.participantIdentities as Array<Record<string, unknown>>) ?? [];
-
-    // 找到自己的 participantId
-    const identity = participantIdentities.find(
-      (id) => ((id.player as Record<string, unknown>)?.puuid as string) === puuid,
-    );
-    const pid = identity?.participantId as number | undefined;
-    const me = participants.find((p) => p.participantId === pid);
-    if (!me) continue;
-
-    const stats = (me.stats as Record<string, unknown>) ?? {};
-    const kills = Number(stats.kills ?? 0);
-    const deaths = Number(stats.deaths ?? 0);
-    const assists = Number(stats.assists ?? 0);
-    const win = Boolean(stats.win);
-
-    totalKills += kills;
-    totalDeaths += deaths;
-    totalAssists += assists;
-    if (win) wins++;
-
-    const championId = Number(me.championId ?? 0);
-    const hero = getHeroByKey(championId);
-    const gameId = Number(match.gameId ?? 0);
-    const teamId = Number(me.teamId ?? 0);
-    const queueId = Number(match.queueId ?? 0);
-    const creation = Number(match.gameCreation ?? 0);
-
-    history.push({
-      gameId,
-      teamId,
-      championId,
-      championName: hero?.name ?? `英雄${championId}`,
-      championAlias: hero?.alias ?? '',
-      queueName: getQueueName(queueId),
-      kills,
-      deaths,
-      assists,
-      win,
-      timeStr: formatTimeAgo(creation),
-    });
+class LiveRequestTimeoutError extends Error {
+  constructor(label: string) {
+    super(`${label} timed out`);
+    this.name = 'LiveRequestTimeoutError';
   }
-
-  const count = history.length || 1;
-  const kda = Math.round(((totalKills + totalAssists) / Math.max(1, totalDeaths)) * 100) / 100;
-  const winRate = Math.round((wins / count) * 100);
-
-  return { kda, winRate, history };
 }
 
-// 从 gameflow session 解析玩家骨架
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(fallback), timeoutMs);
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+  onTimeout: () => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new LiveRequestTimeoutError(label));
+      onTimeout();
+    }, timeoutMs);
     promise
       .then((value) => resolve(value))
-      .catch(() => resolve(fallback))
+      .catch(reject)
       .finally(() => clearTimeout(timer));
   });
 }
 
-async function fetchPlayerStats(
-  client: LcuClient,
-  puuid: string,
-): Promise<PlayerStatsSummary> {
-  const matchResp = await client.get<Record<string, unknown>>(
-    `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${RECENT_MATCH_COUNT}`,
-  );
-  const games = ((matchResp.games as Record<string, unknown>)?.games as Array<Record<string, unknown>>) ?? [];
-  return calcPlayerStats(games, puuid);
+// ---------------------------------------------------------------------------
+// SGP 战绩：一次请求拿回该玩家近期全部战绩
+// ---------------------------------------------------------------------------
+
+interface SgpLiveParticipant {
+  [key: string]: unknown;
+  puuid?: string;
+  kills?: number;
+  deaths?: number;
+  assists?: number;
+  win?: boolean;
+  championId?: number;
+  championName?: string;
+  teamId?: number;
+  challenges?: Record<string, unknown>;
 }
 
-function getCachedPlayerStats(puuid: string): PlayerStatsSummary | null {
-  const cached = playerStatsCache.get(puuid);
-  if (!cached || cached.expiresAt <= Date.now()) {
-    if (cached) playerStatsCache.delete(puuid);
-    return null;
-  }
-  return structuredClone(cached.value);
+interface SgpLiveGame {
+  json?: {
+    gameId?: number;
+    gameCreation?: number;
+    gameDuration?: number;
+    queueId?: number;
+    participants?: SgpLiveParticipant[];
+  };
 }
 
-function getPlayerStats(client: LcuClient, puuid: string): Promise<PlayerStatsSummary> {
-  const cached = getCachedPlayerStats(puuid);
-  if (cached) return Promise.resolve(cached);
+function liveStat(participant: SgpLiveParticipant, key: string): number {
+  const rawValue = participant[key] ?? participant.challenges?.[key];
+  const value = Number(rawValue ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
 
-  const inFlight = playerStatsInFlight.get(puuid);
-  if (inFlight) return inFlight;
+function liveCs(participant: SgpLiveParticipant): number {
+  return liveStat(participant, 'totalMinionsKilled') + liveStat(participant, 'neutralMinionsKilled');
+}
 
-  const request = fetchPlayerStats(client, puuid)
-    .then((value) => {
-      playerStatsCache.set(puuid, {
-        expiresAt: Date.now() + PLAYER_STATS_CACHE_TTL_MS,
-        value,
-      });
-      return value;
-    })
-    .catch(() => EMPTY_PLAYER_STATS)
-    .finally(() => {
-      playerStatsInFlight.delete(puuid);
+function ratio(value: number, total: number): number {
+  return total > 0 ? value / total : 0;
+}
+
+// 只取目标玩家那一条，避免为 10 个参与者做完整字段映射（原实现的开销来源之一）。
+function buildHistoryFromSgp(games: SgpLiveGame[], puuid: string): PlayerStatsSummary {
+  let totalKills = 0;
+  let totalDeaths = 0;
+  let totalAssists = 0;
+  let wins = 0;
+  const history: PlayerHistoryEntry[] = [];
+
+  for (const game of games) {
+    const json = game.json;
+    if (!json) continue;
+    const me = (json.participants ?? []).find((p) => p.puuid === puuid);
+    if (!me) continue;
+
+    const kills = Number(me.kills ?? 0);
+    const deaths = Number(me.deaths ?? 0);
+    const assists = Number(me.assists ?? 0);
+    const win = Boolean(me.win);
+
+    totalKills += kills;
+    totalDeaths += deaths;
+    totalAssists += assists;
+    if (win) wins += 1;
+
+    const championId = Number(me.championId ?? 0);
+    const hero = getHeroByKey(championId);
+    const allParticipants = json.participants ?? [];
+    const teammates = allParticipants.filter((participant) => Number(participant.teamId ?? 0) === Number(me.teamId ?? 0));
+    const duration = Math.max(1, Number(json.gameDuration ?? 0));
+    const championDamage = liveStat(me, 'totalDamageDealtToChampions');
+    const damageTaken = liveStat(me, 'totalDamageTaken');
+    const goldEarned = liveStat(me, 'goldEarned');
+    const cs = liveCs(me);
+    const turretDamage = liveStat(me, 'damageDealtToTurrets');
+    const visionScore = liveStat(me, 'visionScore');
+    const teamKills = teammates.reduce((sum, participant) => sum + liveStat(participant, 'kills'), 0);
+    const teamDamage = teammates.reduce((sum, participant) => sum + liveStat(participant, 'totalDamageDealtToChampions'), 0);
+    const teamDamageTaken = teammates.reduce((sum, participant) => sum + liveStat(participant, 'totalDamageTaken'), 0);
+    const teamGold = teammates.reduce((sum, participant) => sum + liveStat(participant, 'goldEarned'), 0);
+    const teamCs = teammates.reduce((sum, participant) => sum + liveCs(participant), 0);
+    const teamVision = teammates.reduce((sum, participant) => sum + liveStat(participant, 'visionScore'), 0);
+    const teamTurretDamage = teammates.reduce((sum, participant) => sum + liveStat(participant, 'damageDealtToTurrets'), 0);
+    const max = (list: SgpLiveParticipant[], getter: (participant: SgpLiveParticipant) => number) => Math.max(0, ...list.map(getter));
+
+    history.push({
+      gameId: Number(json.gameId ?? 0),
+      teamId: Number(me.teamId ?? 0),
+      championId,
+      championName: hero?.name || me.championName || `英雄${championId}`,
+      championAlias: hero?.alias ?? '',
+      queueName: getQueueName(Number(json.queueId ?? 0)),
+      kills,
+      deaths,
+      assists,
+      win,
+      timeStr: formatTimeAgo(Number(json.gameCreation ?? 0)),
+      performance: {
+        duration,
+        championDamage,
+        damageTaken,
+        goldEarned,
+        cs,
+        turretDamage,
+        visionScore,
+        killParticipation: liveStat(me, 'killParticipation') || ratio(kills + assists, teamKills),
+        soloKills: liveStat(me, 'soloKills'),
+        enemyMissingPings: liveStat(me, 'enemyMissingPings'),
+        teamVisionPercentage: ratio(visionScore, teamVision),
+        damageGoldEfficiency: ratio(championDamage, goldEarned),
+        teamDamagePercentage: ratio(championDamage, teamDamage),
+        relativeTeamDamage: ratio(championDamage, max(teammates, (participant) => liveStat(participant, 'totalDamageDealtToChampions'))),
+        relativeGlobalDamage: ratio(championDamage, max(allParticipants, (participant) => liveStat(participant, 'totalDamageDealtToChampions'))),
+        teamDamageTakenPercentage: ratio(damageTaken, teamDamageTaken),
+        relativeTeamDamageTaken: ratio(damageTaken, max(teammates, (participant) => liveStat(participant, 'totalDamageTaken'))),
+        relativeGlobalDamageTaken: ratio(damageTaken, max(allParticipants, (participant) => liveStat(participant, 'totalDamageTaken'))),
+        teamGoldPercentage: ratio(goldEarned, teamGold),
+        relativeTeamGold: ratio(goldEarned, max(teammates, (participant) => liveStat(participant, 'goldEarned'))),
+        relativeGlobalGold: ratio(goldEarned, max(allParticipants, (participant) => liveStat(participant, 'goldEarned'))),
+        csPerMinute: cs / Math.max(1, duration / 60),
+        teamCsPercentage: ratio(cs, teamCs),
+        relativeTeamCs: ratio(cs, max(teammates, liveCs)),
+        relativeGlobalCs: ratio(cs, max(allParticipants, liveCs)),
+        teamTurretDamagePercentage: ratio(turretDamage, teamTurretDamage),
+        relativeTeamTurretDamage: ratio(turretDamage, max(teammates, (participant) => liveStat(participant, 'damageDealtToTurrets'))),
+        relativeGlobalTurretDamage: ratio(turretDamage, max(allParticipants, (participant) => liveStat(participant, 'damageDealtToTurrets'))),
+      },
     });
+  }
 
-  playerStatsInFlight.set(puuid, request);
-  return request;
+  const count = history.length || 1;
+  return {
+    kda: Math.round(((totalKills + totalAssists) / Math.max(1, totalDeaths)) * 100) / 100,
+    winRate: Math.round((wins / count) * 100),
+    history,
+  };
 }
 
-interface PlayerSkeleton {
+async function fetchMatchHistoryFromSgp(
+  puuid: string,
+  signal: AbortSignal,
+): Promise<PlayerStatsSummary> {
+  const auth = await getSgpAuth({ validateSession: false });
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const client = new SgpClient(auth);
+  const resp = await client.get<{ games?: SgpLiveGame[] }>(
+    `/match-history-query/v1/products/lol/player/${encodeURIComponent(puuid)}/SUMMARY`,
+    { startIndex: 0, count: RECENT_MATCH_COUNT },
+    { signal },
+  );
+
+  return buildHistoryFromSgp(resp.games ?? [], puuid);
+}
+
+function buildHistoryFromLcu(
+  matches: Array<Record<string, unknown>>,
+  puuid: string,
+): PlayerStatsSummary {
+  const games: SgpLiveGame[] = matches.map((match) => {
+    const participants = (match.participants as Array<Record<string, unknown>>) ?? [];
+    const identities = (match.participantIdentities as Array<Record<string, unknown>>) ?? [];
+    const identity = identities.find(
+      (entry) => ((entry.player as Record<string, unknown>)?.puuid as string) === puuid,
+    );
+    const participantId = Number(identity?.participantId ?? 0);
+
+    return {
+      json: {
+        gameId: Number(match.gameId ?? 0),
+        gameCreation: Number(match.gameCreation ?? 0),
+        queueId: Number(match.queueId ?? 0),
+        gameDuration: Number(match.gameDuration ?? 0),
+        participants: participants.map((participant) => {
+          const currentId = Number(participant.participantId ?? 0);
+          const currentIdentity = identities.find((entry) => Number(entry.participantId ?? 0) === currentId);
+          const currentPlayer = (currentIdentity?.player as Record<string, unknown>) ?? {};
+          const currentStats = (participant.stats as Record<string, unknown>) ?? {};
+          return {
+            ...currentStats,
+            puuid: String(currentPlayer.puuid ?? (currentId === participantId ? puuid : '')),
+            championId: Number(participant.championId ?? 0),
+            teamId: Number(participant.teamId ?? 0),
+          };
+        }),
+      },
+    };
+  });
+
+  return buildHistoryFromSgp(games, puuid);
+}
+
+async function fetchMatchHistoryFromLcu(
+  puuid: string,
+  signal: AbortSignal,
+): Promise<PlayerStatsSummary> {
+  const client = createLcuClient();
+  const response = await client.get<Record<string, unknown>>(
+    `/lol-match-history/v1/products/lol/${encodeURIComponent(puuid)}/matches?begIndex=0&endIndex=${RECENT_MATCH_COUNT}`,
+    { signal },
+  );
+  const games = ((response.games as Record<string, unknown>)?.games as Array<Record<string, unknown>>)
+    ?? [];
+  return buildHistoryFromLcu(games, puuid);
+}
+
+async function fetchMatchHistory(
+  puuid: string,
+  signal: AbortSignal,
+): Promise<PlayerStatsSummary> {
+  try {
+    return await fetchMatchHistoryFromSgp(puuid, signal);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    console.warn('[live] SGP 战绩不可用，回退 LCU:', puuid, error);
+    return fetchMatchHistoryFromLcu(puuid, signal);
+  }
+}
+
+// 战绩拉取：命中缓存直接返回，否则走队列（限流 + 可取消）。
+async function loadMatchHistory(
+  puuid: string,
+  generation: number,
+  rosterKey: string,
+): Promise<PlayerStatsSummary> {
+  const cached = store.getMatchHistory(puuid);
+  if (cached) {
+    store.setLoadState(`${puuid}:history`, 'loaded');
+    return cached;
+  }
+
+  const stateKey = `${puuid}:history`;
+  store.setLoadState(stateKey, 'loading');
+
+  const taskId = `match-history:${puuid}`;
+  const task = queue.add(
+    'match-history',
+    taskId,
+    (signal) => fetchMatchHistory(puuid, signal),
+    {
+      priority: LIVE_PRIORITY.MATCH_HISTORY,
+      tags: [puuid, rosterKey, 'roster-player', 'match-history'],
+    },
+  );
+
+  // 同 id 任务已在队列中（另一路已经发起），等它即可。
+  if (!task) return store.getMatchHistory(puuid) ?? EMPTY_PLAYER_STATS;
+
+  try {
+    const stats = await withTimeout(
+      task,
+      PLAYER_STATS_TIMEOUT_MS,
+      taskId,
+      () => queue.cancelById(taskId),
+    );
+    if (generation !== loadGeneration) return stats;
+    store.setMatchHistory(puuid, stats);
+    store.setLoadState(stateKey, 'loaded');
+    return stats;
+  } catch (error) {
+    // 名单变化/离开对局导致的取消不是失败，尤其不能在 reset 清空后再写回 failed。
+    if (isLiveQueueAbortError(error) || generation !== loadGeneration) {
+      return store.getMatchHistory(puuid) ?? EMPTY_PLAYER_STATS;
+    }
+    console.warn('[live] 战绩拉取失败:', puuid, error);
+    store.setLoadState(stateKey, 'failed');
+    return store.getMatchHistory(puuid) ?? EMPTY_PLAYER_STATS;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 玩家身份 + 段位
+// ---------------------------------------------------------------------------
+
+interface ResolvedIdentity {
   puuid: string;
   summonerId: number;
-  championId: number;
-  teamId: number;
-  riotIdHint?: string;
-  gameNameHint?: string;
-  premadeId?: string;
-  position?: string;
+  riotId: string;
+  gameName: string;
+  tagLine: string;
+  summonerLevel: number;
+  profileIconId: number;
+  privacy?: string;
 }
 
-interface LiveClientPlayer {
-  team?: string;
-  championName?: string;
-  riotId?: string;
-  summonerName?: string;
+function fallbackIdentity(roster: RosterPlayer): ResolvedIdentity {
+  const hint = roster.riotIdHint ?? '';
+  const separator = hint.lastIndexOf('#');
+  const gameName = separator > 0 ? hint.slice(0, separator) : roster.gameNameHint || '';
+  const tagLine = separator > 0 ? hint.slice(separator + 1) : '';
+
+  return {
+    puuid: roster.puuid,
+    summonerId: roster.summonerId,
+    riotId: hint || gameName || `玩家${roster.summonerId || '?'}`,
+    gameName: gameName || `玩家${roster.summonerId || '?'}`,
+    tagLine,
+    summonerLevel: 0,
+    profileIconId: 0,
+    privacy: '',
+  };
 }
 
-function fetchLiveClientPlayers(): Promise<LiveClientPlayer[]> {
-  return new Promise((resolve, reject) => {
-    const request = https.request(
-      {
-        hostname: '127.0.0.1',
-        port: 2999,
-        path: '/liveclientdata/playerlist',
-        method: 'GET',
-        rejectUnauthorized: false,
-      },
-      (response) => {
-        let raw = '';
-        response.setEncoding('utf8');
-        response.on('data', (chunk: string) => {
-          raw += chunk;
-        });
-        response.on('end', () => {
-          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-            reject(new Error(`Live Client Data HTTP ${response.statusCode ?? 0}`));
-            return;
-          }
-          try {
-            const parsed = JSON.parse(raw) as unknown;
-            resolve(Array.isArray(parsed) ? parsed as LiveClientPlayer[] : []);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
+// 一次调用解决身份：优先 puuid 查（最全），再退到 summonerId，最后用 roster 线索。
+// 原实现是 3 次串行尝试，这里改成按可用信息直接选路，去掉不必要的往返。
+async function resolveIdentity(
+  roster: RosterPlayer,
+  rosterKey: string,
+): Promise<ResolvedIdentity> {
+  const cached = roster.puuid ? store.getIdentity(roster.puuid) : null;
+  if (cached) return cached;
 
-    request.setTimeout(1_500, () => request.destroy(new Error('Live Client Data timeout')));
-    request.on('error', reject);
-    request.end();
+  const fallback = fallbackIdentity(roster);
+
+  const applySummoner = (sum: Record<string, unknown>): ResolvedIdentity => ({
+    puuid: String(sum.puuid ?? fallback.puuid),
+    summonerId: Number(sum.summonerId ?? fallback.summonerId ?? 0),
+    riotId: '',
+    gameName: String(sum.gameName ?? sum.displayName ?? sum.name ?? fallback.gameName),
+    tagLine: String(sum.tagLine ?? fallback.tagLine ?? ''),
+    summonerLevel: Number(sum.summonerLevel ?? 0),
+    profileIconId: Number(sum.profileIconId ?? 0),
+    privacy: String(sum.privacy ?? ''),
   });
-}
 
-function liveChampionId(player: LiveClientPlayer): number {
-  const name = String(player.championName ?? '').trim();
-  if (!name) return 0;
-  return getAllHeroes().find((hero) => hero.name === name || hero.alias === name)?.id ?? 0;
-}
+  const finalize = (identity: ResolvedIdentity): ResolvedIdentity => {
+    const riotId = identity.tagLine && !identity.gameName.includes('#')
+      ? `${identity.gameName}#${identity.tagLine}`
+      : identity.gameName;
+    const resolved = { ...identity, riotId };
+    if (resolved.puuid) store.setIdentity(resolved.puuid, resolved);
+    return resolved;
+  };
 
-function liveRiotId(player: LiveClientPlayer): string {
-  const riotId = String(player.riotId ?? '').trim();
-  if (riotId && riotId !== '#' && !riotId.startsWith('#')) return riotId;
+  const taskId = `summoner:${roster.puuid || roster.summonerId || rosterKey}`;
+  const task = queue.add(
+    'misc',
+    taskId,
+    async (signal) => {
+      const client = createLcuClient();
 
-  const summonerName = String(player.summonerName ?? '').trim();
-  return summonerName.includes('#') && !summonerName.startsWith('#') ? summonerName : '';
-}
+      // 1. 有 puuid 就走 puuid 端点（能一次拿到名字 + 等级 + 头像）。
+      if (roster.puuid) {
+        for (const path of [
+          `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(roster.puuid)}`,
+          `/lol-summoner/v1/summoners/puuid/${encodeURIComponent(roster.puuid)}`,
+        ]) {
+          try {
+            return finalize(applySummoner(await client.get<Record<string, unknown>>(path, { signal })));
+          } catch {
+            if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+            // 不同客户端版本支持的路径不同，继续尝试下一个。
+          }
+        }
+      }
 
-function supplementTeamFromLiveClient(
-  skeletons: PlayerSkeleton[],
-  livePlayers: LiveClientPlayer[],
-  teamId: number,
-): PlayerSkeleton[] {
-  const usedLivePlayers = new Set<number>();
+      // 2. 只有 summonerId 就用 summonerId 端点。
+      if (roster.summonerId > 0) {
+        try {
+          const sum = await client.get<Record<string, unknown>>(
+            `/lol-summoner/v1/summoners/${roster.summonerId}`,
+            { signal },
+          );
+          const identity = applySummoner(sum);
+          return finalize({
+            ...identity,
+            tagLine: identity.tagLine || fallback.tagLine,
+          });
+        } catch {
+          if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          // 落到线索兜底。
+        }
+      }
 
-  for (const skeleton of skeletons) {
-    const matchIndex = livePlayers.findIndex(
-      (player, index) => !usedLivePlayers.has(index) && liveChampionId(player) === skeleton.championId,
+      // 兜底身份不写入长 TTL 缓存，否则一次瞬时 LCU 失败会让占位名保留 30 分钟。
+      return fallback;
+    },
+    {
+      priority: LIVE_PRIORITY.SUMMONER,
+      tags: [rosterKey, 'roster-player', 'summoner'],
+    },
+  );
+
+  if (!task) return fallback;
+
+  try {
+    return await withTimeout(
+      task,
+      PLAYER_IDENTITY_TIMEOUT_MS,
+      taskId,
+      () => queue.cancelById(taskId),
     );
-    if (matchIndex >= 0) usedLivePlayers.add(matchIndex);
+  } catch (error) {
+    if (!isLiveQueueAbortError(error) && !(error instanceof LiveRequestTimeoutError)) {
+      console.warn('[live] 玩家身份拉取失败:', roster.puuid || roster.summonerId, error);
+    }
+    return fallback;
+  }
+}
+
+// 拉取玩家全部队列段位（单双排 / 灵活组排）。
+// matchService 内部有缓存与在途去重，多要几个队列不会多打请求。
+async function loadRanks(
+  puuid: string,
+  generation: number,
+  rosterKey: string,
+): Promise<PlayerRankSummary[]> {
+  if (!puuid) return [];
+  const cached = store.getRankedList(puuid);
+  if (cached !== undefined) {
+    store.setLoadState(`${puuid}:rank`, 'loaded');
+    return cached;
   }
 
-  const supplemented = [...skeletons];
-  livePlayers.forEach((player, index) => {
-    if (usedLivePlayers.has(index)) return;
-    const championId = liveChampionId(player);
-    const riotIdHint = liveRiotId(player);
-    supplemented.push({
-      puuid: '',
-      summonerId: 0,
-      championId,
-      teamId,
-      riotIdHint,
-      gameNameHint: riotIdHint.split('#')[0] || '身份隐藏',
-    });
+  const stateKey = `${puuid}:rank`;
+  store.setLoadState(stateKey, 'loading');
+
+  const taskId = `rank:${puuid}`;
+  const task = queue.add(
+    'misc',
+    taskId,
+    (signal) => fetchPlayerRanksByPuuid(puuid, undefined, { signal }),
+    {
+      priority: LIVE_PRIORITY.RANK,
+      tags: [puuid, rosterKey, 'roster-player', 'ranked-stats'],
+    },
+  );
+  if (!task) return store.getRankedList(puuid) ?? [];
+
+  try {
+    const ranks = await withTimeout(
+      task,
+      PLAYER_RANK_TIMEOUT_MS,
+      taskId,
+      () => queue.cancelById(taskId),
+    );
+    if (generation !== loadGeneration) return ranks;
+    store.setRankedList(puuid, ranks);
+    store.setRankedStats(puuid, pickDisplayRank(ranks));
+    store.setLoadState(stateKey, 'loaded');
+    return ranks;
+  } catch (error) {
+    if (isLiveQueueAbortError(error) || generation !== loadGeneration) {
+      return store.getRankedList(puuid) ?? [];
+    }
+    console.warn('[live] 段位拉取失败:', puuid, error);
+    store.setLoadState(stateKey, 'failed');
+    return [];
+  }
+}
+
+// 卡片主段位：优先单双排，其次灵活组排，再退到任意一条。
+function pickDisplayRank(ranks: PlayerRankSummary[]): PlayerRankSummary | null {
+  return (
+    ranks.find((rank) => rank.queueType === 'RANKED_SOLO_5x5')
+    ?? ranks.find((rank) => rank.queueType === 'RANKED_FLEX_SR')
+    ?? ranks[0]
+    ?? null
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 组装单个玩家
+// ---------------------------------------------------------------------------
+
+function assemblePlayer(
+  roster: RosterPlayer,
+  identity: ResolvedIdentity,
+  stats: PlayerStatsSummary,
+  ranks: PlayerRankSummary[],
+): LiveBattlePlayer {
+  const hero = getHeroByKey(roster.championId);
+  const statePuuid = identity.puuid || roster.puuid;
+
+  return {
+    puuid: identity.puuid || roster.puuid,
+    summonerId: identity.summonerId || roster.summonerId,
+    riotId: identity.riotId,
+    gameName: identity.gameName,
+    championId: roster.championId,
+    championName: hero?.name ?? `英雄${roster.championId}`,
+    championAlias: hero?.alias ?? '',
+    teamId: roster.teamId,
+    premadeId: roster.premadeId,
+    summonerLevel: identity.summonerLevel,
+    profileIconId: identity.profileIconId,
+    privacy: identity.privacy,
+    position: roster.position,
+    rank: pickDisplayRank(ranks),
+    ranks,
+    kda: stats.kda,
+    winRate: stats.winRate,
+    matchCount: stats.history.length,
+    loadState: {
+      history: statePuuid ? store.getLoadState(`${statePuuid}:history`) : 'idle',
+      rank: statePuuid ? store.getLoadState(`${statePuuid}:rank`) : 'idle',
+    },
+    history: stats.history,
+  };
+}
+
+type LiveBattleSide = 'my' | 'enemy';
+
+function findCurrentRosterPlayer(
+  side: LiveBattleSide,
+  rosterKey: string,
+): RosterPlayer | null {
+  const team = side === 'my' ? currentRoster.myTeam : currentRoster.enemyTeam;
+  return team.find((candidate, index) => rosterTaskKey(side, candidate, index) === rosterKey) ?? null;
+}
+
+function emitCurrentPlayer(
+  side: LiveBattleSide,
+  rosterKey: string,
+  identity: ResolvedIdentity,
+  generation: number,
+): boolean {
+  if (generation !== loadGeneration) return false;
+  const roster = findCurrentRosterPlayer(side, rosterKey);
+  if (!roster) return false;
+
+  const puuid = identity.puuid || roster.puuid;
+  const stats = (puuid ? store.getMatchHistory(puuid) : null) ?? EMPTY_PLAYER_STATS;
+  const ranks = puuid ? store.getRankedList(puuid) ?? [] : [];
+  emitUpdate({
+    type: 'player',
+    side,
+    puuid,
+    player: assemblePlayer(roster, identity, stats, ranks),
   });
-
-  return supplemented.slice(0, livePlayers.length || skeletons.length);
+  return true;
 }
 
-function supplementTeamsFromLiveClient(
-  myTeam: PlayerSkeleton[],
-  enemyTeam: PlayerSkeleton[],
-  livePlayers: LiveClientPlayer[],
-): { myTeam: PlayerSkeleton[]; enemyTeam: PlayerSkeleton[] } {
-  const order = livePlayers.filter((player) => player.team === 'ORDER');
-  const chaos = livePlayers.filter((player) => player.team === 'CHAOS');
-  if (order.length === 0 || chaos.length === 0) return { myTeam, enemyTeam };
+// 身份先到先显示；战绩和段位各自完成后再独立推送，避免整张卡等待最慢字段。
+async function loadPlayer(
+  roster: RosterPlayer,
+  side: LiveBattleSide,
+  rosterKey: string,
+  generation: number,
+): Promise<void> {
+  if (generation !== loadGeneration) return;
 
-  const myChampionIds = new Set(myTeam.map((player) => player.championId).filter(Boolean));
-  const overlap = (players: LiveClientPlayer[]) => players.reduce(
-    (count, player) => count + (myChampionIds.has(liveChampionId(player)) ? 1 : 0),
-    0,
-  );
-  const orderOverlap = overlap(order);
-  const chaosOverlap = overlap(chaos);
-  if (orderOverlap === chaosOverlap) return { myTeam, enemyTeam };
+  try {
+    const identity = await resolveIdentity(roster, rosterKey);
+    if (!findCurrentRosterPlayer(side, rosterKey) || generation !== loadGeneration) return;
 
-  const myLiveTeam = orderOverlap > chaosOverlap ? order : chaos;
-  const enemyLiveTeam = orderOverlap > chaosOverlap ? chaos : order;
+    const statsPuuid = identity.puuid || roster.puuid;
+    if (!statsPuuid) {
+      emitCurrentPlayer(side, rosterKey, identity, generation);
+      return;
+    }
+
+    const historyPromise = loadMatchHistory(statsPuuid, generation, rosterKey);
+    const rankPromise = loadRanks(statsPuuid, generation, rosterKey);
+
+    // 两个加载函数会先同步写入 loading 状态，因此这次推送可以立即展示身份和骨架。
+    emitCurrentPlayer(side, rosterKey, identity, generation);
+
+    await Promise.allSettled([
+      historyPromise.then(() => emitCurrentPlayer(side, rosterKey, identity, generation)),
+      rankPromise.then(() => emitCurrentPlayer(side, rosterKey, identity, generation)),
+    ]);
+  } catch (error) {
+    if (isLiveQueueAbortError(error)) return;
+    console.warn('[live] 玩家加载失败:', roster.puuid || roster.summonerId, error);
+  } finally {
+    pendingPlayers.delete(rosterKey);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 名单获取
+// ---------------------------------------------------------------------------
+
+async function loadRoster(
+  phase: string,
+): Promise<{
+  myTeam: RosterPlayer[];
+  enemyTeam: RosterPlayer[];
+  queueName: string;
+  mapName: string;
+  myPuuid: string;
+}> {
+  const client = createLcuClient();
+  let myPuuid = '';
+  let mySummonerId = 0;
+  try {
+    const summoner = await client.get<Record<string, unknown>>(
+      '/lol-summoner/v1/current-summoner',
+    );
+    myPuuid = String(summoner.puuid ?? '');
+    mySummonerId = Number(summoner.summonerId) || 0;
+  } catch {
+    // 拿不到 puuid 时用 teamOne 兜底。
+  }
+
+  let myTeam: RosterPlayer[] = [];
+  let enemyTeam: RosterPlayer[] = [];
+  let queueName = '';
+  let mapName = '';
+  let queueId = 0;
+
+  if (phase === 'ChampSelect') {
+    try {
+      const cs = await client.get<Record<string, unknown>>('/lol-champ-select/v1/session');
+      const parsed = parseRosterFromChampSelect(cs);
+      myTeam = parsed.myTeam;
+      enemyTeam = parsed.enemyTeam;
+      queueId = parsed.queueId;
+      queueName = getQueueName(queueId);
+      mapName = parsed.mapName;
+      if (myTeam.length > 0) {
+        captureRosterSnapshot(myTeam, enemyTeam, parsed.gameId, parsed.queueId);
+      }
+    } catch {
+      // 选人阶段偶发读不到，交给对局阶段补。
+    }
+  } else if (PREFETCH_PHASES.includes(phase)) {
+    // 大厅/匹配阶段：先把队友（和自己）的战绩预热起来。
+    try {
+      const lobby = await client.get<Record<string, unknown>>('/lol-lobby/v2/lobby');
+      const parsed = parseRosterFromLobby(lobby, myPuuid, mySummonerId);
+      myTeam = parsed.myTeam;
+      enemyTeam = parsed.enemyTeam;
+      queueName = getQueueName(parsed.queueId);
+    } catch {
+      // 大厅阶段可能还没建立 lobby。
+    }
+  } else {
+    try {
+      const session = await client.get<Record<string, unknown>>('/lol-gameflow/v1/session');
+      const parsed = parseRosterFromGameflow(session, myPuuid);
+      myTeam = parsed.myTeam;
+      enemyTeam = parsed.enemyTeam;
+      queueId = parsed.queueId;
+      queueName = getQueueName(queueId);
+      mapName = parsed.mapName;
+
+      // 对局数据缺 puuid 时，用选人阶段存的快照补齐。
+      const snapshot = getRosterSnapshot(parsed.gameId);
+      if (snapshot) {
+        const merged = mergeWithSnapshot({ myTeam, enemyTeam }, snapshot);
+        myTeam = merged.myTeam;
+        enemyTeam = merged.enemyTeam;
+        if (!queueName && snapshot.queueId) queueName = getQueueName(snapshot.queueId);
+      }
+    } catch {
+      // GameStart 阶段 gameflow session 可能短暂不可用，先接住选人快照。
+      const snapshot = getRosterSnapshot();
+      if (snapshot) {
+        myTeam = snapshot.myTeam;
+        enemyTeam = snapshot.enemyTeam;
+        queueId = snapshot.queueId;
+        queueName = getQueueName(queueId);
+      }
+    }
+
+    // 人数不足 10 人时用 Live Client Data 补（敌方身份隐藏的常见场景）。
+    if (myTeam.length + enemyTeam.length < 10) {
+      try {
+        const livePlayers = await fetchLiveClientPlayers();
+        const supplemented = supplementTeamsFromLiveClient(myTeam, enemyTeam, livePlayers);
+        myTeam = supplemented.myTeam;
+        enemyTeam = supplemented.enemyTeam;
+      } catch {
+        // 2999 只在游戏进程就绪后可用。
+      }
+    }
+  }
+
+  if (!queueName && queueId) queueName = getQueueName(queueId);
+  return { myTeam, enemyTeam, queueName, mapName, myPuuid };
+}
+
+// ---------------------------------------------------------------------------
+// 主流程
+// ---------------------------------------------------------------------------
+
+function rosterTaskKey(side: LiveBattleSide, player: RosterPlayer, index: number): string {
+  if (player.puuid) return `${side}:puuid:${player.puuid}`;
+  if (player.summonerId > 0) return `${side}:summoner:${player.summonerId}`;
+  return `${side}:anonymous:${player.championId}:${player.riotIdHint || index}`;
+}
+
+// 启动一轮加载。加载期间收到的新相位只保留最新值，避免 Lobby 请求完成后
+// 覆盖已经到来的 ChampSelect / GameStart 状态。
+export async function startLiveLoad(phase: string): Promise<void> {
+  if (loading) {
+    pendingPhase = phase;
+    return;
+  }
+  loading = true;
+  let phaseToLoad: string | null = phase;
+
+  try {
+    while (phaseToLoad) {
+      const requestedPhase = phaseToLoad;
+      phaseToLoad = null;
+      const generation = loadGeneration;
+      const loadedRoster = await loadRoster(requestedPhase);
+
+      // 读取期间又有更新：旧结果不落地，直接处理最新阶段/名单。
+      if (generation !== loadGeneration || pendingPhase) {
+        phaseToLoad = pendingPhase;
+        pendingPhase = null;
+        continue;
+      }
+
+      const previousTotal = currentRoster.myTeam.length + currentRoster.enemyTeam.length;
+      const loadedTotal = loadedRoster.myTeam.length + loadedRoster.enemyTeam.length;
+      const keepPreviousRoster = LIVE_PHASES.includes(requestedPhase)
+        && previousTotal > 0
+        && loadedTotal === 0;
+      const roster = keepPreviousRoster
+        ? {
+            myTeam: currentRoster.myTeam,
+            enemyTeam: currentRoster.enemyTeam,
+            queueName: loadedRoster.queueName || currentQueueName,
+            mapName: loadedRoster.mapName || currentMapName,
+            myPuuid: loadedRoster.myPuuid || currentMyPuuid,
+          }
+        : loadedRoster;
+
+      currentPhase = requestedPhase;
+      currentQueueName = roster.queueName;
+      currentMapName = roster.mapName;
+      if (roster.myPuuid) currentMyPuuid = roster.myPuuid;
+      currentRoster = { myTeam: roster.myTeam, enemyTeam: roster.enemyTeam };
+
+      const allPuuids = [...roster.myTeam, ...roster.enemyTeam]
+        .map((player) => player.puuid)
+        .filter(Boolean);
+
+      // 只清理已经不在场上的玩家；在场玩家的分片原地保留（这就是换人不重拉）。
+      const removed = store.retain(allPuuids);
+      for (const puuid of removed) {
+        emitUpdate({ type: 'removed', puuid });
+      }
+
+      const rosterEntries = [
+        ...roster.myTeam.map((player, index) => ({ player, side: 'my' as const, index })),
+        ...roster.enemyTeam.map((player, index) => ({ player, side: 'enemy' as const, index })),
+      ];
+      const activeRosterKeys = rosterEntries.map(({ player, side, index }) =>
+        rosterTaskKey(side, player, index));
+
+      // 名单一变，取消已下场玩家的身份/战绩/段位任务；运行中的 HTTP 请求也会收到 signal。
+      queue.cancelByTagsNotIn('roster-player', activeRosterKeys);
+
+      const tasks: Promise<void>[] = [];
+      for (const { player, side, index } of rosterEntries) {
+        const key = rosterTaskKey(side, player, index);
+        if (pendingPlayers.has(key)) continue;
+        pendingPlayers.add(key);
+        tasks.push(loadPlayer(player, side, key, generation));
+      }
+
+      // 不 await 全部：让每个玩家各自完成各自推送（增量渲染）。
+      void Promise.allSettled(tasks);
+
+      phaseToLoad = pendingPhase;
+      pendingPhase = null;
+    }
+  } catch (error) {
+    console.warn('[live] 名单加载失败:', error);
+  } finally {
+    loading = false;
+    if (pendingPhase) {
+      const latestPhase = pendingPhase;
+      pendingPhase = null;
+      void startLiveLoad(latestPhase);
+    }
+  }
+}
+
+// 从分片状态组装完整对局信息（给 getBattle 与前端首屏用）。
+function assembleBattle(): LiveBattleInfo {
+  const toPlayer = (roster: RosterPlayer): LiveBattlePlayer => {
+    const identity = (roster.puuid ? store.getIdentity(roster.puuid) : null)
+      ?? fallbackIdentity(roster);
+    const stats = (roster.puuid ? store.getMatchHistory(roster.puuid) : null)
+      ?? EMPTY_PLAYER_STATS;
+    const ranks = roster.puuid ? store.getRankedList(roster.puuid) ?? [] : [];
+    return assemblePlayer(roster, identity, stats, ranks);
+  };
+
   return {
-    myTeam: supplementTeamFromLiveClient(myTeam, myLiveTeam, myTeam[0]?.teamId ?? 100),
-    enemyTeam: supplementTeamFromLiveClient(enemyTeam, enemyLiveTeam, enemyTeam[0]?.teamId ?? 200),
+    inGame: true,
+    phase: currentPhase,
+    queueName: currentQueueName,
+    mapName: currentMapName,
+    myPuuid: currentMyPuuid,
+    myTeam: currentRoster.myTeam.map(toPlayer),
+    enemyTeam: currentRoster.enemyTeam.map(toPlayer),
   };
 }
 
-function currentPartyId(player: Record<string, unknown>): string | undefined {
-  const raw = player.teamParticipantId ?? player.premadeId ?? player.partyId;
-  if (raw === undefined || raw === null) return undefined;
-  const value = String(raw).trim();
-  return value && value !== '0' ? value : undefined;
-}
-
-function currentPosition(player: Record<string, unknown>): string | undefined {
-  const raw = player.assignedPosition ?? player.selectedPosition ?? player.position ?? player.lane;
-  const value = String(raw ?? '').trim();
-  return value || undefined;
-}
-
-function parseTeamFromGameflow(
-  session: Record<string, unknown>,
-  myPuuid: string,
-): { myTeam: PlayerSkeleton[]; enemyTeam: PlayerSkeleton[] } {
-  const gameData = (session.gameData as Record<string, unknown>) ?? {};
-  const teamOne = (gameData.teamOne as Array<Record<string, unknown>>) ?? [];
-  const teamTwo = (gameData.teamTwo as Array<Record<string, unknown>>) ?? [];
-
-  const toSkeleton = (players: Array<Record<string, unknown>>, teamId: number): PlayerSkeleton[] =>
-    players.map((p) => ({
-      puuid: String(p.puuid ?? ''),
-      summonerId: Number(p.summonerId ?? 0),
-      championId: Number(p.championId ?? 0),
-      teamId,
-      premadeId: currentPartyId(p),
-      position: currentPosition(p),
-    }));
-
-  const t1 = toSkeleton(teamOne, 100);
-  const t2 = toSkeleton(teamTwo, 200);
-
-  // 我在哪队
-  const inT1 = t1.some((p) => p.puuid === myPuuid);
-  return {
-    myTeam: inT1 ? t1 : t2,
-    enemyTeam: inT1 ? t2 : t1,
-  };
-}
-
-// 从 ChampSelect session 解析
-function parseTeamFromChampSelect(
-  csSession: Record<string, unknown>,
-): { myTeam: PlayerSkeleton[]; enemyTeam: PlayerSkeleton[] } {
-  const myTeamRaw = (csSession.myTeam as Array<Record<string, unknown>>) ?? [];
-  const theirTeamRaw = (csSession.theirTeam as Array<Record<string, unknown>>) ?? [];
-
-  const toSkeleton = (players: Array<Record<string, unknown>>, teamId: number): PlayerSkeleton[] =>
-    players
-      .filter((p) => Number(p.cellId) >= 0 || Number(p.championId) > 0)
-      .map((p) => ({
-        puuid: String(p.puuid ?? ''),
-        summonerId: Number(p.summonerId ?? 0),
-        championId: Number(p.championId ?? 0),
-        teamId,
-        premadeId: currentPartyId(p),
-        position: currentPosition(p),
-      }));
-
-  return {
-    myTeam: toSkeleton(myTeamRaw, 100),
-    enemyTeam: toSkeleton(theirTeamRaw, 200),
-  };
-}
-
-// 并行补全玩家信息（Riot ID + 战绩）
-async function enrichPlayers(
-  client: LcuClient,
-  skeletons: PlayerSkeleton[],
-): Promise<LiveBattlePlayer[]> {
-  // 并行拉每个玩家的召唤师名 + 战绩
-  const enriched = await Promise.all(
-    skeletons.map(async (s): Promise<LiveBattlePlayer> => {
-      // 默认值
-      let gameName = s.gameNameHint || `玩家${s.summonerId || '?'}`;
-      const hintSeparator = s.riotIdHint?.lastIndexOf('#') ?? -1;
-      let tagLine = hintSeparator > 0 ? s.riotIdHint?.slice(hintSeparator + 1) ?? '' : '';
-      if (hintSeparator > 0) gameName = s.riotIdHint?.slice(0, hintSeparator) || gameName;
-      let championName = `英雄${s.championId}`;
-      let summonerLevel = 0;
-
-      if (s.summonerId <= 0 && s.riotIdHint) {
-        try {
-          const sum = await client.get<Record<string, unknown>>(
-            `/lol-summoner/v1/summoners?name=${encodeURIComponent(s.riotIdHint)}`,
-          );
-          s.summonerId = Number(sum.summonerId ?? sum.id ?? 0);
-          s.puuid = String(sum.puuid ?? s.puuid);
-          gameName = (sum.gameName as string) || (sum.name as string) || gameName;
-          tagLine = (sum.tagLine as string) || tagLine;
-          summonerLevel = Number(sum.summonerLevel ?? 0);
-        } catch {
-          // The live game API may intentionally hide an opponent's identity.
-        }
-      }
-
-      // 召唤师名（通过 summonerId）
-      if (s.summonerId > 0) {
-        try {
-          const sum = await client.get<Record<string, unknown>>(
-            `/lol-summoner/v1/summoners/${s.summonerId}`,
-          );
-          gameName = (sum.gameName as string) || (sum.name as string) || gameName;
-          tagLine = (sum.tagLine as string) || tagLine;
-          summonerLevel = Number(sum.summonerLevel ?? 0);
-          if (!s.puuid) s.puuid = (sum.puuid as string) ?? s.puuid;
-        } catch {
-          // 下方统一通过 PUUID 回退。
-        }
-      }
-
-      // 部分客户端的 summonerId 接口只给名字，不给 tagLine。
-      if (s.puuid && !tagLine && !gameName.includes('#')) {
-        try {
-          const sum = await client.get<Record<string, unknown>>(
-            `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(s.puuid)}`,
-          );
-          gameName = (sum.gameName as string) || (sum.name as string) || gameName;
-          tagLine = (sum.tagLine as string) || tagLine;
-          summonerLevel = Number(sum.summonerLevel ?? summonerLevel);
-        } catch {
-          // 保留 summonerId 接口已经拿到的名字。
-        }
-      }
-      const riotId = tagLine && !gameName.includes('#') ? `${gameName}#${tagLine}` : gameName;
-
-      // 英雄名
-      const hero = getHeroByKey(s.championId);
-      championName = hero?.name ?? championName;
-      const championAlias = hero?.alias ?? '';
-
-      // 战绩（最近 N 场）
-      let kda = 0;
-      let winRate = 0;
-      let history: LiveBattlePlayer['history'] = [];
-      let rank: LiveBattlePlayer['rank'] = null;
-      if (s.puuid) {
-        const cachedStats = getCachedPlayerStats(s.puuid);
-        const [stats, fetchedRank] = await Promise.all([
-          cachedStats
-            ? Promise.resolve(cachedStats)
-            : withTimeout(
-              getPlayerStats(client, s.puuid),
-              PLAYER_STATS_QUICK_TIMEOUT_MS,
-              EMPTY_PLAYER_STATS,
-            ),
-          withTimeout(
-            fetchPlayerRankByPuuid(s.puuid),
-            PLAYER_RANK_QUICK_TIMEOUT_MS,
-            null,
-          ),
-        ]);
-        kda = stats.kda;
-        winRate = stats.winRate;
-        history = stats.history;
-        rank = fetchedRank;
-      }
-
-      return {
-        puuid: s.puuid,
-        summonerId: s.summonerId,
-        riotId,
-        gameName,
-        championId: s.championId,
-        championName,
-        championAlias,
-        teamId: s.teamId,
-        premadeId: s.premadeId,
-        summonerLevel,
-        position: s.position,
-        rank,
-        kda,
-        winRate,
-        matchCount: history.length,
-        history,
-      };
-    }),
-  );
-  return enriched;
-}
-
-// 主入口
-async function loadLiveBattle(): Promise<LiveBattleInfo> {
-  let client: LcuClient;
+// 对外主入口：返回当前快照。数据由 startLiveLoad 在后台增量填充，
+// 这里只做组装，不阻塞等待网络。
+export async function getLiveBattle(): Promise<LiveBattleInfo> {
+  let client;
   try {
     client = createLcuClient();
   } catch (err) {
@@ -517,7 +952,6 @@ async function loadLiveBattle(): Promise<LiveBattleInfo> {
     };
   }
 
-  // 1. 检测游戏阶段
   let phase: string;
   try {
     phase = await client.get<string>('/lol-gameflow/v1/gameflow-phase');
@@ -532,118 +966,70 @@ async function loadLiveBattle(): Promise<LiveBattleInfo> {
     };
   }
 
-  // 去引号（LCU 可能返回带引号的字符串）
   phase = phase.replace(/"/g, '');
-
-  const isInGame = ['InProgress', 'ChampSelect', 'GameStart', 'Reconnect'].includes(phase);
+  const isInGame = LIVE_PHASES.includes(phase);
   if (!isInGame) {
+    if (PREFETCH_PHASES.includes(phase)) {
+      const hadRoster = currentRoster.myTeam.length + currentRoster.enemyTeam.length > 0;
+      await startLiveLoad(phase);
+      if (!hadRoster) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      const lobby = assembleBattle();
+      return { ...lobby, inGame: false, phase };
+    }
     return { inGame: false, phase, queueName: '', myTeam: [], enemyTeam: [] };
   }
 
-  // 2. 当前账号 puuid
-  let myPuuid = '';
-  try {
-    const summoner = await client.get<Record<string, unknown>>(
-      '/lol-summoner/v1/current-summoner',
-    );
-    myPuuid = (summoner.puuid as string) ?? '';
-  } catch {
-    // 继续
+  // 名单还没建立（首次进入该阶段）→ 触发加载并返回已就绪的部分。
+  if (currentRoster.myTeam.length + currentRoster.enemyTeam.length === 0) {
+    void startLiveLoad(phase);
+    // 给首个玩家一点时间，让首屏尽量不是空的；超时也不阻塞。
+    await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
-  // 3. 拿对局骨架
-  let myTeamSkeletons: PlayerSkeleton[] = [];
-  let enemyTeamSkeletons: PlayerSkeleton[] = [];
-  let queueName = '';
-
-  if (phase === 'ChampSelect') {
-    try {
-      const cs = await client.get<Record<string, unknown>>(
-        '/lol-champ-select/v1/session',
-      );
-      const parsed = parseTeamFromChampSelect(cs);
-      myTeamSkeletons = parsed.myTeam;
-      enemyTeamSkeletons = parsed.enemyTeam;
-    } catch {
-      // 选人阶段可能读不到
-    }
-  } else {
-    try {
-      const session = await client.get<Record<string, unknown>>(
-        '/lol-gameflow/v1/session',
-      );
-      const parsed = parseTeamFromGameflow(session, myPuuid);
-      myTeamSkeletons = parsed.myTeam;
-      enemyTeamSkeletons = parsed.enemyTeam;
-      const gameData = (session.gameData as Record<string, unknown>) ?? {};
-      const queue = (gameData.queue as Record<string, unknown>) ?? {};
-      queueName = getQueueName(Number(queue.id ?? 0));
-    } catch {
-      // 继续
-    }
-
-    if (myTeamSkeletons.length + enemyTeamSkeletons.length < 10) {
-      try {
-        const livePlayers = await fetchLiveClientPlayers();
-        const supplemented = supplementTeamsFromLiveClient(
-          myTeamSkeletons,
-          enemyTeamSkeletons,
-          livePlayers,
-        );
-        myTeamSkeletons = supplemented.myTeam;
-        enemyTeamSkeletons = supplemented.enemyTeam;
-      } catch {
-        // Port 2999 is only available after the game process is ready.
-      }
-    }
-  }
-
-  // 4-5. 并行补全 10 人信息 + 战绩
-  const [myTeam, enemyTeam] = await Promise.all([
-    enrichPlayers(client, myTeamSkeletons),
-    enrichPlayers(client, enemyTeamSkeletons),
-  ]);
-
-  return {
-    inGame: true,
-    phase,
-    queueName,
-    myTeam,
-    enemyTeam,
-  };
+  const battle = assembleBattle();
+  const stabilized = stabilizeLiveBattle(
+    battle,
+    stableSnapshot,
+    Date.now(),
+    LIVE_BATTLE_STALE_TTL_MS,
+  );
+  stableSnapshot = stabilized.stable;
+  return stabilized.value;
 }
 
-export async function getLiveBattle(): Promise<LiveBattleInfo> {
-  if (liveBattleCache && liveBattleCache.expiresAt > Date.now()) {
-    return structuredClone(liveBattleCache.value);
-  }
-  if (!liveBattleInFlight) {
-    const version = liveBattleCacheVersion;
-    liveBattleInFlight = loadLiveBattle()
-      .then((value) => {
-        const stabilized = stabilizeLiveBattle(
-          value,
-          stableLiveBattle,
-          Date.now(),
-          LIVE_BATTLE_STALE_TTL_MS,
-        );
-        stableLiveBattle = stabilized.stable;
+// 离开对局/大厅时彻底重置：递增 generation 让在途回调失效，清空分片状态。
+export function resetLiveBattle(): void {
+  loadGeneration += 1;
+  queue.clear();
+  store.clearSession();
+  currentRoster = { myTeam: [], enemyTeam: [] };
+  currentQueueName = '';
+  currentMapName = '';
+  currentMyPuuid = '';
+  matchDetailCache.clear();
+  stableSnapshot = null;
+  pendingPhase = null;
+  pendingPlayers.clear();
+  clearRosterSnapshot();
+  emitUpdate({ type: 'reset' });
+}
 
-        if (version === liveBattleCacheVersion) {
-          liveBattleCache = {
-            expiresAt: Date.now() + (
-              stabilized.value.inGame
-                ? LIVE_BATTLE_CACHE_TTL_MS
-                : LIVE_BATTLE_EMPTY_CACHE_TTL_MS
-            ),
-            value: stabilized.value,
-          };
-        }
-        return stabilized.value;
-      })
-      .finally(() => {
-        liveBattleInFlight = null;
-      });
+// 相位变化时调用（由 liveWatcher 驱动）。
+//
+// 关键设计：Lobby → ChampSelect → GameStart → InProgress 视为同一次会话，
+// 期间不清缓存、不递增 generation —— 这样大厅/选人阶段预取到的数据能一路
+export function onPhaseChanged(phase: string): void {
+  const isLive = LIVE_PHASES.includes(phase);
+  const isPrefetch = PREFETCH_PHASES.includes(phase);
+
+  if (!isLive && !isPrefetch) {
+    currentPhase = phase;
+    resetLiveBattle();
+    return;
   }
-  return structuredClone(await liveBattleInFlight);
+
+  currentPhase = phase;
+  void startLiveLoad(phase);
 }

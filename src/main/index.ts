@@ -43,7 +43,6 @@ if (started) {
   app.quit();
 }
 
-// 隐藏 Electron 默认菜单栏（File/Edit/View/Window），避免破坏现代桌面应用感。
 Menu.setApplicationMenu(null);
 
 function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
@@ -68,21 +67,17 @@ function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
 }
 
 const createWindow = () => {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     title: APP_WINDOW_TITLE,
-    // 三栏常驻布局：保持原 1280 工作区宽度，再额外加右侧 288px 好友栏。
     width: DEFAULT_WINDOW_WIDTH,
-    height: 800,
+    height: APP_LAYOUT.windowHeight,
     minWidth: MIN_WINDOW_WIDTH,
-    minHeight: 680,
-    backgroundColor: '#f6f1e4',
-    // 隐藏系统标题栏文字区，用自己的顶部标题栏；保留原生最小化/最大化/关闭按钮。
-    // 拖拽窗口/双击最大化/Windows Snap 仍由原生支持，零 bug 风险。
+    minHeight: APP_LAYOUT.minWindowHeight,
+    backgroundColor: '#0b0f14',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#f6f1e4', // 与顶部暖色标题栏保持一体
-      symbolColor: '#1a1c1f',
+      color: '#0d1219',
+      symbolColor: '#c4ced9',
       height: 44,
     },
     webPreferences: {
@@ -96,7 +91,6 @@ const createWindow = () => {
     },
   });
 
-  // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -137,7 +131,6 @@ const createWindow = () => {
   });
 
   // 仅开发环境自动打开 DevTools；打包后（app.isPackaged === true）不再弹。
-  // 用 'detach' 模式：DevTools 作为独立浮窗，不 dock 在应用窗口内（避免占用右侧/底部布局空间）。
   if (!app.isPackaged && process.env.LOLHELP_OPEN_DEVTOOLS === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }

@@ -4,10 +4,11 @@ import { IPC_CHANNELS } from '../../shared/channels';
 import type { LiveStateChangeEvent } from '../../shared/api';
 import { LcuClient } from '../lcu/client';
 import { getCachedCredentials, type LcuCredentials } from '../lcu/lockfile';
-import { invalidateLiveBattleCache } from './liveBattle';
+import { onPhaseChanged } from './liveBattle';
 
 const GAMEFLOW_PHASE_URI = '/lol-gameflow/v1/gameflow-phase';
 const CHAMP_SELECT_SESSION_URI = '/lol-champ-select/v1/session';
+const LOBBY_URI_PREFIX = '/lol-lobby/v2/lobby';
 const POLL_INTERVAL_MS = 2_500;
 const RECONNECT_DELAY_MS = 2_000;
 const CHAMP_SELECT_REFRESH_THROTTLE_MS = 900;
@@ -34,6 +35,11 @@ function isLivePhase(phase: string): boolean {
   return ['ChampSelect', 'GameStart', 'InProgress', 'Reconnect'].includes(phase);
 }
 
+function isRosterPhase(phase: string): boolean {
+  return ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect', 'GameStart', 'InProgress', 'Reconnect']
+    .includes(phase);
+}
+
 function credentialKey(creds: LcuCredentials): string {
   return `${creds.port}:${creds.token}`;
 }
@@ -44,7 +50,9 @@ function emitLiveState(event: Omit<LiveStateChangeEvent, 'at'>): void {
     at: Date.now(),
   };
 
-  invalidateLiveBattleCache();
+  // 相位变化驱动实时对局流水线：进入 Lobby/选人就开始预取，
+  // 离开对局则重置分片状态。这里不再无脑清空缓存。
+  onPhaseChanged(payload.phase);
 
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
@@ -69,7 +77,7 @@ function emitPhaseIfChanged(
 ): void {
   const normalized = normalizePhase(phase);
   if (normalized === lastPhase) {
-    if (!isLivePhase(normalized) || Date.now() - lastLiveHeartbeatAt < LIVE_HEARTBEAT_MS) {
+    if (!isRosterPhase(normalized) || Date.now() - lastLiveHeartbeatAt < LIVE_HEARTBEAT_MS) {
       return;
     }
   } else {
@@ -85,16 +93,18 @@ function emitPhaseIfChanged(
   });
 }
 
-function scheduleChampSelectRefresh(): void {
+function scheduleRosterRefresh(uri: string): void {
   if (champSelectRefreshTimer) return;
   champSelectRefreshTimer = setTimeout(() => {
     champSelectRefreshTimer = null;
-    emitActivity(lastPhase === 'None' ? 'ChampSelect' : lastPhase);
+    const fallbackPhase = uri.startsWith(LOBBY_URI_PREFIX) ? 'Lobby' : 'ChampSelect';
+    const phase = lastPhase === 'None' ? fallbackPhase : lastPhase;
+    emitActivity(phase);
     emitLiveState({
-      phase: lastPhase === 'None' ? 'ChampSelect' : lastPhase,
-      inGame: true,
+      phase,
+      inGame: isLivePhase(phase),
       source: 'websocket',
-      uri: CHAMP_SELECT_SESSION_URI,
+      uri,
     });
   }, CHAMP_SELECT_REFRESH_THROTTLE_MS);
 }
@@ -188,7 +198,12 @@ function handleSocketMessage(raw: WebSocket.RawData): void {
   }
 
   if (payload.uri === CHAMP_SELECT_SESSION_URI) {
-    scheduleChampSelectRefresh();
+    scheduleRosterRefresh(payload.uri);
+    return;
+  }
+
+  if (payload.uri?.startsWith(LOBBY_URI_PREFIX)) {
+    scheduleRosterRefresh(payload.uri);
   }
 }
 

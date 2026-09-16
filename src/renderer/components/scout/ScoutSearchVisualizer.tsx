@@ -354,7 +354,6 @@ function drawWarpedSpaceGrid(
   context.restore();
 }
 
-// Kept as a lightweight fallback for WebGL-disabled environments.
 function drawIridescentScannerField(
   context: CanvasRenderingContext2D,
   centerX: number,
@@ -440,7 +439,6 @@ function drawIridescentScannerField(
   context.restore();
 }
 
-// Kept as a lightweight fallback for WebGL-disabled environments.
 function drawDiscoScannerCore(
   context: CanvasRenderingContext2D,
   centerX: number,
@@ -1009,7 +1007,7 @@ export function ScoutSearchVisualizer({
         if (!recent && node.event.state !== 'checking' && node.event.state !== 'matched') continue;
         context.strokeStyle =
           node.event.state === 'matched'
-            ? 'rgba(94,106,210, 0.22)'
+            ? 'rgba(213,180,105, 0.22)'
             : 'rgba(91, 126, 134, 0.13)';
         context.lineWidth = node.event.state === 'matched' ? 1.1 : 0.7;
         context.beginPath();
@@ -1019,7 +1017,6 @@ export function ScoutSearchVisualizer({
       }
       context.restore();
 
-      // Keep the 2D relationship lines behind the WebGL energy core.
       context.save();
       context.globalCompositeOperation = 'destination-out';
       context.drawImage(coreMaskSprite, centerX - 94, centerY - 94, 188, 188);

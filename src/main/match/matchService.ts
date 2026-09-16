@@ -45,6 +45,9 @@ interface LcuRankQueue {
   ratedRating?: number;
   wins?: number;
   losses?: number;
+  previousSeasonEndTier?: string;
+  previousSeasonHighestTier?: string;
+  highestTier?: string;
 }
 
 interface LcuRankedStats {
@@ -77,10 +80,12 @@ async function requestWithRetry<T>(
   client: SgpClient,
   path: string,
   params?: Record<string, string | number>,
+  signal?: AbortSignal,
 ): Promise<T> {
   try {
-    return await client.get<T>(path, params);
+    return await client.get<T>(path, params, { signal });
   } catch (err) {
+    if (signal?.aborted) throw err;
     if (getSgpHttpStatus(err) === 400) {
       try {
         const currentAuth = await getSgpAuth({ validateSession: true });
@@ -88,16 +93,17 @@ async function requestWithRetry<T>(
           || currentAuth.accessToken !== client.auth.accessToken;
         if (sessionChanged) {
           const newClient = new SgpClient({ ...currentAuth, region: client.auth.region });
-          return await newClient.get<T>(path, params);
+          return await newClient.get<T>(path, params, { signal });
         }
-      } catch {
+      } catch (refreshError) {
+        if (signal?.aborted) throw refreshError;
         // 保留最初的 SGP 错误，避免认证刷新错误掩盖真正的请求结果。
       }
     }
     if (shouldForceRefreshSgpAuth(err)) {
       const newAuth = await getSgpAuth({ forceRefresh: true });
       const newClient = new SgpClient({ ...newAuth, region: client.auth.region });
-      return await newClient.get<T>(path, params);
+      return await newClient.get<T>(path, params, { signal });
     }
     throw err;
   }
@@ -184,6 +190,9 @@ function mapRankQueue(queue: LcuRankQueue): PlayerRankSummary | null {
     wins: toFiniteNumber(queue.wins),
     losses: toFiniteNumber(queue.losses),
     displayText,
+    previousSeasonEndTier: normalizeRankTier(queue.previousSeasonEndTier),
+    previousSeasonHighestTier: normalizeRankTier(queue.previousSeasonHighestTier),
+    highestTier: normalizeRankTier(queue.highestTier),
   };
 }
 
@@ -276,6 +285,7 @@ async function fetchRankByPuuid(
   client: LcuClient,
   puuid: string,
   summonerId?: number,
+  signal?: AbortSignal,
 ): Promise<PlayerRankSummary | null> {
   const paths = [
     puuid ? `/lol-ranked/v1/ranked-stats/${encodeURIComponent(puuid)}` : '',
@@ -284,10 +294,11 @@ async function fetchRankByPuuid(
 
   for (const path of paths) {
     try {
-      const stats = await client.get<LcuRankedStats | LcuRankQueue[]>(path);
+      const stats = await client.get<LcuRankedStats | LcuRankQueue[]>(path, { signal });
       const rank = pickRankSummary(stats);
       if (rank) return rank;
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       // 段位只是附加信息，失败不能影响战绩查询。
     }
   }
@@ -298,6 +309,7 @@ async function fetchRanksByPuuid(
   client: LcuClient,
   puuid: string,
   summonerId?: number,
+  signal?: AbortSignal,
 ): Promise<PlayerRankSummary[]> {
   const paths = [
     puuid ? `/lol-ranked/v1/ranked-stats/${encodeURIComponent(puuid)}` : '',
@@ -306,10 +318,11 @@ async function fetchRanksByPuuid(
 
   for (const path of paths) {
     try {
-      const stats = await client.get<LcuRankedStats | LcuRankQueue[]>(path);
+      const stats = await client.get<LcuRankedStats | LcuRankQueue[]>(path, { signal });
       const ranks = getRankSummaries(stats);
       if (ranks.length > 0) return ranks;
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       // 段位只是附加信息，失败不能影响战绩查询。
     }
   }
@@ -334,6 +347,7 @@ async function fetchCurrentRanks(
 async function fetchSgpRanksByPuuid(
   auth: Awaited<ReturnType<typeof getSgpAuth>>,
   puuid: string,
+  signal?: AbortSignal,
 ): Promise<PlayerRankSummary[]> {
   if (!puuid) return [];
   try {
@@ -341,9 +355,12 @@ async function fetchSgpRanksByPuuid(
     const stats = await requestWithRetry<LcuRankedStats | LcuRankQueue[]>(
       client,
       `/leagues-ledge/v2/rankedStats/puuid/${encodeURIComponent(puuid)}`,
+      undefined,
+      signal,
     );
     return getRankSummaries(stats);
   } catch (err) {
+    if (signal?.aborted) throw err;
     console.warn('[match] SGP 段位查询失败:', puuid, err);
     return [];
   }
@@ -391,7 +408,11 @@ async function fetchLcuSummonerProfileByPuuid(
   return null;
 }
 
-async function fetchSummonerIdByPuuid(client: LcuClient, puuid: string): Promise<number | undefined> {
+async function fetchSummonerIdByPuuid(
+  client: LcuClient,
+  puuid: string,
+  signal?: AbortSignal,
+): Promise<number | undefined> {
   const paths = [
     `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(puuid)}`,
     `/lol-summoner/v1/summoners/puuid/${encodeURIComponent(puuid)}`,
@@ -399,9 +420,10 @@ async function fetchSummonerIdByPuuid(client: LcuClient, puuid: string): Promise
 
   for (const path of paths) {
     try {
-      const summoner = await client.get<{ summonerId?: number }>(path);
+      const summoner = await client.get<{ summonerId?: number }>(path, { signal });
       if (typeof summoner.summonerId === 'number') return summoner.summonerId;
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       // 不同客户端版本可能只支持其中一个路径，继续尝试。
     }
   }
@@ -430,8 +452,10 @@ function cachePlayerRanks(puuid: string, value: PlayerRankSummary[]): void {
 export async function fetchPlayerRanksByPuuid(
   puuid: string,
   region?: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<PlayerRankSummary[]> {
   if (!puuid) return [];
+  const { signal } = options;
   const cacheKey = `${region ? getRegionConfig(region)?.key ?? region : 'current'}:${puuid}`;
   const cached = playerRankCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -441,7 +465,8 @@ export async function fetchPlayerRanksByPuuid(
     playerRankCache.delete(cacheKey);
   }
 
-  const pendingRequest = playerRankRequests.get(cacheKey);
+  // 可取消请求不与其他页面共享同一个在途 Promise，避免一个消费者取消后误伤另一个。
+  const pendingRequest = signal ? undefined : playerRankRequests.get(cacheKey);
   if (pendingRequest) {
     return pendingRequest;
   }
@@ -450,10 +475,11 @@ export async function fetchPlayerRanksByPuuid(
     if (region) {
       try {
         const auth = await getSgpAuthForRegion(region);
-        const ranks = await fetchSgpRanksByPuuid(auth, puuid);
+        const ranks = await fetchSgpRanksByPuuid(auth, puuid, signal);
         cachePlayerRanks(cacheKey, ranks);
         return ranks;
-      } catch {
+      } catch (error) {
+        if (signal?.aborted) throw error;
         // Fall back to local LCU below.
       }
     }
@@ -464,24 +490,27 @@ export async function fetchPlayerRanksByPuuid(
     }
 
     const client = new LcuClient(creds);
-    let ranks = await fetchRanksByPuuid(client, puuid);
+    let ranks = await fetchRanksByPuuid(client, puuid, undefined, signal);
     if (ranks.length === 0) {
-      const summonerId = await fetchSummonerIdByPuuid(client, puuid);
+      const summonerId = await fetchSummonerIdByPuuid(client, puuid, signal);
       if (summonerId) {
-        ranks = await fetchRanksByPuuid(client, '', summonerId);
+        ranks = await fetchRanksByPuuid(client, '', summonerId, signal);
       }
     }
     if (ranks.length === 0) {
       try {
         const auth = await getSgpAuthForRegion(region);
-        ranks = await fetchSgpRanksByPuuid(auth, puuid);
-      } catch {
+        ranks = await fetchSgpRanksByPuuid(auth, puuid, signal);
+      } catch (error) {
+        if (signal?.aborted) throw error;
         // Rank is optional.
       }
     }
     cachePlayerRanks(cacheKey, ranks);
     return ranks;
   })();
+
+  if (signal) return request;
 
   playerRankRequests.set(cacheKey, request);
   try {
@@ -493,14 +522,17 @@ export async function fetchPlayerRanksByPuuid(
   }
 }
 
-export async function fetchPlayerRankByPuuid(puuid: string): Promise<PlayerRankSummary | null> {
-  const ranks = await fetchPlayerRanksByPuuid(puuid);
+export async function fetchPlayerRankByPuuid(
+  puuid: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<PlayerRankSummary | null> {
+  const ranks = await fetchPlayerRanksByPuuid(puuid, undefined, options);
   const preferred = pickPreferredRank(ranks);
   if (preferred || !puuid) return preferred;
 
   const creds = getCachedCredentials();
   if (!creds) return null;
-  return fetchRankByPuuid(new LcuClient(creds), puuid);
+  return fetchRankByPuuid(new LcuClient(creds), puuid, undefined, options.signal);
 }
 
 // 按 Riot ID（名字#数字）查 puuid。

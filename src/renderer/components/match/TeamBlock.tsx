@@ -2,7 +2,6 @@ import { PlayerRow } from './PlayerRow';
 import type { MatchParticipantSummary } from '../../../shared/api';
 import type { RecurringMate } from './MatchList';
 
-// 队伍区块：只展示玩家明细表，避免额外团队摘要占用视觉焦点。
 interface TeamBlockProps {
   teamId: number;
   participants: MatchParticipantSummary[];

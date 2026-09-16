@@ -32,6 +32,7 @@ import type {
 interface SgpParticipant {
   [key: string]: unknown;
   puuid: string;
+  participantId?: number;
   riotIdGameName: string;
   riotIdTagline: string;
   summonerName: string;
@@ -191,6 +192,22 @@ function buildParticipantStats(p?: Partial<SgpParticipant>): MatchParticipantSta
   };
 }
 
+function buildRawParticipantStats(p?: Partial<SgpParticipant>): Record<string, number | string | boolean> {
+  if (!p) return {};
+  const result: Record<string, number | string | boolean> = {};
+  for (const [key, rawValue] of Object.entries(p)) {
+    if (typeof rawValue === 'number' && Number.isFinite(rawValue)) result[key] = rawValue;
+    else if (typeof rawValue === 'boolean' || typeof rawValue === 'string') result[key] = rawValue;
+  }
+  if (p.challenges && typeof p.challenges === 'object') {
+    for (const [key, rawValue] of Object.entries(p.challenges)) {
+      if (typeof rawValue === 'number' && Number.isFinite(rawValue)) result[key] = rawValue;
+      else if (typeof rawValue === 'boolean' || typeof rawValue === 'string') result[key] = rawValue;
+    }
+  }
+  return result;
+}
+
 function normalizePremadeId(p: SgpParticipant): string | undefined {
   const raw =
     p.premadeId ??
@@ -331,7 +348,7 @@ function collectAugments(p: SgpParticipant): PlayerRuneSummary[] {
 }
 
 // 映射单个 participant
-function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
+function mapParticipant(p: SgpParticipant, fallbackParticipantId: number): MatchParticipantSummary {
   const hero = getHeroByKey(p.championId);
   const championSplashUrl = buildChampionSplashByAlias(
     hero?.alias ?? '',
@@ -349,6 +366,7 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
     : p.summonerName ?? '';
 
   return {
+    participantId: toNumber(p.participantId) || fallbackParticipantId,
     puuid: p.puuid ?? '',
     riotId,
     gameName: p.riotIdGameName ?? '',
@@ -379,6 +397,7 @@ function mapParticipant(p: SgpParticipant): MatchParticipantSummary {
     runes,
     augments,
     stats,
+    rawStats: buildRawParticipantStats(p),
     visionScore: stats.visionScore,
     largestMultiKill: stats.largestMultiKill,
     largestKillingSpree: stats.largestKillingSpree,
@@ -404,7 +423,7 @@ export function extractMatchDetail(game: SgpGame, targetPuuid: string): PlayerMa
       )
     : '';
 
-  const participants = json.participants.map((p) => mapParticipant(p));
+  const participants = json.participants.map((p, index) => mapParticipant(p, index + 1));
 
   const target = targetP ?? json.participants[0];
   const items = target ? collectItems(target) : [];

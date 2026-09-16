@@ -9,9 +9,6 @@ import {
 import { Button } from './ui/button';
 import type { LcuConnection } from '../../shared/api';
 
-// LCU 客户端检测卡：验证 LOL 客户端连通性。
-// 点击检测 → IPC 到 main → 读 lockfile + 发真实 LCU 请求 → 返回连通结果。
-// 这是 LCU 功能路线的可行性验证入口。
 export function LcuConnectionCard() {
   const [result, setResult] = useState<LcuConnection | null>(null);
   const [loading, setLoading] = useState(false);

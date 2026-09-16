@@ -28,7 +28,6 @@ function resolveSettingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
 }
 
-// 读设置。文件不存在/损坏时返回默认值（不抛错，保证 UI 永远拿得到值）。
 export function getSettings(): AppSettings {
   if (settingsCache) return structuredClone(settingsCache);
 

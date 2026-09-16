@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>实时对局 · Akari 版式预览</title>
+<style>
+:root {
+  --color-app-bg: #0b0f14;
+  --color-app-bg-soft: #10161f;
+  --color-app-shell: #0d1219;
+  --color-app-sidebar: #0c1118;
+
+  --color-app-surface: #121923;
+  --color-app-surface-soft: #18212c;
+
+  --color-app-border: #222c39;
+  --color-app-border-strong: #344255;
+
+  --color-app-nav-hover: rgba(255, 255, 255, 0.045);
+  --color-app-selected: rgba(213, 180, 105, 0.11);
+  --color-app-focus: #d5b469;
+
+  --color-app-text: #f2f5f8;
+  --color-app-body: #c4ced9;
+  --color-app-muted: #929dab;
+  --color-app-subtle: #687586;
+
+  --color-app-primary: #d5b469;
+  --color-app-primary-hover: #e2c47d;
+  --color-app-primary-soft: rgba(213, 180, 105, 0.14);
+  --color-app-primary-foreground: #17130b;
+  --color-app-accent: #d5b469;
+
+  --color-app-danger: #f07178;
+  --color-app-danger-hover: #f6848a;
+  --color-app-success: #55c58a;
+  --color-app-link: #78aef2;
+  --color-app-team-mine: #5da9ff;
+  --color-app-team-enemy: #f07178;
+
+  --color-app-win: #55c58a;
+  --color-app-win-bg: rgba(85, 197, 138, 0.11);
+  --color-app-win-border: rgba(85, 197, 138, 0.28);
+  --color-app-loss: #f07178;
+  --color-app-loss-bg: rgba(240, 113, 120, 0.1);
+  --color-app-loss-border: rgba(240, 113, 120, 0.28);
+
+  --font-sans: Inter, "Microsoft YaHei UI", "PingFang SC", "Segoe UI",
+    ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  --tracking-label: 0.14em;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Linear resists drop shadows on dark: hairlines and surface lift instead.
+     Only floating layers keep a whisper of black depth. */
+  --shadow-ui-sm: none;
+  --shadow-ui-shell: 0 0 0 1px rgba(255, 255, 255, 0.025);
+  --shadow-ui-popover: 0 0 0 1px #344255, 0 18px 44px -24px rgba(0, 0, 0, 0.86);
+
+  --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #app { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  background: var(--color-app-bg);
+  color: var(--color-app-body);
+  overflow: hidden;
+}
+button { font: inherit; border: 0; background: none; color: inherit; cursor: pointer; }
+
+
+  /* ==========================================================================
+     实时对局（Akari 对局面板版式）
+     顶部队列标题栏 → 两队分区（蓝队在上、红队在下）→ 每队 5 张玩家卡。
+     每张卡：圆头像+等级 → 名字#tag → 双段位行 → 胜率(场次)/KDA → 标签
+     → 最近英雄 → 可滚动的战绩列表。
+     ========================================================================== */
+
+  .live-page {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-app-bg);
+    color: var(--color-app-text);
+  }
+
+  /* 顶部标题栏：队列 · 地图 · 我方阵营 */
+  .live-page-bar {
+    display: flex;
+    height: 30px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--color-app-border);
+    padding: 0 10px 0 12px;
+    background: var(--color-app-bg-soft);
+  }
+
+  .live-page-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 11.5px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-page-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .live-page-action {
+    display: flex;
+    height: 22px;
+    align-items: center;
+    gap: 5px;
+    border-radius: var(--radius-xs);
+    padding: 0 7px;
+    color: var(--color-app-muted);
+    font-size: 10px;
+    font-weight: 600;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .live-page-action:hover {
+    background: var(--color-app-nav-hover);
+    color: var(--color-app-text);
+  }
+
+  .live-page-action--active {
+    background: var(--color-app-primary-soft);
+    color: var(--color-app-primary);
+  }
+
+  .live-page-icon-action {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: var(--radius-xs);
+    color: var(--color-app-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .live-page-icon-action:hover {
+    background: var(--color-app-nav-hover);
+    color: var(--color-app-text);
+  }
+
+  .live-page-icon-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .live-page-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 6px 8px 8px;
+  }
+
+  .live-page-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--color-app-muted);
+  }
+
+  .live-page-empty--error {
+    font-size: 13px;
+  }
+
+  .live-page-empty-icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-app-subtle);
+    background: var(--color-app-surface-soft);
+  }
+
+  .live-page-empty-text {
+    color: var(--color-app-body);
+    font-size: 13px;
+  }
+
+  /* 看板：上下两块队伍区 */
+  .live-board {
+    display: grid;
+    width: min(100%, 1120px);
+    height: min(100%, 720px);
+    min-height: 0;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    align-content: center;
+    gap: 7px;
+  }
+
+  .live-team {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-app-border);
+    border-radius: var(--radius-md);
+    background: var(--color-app-surface);
+  }
+
+  /* 队伍条：● 蓝队 [我方]  50% | 3.25 | 4 黑 */
+  .live-team-bar {
+    display: flex;
+    height: 26px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-app-border);
+    padding: 0 10px;
+    background: var(--color-app-bg-soft);
+  }
+
+  .live-team-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 999px;
+  }
+
+  .live-team-dot--blue { background: var(--color-app-team-mine); }
+  .live-team-dot--red { background: var(--color-app-team-enemy); }
+
+  .live-team-name {
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .live-team-mine {
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--color-app-primary);
+    background: var(--color-app-primary-soft);
+    font-size: 9.5px;
+    font-weight: 700;
+  }
+
+  .live-team-metrics {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    margin-left: 2px;
+  }
+
+  .live-team-metric {
+    color: var(--color-app-body);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-team-metric--win { color: var(--color-app-success); }
+
+  .live-team-sep {
+    width: 1px;
+    height: 11px;
+    background: var(--color-app-border-strong);
+  }
+
+  .live-team-cards {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  /* ===================== 玩家卡 ===================== */
+
+  .live-card {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .live-card + .live-card {
+    border-left: 1px solid var(--color-app-border);
+  }
+
+  /* 预组队：顶部色条 + 右上角三角，与 Akari 的开黑标记一致 */
+  .live-card--party::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 4;
+    height: 2px;
+    content: "";
+    background: var(--live-party-color);
+  }
+
+  .live-card--party::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 5;
+    width: 11px;
+    height: 11px;
+    content: "";
+    background: var(--live-party-color);
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+  }
+
+  .live-card--self {
+    background: color-mix(in srgb, var(--color-app-primary) 5%, transparent);
+  }
+
+  .live-card-inner {
+    display: flex;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    padding: 7px 9px 6px;
+    transition: background-color 140ms ease;
+  }
+
+  .live-card-inner:hover {
+    background: color-mix(in srgb, var(--color-app-surface-soft) 45%, transparent);
+  }
+
+  /* 头部：圆头像 + 名字/#tag + 更多 */
+  .live-card-head {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .live-card-avatar {
+    position: relative;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    place-items: center;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.31);
+    background: var(--color-app-surface-soft);
+  }
+
+  .live-card-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    object-fit: cover;
+  }
+
+  .live-card-avatar-fallback {
+    color: var(--color-app-subtle);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  /* 召唤师等级徽章：压在头像下沿 */
+  .live-card-level {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    z-index: 6;
+    min-width: 15px;
+    transform: translateX(-50%);
+    border-radius: 4px;
+    padding: 1px 4px;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.72);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-card-identity {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .live-card-name-row {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .live-card-name {
+    min-width: 0;
+    overflow: hidden;
+    border: 0;
+    padding: 0;
+    color: var(--color-app-text);
+    background: transparent;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 750;
+    line-height: 16px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 140ms ease;
+  }
+
+  .live-card--party .live-card-name {
+    color: var(--live-party-color);
+  }
+
+  .live-card-name:hover,
+  .live-card-name:focus-visible {
+    color: var(--color-app-primary);
+  }
+
+  .live-card-name:focus-visible {
+    border-radius: 3px;
+    outline: 2px solid color-mix(in srgb, var(--color-app-primary) 28%, transparent);
+    outline-offset: 2px;
+  }
+
+  .live-card-name:disabled {
+    cursor: default;
+  }
+
+  .live-card-name:disabled:hover {
+    color: var(--color-app-text);
+  }
+
+  .live-card--party .live-card-name:disabled:hover {
+    color: var(--live-party-color);
+  }
+
+  .live-card-tag {
+    flex: 0 0 auto;
+    overflow: hidden;
+    color: var(--color-app-subtle);
+    font-size: 10px;
+    font-weight: 550;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-card-more {
+    display: grid;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    place-items: center;
+    border-radius: 3px;
+    color: var(--color-app-subtle);
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .live-card-more:hover {
+    background: var(--color-app-nav-hover);
+    color: var(--color-app-text);
+  }
+
+  .live-card-more:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+
+  /* 段位行：单双排 + 灵活组排 */
+  .live-card-ranks {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0 0 48px;
+  }
+
+  .live-rank-item {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .live-rank-emblem {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    object-fit: contain;
+  }
+
+  .live-rank-text {
+    color: var(--color-app-body);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .live-rank-item--empty .live-rank-text,
+  .live-rank-item--empty {
+    color: var(--color-app-subtle);
+  }
+
+  .live-rank-item--empty {
+    font-size: 11px;
+    font-weight: 550;
+  }
+
+  /* 数据行：胜率(场次) | KDA */
+  .live-card-stats {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 2px 4px;
+  }
+
+  .live-card-stat {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 3px;
+  }
+
+  .live-card-stat b {
+    color: var(--color-app-text);
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 17px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
+  }
+
+  .live-card-stat small {
+    color: var(--color-app-subtle);
+    font-size: 10px;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-card-stat--win b { color: var(--color-app-success); }
+  .live-card-stat--loss b { color: var(--color-app-danger); }
+  .live-card-stat--kda { justify-content: flex-end; }
+
+  /* 标签行 */
+  .live-card-tags {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 5px;
+  }
+
+  .live-chip {
+    display: inline-flex;
+    height: 17px;
+    max-width: 100%;
+    flex: 0 0 auto;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 4px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-chip--self {
+    color: var(--color-app-primary);
+    background: var(--color-app-primary-soft);
+  }
+
+  .live-chip--party {
+    color: color-mix(in srgb, var(--live-party-color, #4fd1c5) 82%, #ffffff);
+    background: color-mix(in srgb, var(--live-party-color, #4fd1c5) 24%, transparent);
+  }
+
+  .live-chip--win {
+    color: #7ddc9c;
+    background: rgba(22, 128, 58, 0.14);
+  }
+
+  .live-chip--loss {
+    color: #ef88a0;
+    background: rgba(207, 49, 84, 0.13);
+  }
+
+  .live-chip--position {
+    color: var(--color-app-muted);
+    background: rgba(247, 248, 248, 0.07);
+  }
+
+  /* 最近使用英雄 */
+  .live-card-champs {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    gap: 3px;
+    padding-bottom: 5px;
+  }
+
+  .live-champ {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 5px;
+    border: 1px solid var(--color-app-border-strong);
+    background: var(--color-app-surface-soft);
+  }
+
+  .live-champ--win { border-color: rgba(35, 104, 202, 0.85); }
+  .live-champ--loss { border-color: rgba(201, 79, 79, 0.85); }
+
+  .live-champ img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* 战绩列表：可滚动，行底色区分胜负 */
+  .live-card-history {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-auto-rows: min-content;
+    gap: 3px;
+    align-content: start;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .live-match {
+    display: grid;
+    min-width: 0;
+    height: 34px;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+    padding: 0 6px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+
+  .live-match--win {
+    background: color-mix(in srgb, #3b82f6 17%, transparent);
+  }
+
+  .live-match--loss {
+    background: color-mix(in srgb, #ef4444 15%, transparent);
+  }
+
+  .live-match-icon {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--color-app-surface-soft);
+  }
+
+  .live-match-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .live-match-info {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.15;
+  }
+
+  .live-match-mode {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 11px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-match-meta {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .live-match-time {
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 9.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-match-result {
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .live-match-result--win { color: #7fb2f5; }
+  .live-match-result--loss { color: var(--color-app-danger); }
+
+  .live-match-kda {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .live-match--placeholder {
+    animation: live-chip-pulse 1.15s ease-in-out infinite;
+    background: color-mix(in srgb, var(--color-app-surface-soft) 90%, transparent);
+  }
+
+  .live-match--placeholder:nth-child(2n) { animation-delay: 0.16s; }
+  .live-match--placeholder:nth-child(3n) { animation-delay: 0.32s; }
+
+  @keyframes live-chip-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 0.95;
+    }
+  }
+
+  .live-card-history-summary {
+    padding-top: 2px;
+    color: var(--color-app-subtle);
+    font-size: 9.5px;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .live-card-history-summary b {
+    color: var(--color-app-success);
+    font-weight: 750;
+  }
+
+  .live-card-history-summary i {
+    color: var(--color-app-danger);
+    font-style: normal;
+    font-weight: 750;
+  }
+
+  .live-card-history-placeholder {
+    display: grid;
+    min-height: 0;
+    grid-auto-rows: 34px;
+    gap: 3px;
+  }
+
+  .live-card-empty {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-app-subtle);
+    font-size: 10px;
+  }
+
+  @media (max-height: 800px) {
+    .live-board {
+      height: min(100%, 660px);
+    }
+
+    .live-card-avatar {
+      width: 34px;
+      height: 34px;
+      flex-basis: 34px;
+    }
+
+    .live-card-ranks {
+      padding-left: 42px;
+    }
+
+    .live-card-stat b {
+      font-size: 14px;
+    }
+
+    .live-match {
+      height: 30px;
+    }
+  }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const PARTY_COLORS = ['#4fd1c5', '#d5b469', '#55c58a', '#a892d4', '#d88b66', '#78aef2'];
+const RANK_EMBLEM = {
+  IRON: 'iron', BRONZE: 'bronze', SILVER: 'silver', GOLD: 'gold', PLATINUM: 'platinum',
+  EMERALD: 'emerald', DIAMOND: 'diamond', MASTER: 'master', GRANDMASTER: 'grandmaster',
+  CHALLENGER: 'challenger',
+};
+const TIER_SHORT = {
+  IRON: '黑铁', BRONZE: '青铜', SILVER: '白银', GOLD: '黄金', PLATINUM: '铂金',
+  EMERALD: '翡翠', DIAMOND: '钻石', MASTER: '大师', GRANDMASTER: '宗师', CHALLENGER: '王者',
+};
+const CHAMP_ICON = (alias) => 'https://game.gtimg.cn/images/lol/act/img/champion/' + alias + '.png';
+const RANK_ICON = (tier) => 'file:///C:/Users/Administrator/Desktop/个人项目/lolhelp/src/renderer/assets/rank-emblems/' + (RANK_EMBLEM[tier] || 'iron') + '.png';
+
+function rankText(r) {
+  const tier = TIER_SHORT[r.tier] || r.tier;
+  const div = r.division && r.division !== 'NA' ? ' ' + r.division : '';
+  const lp = r.lp > 0 ? ' ' + r.lp : '';
+  return tier + div + lp;
+}
+
+function card(p, index, party) {
+  const style = party ? ` style="--live-party-color: ${party.color}"` : '';
+  const cls = 'live-card' + (party ? ' live-card--party' : '') + (p.isSelf ? ' live-card--self' : '');
+  const winTone = p.matchCount === 0 ? '' : p.winRate >= 53 ? ' live-card-stat--win' : p.winRate <= 47 ? ' live-card-stat--loss' : '';
+  const kdaTone = p.matchCount === 0 ? '' : p.kda >= 4 ? ' live-card-stat--win' : p.kda < 2 ? ' live-card-stat--loss' : '';
+  const ranks = p.ranks.map((r) => `
+      <span class="live-rank-item" title="${r.queue} ${rankText(r)}">
+        <img class="live-rank-emblem" src="${RANK_ICON(r.tier)}" alt="${r.tier}">
+        <span class="live-rank-text">${rankText(r)}</span>
+      </span>`).join('');
+  const chips = [
+    p.isSelf ? '<span class="live-chip live-chip--self">自己</span>' : '',
+    party ? `<span class="live-chip live-chip--party">小队 ${party.label}</span>` : '',
+    p.streak ? `<span class="live-chip ${p.streak.win ? 'live-chip--win' : 'live-chip--loss'}">${p.streak.count} ${p.streak.win ? '连胜' : '连败'}</span>` : '',
+    p.position ? `<span class="live-chip live-chip--position">${p.position}</span>` : '',
+  ].join('');
+  const champs = p.champs.map((c) => `
+        <span class="live-champ ${c.win ? 'live-champ--win' : 'live-champ--loss'}" title="${c.name} · 近${c.games}场 ${c.wins}胜">
+          <img src="${CHAMP_ICON(c.alias)}" alt="${c.name}">
+        </span>`).join('');
+  const history = p.history.map((h) => `
+        <div class="live-match ${h.win ? 'live-match--win' : 'live-match--loss'}">
+          <span class="live-match-icon"><img src="${CHAMP_ICON(h.alias)}" alt=""></span>
+          <span class="live-match-info">
+            <span class="live-match-mode">${h.mode}</span>
+            <span class="live-match-meta">
+              <span class="live-match-time">${h.time}</span>
+              <span class="live-match-result ${h.win ? 'live-match-result--win' : 'live-match-result--loss'}">${h.win ? '胜' : '负'}</span>
+            </span>
+          </span>
+          <span class="live-match-kda">${h.k}</span>
+        </div>`).join('');
+
+  return `
+  <div class="${cls}"${style}>
+    <div class="live-card-inner">
+      <div class="live-card-head">
+        <div class="live-card-avatar" title="${p.champion} · Lv.${p.level}">
+          <img src="${CHAMP_ICON(p.alias)}" alt="${p.champion}">
+          <span class="live-card-level">${p.level}</span>
+        </div>
+        <div class="live-card-identity">
+          <div class="live-card-name-row">
+            <button type="button" class="live-card-name">${p.name}</button>
+            <span class="live-card-tag">#${p.tag}</span>
+          </div>
+          <button type="button" class="live-card-more" title="查看战绩">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="live-card-ranks">${ranks}</div>
+      <div class="live-card-stats">
+        <span class="live-card-stat${winTone}"><b>${p.matchCount > 0 ? p.winRate + '%' : '— %'}</b>${p.matchCount > 0 ? '<small>(' + p.matchCount + ')</small>' : ''}</span>
+        <span class="live-card-stat live-card-stat--kda${kdaTone}"><b>${p.matchCount > 0 ? p.kda.toFixed(2) : '—'}</b></span>
+      </div>
+      <div class="live-card-tags">${chips}</div>
+      <div class="live-card-champs">${champs}</div>
+      <div class="live-card-history">${history}</div>
+    </div>
+  </div>`;
+}
+
+function teamBar(teamId, name, summary, isMine) {
+  const cls = teamId === 100 ? 'blue' : 'red';
+  return `
+    <div class="live-team-bar">
+      <span class="live-team-dot live-team-dot--${cls}"></span>
+      <span class="live-team-name">${name}</span>
+      ${isMine ? '<span class="live-team-mine">我方</span>' : ''}
+      <span class="live-team-metrics">
+        <span class="live-team-metric live-team-metric--win">${summary.winRate}%</span>
+        <span class="live-team-sep"></span>
+        <span class="live-team-metric">${summary.kda.toFixed(2)}</span>
+        ${summary.black > 0 ? '<span class="live-team-sep"></span><span class="live-chip live-chip--party">' + summary.black + ' 黑</span>' : ''}
+      </span>
+    </div>`;
+}
+
+function section(teamId, name, players, summary, isMine, parties) {
+  const cards = players.map((p, i) => card(p, i, parties[p.party] || null)).join('');
+  return `<section class="live-team">${teamBar(teamId, name, summary, isMine)}<div class="live-team-cards">${cards}</div></section>`;
+}
+
+const QN = '海克斯大乱斗';
+const MAP = '随机地图';
+const MYSIDE = '红队';
+
+const parties = {
+  a: { color: PARTY_COLORS[0], label: 'A' },
+  b: { color: PARTY_COLORS[1], label: 'B' },
+};
+
+function hist(seed, count) {
+  const modes = ['海克斯大乱斗', '极地大乱斗', '单双排位'];
+  const champs = [['Jinx', '暴走萝莉'], ['Thresh', '魂锁典狱长'], ['Ahri', '九尾妖狐'], ['LeeSin', '盲僧'], ['Garen', '德玛西亚之力']];
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const c = champs[(seed + i) % champs.length];
+    const win = ((seed * 3 + i * 7) % 10) < 5;
+    out.push({
+      alias: c[0], name: c[1],
+      mode: modes[i % 2],
+      time: '09-15 ' + String(1 + (i % 12)).padStart(2, '0') + ':' + String((seed * 13 + i * 7) % 60).padStart(2, '0'),
+      k: (2 + ((seed + i * 3) % 13)) + ' / ' + (1 + ((seed * 2 + i) % 9)) + ' / ' + (3 + ((seed * 5 + i * 2) % 19)),
+      win,
+    });
+  }
+  return out;
+}
+
+const raw = [
+  ['Paranoid | 书生', '50721', 817, 'Vayne', '暗夜猎手', 'PLATINUM', 'II', 57, 'DIAMOND', 'II', 65, 49, 49, 3.06, 'a', 'top', null],
+  ['Losts4likedream', '70913', 699, 'Yasuo', '疾风剑豪', 'PLATINUM', 'III', 7, null, null, 0, 44, 48, 3.16, null, 'middle', { win: false, count: 4 }],
+  ['凤凰King', '77215', 91, 'Anivia', '冰晶凤凰', null, null, 0, null, null, 0, 52, 48, 2.93, 'a', 'middle', null],
+  ['水朵蜜蜜', '20196', 164, 'Seraphine', '星籁歌姬', null, null, 0, 'PLATINUM', 'II', 98, 51, 41, 3.23, 'a', 'support', null],
+  ['Love', '15372', 1226, 'Kaisa', '虚空之女', 'DIAMOND', 'IV', 15, 'DIAMOND', 'II', 65, 56, 48, 3.99, null, 'bottom', null],
+  ['ydrtuesrtuhdrt', '39602', 278, 'Zed', '影流之主', null, null, 0, null, null, 0, 45, 47, 3.15, null, 'jungle', { win: false, count: 4 }],
+  ['淡淡粗现在脸上', '34526', 1441, 'Darius', '诺克萨斯之手', 'MASTER', '', 31, null, null, 0, 45, 47, 2.80, null, 'top', { win: false, count: 6 }],
+  ['小猫猫拳', '46662', 227, 'Riven', '放逐之刃', 'GOLD', 'I', 62, 'EMERALD', 'III', 60, 41, 49, 3.94, 'b', 'top', null],
+  ['黑色红薯', '61319', 163, 'Lulu', '仙灵女巫', null, null, 0, null, null, 0, 46, 48, 4.04, 'b', 'support', null],
+  ['月南城、城北后', '22348', 61, 'Gwen', '灵罗娃娃', 'GOLD', 'IV', 36, null, null, 0, 47, 49, 3.20, null, 'middle', { win: true, count: 3 }],
+];
+
+const players = raw.map((r) => {
+  const [name, tag, level, alias, champion, t1, d1, lp1, t2, d2, lp2, wr, mc, kda, party, position, streak] = r;
+  const ranks = [];
+  if (t1) ranks.push({ queue: '单双', tier: t1, division: d1, lp: lp1 });
+  if (t2) ranks.push({ queue: '灵活', tier: t2, division: d2, lp: lp2 });
+  const h = hist(level % 17, 9);
+  const champMap = new Map();
+  h.forEach((x) => {
+    const cur = champMap.get(x.alias) || { alias: x.alias, name: x.name, games: 0, wins: 0 };
+    cur.games += 1;
+    if (x.win) cur.wins += 1;
+    champMap.set(x.alias, cur);
+  });
+  return {
+    name, tag, level, alias, champion, ranks, winRate: wr, matchCount: mc, kda,
+    party, position: ({ top: '上单', jungle: '打野', middle: '中路', bottom: '下路', support: '辅助' })[position],
+    streak, history: h, champs: Array.from(champMap.values()).slice(0, 5),
+    isSelf: name === '小猫猫拳',
+  };
+});
+
+const blue = players.slice(0, 5);
+const red = players.slice(5);
+const sum = (list) => ({
+  winRate: Math.round(list.reduce((a, p) => a + p.winRate, 0) / list.length),
+  kda: list.reduce((a, p) => a + p.kda, 0) / list.length,
+  black: list.filter((p) => p.party).length,
+});
+
+document.getElementById('app').innerHTML = `
+<div class="live-page">
+  <div class="live-page-bar">
+    <span class="live-page-title">${QN} · ${MAP} · ${MYSIDE}</span>
+    <div class="live-page-actions">
+      <button type="button" class="live-page-action">测试数据</button>
+      <button type="button" class="live-page-icon-action">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="live-page-body">
+    <div class="live-board">
+      ${section(100, '蓝队', blue, sum(blue), false, parties)}
+      ${section(200, '红队', red, sum(red), true, parties)}
+    </div>
+  </div>
+</div>`;
+</script>
+</body>
+</html>

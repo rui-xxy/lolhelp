@@ -60,6 +60,7 @@ function mergePlayer(
     riotId: freshHasIdentity ? fresh.riotId : previous.riotId,
     gameName: freshHasIdentity ? fresh.gameName : previous.gameName,
     summonerLevel: fresh.summonerLevel || previous.summonerLevel,
+    privacy: fresh.privacy || previous.privacy,
     rank: fresh.rank ?? previous.rank,
     kda: freshHasHistory ? fresh.kda : previous.kda,
     winRate: freshHasHistory ? fresh.winRate : previous.winRate,

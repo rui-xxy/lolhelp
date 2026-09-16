@@ -30,7 +30,7 @@ const RANK_EMBLEM_URLS: Record<string, string> = {
   challenger: challengerEmblem,
 };
 
-function getRankEmblemUrl(tier: string): string {
+export function getRankEmblemUrl(tier: string): string {
   const normalizedTier = tier.toLowerCase();
   return RANK_EMBLEM_URLS[normalizedTier] ?? RANK_EMBLEM_URLS.iron;
 }

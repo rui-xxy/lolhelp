@@ -8,10 +8,6 @@ import {
   type FriendStatusKind,
 } from './friendStatus';
 
-// 好友列表面板（内联侧栏，不是弹窗）。
-// 分组显示好友、在线状态、备注，点击好友查战绩。
-// 排版参考 LOL 客户端好友列表：在线优先 → 按分组 → 头像+名字+状态。
-
 interface FriendPanelProps {
   onFriendClick: (riotId: string) => void;
   onFriendFollow?: (riotId: string) => void;
@@ -317,7 +313,6 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
 
   return (
     <div className="flex h-full flex-col bg-app-surface">
-      {/* 头部 */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface px-3">
         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
           好友 {onlineCount}/{friends.length}
@@ -332,7 +327,6 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
         </button>
       </div>
 
-      {/* 好友列表 */}
       <div
         className="min-h-0 flex-1 overflow-y-auto p-1.5"
         onScroll={() => setActionFriendId('')}

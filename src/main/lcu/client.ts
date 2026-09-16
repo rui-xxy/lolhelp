@@ -7,8 +7,8 @@ const LCU_MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
 export class LcuClient {
   constructor(private creds: LcuCredentials) {}
 
-  get<T = unknown>(requestPath: string): Promise<T> {
-    return this.request<T>('GET', requestPath);
+  get<T = unknown>(requestPath: string, options: { signal?: AbortSignal } = {}): Promise<T> {
+    return this.request<T>('GET', requestPath, undefined, options.signal);
   }
 
   put<T = unknown>(requestPath: string, body: unknown): Promise<T> {
@@ -31,6 +31,7 @@ export class LcuClient {
     method: 'GET' | 'PUT' | 'PATCH' | 'POST' | 'DELETE',
     requestPath: string,
     body?: unknown,
+    signal?: AbortSignal,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const payload = body === undefined ? undefined : JSON.stringify(body);
@@ -42,6 +43,7 @@ export class LcuClient {
           method,
           auth: `riot:${this.creds.token}`,
           rejectUnauthorized: false,
+          signal,
           headers: payload
             ? {
                 'Content-Type': 'application/json',

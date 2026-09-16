@@ -9,6 +9,7 @@ import type {
   LolConfigApplyValuesRequest,
   LolConfigSaveProfileRequest,
   LolHelper,
+  LiveBattleUpdateEvent,
   LiveStateChangeEvent,
   PlayerLookupRequest,
   ReplayAvailabilityRequest,
@@ -88,6 +89,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_DOWNLOAD_REPLAY, gameId),
     watchReplay: (gameId: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_WATCH_REPLAY, gameId),
+    getTimeline: (gameId: number, region?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_TIMELINE, gameId, region),
     getChampions: () => ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_CHAMPIONS),
   },
   ranking: {
@@ -104,12 +107,21 @@ const lolHelper: LolHelper = {
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),
+    getMatchDetail: (gameId: number, puuid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_MATCH_DETAIL, gameId, puuid),
     onStateChanged: (listener: (event: LiveStateChangeEvent) => void) => {
       const handler = (_event: IpcRendererEvent, payload: LiveStateChangeEvent) => {
         listener(payload);
       };
       ipcRenderer.on(IPC_CHANNELS.LIVE_STATE_CHANGED, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.LIVE_STATE_CHANGED, handler);
+    },
+    onBattleUpdate: (listener: (event: LiveBattleUpdateEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, payload: LiveBattleUpdateEvent) => {
+        listener(payload);
+      };
+      ipcRenderer.on(IPC_CHANNELS.LIVE_BATTLE_UPDATE, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.LIVE_BATTLE_UPDATE, handler);
     },
   },
   window: {

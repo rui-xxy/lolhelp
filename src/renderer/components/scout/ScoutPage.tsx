@@ -461,7 +461,6 @@ export function ScoutPage({
       : finalSummary || '等待开始搜索';
   return (
     <div className={`scout-page flex h-full ${configPanelMinimized ? 'scout-page--panel-minimized' : ''}`}>
-      {/* ===== 左侧：配置面板 ===== */}
       <aside
         aria-hidden={configPanelMinimized}
         onClick={handleConfigPanelClick}
@@ -642,7 +641,6 @@ export function ScoutPage({
         </footer>
       </aside>
 
-      {/* ===== 右侧：结果区 ===== */}
       <section className="scout-results">
         <header className="scout-results-header">
           <div className="scout-results-title">
@@ -717,7 +715,6 @@ export function ScoutPage({
         </div>
       </section>
 
-      {/* 英雄选择弹窗 */}
       <ChampionPickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}

@@ -11,7 +11,6 @@ import { StatusOutput } from './StatusOutput';
 import type { AppStatus } from '../../shared/api';
 
 // 应用状态卡：演示业务组件通过 window.lolHelper 调 IPC。
-// 这一层负责"内容"（状态逻辑 + shadcn Card/Button 组合），不负责页面布局。
 export function AppStatusCard() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(false);

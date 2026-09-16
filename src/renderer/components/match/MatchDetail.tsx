@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { CirclePlay, Download, LoaderCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, CirclePlay, Download, LoaderCircle } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
@@ -19,6 +19,9 @@ import badgeTriple from '../../assets/match-badges/triple.png';
 import type {
   MatchParticipantStats,
   MatchParticipantSummary,
+  MatchTimeline,
+  MatchTimelineEvent,
+  MatchTimelineResult,
   PlayerMatchDetail,
   PlayerRankSummary,
   PlayerRuneSummary,
@@ -27,7 +30,7 @@ import type {
 } from '../../../shared/api';
 import type { RecurringMate } from './MatchList';
 
-type DetailTab = 'scoreboard' | 'stats' | 'charts';
+type DetailTab = 'overview' | 'details' | 'events' | 'builds' | 'timeline';
 type LinkTone = 'amber' | 'cyan' | 'violet' | 'rose' | 'emerald';
 
 interface MatchDetailProps {
@@ -38,17 +41,14 @@ interface MatchDetailProps {
   onPlayerSearch?: (riotId: string) => void;
 }
 
-interface ChartMetric {
-  key: string;
-  label: string;
-  value: (participant: MatchParticipantSummary) => number;
-}
-
 interface StatsMetric {
   key: string;
   label: string;
   value?: (participant: MatchParticipantSummary) => number;
   text?: (participant: MatchParticipantSummary) => string;
+  rawKey?: string;
+  kind?: 'number' | 'decimal' | 'percent' | 'duration' | 'boolean';
+  description?: string;
 }
 
 interface StatsGroup {
@@ -57,22 +57,11 @@ interface StatsGroup {
 }
 
 const DETAIL_TABS: Array<{ key: DetailTab; label: string }> = [
-  { key: 'scoreboard', label: '计分板' },
-  { key: 'stats', label: '统计' },
-  { key: 'charts', label: '图表' },
-];
-
-const CHART_METRICS: ChartMetric[] = [
-  { key: 'championDamage', label: '对英雄造成伤害', value: (p) => p.damage },
-  { key: 'totalDamage', label: '造成的总伤害', value: (p) => stat(p, 'totalDamageDealt') },
-  { key: 'physicalDamage', label: '造成物理伤害', value: (p) => stat(p, 'physicalDamageDealtToChampions') },
-  { key: 'magicDamage', label: '造成魔法伤害', value: (p) => stat(p, 'magicDamageDealtToChampions') },
-  { key: 'trueDamage', label: '造成真实伤害', value: (p) => stat(p, 'trueDamageDealtToChampions') },
-  { key: 'damageTaken', label: '承受伤害', value: (p) => stat(p, 'totalDamageTaken') },
-  { key: 'selfMitigated', label: '自我缓和的伤害', value: (p) => stat(p, 'damageSelfMitigated') },
-  { key: 'gold', label: '获得金币', value: (p) => p.gold },
-  { key: 'vision', label: '视野得分', value: (p) => stat(p, 'visionScore') },
-  { key: 'healing', label: '治疗效果', value: (p) => stat(p, 'totalHeal') },
+  { key: 'overview', label: '总览' },
+  { key: 'details', label: '详尽表格' },
+  { key: 'events', label: '事件' },
+  { key: 'builds', label: '构建' },
+  { key: 'timeline', label: '时间线' },
 ];
 
 const STATS_GROUPS: StatsGroup[] = [
@@ -145,6 +134,103 @@ const STATS_GROUPS: StatsGroup[] = [
     ],
   },
 ];
+
+function rawMetric(
+  rawKey: string,
+  label: string,
+  kind: StatsMetric['kind'] = 'number',
+  description?: string,
+): StatsMetric {
+  return { key: `raw-${rawKey}`, rawKey, label, kind, description: description || label };
+}
+
+const AKARI_EXTRA_STATS_GROUPS: StatsGroup[] = [
+  {
+    title: '击杀与生存',
+    metrics: [
+      rawMetric('kills', '击杀'), rawMetric('deaths', '死亡'), rawMetric('assists', '助攻'),
+      rawMetric('doubleKills', '双杀'), rawMetric('tripleKills', '三杀'), rawMetric('quadraKills', '四杀'),
+      rawMetric('pentaKills', '五杀'), rawMetric('unrealKills', '超神'),
+      rawMetric('killingSprees', '连杀次数'), rawMetric('largestKillingSpree', '最大连杀'),
+      rawMetric('largestMultiKill', '最大多杀'), rawMetric('longestTimeSpentLiving', '最长存活时间', 'duration'),
+      rawMetric('totalTimeSpentDead', '总死亡时间', 'duration'), rawMetric('firstBloodKill', '一血击杀', 'boolean'),
+      rawMetric('firstBloodAssist', '一血助攻', 'boolean'), rawMetric('bountyLevel', '结束时赏金等级'),
+    ],
+  },
+  {
+    title: '伤害、治疗与控制',
+    metrics: [
+      rawMetric('damageDealtToBuildings', '对建筑伤害'), rawMetric('damageDealtToObjectives', '对史诗野怪伤害'),
+      rawMetric('damageDealtToTurrets', '对防御塔伤害'), rawMetric('totalTimeCCDealt', '造成控制总时长', 'duration'),
+      rawMetric('totalUnitsHealed', '治疗单位数'), rawMetric('totalHealsOnTeammates', '对队友治疗量'),
+      rawMetric('totalDamageShieldedOnTeammates', '给予队友护盾量'),
+      rawMetric('teamDamagePercentage', '团队伤害占比', 'percent'),
+      rawMetric('damagePerMinute', '每分钟英雄伤害', 'decimal'),
+      rawMetric('damageTakenOnTeamPercentage', '团队承伤占比', 'percent'),
+      rawMetric('effectiveHealAndShielding', '有效治疗与护盾'),
+      rawMetric('largestCriticalStrike', '最大暴击伤害'),
+    ],
+  },
+  {
+    title: '经济与发育',
+    metrics: [
+      rawMetric('champExperience', '获得经验'), rawMetric('goldPerMinute', '每分钟金币', 'decimal'),
+      rawMetric('totalMinionsKilled', '线上补刀'), rawMetric('neutralMinionsKilled', '野怪补刀'),
+      rawMetric('totalAllyJungleMinionsKilled', '己方野区补刀'), rawMetric('totalEnemyJungleMinionsKilled', '敌方野区补刀'),
+      rawMetric('itemsPurchased', '购买装备次数'), rawMetric('consumablesPurchased', '购买消耗品次数'),
+      rawMetric('visionWardsBoughtInGame', '购买控制守卫'), rawMetric('sightWardsBoughtInGame', '购买侦查守卫'),
+      rawMetric('turretPlatesTaken', '获得镀层'), rawMetric('skillshotsHit', '技能命中'),
+      rawMetric('skillshotsDodged', '躲避技能'),
+    ],
+  },
+  {
+    title: '地图资源与推进',
+    metrics: [
+      rawMetric('baronKills', '参与击杀男爵'), rawMetric('dragonKills', '参与击杀小龙'),
+      rawMetric('objectivesStolen', '抢夺史诗野怪'), rawMetric('objectivesStolenAssists', '协助抢夺史诗野怪'),
+      rawMetric('turretKills', '摧毁防御塔'), rawMetric('turretTakedowns', '参与摧毁防御塔'),
+      rawMetric('turretsLost', '损失防御塔'), rawMetric('inhibitorKills', '摧毁召唤水晶'),
+      rawMetric('inhibitorTakedowns', '参与摧毁召唤水晶'), rawMetric('inhibitorsLost', '损失召唤水晶'),
+      rawMetric('nexusKills', '摧毁基地'), rawMetric('nexusTakedowns', '参与摧毁基地'),
+      rawMetric('nexusLost', '基地被摧毁'), rawMetric('firstTowerKill', '一塔击杀', 'boolean'),
+      rawMetric('firstTowerAssist', '一塔助攻', 'boolean'),
+    ],
+  },
+  {
+    title: '信号与对局状态',
+    metrics: [
+      rawMetric('allInPings', '全力进攻信号'), rawMetric('assistMePings', '请求协助信号'),
+      rawMetric('baitPings', '引诱信号'), rawMetric('basicPings', '基础信号'),
+      rawMetric('commandPings', '指令信号'), rawMetric('dangerPings', '危险信号'),
+      rawMetric('enemyMissingPings', '敌人消失信号'), rawMetric('enemyVisionPings', '敌方视野信号'),
+      rawMetric('getBackPings', '撤退信号'), rawMetric('holdPings', '坚持信号'),
+      rawMetric('needVisionPings', '需要视野信号'), rawMetric('onMyWayPings', '正在路上信号'),
+      rawMetric('pushPings', '推进信号'), rawMetric('visionClearedPings', '视野已清除信号'),
+      rawMetric('gameEndedInEarlySurrender', '重开投降', 'boolean'),
+      rawMetric('gameEndedInSurrender', '游戏以投降结束', 'boolean'),
+      rawMetric('teamEarlySurrendered', '队伍提前投降', 'boolean'),
+      rawMetric('eligibleForProgression', '可获得结算进度', 'boolean'),
+    ],
+  },
+];
+
+const RAW_STATS_EXCLUDED = new Set([
+  'participantId', 'teamId', 'championId', 'championName', 'championTransform', 'champLevel',
+  'profileIcon', 'puuid', 'riotIdGameName', 'riotIdName', 'riotIdTagline', 'summonerId',
+  'summonerName', 'summonerLevel', 'role', 'lane', 'teamPosition', 'individualPosition',
+  'spell1Id', 'spell2Id', 'summoner1Id', 'summoner2Id', 'skinId', 'championSkinId',
+  'win', 'gameId', 'gameCreation', 'gameDuration', 'gameEndedInEarlySurrender',
+  'gameEndedInSurrender', 'teamEarlySurrendered', 'eligibleForProgression',
+  'kills', 'deaths', 'assists', 'doubleKills', 'tripleKills', 'quadraKills', 'pentaKills',
+  'largestKillingSpree', 'largestMultiKill', 'largestCriticalStrike', 'totalDamageDealtToChampions',
+  'physicalDamageDealtToChampions', 'magicDamageDealtToChampions', 'trueDamageDealtToChampions',
+  'totalDamageDealt', 'physicalDamageDealt', 'magicDamageDealt', 'trueDamageDealt',
+  'totalDamageTaken', 'physicalDamageTaken', 'magicDamageTaken', 'trueDamageTaken',
+  'damageSelfMitigated', 'totalHeal', 'totalHealsOnTeammates', 'totalDamageShieldedOnTeammates',
+  'goldEarned', 'goldSpent', 'totalMinionsKilled', 'neutralMinionsKilled', 'visionScore',
+  'wardsPlaced', 'wardsKilled', 'detectorWardsPlaced', 'timeCCingOthers',
+  ...AKARI_EXTRA_STATS_GROUPS.flatMap((group) => group.metrics.map((metric) => metric.rawKey || '')),
+]);
 
 const POSITION_ORDER: Record<string, number> = {
   TOP: 0,
@@ -396,8 +482,9 @@ function rankDisplay(rank: PlayerRankSummary | null): string {
 }
 
 export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlayerSearch }: MatchDetailProps) {
-  const [activeTab, setActiveTab] = useState<DetailTab>('scoreboard');
-  const [chartMetricKey, setChartMetricKey] = useState(CHART_METRICS[0].key);
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [timelineResult, setTimelineResult] = useState<MatchTimelineResult | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const [rankByPuuid, setRankByPuuid] = useState<Record<string, PlayerRankSummary[]>>({});
   const [replayPhase, setReplayPhase] = useState<'idle' | 'download' | 'watch'>('idle');
   const [replayNotice, setReplayNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -539,9 +626,32 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
     };
   }, [match.gameId, participants, region, useRiftScoreboard]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setTimelineResult(null);
+    setTimelineLoading(true);
+    void window.lolHelper.match.getTimeline(match.gameId, region)
+      .then((result) => {
+        if (!cancelled) setTimelineResult(result);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setTimelineResult({
+            available: false,
+            timeline: null,
+            error: error instanceof Error ? error.message : '时间线读取失败',
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTimelineLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [match.gameId, region]);
+
   const target = participants.find((p) => p.puuid === targetPuuid) ?? participants[0];
-  const selectedChartMetric =
-    CHART_METRICS.find((metric) => metric.key === chartMetricKey) ?? CHART_METRICS[0];
   const replayReady = ['found', 'watch'].includes(replayAvailability?.state ?? '');
   const replayBusy = replayPhase !== 'idle' || replayAvailability?.state === 'downloading';
   const replayControlLabel = replayAvailability?.state === 'downloading'
@@ -604,7 +714,7 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
       </div>
 
       <div className="lol-postgame-content">
-        {activeTab === 'scoreboard' && (
+        {activeTab === 'overview' && (
           useRiftScoreboard ? (
             <RiftScoreboardTab
               participants={participants}
@@ -623,14 +733,29 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
             />
           )
         )}
-        {activeTab === 'stats' && <StatsTab participants={participants} targetPuuid={targetPuuid} />}
-        {activeTab === 'charts' && (
-          <ChartsTab
+        {activeTab === 'details' && <DetailedTableTab participants={participants} targetPuuid={targetPuuid} />}
+        {activeTab === 'events' && (
+          <EventsTab
             participants={participants}
+            timeline={timelineResult?.timeline ?? null}
+            loading={timelineLoading}
+            error={timelineResult?.error}
+          />
+        )}
+        {activeTab === 'builds' && (
+          <BuildsTab
+            participants={participants}
+            timeline={timelineResult?.timeline ?? null}
             targetPuuid={targetPuuid}
-            selectedMetric={selectedChartMetric}
-            selectedMetricKey={chartMetricKey}
-            onSelectMetric={setChartMetricKey}
+          />
+        )}
+        {activeTab === 'timeline' && (
+          <TimelineTab
+            participants={participants}
+            timeline={timelineResult?.timeline ?? null}
+            loading={timelineLoading}
+            error={timelineResult?.error}
+            targetPuuid={targetPuuid}
           />
         )}
       </div>
@@ -1070,45 +1195,152 @@ function ScoreboardRow({
   );
 }
 
-function StatsTab({
+type StatsDisplayValue = number | string | boolean;
+
+function getMetricValue(metric: StatsMetric, participant: MatchParticipantSummary): StatsDisplayValue {
+  if (metric.text) return metric.text(participant);
+  if (metric.value) return metric.value(participant);
+  if (metric.rawKey) {
+    const rawValue = participant.rawStats?.[metric.rawKey];
+    if (rawValue !== undefined) return rawValue;
+    const normalizedValue = (participant.stats as unknown as Record<string, number>)[metric.rawKey];
+    if (normalizedValue !== undefined) return normalizedValue;
+  }
+  return 0;
+}
+
+function formatMetricValue(metric: StatsMetric, value: StatsDisplayValue): string {
+  if (metric.kind === 'boolean') {
+    return value === true || value === 1 || value === 'true' ? '是' : '否';
+  }
+  if (typeof value !== 'number') return String(value || '—');
+  if (metric.kind === 'percent') {
+    const percentage = Math.abs(value) <= 1 ? value * 100 : value;
+    return `${percentage.toFixed(2)}%`;
+  }
+  if (metric.kind === 'duration') {
+    const seconds = Math.max(0, Math.round(value));
+    return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, '0')}秒`;
+  }
+  if (metric.kind === 'decimal') return value.toFixed(2);
+  return formatInteger(value);
+}
+
+function rawFieldLabel(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (value) => value.toUpperCase());
+}
+
+function StatsMetricComparison({
+  metric,
+  participants,
+}: {
+  metric: StatsMetric;
+  participants: MatchParticipantSummary[];
+}) {
+  const rows = participants.map((participant) => ({
+    participant,
+    value: getMetricValue(metric, participant),
+  }));
+  const numericValues = rows.map((row) => typeof row.value === 'number' ? Math.abs(row.value) : 0);
+  const maxValue = Math.max(0, ...numericValues);
+  return (
+    <aside className="lol-stats-compare" role="tooltip">
+      <strong>{metric.label}</strong>
+      <small>{metric.description || `原始字段：${metric.rawKey || metric.key}`}</small>
+      <div className="lol-stats-compare__rows">
+        {rows.map(({ participant, value }) => {
+          const numericValue = typeof value === 'number' ? Math.abs(value) : 0;
+          return <div className="lol-stats-compare__row" key={`${metric.key}-${participant.puuid}-compare`}>
+            <GameIcon src={participant.championAvatar} alt={participant.championName} size={20} rounded />
+            <span title={playerName(participant)}>{playerName(participant)}</span>
+            <i><b style={{ width: maxValue > 0 ? `${Math.max(2, numericValue / maxValue * 100)}%` : '0%' }} /></i>
+            <em>{formatMetricValue(metric, value)}</em>
+          </div>;
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function DetailedTableTab({
   participants,
   targetPuuid,
 }: {
   participants: MatchParticipantSummary[];
   targetPuuid: string;
 }) {
+  const [metricFilter, setMetricFilter] = useState('');
+  const extraRawMetrics = useMemo(() => {
+    const keys = new Set<string>();
+    participants.forEach((participant) => {
+      Object.keys(participant.rawStats || {}).forEach((key) => {
+        if (!RAW_STATS_EXCLUDED.has(key)
+          && !/^item[0-9]+$/i.test(key)
+          && !/^playerAugment[0-9]+$/i.test(key)
+          && !/^playerScore[0-9]+$/i.test(key)) keys.add(key);
+      });
+    });
+    return [...keys].sort().map((key) => {
+      const sample = participants.map((participant) => participant.rawStats?.[key]).find((value) => value !== undefined);
+      const kind: StatsMetric['kind'] = typeof sample === 'boolean' ? 'boolean' : 'number';
+      return rawMetric(key, rawFieldLabel(key), kind, `SGP 原始统计字段：${key}`);
+    });
+  }, [participants]);
+  const groups = useMemo(() => [
+    ...STATS_GROUPS,
+    ...AKARI_EXTRA_STATS_GROUPS,
+    ...(extraRawMetrics.length > 0 ? [{ title: '更多原始统计', metrics: extraRawMetrics }] : []),
+  ], [extraRawMetrics]);
+  const visibleGroups = useMemo(() => {
+    const query = metricFilter.trim().toLocaleLowerCase();
+    if (!query) return groups;
+    return groups
+      .map((group) => ({
+        ...group,
+        metrics: group.metrics.filter((metric) => `${metric.label} ${metric.rawKey || metric.key}`.toLocaleLowerCase().includes(query)),
+      }))
+      .filter((group) => group.metrics.length > 0);
+  }, [groups, metricFilter]);
   const gridStyle = {
-    gridTemplateColumns: `118px repeat(${participants.length}, minmax(40px, 1fr))`,
+    gridTemplateColumns: `148px repeat(${participants.length}, minmax(68px, 1fr))`,
   } as CSSProperties;
 
   return (
     <div className="lol-stats">
       <div className="lol-stats-grid lol-stats-grid--icons" style={gridStyle}>
-        <span />
+        <label className="lol-stats-filter">
+          <input value={metricFilter} onChange={(event) => setMetricFilter(event.target.value)} placeholder="筛选字段" />
+        </label>
         {participants.map((player) => (
           <GameIcon
             key={`${player.puuid}-icon`}
             src={player.championAvatar}
             alt={player.championName}
             title={playerName(player)}
-            size={24}
+            size={30}
             rounded
             className={player.teamId === 100 ? 'lol-stats-avatar--blue' : 'lol-stats-avatar--red'}
           />
         ))}
       </div>
-      {STATS_GROUPS.map((group) => (
+      {visibleGroups.map((group) => (
         <section key={group.title}>
           <div className="lol-stats-group-title">{group.title}</div>
           {group.metrics.map((metric) => (
             <div key={metric.key} className="lol-stats-grid lol-stats-row" style={gridStyle}>
-              <span className="lol-stats-label">{metric.label}</span>
+              <div className="lol-stats-label" tabIndex={0} aria-label={`${metric.label}，悬浮查看十名玩家对比`}>
+                <span>{metric.label}</span>
+                <small>?</small>
+                <StatsMetricComparison metric={metric} participants={participants} />
+              </div>
               {participants.map((player) => (
                 <span
                   key={`${metric.key}-${player.puuid}`}
                   className={`lol-stats-value ${player.puuid === targetPuuid ? 'lol-stats-value--target' : ''}`}
                 >
-                  {metric.text ? metric.text(player) : formatInteger(metric.value?.(player) ?? 0)}
+                  {formatMetricValue(metric, getMetricValue(metric, player))}
                 </span>
               ))}
             </div>
@@ -1119,63 +1351,440 @@ function StatsTab({
   );
 }
 
-function ChartsTab({
+function timelineEvents(timeline: MatchTimeline | null): MatchTimelineEvent[] {
+  return timeline?.frames.flatMap((frame) => frame.events ?? [])
+    .sort((a, b) => a.timestamp - b.timestamp) ?? [];
+}
+
+function formatEventTime(timestamp: number): string {
+  const totalSeconds = Math.max(0, Math.floor(timestamp / 1000));
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+function formatBuildTime(timestamp: number): string {
+  const totalSeconds = Math.max(0, Math.floor(timestamp / 1000));
+  return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+type BuildPurchaseNode =
+  | { kind: 'item'; event: MatchTimelineEvent }
+  | { kind: 'spacer'; timestamp: number };
+
+function buildPurchaseSequence(events: MatchTimelineEvent[]): BuildPurchaseNode[] {
+  const nodes: BuildPurchaseNode[] = [];
+  let previousTimestamp = 0;
+  events
+    .filter((event) => event.type === 'ITEM_PURCHASED')
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .forEach((event) => {
+      if (previousTimestamp > 0 && event.timestamp - previousTimestamp > 30_000) {
+        nodes.push({ kind: 'spacer', timestamp: event.timestamp });
+      }
+      nodes.push({ kind: 'item', event });
+      previousTimestamp = event.timestamp;
+    });
+  return nodes;
+}
+
+function participantIndex(participants: MatchParticipantSummary[]) {
+  return new Map(participants.map((participant, index) => [
+    participant.participantId || index + 1,
+    participant,
+  ]));
+}
+
+function eventCopy(event: MatchTimelineEvent, names: Map<number, MatchParticipantSummary>): {
+  title: string;
+  detail: string;
+  tone: string;
+} {
+  const actor = names.get(event.killerId || event.participantId || event.creatorId || 0);
+  const victim = names.get(event.victimId || 0);
+  const actorName = actor ? playerName(actor) : '地图';
+  const victimName = victim ? playerName(victim) : '';
+  switch (event.type) {
+    case 'CHAMPION_KILL':
+      return {
+        title: `${actorName} 击杀了 ${victimName || '一名英雄'}`,
+        detail: `${event.assistingParticipantIds?.length ?? 0} 次助攻${event.shutdownBounty ? ` · 终结赏金 ${event.shutdownBounty}` : ''}`,
+        tone: actor?.teamId === 200 ? 'red' : 'blue',
+      };
+    case 'ELITE_MONSTER_KILL':
+      return { title: `${actorName} 击杀了 ${event.monsterSubType || event.monsterType || '史诗野怪'}`, detail: '团队资源事件', tone: 'gold' };
+    case 'BUILDING_KILL':
+      return { title: `${actorName} 摧毁了${event.laneType ? ` ${event.laneType}` : ''}防御建筑`, detail: event.buildingType || '建筑事件', tone: actor?.teamId === 200 ? 'red' : 'blue' };
+    case 'TURRET_PLATE_DESTROYED':
+      return { title: `${actorName} 拆除了一层镀层`, detail: '防御塔事件', tone: 'gold' };
+    case 'GAME_END':
+      return { title: '对局结束', detail: `获胜方：${event.winningTeam === 200 ? '红方' : '蓝方'}`, tone: 'gold' };
+    default:
+      return { title: event.type.replaceAll('_', ' ').toLowerCase(), detail: actorName, tone: 'muted' };
+  }
+}
+
+function TimelineEmpty({ loading, error }: { loading: boolean; error?: string }) {
+  return (
+    <div className="lol-timeline-empty">
+      {loading ? <LoaderCircle className="size-4 animate-spin" /> : null}
+      <strong>{loading ? '正在读取客户端时间线' : '这场对局没有可用时间线'}</strong>
+      {!loading && <span>{error || '较早的对局可能已不在本地客户端缓存中'}</span>}
+    </div>
+  );
+}
+
+function EventsTab({
   participants,
-  targetPuuid,
-  selectedMetric,
-  selectedMetricKey,
-  onSelectMetric,
+  timeline,
+  loading,
+  error,
 }: {
   participants: MatchParticipantSummary[];
-  targetPuuid: string;
-  selectedMetric: ChartMetric;
-  selectedMetricKey: string;
-  onSelectMetric: (key: string) => void;
+  timeline: MatchTimeline | null;
+  loading: boolean;
+  error?: string;
 }) {
-  const maxValue = Math.max(1, ...participants.map((player) => selectedMetric.value(player)));
+  const names = participantIndex(participants);
+  const [showChampionKills, setShowChampionKills] = useState(true);
+  const [showSpecialKills, setShowSpecialKills] = useState(false);
+  const [showBuildings, setShowBuildings] = useState(true);
+  const [championFilters, setChampionFilters] = useState<Set<number>>(new Set());
+  const [expandedEvent, setExpandedEvent] = useState<string>('');
+  const allEvents = timelineEvents(timeline);
+  const events = allEvents.filter((event) => {
+    const isSpecial = event.type === 'CHAMPION_KILL' && (event.multiKillLength ?? 0) >= 2;
+    const matchesType = event.type === 'CHAMPION_KILL'
+      ? (isSpecial ? showSpecialKills : showChampionKills)
+      : showBuildings && ['ELITE_MONSTER_KILL', 'BUILDING_KILL', 'TURRET_PLATE_DESTROYED'].includes(event.type);
+    if (!matchesType) return false;
+    if (championFilters.size === 0) return true;
+    return [event.killerId, event.victimId, ...(event.assistingParticipantIds ?? [])]
+      .some((id) => id && championFilters.has(id));
+  });
+
+  if (!timeline) return <TimelineEmpty loading={loading} error={error} />;
+
+  const toggleChampion = (participantId: number) => {
+    setChampionFilters((current) => {
+      const next = new Set(current);
+      if (next.has(participantId)) next.delete(participantId);
+      else next.add(participantId);
+      return next;
+    });
+  };
 
   return (
-    <div className="lol-charts">
-      <aside className="lol-chart-picker">
-        {CHART_METRICS.map((metric) => (
-          <button
-            key={metric.key}
-            type="button"
-            className={`lol-chart-option ${selectedMetricKey === metric.key ? 'lol-chart-option--active' : ''}`}
-            onClick={() => onSelectMetric(metric.key)}
-          >
-            <span className="lol-chart-checkbox" />
-            {metric.label}
-          </button>
-        ))}
-      </aside>
-      <div className="lol-chart-bars">
-        <div className="lol-chart-title">{selectedMetric.label}</div>
-        {participants.map((player) => {
-          const value = selectedMetric.value(player);
-          const width = Math.max(4, Math.round((value / maxValue) * 100));
+    <div className="lol-events">
+      <div className="lol-events__stream">
+        <div className="lol-event lol-event--boundary">
+          <time>00:00</time><span className="lol-event__dot" /><strong>开始游戏</strong>
+        </div>
+        {events.map((event, index) => {
+          const key = `${event.timestamp}-${event.type}-${index}`;
+          const killer = names.get(event.killerId ?? 0);
+          const victim = names.get(event.victimId ?? 0);
+          const assists = (event.assistingParticipantIds ?? []).map((id) => names.get(id)).filter(Boolean) as MatchParticipantSummary[];
+          const copy = eventCopy(event, names);
+          const damageRows = event.victimDamageReceived ?? [];
+          const hasPosition = Boolean(event.position && (event.position.x || event.position.y));
           return (
-            <div key={`${selectedMetric.key}-${player.puuid}`} className="lol-chart-row">
-              <GameIcon
-                src={player.championAvatar}
-                alt={player.championName}
-                title={playerName(player)}
-                size={24}
-                rounded
-              />
-              <div className="lol-chart-track">
-                <div
-                  className={`lol-chart-bar lol-chart-bar--${teamTone(player.teamId)} ${
-                    player.puuid === targetPuuid ? 'lol-chart-bar--target' : ''
-                  }`}
-                  style={{ width: `${width}%` }}
-                />
+            <article className="lol-event" key={key}>
+              <time>{formatEventTime(event.timestamp)}</time>
+              <span className={`lol-event__dot lol-event__dot--${copy.tone}`} />
+              <div className="lol-event__body">
+                <div className="lol-event__heading">
+                  <strong>{event.type === 'CHAMPION_KILL' ? '英雄击杀' : copy.title}</strong>
+                  {event.multiKillLength && event.multiKillLength >= 2 ? <em>{event.multiKillLength} 杀</em> : null}
+                  {hasPosition && <button type="button" onClick={() => setExpandedEvent(expandedEvent === `${key}:position` ? '' : `${key}:position`)}>查看位置</button>}
+                  {damageRows.length > 0 && <button type="button" onClick={() => setExpandedEvent(expandedEvent === `${key}:damage` ? '' : `${key}:damage`)}>伤害明细</button>}
+                </div>
+                {event.type === 'CHAMPION_KILL' ? (
+                  <div className="lol-event__participants">
+                    <span className="lol-event__side">
+                      {killer && <GameIcon src={killer.championAvatar} alt={killer.championName} title={playerName(killer)} size={28} rounded />}
+                      {assists.map((participant) => <GameIcon key={participant.puuid} src={participant.championAvatar} alt={participant.championName} title={`助攻 · ${playerName(participant)}`} size={21} rounded />)}
+                    </span>
+                    <span>击杀</span>
+                    {victim && <GameIcon src={victim.championAvatar} alt={victim.championName} title={playerName(victim)} size={28} rounded />}
+                  </div>
+                ) : <small>{copy.detail}</small>}
+                {expandedEvent === `${key}:position` && event.position && (
+                  <div className="lol-event__position">
+                    <span className="lol-event__map-dot" style={{ left: `${Math.max(3, Math.min(97, (event.position.x / 15000) * 100))}%`, bottom: `${Math.max(3, Math.min(97, (event.position.y / 15000) * 100))}%` }} />
+                    <small>X {event.position.x} · Y {event.position.y}</small>
+                  </div>
+                )}
+                {expandedEvent === `${key}:damage` && (
+                  <div className="lol-event__damage">
+                    <strong>受到伤害</strong>
+                    {damageRows.sort((a, b) => (b.damage ?? 0) - (a.damage ?? 0)).map((row, damageIndex) => {
+                      const dealer = names.get(row.participantId ?? 0);
+                      return <span key={`${row.participantId}-${row.spellName}-${damageIndex}`}>
+                        <b>{dealer ? playerName(dealer) : row.name || row.type || '其他'}</b>
+                        <small>{row.spellName || (row.basic ? '普通攻击' : '技能伤害')}</small>
+                        <em>{formatInteger(row.damage ?? 0)}</em>
+                      </span>;
+                    })}
+                  </div>
+                )}
               </div>
-              <span>{formatInteger(value)}</span>
-            </div>
+            </article>
+          );
+        })}
+        <div className="lol-event lol-event--boundary">
+          <time>{formatEventTime(timeline.frames.at(-1)?.timestamp ?? 0)}</time><span className="lol-event__dot lol-event__dot--gold" /><strong>对局结束</strong>
+        </div>
+      </div>
+      <aside className="lol-events__filters">
+        <strong>筛选</strong>
+        <label><input type="checkbox" checked={showChampionKills} onChange={(event) => setShowChampionKills(event.target.checked)} /> 英雄击杀</label>
+        <label><input type="checkbox" checked={showSpecialKills} onChange={(event) => setShowSpecialKills(event.target.checked)} /> 特殊击杀</label>
+        <label><input type="checkbox" checked={showBuildings} onChange={(event) => setShowBuildings(event.target.checked)} /> 摧毁建筑</label>
+        <strong>按英雄筛选</strong>
+        <button type="button" className="lol-events__select-all" onClick={() => setChampionFilters(new Set())}>全选 / 清除筛选</button>
+        {participants.map((participant, index) => {
+          const participantId = participant.participantId || index + 1;
+          return <label key={`${participant.puuid}-event-filter`}>
+            <input type="checkbox" checked={championFilters.has(participantId)} onChange={() => toggleChampion(participantId)} />
+            <GameIcon src={participant.championAvatar} alt={participant.championName} size={22} rounded />
+            <span>{playerName(participant)}</span>
+          </label>;
+        })}
+      </aside>
+    </div>
+  );
+}
+
+function BuildsTab({
+  participants,
+  timeline,
+  targetPuuid,
+}: {
+  participants: MatchParticipantSummary[];
+  timeline: MatchTimeline | null;
+  targetPuuid: string;
+}) {
+  const events = timelineEvents(timeline);
+  const sectionRefs = useRef(new Map<number, HTMLElement>());
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [railExpanded, setRailExpanded] = useState(false);
+  const [activeParticipantId, setActiveParticipantId] = useState(() => {
+    const target = participants.find((participant) => participant.puuid === targetPuuid);
+    return target?.participantId || participants[0]?.participantId || 1;
+  });
+
+  const scrollToParticipant = (participantId: number) => {
+    const content = contentRef.current;
+    const section = sectionRefs.current.get(participantId);
+    if (!content || !section) return;
+    setActiveParticipantId(participantId);
+    content.scrollTo({
+      top: Math.max(0, section.offsetTop - content.offsetTop),
+      behavior: 'smooth',
+    });
+  };
+
+  const handleBuildScroll = () => {
+    const content = contentRef.current;
+    if (!content) return;
+    const readingLine = content.scrollTop + 48;
+    let nextParticipantId = participants[0]?.participantId || 1;
+    participants.forEach((participant, index) => {
+      const participantId = participant.participantId || index + 1;
+      const section = sectionRefs.current.get(participantId);
+      if (section && section.offsetTop - content.offsetTop <= readingLine) {
+        nextParticipantId = participantId;
+      }
+    });
+    setActiveParticipantId((current) => current === nextParticipantId ? current : nextParticipantId);
+  };
+
+  return (
+    <div className="lol-builds">
+      <div ref={contentRef} className="lol-builds__content" onScroll={handleBuildScroll}>
+        {participants.map((participant, index) => {
+          const participantId = participant.participantId || index + 1;
+          const skillEvents = events.filter((event) => event.participantId === participantId && event.type === 'SKILL_LEVEL_UP');
+          const purchases = buildPurchaseSequence(events.filter((event) => event.participantId === participantId));
+          const anvilCount = purchases.filter((node) => node.kind === 'item' && [6032, 22000].includes(node.event.itemId ?? 0)).length;
+          return (
+            <section
+              ref={(element) => {
+                if (element) sectionRefs.current.set(participantId, element);
+                else sectionRefs.current.delete(participantId);
+              }}
+              key={`${participant.puuid}-build`}
+              className={`lol-build ${participant.puuid === targetPuuid ? 'lol-build--target' : ''}`}
+            >
+              <div className="lol-build__player">
+                <GameIcon src={participant.championAvatar} alt={participant.championName} size={38} rounded />
+                <span><strong>{playerName(participant)}</strong><small>{participant.championName} · #{participantId}</small></span>
+                {anvilCount > 0 && <em className="lol-build__anvil">{anvilCount} 锻</em>}
+              </div>
+              <div className="lol-build__sequence">
+                <small>技能构建</small>
+                <div>{skillEvents.length > 0 ? skillEvents.map((event, skillIndex) => {
+                  const skill = ['?', 'Q', 'W', 'E', 'R'][event.skillSlot ?? 0] ?? '?';
+                  return <span className={`lol-build__skill lol-build__skill--${skill.toLowerCase()} ${event.levelUpType === 'EVOLVE' ? 'is-evolve' : ''}`} key={`${event.timestamp}-skill-${skillIndex}`} title={`${formatBuildTime(event.timestamp)} · ${skill}`}><b>{skill}</b><em>{skillIndex + 1}</em></span>;
+                }) : <i>无技能升级数据</i>}</div>
+              </div>
+              <div className="lol-build__sequence">
+                <small>装备购买</small>
+                <div className="lol-build__purchases">{purchases.some((node) => node.kind === 'item') ? purchases.map((node, eventIndex) => {
+                  if (node.kind === 'spacer') {
+                    return <span className="lol-build__purchase-spacer" key={`${node.timestamp}-spacer-${eventIndex}`}>→</span>;
+                  }
+                  const event = node.event;
+                  return (
+                    <span className="lol-build__purchase" key={`${event.timestamp}-${event.itemId}-${eventIndex}`} title={`${formatBuildTime(event.timestamp)} · ${event.itemName || event.itemId}`}>
+                      {event.itemIcon ? <img src={event.itemIcon} alt={event.itemName || ''} /> : <b>{event.itemId || '?'}</b>}
+                      <time>{formatBuildTime(event.timestamp)}</time>
+                    </span>
+                  );
+                }) : <i>无装备购买数据</i>}</div>
+              </div>
+            </section>
           );
         })}
       </div>
+      <aside className={`lol-builds__rail ${railExpanded ? 'is-expanded' : ''}`}>
+        <button type="button" className="lol-builds__rail-toggle" onClick={() => setRailExpanded((current) => !current)} title={railExpanded ? '收起玩家导航' : '展开玩家导航'}>
+          {railExpanded ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+        {participants.map((participant, index) => {
+          const participantId = participant.participantId || index + 1;
+          const teamClass = participant.teamId === 100 ? 'is-blue' : 'is-red';
+          return <button type="button" key={`${participant.puuid}-rail`} className={`${teamClass} ${activeParticipantId === participantId ? 'is-active' : ''}`} onClick={() => scrollToParticipant(participantId)} title={playerName(participant)} aria-current={activeParticipantId === participantId ? 'true' : undefined}>
+            <GameIcon src={participant.championAvatar} alt={participant.championName} size={30} rounded />
+            {railExpanded && <span>{playerName(participant)}</span>}
+          </button>;
+        })}
+      </aside>
+    </div>
+  );
+}
+
+type TimelineMetric = 'gold' | 'cs' | 'xp' | 'damageDealt' | 'damageTaken';
+
+const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string }> = [
+  { key: 'gold', label: '金币' },
+  { key: 'cs', label: '补刀' },
+  { key: 'xp', label: '经验' },
+  { key: 'damageDealt', label: '已造成英雄伤害' },
+  { key: 'damageTaken', label: '已承受伤害' },
+];
+
+const TIMELINE_COLORS = ['#ef5f83', '#3da8ea', '#f1c94d', '#49c7bc', '#9a6ce8', '#f39ac0', '#9fcb56', '#f18c54', '#64b7ef', '#d99be8'];
+
+function timelineMetricValue(frame: MatchTimeline['frames'][number]['participantFrames'][string] | undefined, metric: TimelineMetric): number {
+  if (!frame) return 0;
+  if (metric === 'gold') return frame.totalGold;
+  if (metric === 'cs') return frame.minionsKilled + frame.jungleMinionsKilled;
+  if (metric === 'xp') return frame.xp;
+  if (metric === 'damageDealt') return frame.damageStats?.totalDamageDoneToChampions ?? frame.damageStats?.totalDamageDone ?? 0;
+  return frame.damageStats?.totalDamageTaken ?? 0;
+}
+
+function TimelineTab({
+  participants,
+  timeline,
+  loading,
+  error,
+  targetPuuid,
+}: {
+  participants: MatchParticipantSummary[];
+  timeline: MatchTimeline | null;
+  loading: boolean;
+  error?: string;
+  targetPuuid: string;
+}) {
+  const [view, setView] = useState<'chart' | 'stats'>('chart');
+  const [metric, setMetric] = useState<TimelineMetric>('gold');
+  const [showBlueAverage, setShowBlueAverage] = useState(true);
+  const [showRedAverage, setShowRedAverage] = useState(true);
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+  const [statsParticipantId, setStatsParticipantId] = useState<number>(() => {
+    const target = participants.find((participant) => participant.puuid === targetPuuid);
+    return target?.participantId || participants.indexOf(target ?? participants[0]) + 1;
+  });
+  if (!timeline) return <TimelineEmpty loading={loading} error={error} />;
+  const names = participantIndex(participants);
+  const playerMeta = participants.map((participant, index) => ({ participant, participantId: participant.participantId || index + 1, color: TIMELINE_COLORS[index % TIMELINE_COLORS.length] }));
+  const buildSeries = (ids: number[], label: string, color: string, dashed = false) => ({
+    label,
+    color,
+    dashed,
+    values: timeline.frames.map((frame) => {
+      const values = ids.map((id) => timelineMetricValue(frame.participantFrames[String(id)], metric));
+      return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+    }),
+  });
+  const series = [
+    ...(showBlueAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 100).map(({ participantId }) => participantId), '蓝队平均', '#278fe5', true)] : []),
+    ...(showRedAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 200).map(({ participantId }) => participantId), '红队平均', '#ef4c62', true)] : []),
+    ...playerMeta.filter(({ participantId }) => selectedPlayers.has(participantId)).map(({ participant, participantId, color }) => buildSeries([participantId], playerName(participant), color)),
+  ];
+  const maxValue = Math.max(1, ...series.flatMap((line) => line.values));
+  const chartLine = (values: number[]) => values.map((value, index) => {
+    const x = 56 + (index / Math.max(1, values.length - 1)) * 624;
+    const y = 430 - (value / maxValue) * 390;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const statsPlayer = names.get(statsParticipantId) ?? participants[0];
+  const togglePlayer = (participantId: number) => setSelectedPlayers((current) => {
+    const next = new Set(current);
+    if (next.has(participantId)) next.delete(participantId);
+    else next.add(participantId);
+    return next;
+  });
+
+  return (
+    <div className="lol-timeline">
+      <div className="lol-timeline__subtabs">
+        <button type="button" className={view === 'chart' ? 'is-active' : ''} onClick={() => setView('chart')}>差距线图表</button>
+        <button type="button" className={view === 'stats' ? 'is-active' : ''} onClick={() => setView('stats')}>属性时间线</button>
+      </div>
+      {view === 'chart' ? <>
+        <section className="lol-timeline__chart">
+          <svg viewBox="0 0 700 470" role="img" aria-label="玩家数据增长曲线">
+            {Array.from({ length: 6 }, (_, index) => {
+              const y = 40 + index * 78;
+              const label = Math.round(maxValue * (1 - index / 5));
+              return <g key={`grid-${index}`}><line x1="56" y1={y} x2="680" y2={y} /><text x="48" y={y + 4}>{formatInteger(label)}</text></g>;
+            })}
+            {Array.from({ length: 8 }, (_, index) => {
+              const x = 56 + index * (624 / 7);
+              const frameIndex = Math.round(index * Math.max(0, timeline.frames.length - 1) / 7);
+              const timestamp = timeline.frames[frameIndex]?.timestamp ?? 0;
+              return <g className="lol-timeline__x-grid" key={`x-grid-${index}`}><line x1={x} y1="40" x2={x} y2="430" /><text x={x} y="447">{Math.floor(timestamp / 60000)}min</text></g>;
+            })}
+            {series.map((line) => <polyline key={line.label} points={chartLine(line.values)} style={{ stroke: line.color, strokeDasharray: line.dashed ? '8 4' : undefined }} />)}
+            <text x="360" y="462" className="lol-timeline__axis-title">游戏时间</text>
+          </svg>
+        </section>
+        <aside className="lol-timeline__controls">
+          <strong>数据类型</strong>
+          {TIMELINE_METRICS.map((option) => <label key={option.key}><input type="radio" name="timeline-metric" checked={metric === option.key} onChange={() => setMetric(option.key)} /> {option.label}</label>)}
+          <strong>队伍平均</strong>
+          <label><input type="checkbox" checked={showBlueAverage} onChange={(event) => setShowBlueAverage(event.target.checked)} /><i style={{ background: '#278fe5' }} /> 蓝队平均</label>
+          <label><input type="checkbox" checked={showRedAverage} onChange={(event) => setShowRedAverage(event.target.checked)} /><i style={{ background: '#ef4c62' }} /> 红队平均</label>
+          <strong>玩家</strong>
+          <button type="button" onClick={() => setSelectedPlayers(selectedPlayers.size === playerMeta.length ? new Set() : new Set(playerMeta.map(({ participantId }) => participantId)))}>全选</button>
+          {playerMeta.map(({ participant, participantId, color }) => <label key={`${participant.puuid}-timeline`}><input type="checkbox" checked={selectedPlayers.has(participantId)} onChange={() => togglePlayer(participantId)} /><i style={{ background: color }} /><span>{playerName(participant)}</span></label>)}
+        </aside>
+      </> : <>
+        <section className="lol-timeline__table">
+          <div className="lol-timeline__table-title"><strong>{statsPlayer ? playerName(statsPlayer) : '玩家'} · 属性时间线</strong><span>此为服务器返回的数据，部分字段可能存在误差</span></div>
+          <div className="lol-timeline__row lol-timeline__row--head"><span>时间</span><span>等级</span><span>金币</span><span>补刀</span><span>经验</span><span>攻击力</span><span>护甲</span><span>魔抗</span></div>
+          {timeline.frames.map((frame) => {
+            const data = frame.participantFrames[String(statsParticipantId)];
+            return <div className="lol-timeline__row" key={`${frame.timestamp}-stats`}><span>{formatEventTime(frame.timestamp)}</span><span>{data?.level ?? '—'}</span><span>{formatInteger(data?.totalGold ?? 0)}</span><span>{data ? data.minionsKilled + data.jungleMinionsKilled : '—'}</span><span>{formatInteger(data?.xp ?? 0)}</span><span>{formatInteger(data?.championStats?.attackDamage ?? 0)}</span><span>{formatInteger(data?.championStats?.armor ?? 0)}</span><span>{formatInteger(data?.championStats?.magicResist ?? 0)}</span></div>;
+          })}
+        </section>
+        <aside className="lol-timeline__players">
+          <strong>玩家</strong>
+          {playerMeta.map(({ participant, participantId, color }) => <button type="button" className={statsParticipantId === participantId ? 'is-active' : ''} key={`${participant.puuid}-stats-player`} onClick={() => setStatsParticipantId(participantId)}><i style={{ background: color }} /><GameIcon src={participant.championAvatar} alt={participant.championName} size={22} rounded /><span>{playerName(participant)}</span></button>)}
+        </aside>
+      </>}
     </div>
   );
 }
