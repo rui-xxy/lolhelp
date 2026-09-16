@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CirclePlay, Download, LoaderCircle } from 'l
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
+import { MATCH_TEAM_COLORS, MATCH_TIMELINE_COLORS } from '../../styles/palette';
 import badgeLegendary from '../../assets/match-badges/legendary.png';
 import badgeMaxAssist from '../../assets/match-badges/max-assist.png';
 import badgeMaxDamage from '../../assets/match-badges/max-damage.png';
@@ -1673,7 +1674,7 @@ const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string }> = [
   { key: 'damageTaken', label: '已承受伤害' },
 ];
 
-const TIMELINE_COLORS = ['#ef5f83', '#3da8ea', '#f1c94d', '#49c7bc', '#9a6ce8', '#f39ac0', '#9fcb56', '#f18c54', '#64b7ef', '#d99be8'];
+const TIMELINE_COLORS = MATCH_TIMELINE_COLORS;
 
 function timelineMetricValue(frame: MatchTimeline['frames'][number]['participantFrames'][string] | undefined, metric: TimelineMetric): number {
   if (!frame) return 0;
@@ -1719,8 +1720,8 @@ function TimelineTab({
     }),
   });
   const series = [
-    ...(showBlueAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 100).map(({ participantId }) => participantId), '蓝队平均', '#278fe5', true)] : []),
-    ...(showRedAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 200).map(({ participantId }) => participantId), '红队平均', '#ef4c62', true)] : []),
+    ...(showBlueAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 100).map(({ participantId }) => participantId), '蓝队平均', MATCH_TEAM_COLORS.blue, true)] : []),
+    ...(showRedAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 200).map(({ participantId }) => participantId), '红队平均', MATCH_TEAM_COLORS.red, true)] : []),
     ...playerMeta.filter(({ participantId }) => selectedPlayers.has(participantId)).map(({ participant, participantId, color }) => buildSeries([participantId], playerName(participant), color)),
   ];
   const maxValue = Math.max(1, ...series.flatMap((line) => line.values));
@@ -1765,8 +1766,8 @@ function TimelineTab({
           <strong>数据类型</strong>
           {TIMELINE_METRICS.map((option) => <label key={option.key}><input type="radio" name="timeline-metric" checked={metric === option.key} onChange={() => setMetric(option.key)} /> {option.label}</label>)}
           <strong>队伍平均</strong>
-          <label><input type="checkbox" checked={showBlueAverage} onChange={(event) => setShowBlueAverage(event.target.checked)} /><i style={{ background: '#278fe5' }} /> 蓝队平均</label>
-          <label><input type="checkbox" checked={showRedAverage} onChange={(event) => setShowRedAverage(event.target.checked)} /><i style={{ background: '#ef4c62' }} /> 红队平均</label>
+          <label><input type="checkbox" checked={showBlueAverage} onChange={(event) => setShowBlueAverage(event.target.checked)} /><i style={{ background: MATCH_TEAM_COLORS.blue }} /> 蓝队平均</label>
+          <label><input type="checkbox" checked={showRedAverage} onChange={(event) => setShowRedAverage(event.target.checked)} /><i style={{ background: MATCH_TEAM_COLORS.red }} /> 红队平均</label>
           <strong>玩家</strong>
           <button type="button" onClick={() => setSelectedPlayers(selectedPlayers.size === playerMeta.length ? new Set() : new Set(playerMeta.map(({ participantId }) => participantId)))}>全选</button>
           {playerMeta.map(({ participant, participantId, color }) => <label key={`${participant.puuid}-timeline`}><input type="checkbox" checked={selectedPlayers.has(participantId)} onChange={() => togglePlayer(participantId)} /><i style={{ background: color }} /><span>{playerName(participant)}</span></label>)}

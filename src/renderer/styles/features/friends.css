@@ -1,0 +1,199 @@
+@layer components {
+  .friend-panel-column {
+    width: 288px;
+    flex-shrink: 0;
+    overflow: hidden;
+    padding: 44px 8px 8px 0;
+    background: var(--color-app-shell);
+    transition:
+      width 200ms var(--ease-ui),
+      padding 200ms var(--ease-ui);
+  }
+
+  .friend-panel-column > * {
+    min-width: 280px;
+    overflow: hidden;
+    border: 1px solid var(--color-app-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-ui-shell);
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+      opacity 160ms ease,
+      transform 200ms var(--ease-ui);
+  }
+
+  .friend-panel-column--hidden {
+    width: 0;
+    padding-right: 0;
+    pointer-events: none;
+  }
+
+  .friend-panel-column--hidden > * {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  .friend-row {
+    position: relative;
+    overflow: hidden;
+    transition:
+      background-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .friend-row::before {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    content: "";
+    background-image: var(--friend-skin-bg);
+    background-position: center 36%;
+    background-size: cover;
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.22) 0%,
+      rgba(0, 0, 0, 0.48) 34%,
+      rgba(0, 0, 0, 0.9) 72%,
+      rgba(0, 0, 0, 1) 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.22) 0%,
+      rgba(0, 0, 0, 0.48) 34%,
+      rgba(0, 0, 0, 0.9) 72%,
+      rgba(0, 0, 0, 1) 100%
+    );
+    pointer-events: none;
+    transition:
+      opacity 180ms ease,
+      transform 220ms ease;
+    transform: scale(1.04);
+  }
+
+  .friend-row::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      rgba(247, 248, 248, 0.06) 0%,
+      rgba(247, 248, 248, 0.04) 52%,
+      rgba(247, 248, 248, 0.03) 100%
+    );
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  .friend-row > * {
+    position: relative;
+    z-index: 2;
+  }
+
+  .friend-row:hover {
+    background-color: var(--color-app-nav-hover);
+  }
+
+  .friend-row--has-skin::before {
+    opacity: 0.48;
+  }
+
+  .friend-row--has-skin::after {
+    opacity: 1;
+  }
+
+  .friend-row--has-skin:hover::before {
+    opacity: 0.66;
+    transform: scale(1.02);
+  }
+
+  .friend-row-timer {
+    position: absolute;
+    right: 8px;
+    bottom: 5px;
+    z-index: 3;
+    color: #8ab6ef;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    text-shadow: rgba(0, 0, 0, 0.6) 0 1px 2px;
+  }
+
+  .friend-status {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    border-radius: 999px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    vertical-align: top;
+  }
+
+  .friend-added-time {
+    display: block;
+    max-width: 100%;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 10px;
+    line-height: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .friend-status--ranked-solo {
+    background: rgba(66, 139, 255, 0.13);
+    color: #7fa9ec;
+  }
+
+  .friend-status--ranked-flex {
+    background: rgba(106, 90, 205, 0.13);
+    color: #a193e8;
+  }
+
+  .friend-status--normal-game {
+    background: rgba(0, 138, 5, 0.12);
+    color: #6bc984;
+  }
+
+  .friend-status--aram {
+    background: rgba(0, 132, 165, 0.12);
+    color: #5fc0da;
+  }
+
+  .friend-status--arena {
+    background: rgba(190, 97, 255, 0.13);
+    color: #c48ae8;
+  }
+
+  .friend-status--tft {
+    background: rgba(0, 170, 150, 0.13);
+    color: #5fd0c4;
+  }
+
+  .friend-status--queue {
+    background: rgba(247, 248, 248, 0.06);
+    color: #b9baa0;
+  }
+
+  .friend-status--champ-select {
+    background: rgba(213, 180, 105, 0.12);
+    color: #ef88a0;
+  }
+
+  .friend-status--lobby,
+  .friend-status--online {
+    background: rgba(0, 138, 5, 0.1);
+    color: #6bc984;
+  }
+
+  .friend-status--offline {
+    background: rgba(146, 146, 146, 0.12);
+    color: #a8a8a8;
+  }
+}

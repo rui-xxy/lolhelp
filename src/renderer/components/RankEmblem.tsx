@@ -48,7 +48,7 @@ export function RankEmblem({ rank, size = 44, className = '' }: RankEmblemProps)
       <img
         src={getRankEmblemUrl(rank.tier)}
         alt={rank.displayText}
-        className="h-full w-full object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.18)]"
+        className="h-full w-full object-contain drop-shadow-ui-rank-emblem"
         draggable={false}
       />
     </div>

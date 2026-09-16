@@ -139,7 +139,7 @@ export function FriendManagerDialog({
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-app-border bg-app-bg-soft/60 px-5 py-3.5">
           <form
-            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-[0_0_0_3px_rgba(213,180,105,0.08)]"
+            className="flex h-9 w-[470px] max-w-[78%] items-stretch overflow-hidden rounded-md border border-app-border bg-app-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-app-primary/60 focus-within:shadow-ui-focus-soft"
             onSubmit={(event) => {
               event.preventDefault();
               void addFriend();

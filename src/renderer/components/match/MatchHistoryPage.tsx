@@ -93,8 +93,8 @@ function QueueFilterMenu({
         onClick={() => setOpen((current) => !current)}
         className={`flex h-8 min-w-[102px] items-center justify-between gap-2 rounded-sm border px-2.5 text-xs transition-[background-color,border-color,box-shadow] ${
           open
-            ? 'border-app-border-strong bg-app-surface shadow-[0_0_0_3px_rgba(26,28,31,0.05)]'
-            : 'border-app-border-strong bg-app-surface shadow-[0_1px_2px_rgba(26,28,31,0.05)] hover:border-app-primary/25'
+            ? 'border-app-border-strong bg-app-surface shadow-ui-neutral-ring'
+            : 'border-app-border-strong bg-app-surface shadow-ui-neutral-sm hover:border-app-primary/25'
         }`}
       >
         <span className="truncate text-app-body">{activeFilter.name}</span>
@@ -933,7 +933,7 @@ export function MatchHistoryPage({
                     {tabLabel}
                   </span>
                   {tab.loading && (
-                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-[0_0_0_3px_rgba(213,180,105,0.12)]" />
+                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-ui-focus" />
                   )}
                 </button>
                 <button

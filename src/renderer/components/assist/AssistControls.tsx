@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { SwitchControl } from '../settings/SettingsControls';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Select } from '../ui/select';
 
 export function SettingCard({
   title,
@@ -58,12 +60,11 @@ export function TextInput({
   type?: 'text' | 'number';
 }) {
   return (
-    <input
+    <Input
       type={type}
       value={value}
       placeholder={placeholder}
       onChange={(event) => onChange(event.target.value)}
-      className="h-9 w-full rounded-sm border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-[border-color,box-shadow] placeholder:text-app-subtle hover:border-app-border-strong focus:border-app-primary focus:shadow-[0_0_0_3px_rgba(213,180,105,0.07)]"
     />
   );
 }
@@ -78,18 +79,11 @@ export function SelectInput({
   options: Array<[string, string]>;
 }) {
   return (
-    <span className="relative block w-full">
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full appearance-none rounded-sm border border-app-border bg-app-surface pr-9 pl-3 text-sm text-app-text outline-none transition-colors hover:border-app-border-strong focus:border-app-primary"
-      >
-        {options.map(([optionValue, label]) => (
-          <option key={optionValue} value={optionValue}>{label}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-app-subtle" />
-    </span>
+    <Select value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map(([optionValue, label]) => (
+        <option key={optionValue} value={optionValue}>{label}</option>
+      ))}
+    </Select>
   );
 }
 
@@ -103,8 +97,10 @@ export function HotkeyInput({
   const [recording, setRecording] = useState(false);
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="lg"
       onClick={() => setRecording(true)}
       onBlur={() => setRecording(false)}
       onKeyDown={(event) => {
@@ -128,14 +124,14 @@ export function HotkeyInput({
         onChange(parts.join('+'));
         setRecording(false);
       }}
-      className={`h-9 w-full rounded-sm border px-3 text-left font-mono text-xs outline-none transition-[border-color,background-color,box-shadow] ${
+      className={`w-full justify-start px-3 text-left font-mono text-xs ${
         recording
-          ? 'border-app-focus bg-blue-50/60 text-app-text shadow-[0_0_0_3px_rgba(51,156,255,0.1)]'
-          : 'border-app-border bg-app-surface text-app-text hover:border-app-border-strong'
+          ? 'border-app-focus bg-app-info-soft text-app-text shadow-ui-info-focus'
+          : 'border-app-border bg-app-surface text-app-text hover:border-app-border-strong hover:bg-app-surface'
       }`}
     >
       {recording ? '请按下快捷键…（Esc 取消）' : value || '点击录入快捷键'}
-    </button>
+    </Button>
   );
 }
 
@@ -149,13 +145,14 @@ export function ActionButton({
   disabled?: boolean;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      size="sm"
       disabled={disabled}
       onClick={onClick}
-      className="h-8 rounded-sm bg-app-primary px-3.5 text-xs font-semibold text-app-primary-foreground transition-[background-color,box-shadow] hover:bg-app-primary-hover hover:shadow-[0_2px_8px_rgba(213,180,105,0.16)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="text-xs font-semibold hover:bg-app-primary-hover hover:shadow-ui-primary-hover"
     >
       {children}
-    </button>
+    </Button>
   );
 }

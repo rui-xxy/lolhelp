@@ -1,0 +1,145 @@
+@layer components {
+  .match-result-card {
+    min-height: 42px;
+    max-height: 48px;
+    flex: 1 1 44px;
+    gap: 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0 8px 0 10px;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .match-result-card::before {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 2px;
+    z-index: 2;
+    width: 2px;
+    height: 18px;
+    border-radius: 999px;
+    background-image: none;
+    background-color: transparent;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 150ms ease;
+  }
+
+  .match-result-card::after,
+  .match-result-card--win::after,
+  .match-result-card--loss::after {
+    border-radius: var(--radius-sm);
+    background: var(--color-app-nav-hover);
+    opacity: 0;
+  }
+
+  .match-result-card:hover,
+  .match-result-card--selected,
+  .match-result-card--win.match-result-card--selected,
+  .match-result-card--loss.match-result-card--selected {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .match-result-card:hover::after {
+    opacity: 0.7;
+  }
+
+  .match-result-card--selected::after {
+    opacity: 1;
+  }
+
+  .match-result-card--selected::before,
+  .match-result-card--checked::before {
+    opacity: 1;
+  }
+
+  .match-result-card--win.match-result-card--selected::before {
+    background: var(--color-app-success);
+  }
+
+  .match-result-card--loss.match-result-card--selected::before {
+    background: var(--color-app-danger);
+  }
+
+  .match-result-card--checked,
+  .match-result-card--checked:hover {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .match-result-card--checked::before {
+    background: var(--color-app-primary);
+  }
+
+  .match-result-card--checked::after {
+    background: var(--color-app-primary-soft);
+    opacity: 1;
+  }
+
+  .match-result-avatar,
+  .match-result-avatar--win,
+  .match-result-avatar--loss {
+    border: 1px solid var(--color-app-border-strong);
+    box-shadow: none;
+  }
+
+  .match-result-mode {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .match-result-badge {
+    height: auto;
+    border: 0 !important;
+    border-radius: 0;
+    padding: 0;
+    background: transparent !important;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    transform: none;
+  }
+
+  .match-result-card--win .match-result-badge {
+    color: var(--color-app-success);
+  }
+
+  .match-result-card--loss .match-result-badge {
+    color: var(--color-app-danger);
+  }
+
+  .match-result-time {
+    min-width: 40px;
+  }
+
+  .match-result-time-value {
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .lol-rift-player-name,
+  .lol-score-player-name {
+    cursor: pointer;
+    transition:
+      color 140ms ease,
+      text-decoration-color 140ms ease;
+  }
+
+  .lol-rift-row .lol-rift-player-name:hover,
+  .lol-rift-row .lol-rift-player-name:focus-visible,
+  .lol-score-row .lol-score-player-name:hover,
+  .lol-score-row .lol-score-player-name:focus-visible {
+    color: var(--color-app-primary);
+    text-decoration: underline;
+    text-decoration-color: rgba(213, 180, 105, 0.38);
+    text-underline-offset: 2px;
+    text-shadow: none;
+    outline: none;
+  }
+}

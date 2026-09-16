@@ -359,7 +359,7 @@ export function AppShell({
             className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
           >
             <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-primary/25 bg-app-primary-soft shadow-[var(--shadow-ui-sm)] transition-colors group-hover:border-app-primary/45">
-              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[conic-gradient(from_45deg,#d5b469_0_25%,#8d7442_0_50%,#344255_0_75%,#687586_0)] transition-opacity group-hover:opacity-0" />
+              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[image:var(--app-logo-gradient)] transition-opacity group-hover:opacity-0" />
               <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-app-surface-soft transition-opacity group-hover:opacity-0" />
               <Sparkles className="absolute size-3.5 text-app-primary-foreground transition-opacity group-hover:opacity-0" />
               <PanelLeft className="absolute size-4 text-app-primary opacity-0 transition-opacity group-hover:opacity-100" />

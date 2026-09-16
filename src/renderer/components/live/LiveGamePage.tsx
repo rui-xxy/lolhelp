@@ -7,19 +7,12 @@ import { getRankEmblemUrl } from '../RankEmblem';
 import { ProfileIcon } from '../ProfileIcon';
 import { MatchDetail } from '../match/MatchDetail';
 import { LargeDialog } from '../ui/large-dialog';
+import { LIVE_PARTY_COLORS } from '../../styles/palette';
 import { LIVE_PREVIEW_ENEMY_TEAM, LIVE_PREVIEW_MY_TEAM } from './livePreviewData';
 
 const HISTORY_CARD_ROWS = 7;
 const RECENT_CHAMPION_COUNT = 10;
 const MAX_BOARD_CARDS = 10;
-const PARTY_COLORS = [
-  '#4fd1c5',
-  '#d5b469',
-  '#55c58a',
-  '#a892d4',
-  '#d88b66',
-  '#78aef2',
-];
 const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const TEAM_NAMES: Record<number, string> = {
@@ -145,7 +138,7 @@ function buildParties(players: LiveBattlePlayer[]) {
   let labelIndex = 0;
   byParty.forEach((partyPlayers) => {
     if (partyPlayers.length < 2) return;
-    const color = PARTY_COLORS[colorIndex % PARTY_COLORS.length];
+    const color = LIVE_PARTY_COLORS[colorIndex % LIVE_PARTY_COLORS.length];
     const label = PARTY_LABELS[labelIndex % PARTY_LABELS.length];
     colorIndex += 1;
     labelIndex += 1;

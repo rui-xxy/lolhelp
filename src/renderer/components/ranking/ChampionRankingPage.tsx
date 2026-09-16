@@ -23,6 +23,7 @@ import type {
   ChampionRankingRegion,
   ChampionRankingResult,
 } from '../../../shared/api';
+import { RANKING_HERO_TONES, RANKING_MODE_TONES } from '../../styles/palette';
 import { MayhemGuidePage } from './MayhemGuidePage';
 
 export type RankingChapter = 'mayhem' | 'ranking';
@@ -36,10 +37,10 @@ interface MenuOption<T extends string> {
 }
 
 const MODE_OPTIONS: MenuOption<ChampionRankingMode>[] = [
-  { value: 'ranked', label: '召唤师峡谷', description: '排位赛综合强度', icon: LandPlot, tone: '#2f8f6b' },
-  { value: 'aram', label: '极地大乱斗', description: '嚎哭深渊全英雄', icon: Snowflake, tone: '#4f86c6' },
-  { value: 'arena', label: '斗魂竞技场', description: '双人竞技场表现', icon: Orbit, tone: '#b46a50' },
-  { value: 'hextech', label: '海克斯大乱斗', description: '强化符文环境', icon: Gem, tone: '#8b68bd' },
+  { value: 'ranked', label: '召唤师峡谷', description: '排位赛综合强度', icon: LandPlot, tone: RANKING_MODE_TONES.ranked },
+  { value: 'aram', label: '极地大乱斗', description: '嚎哭深渊全英雄', icon: Snowflake, tone: RANKING_MODE_TONES.aram },
+  { value: 'arena', label: '斗魂竞技场', description: '双人竞技场表现', icon: Orbit, tone: RANKING_MODE_TONES.arena },
+  { value: 'hextech', label: '海克斯大乱斗', description: '强化符文环境', icon: Gem, tone: RANKING_MODE_TONES.hextech },
 ];
 
 const REGION_OPTIONS: MenuOption<ChampionRankingRegion>[] = [
@@ -86,7 +87,7 @@ const ROLE_NAMES: Record<string, string> = {
   Tank: '坦克',
 };
 
-const HERO_TONES = ['#d85d6f', '#2f8f78', '#4d7fc1', '#9a68b4', '#d28a3f', '#477f91'];
+const HERO_TONES = RANKING_HERO_TONES;
 
 export function RankingChapterSwitch({
   value,

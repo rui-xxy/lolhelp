@@ -1,0 +1,692 @@
+@layer components {
+  .lol-rift-scoreboard {
+    display: grid;
+    gap: 14px;
+    padding: 4px 2px 8px;
+  }
+
+  .lol-rift-team {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .lol-rift-team-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #9aa3ad;
+  }
+
+  .lol-rift-team-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .lol-rift-team-total {
+    font-variant-numeric: tabular-nums;
+    color: #c6cdd6;
+  }
+
+  .lol-rift-team-rows {
+    display: grid;
+    gap: 5px;
+  }
+
+  .lol-rift-row {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr) 128px;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    min-height: 50px;
+    padding: 5px 10px 5px 6px;
+    border: 0;
+    border-radius: 0;
+    background:
+      linear-gradient(90deg, rgba(247, 248, 248, 0.05), rgba(247, 248, 248, 0.02)),
+      rgba(247, 248, 248, 0.03);
+    box-shadow: none;
+  }
+
+  .lol-rift-team--blue .lol-rift-row {
+    background:
+      linear-gradient(90deg, rgba(178, 213, 243, 0.08), rgba(178, 213, 243, 0.02)),
+      rgba(59, 130, 246, 0.055);
+  }
+
+  .lol-rift-team--red .lol-rift-row {
+    background:
+      linear-gradient(90deg, rgba(239, 136, 160, 0.08), rgba(239, 136, 160, 0.02)),
+      rgba(244, 63, 94, 0.055);
+  }
+
+  .lol-rift-row--target {
+    background:
+      linear-gradient(90deg, rgba(239, 136, 160, 0.1), rgba(239, 136, 160, 0.03)),
+      rgba(213, 180, 105, 0.1) !important;
+  }
+
+  .lol-rift-row:hover {
+    background:
+      linear-gradient(90deg, rgba(247, 248, 248, 0.07), rgba(247, 248, 248, 0.03)),
+      rgba(213, 180, 105, 0.08);
+  }
+
+  .lol-rift-row--recurring {
+    background: rgba(245, 158, 11, 0.08);
+  }
+
+  .lol-rift-loadout {
+    display: grid;
+    grid-template-columns: 42px 21px 21px;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .lol-rift-champion {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  }
+
+  .lol-rift-spells,
+  .lol-rift-runes {
+    display: grid;
+    gap: 3px;
+  }
+
+  .lol-rift-spells img,
+  .lol-rift-runes img {
+    border-radius: 4px;
+  }
+
+  .lol-rift-identity {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .lol-rift-player-name {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #e8e3d8;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .lol-rift-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 17px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .lol-rift-badge {
+    display: block;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    object-fit: contain;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .lol-rift-badge--wide {
+    width: 32px;
+    height: 13px;
+  }
+
+  .lol-rift-rank {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    justify-content: end;
+    gap: 6px;
+    min-width: 0;
+    color: #d4d0c7;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .lol-rift-rank > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-rift-rank-empty {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.12);
+  }
+}
+
+@layer components {
+  .lol-rift-grid,
+  .lol-rift-row {
+    display: grid;
+    grid-template-columns: minmax(330px, 1.35fr) minmax(158px, 0.8fr) 78px 72px;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .lol-rift-grid--head {
+    min-height: 21px;
+    padding: 0 4px;
+    border-bottom: 0;
+    color: #858b95;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .lol-rift-grid--head span:nth-child(n+2) {
+    text-align: center;
+  }
+
+  .lol-rift-team-rows {
+    gap: 4px;
+  }
+
+  .lol-rift-row,
+  .lol-rift-team--blue .lol-rift-row,
+  .lol-rift-team--red .lol-rift-row {
+    min-height: 52px;
+    padding: 4px 4px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .lol-rift-row:hover {
+    background: rgba(247, 248, 248, 0.05);
+  }
+
+  .lol-rift-row--target,
+  .lol-rift-team--blue .lol-rift-row--target,
+  .lol-rift-team--red .lol-rift-row--target {
+    background:
+      linear-gradient(90deg, rgba(213, 180, 105, 0.08), transparent 58%),
+      transparent !important;
+    box-shadow: none;
+  }
+
+  .lol-rift-row--recurring {
+    box-shadow: none;
+  }
+
+  .lol-rift-player-cell {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 92px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 42px 21px 21px;
+  }
+
+  .lol-rift-identity {
+    align-content: center;
+  }
+
+  .lol-rift-rank {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 4px;
+    color: #aab4c0;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .lol-rift-rank-empty {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-rift-items {
+    display: grid;
+    grid-template-columns: repeat(7, 22px);
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .lol-rift-items img {
+    border-radius: 4px;
+  }
+
+  .lol-rift-kda,
+  .lol-rift-damage {
+    color: #e8e3d8;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-rift-damage {
+    color: #e8e3d8;
+  }
+}
+
+@layer components {
+  .lol-rift-scoreboard {
+    gap: 6px;
+    padding: 0;
+  }
+
+  .lol-postgame-content:has(.lol-rift-scoreboard) {
+    max-height: none;
+    overflow: visible;
+    padding: 6px 14px 8px;
+  }
+
+  .lol-rift-team {
+    gap: 0;
+  }
+
+  .lol-rift-team + .lol-rift-team {
+    margin-top: 6px;
+  }
+
+  .lol-rift-team-bar {
+    display: none;
+  }
+
+  .lol-rift-team-title {
+    gap: 4px;
+  }
+
+  .lol-rift-team-title .lol-score-team-line {
+    width: 12px;
+  }
+
+  .lol-rift-grid,
+  .lol-rift-row {
+    grid-template-columns: minmax(332px, 2.15fr) minmax(178px, 1.08fr) 78px 66px;
+    gap: 10px;
+  }
+
+  .lol-rift-grid--head {
+    min-height: 17px;
+    padding-inline: 0;
+    font-size: 10px;
+    line-height: 17px;
+  }
+
+  .lol-rift-row,
+  .lol-rift-team--blue .lol-rift-row,
+  .lol-rift-team--red .lol-rift-row {
+    min-height: 55px;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  .lol-rift-player-cell {
+    grid-template-columns: 92px minmax(0, 1fr) 90px;
+    gap: 8px;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 40px 19px 19px;
+    gap: 5px;
+  }
+
+  .lol-rift-champion {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+  }
+
+  .lol-rift-champion img,
+  .lol-rift-champion > span:first-child {
+    border: 1px solid rgba(200, 170, 110, 0.56);
+  }
+
+  .lol-rift-spells,
+  .lol-rift-runes {
+    gap: 2px;
+  }
+
+  .lol-rift-spells img,
+  .lol-rift-runes img {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 4px;
+  }
+
+  .lol-rift-player-name {
+    max-width: 126px;
+    font-size: 12px;
+  }
+
+  .lol-rift-badges {
+    gap: 3px;
+    min-height: 16px;
+  }
+
+  .lol-rift-badge {
+    width: 13px;
+    height: 13px;
+  }
+
+  .lol-rift-badge--wide {
+    width: 32px;
+    height: 13px;
+  }
+
+  .lol-rift-rank {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .lol-rift-rank-empty {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-rift-items {
+    grid-template-columns: repeat(7, 24px);
+    gap: 2px;
+  }
+
+  .lol-rift-items img,
+  .lol-rift-items .lol-score-item-empty {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 4px;
+  }
+
+  .lol-rift-kda,
+  .lol-rift-damage {
+    font-size: 12px;
+  }
+
+  .lol-rift-row--linked {
+    --lol-score-link-color: #dba856;
+    --lol-score-link-soft: rgba(245, 158, 11, 0.24);
+  }
+
+  .lol-rift-row--linked-amber {
+    --lol-score-link-color: #dba856;
+    --lol-score-link-soft: rgba(245, 158, 11, 0.26);
+    --lol-score-link-glow: rgba(245, 158, 11, 0.22);
+  }
+
+  .lol-rift-row--linked-cyan {
+    --lol-score-link-color: #5fc6de;
+    --lol-score-link-soft: rgba(6, 182, 212, 0.24);
+    --lol-score-link-glow: rgba(6, 182, 212, 0.2);
+  }
+
+  .lol-rift-row--linked-violet {
+    --lol-score-link-color: #ab8ff0;
+    --lol-score-link-soft: rgba(139, 92, 246, 0.24);
+    --lol-score-link-glow: rgba(139, 92, 246, 0.2);
+  }
+
+  .lol-rift-row--linked-rose {
+    --lol-score-link-color: #ea8aa5;
+    --lol-score-link-soft: rgba(244, 63, 94, 0.24);
+    --lol-score-link-glow: rgba(244, 63, 94, 0.18);
+  }
+
+  .lol-rift-row--linked-emerald {
+    --lol-score-link-color: #4ecb96;
+    --lol-score-link-soft: rgba(16, 185, 129, 0.24);
+    --lol-score-link-glow: rgba(16, 185, 129, 0.2);
+  }
+
+  .lol-rift-row--linked .lol-rift-champion img,
+  .lol-rift-row--linked .lol-rift-champion > span:first-child {
+    border-color: var(--lol-score-link-color) !important;
+    box-shadow: 0 0 0 2px var(--lol-score-link-soft);
+  }
+
+  .lol-rift-row--linked .lol-rift-player-name {
+    color: var(--lol-score-link-color);
+    text-shadow: 0 0 10px var(--lol-score-link-glow);
+  }
+}
+
+@layer components {
+  .lol-postgame-content:has(.lol-scoreboard) {
+    max-height: none;
+    overflow: visible;
+    padding: 6px 14px 8px;
+  }
+
+  .lol-score-team {
+    gap: 0;
+  }
+
+  .lol-score-team + .lol-score-team {
+    margin-top: 6px;
+  }
+
+  .lol-score-team-bar {
+    display: none;
+  }
+
+  .lol-score-grid {
+    grid-template-columns: minmax(200px, 1.4fr) 124px minmax(176px, 1fr) 76px 64px;
+    gap: 10px;
+  }
+
+  .lol-score-grid--head {
+    min-height: 17px;
+    padding-inline: 0;
+    font-size: 10px;
+    line-height: 17px;
+  }
+
+  .lol-score-row {
+    min-height: 55px;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  .lol-score-player {
+    gap: 8px;
+  }
+
+  .lol-score-spells {
+    gap: 2px;
+  }
+
+  .lol-score-spells img,
+  .lol-score-spells > span {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 4px;
+  }
+
+  .lol-score-champion {
+    width: 40px;
+    height: 40px;
+  }
+
+  .lol-score-champion img,
+  .lol-score-champion > span:first-child {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .lol-score-champion > span:last-child {
+    min-width: 17px;
+    height: 17px;
+    font-size: 10px;
+  }
+
+  .lol-score-player-name {
+    max-width: 126px;
+    font-size: 12px;
+  }
+
+  .lol-score-runes {
+    gap: 4px;
+  }
+
+  .lol-score-enhancement {
+    width: 28px;
+    height: 28px;
+  }
+
+  .lol-score-enhancement-glyph {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-score-enhancement--rune img {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .lol-score-items {
+    grid-template-columns: repeat(7, 24px);
+    gap: 2px;
+  }
+
+  .lol-score-items img,
+  .lol-score-items .lol-score-item-empty {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 4px;
+  }
+
+  .lol-score-kda strong,
+  .lol-score-number {
+    font-size: 12px;
+  }
+}
+
+@layer components {
+  .lol-postgame,
+  .lol-postgame-content,
+  .lol-rift-scoreboard,
+  .lol-scoreboard,
+  .lol-rift-team,
+  .lol-rift-team-rows,
+  .lol-score-team {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .lol-postgame {
+    overflow: hidden;
+  }
+
+  .lol-postgame-tabs {
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+
+  .lol-postgame-content,
+  .lol-postgame-content:has(.lol-rift-scoreboard),
+  .lol-postgame-content:has(.lol-scoreboard) {
+    overflow: visible;
+    padding: 6px 10px 8px;
+  }
+
+  .lol-rift-grid,
+  .lol-rift-row {
+    width: 100%;
+    grid-template-columns:
+      minmax(250px, 1.72fr)
+      minmax(150px, 0.92fr)
+      minmax(66px, 0.4fr)
+      minmax(48px, 0.3fr);
+    gap: 7px;
+  }
+
+  .lol-rift-player-cell {
+    grid-template-columns: 86px minmax(0, 1fr) minmax(68px, 82px);
+    gap: 6px;
+  }
+
+  .lol-rift-loadout {
+    grid-template-columns: 38px 18px 18px;
+    gap: 4px;
+  }
+
+  .lol-rift-champion {
+    width: 38px;
+    height: 38px;
+  }
+
+  .lol-rift-player-name {
+    max-width: 100%;
+  }
+
+  .lol-rift-items {
+    grid-template-columns: repeat(7, minmax(0, 22px));
+    gap: 2px;
+  }
+
+  .lol-rift-items img,
+  .lol-rift-items .lol-score-item-empty {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .lol-score-grid {
+    width: 100%;
+    grid-template-columns:
+      minmax(150px, 1.24fr)
+      minmax(96px, 0.68fr)
+      minmax(150px, 1fr)
+      minmax(66px, 0.42fr)
+      minmax(48px, 0.3fr);
+    gap: 7px;
+  }
+
+  .lol-score-runes {
+    gap: 3px;
+  }
+
+  .lol-score-enhancement {
+    width: 24px;
+    height: 24px;
+  }
+
+  .lol-score-enhancement-glyph {
+    width: 20px;
+    height: 20px;
+  }
+
+  .lol-score-items {
+    grid-template-columns: repeat(7, minmax(0, 22px));
+    gap: 2px;
+  }
+
+  .lol-score-items img,
+  .lol-score-items .lol-score-item-empty {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}

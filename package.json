@@ -12,8 +12,9 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "check:styles": "node scripts/check-ui-styles.mjs",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm run check:styles && npm test"
   },
   "keywords": [],
   "author": {

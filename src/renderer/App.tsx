@@ -273,7 +273,7 @@ export function App() {
         e.preventDefault();
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/40 focus-within:bg-app-surface-soft focus-within:shadow-[0_0_0_2px_rgba(213,180,105,0.18)]"
+      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/40 focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
     >
       <div className="relative flex w-32 shrink-0 items-center border-r border-app-border bg-app-shell/45">
         <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary/75" />
