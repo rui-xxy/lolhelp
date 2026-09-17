@@ -1,26 +1,95 @@
 @layer components {
-  .app-eyebrow {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-app-subtle);
+  .app-shell {
+    position: relative;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    color: var(--color-app-text);
+    background: var(--fill-frost-shell), var(--color-app-shell);
   }
 
-  .app-orbit {
-    display: inline-block;
-    width: 38px;
-    height: 38px;
-    border: 1px solid #34343a;
-    border-top-color: #d5b469;
-    border-radius: 50%;
-    animation: 2.5s linear infinite app-orbit-rotate;
+  .app-shell-sidebar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    padding-top: 44px;
+    border-right: 1px solid var(--color-frost-line-faint);
+    background: var(--color-app-sidebar);
+    box-shadow: none;
+    transition: width 220ms var(--ease-ui);
   }
 
-  @keyframes app-orbit-rotate {
-    to {
-      transform: rotate(360deg);
-    }
-  }
+  .app-shell-drag-region { position: absolute; inset: 0 0 auto; height: 44px; -webkit-app-region: drag; }
+  .app-shell-brand-row { display: flex; height: 48px; flex: 0 0 48px; align-items: center; padding: 0 8px; -webkit-app-region: drag; }
 
+  .app-shell-brand {
+    display: flex; width: 100%; height: 32px; align-items: center; gap: 8px;
+    border: 1px solid transparent; border-radius: var(--radius-xs); padding: 0 8px;
+    color: var(--color-app-muted); background: transparent; text-align: left;
+    transition: color 120ms ease, background-color 120ms ease; -webkit-app-region: no-drag;
+  }
+  .app-shell-brand:hover { color: var(--color-app-body); background: var(--color-frost-fill-faint); }
+
+  .app-shell-brand-mark {
+    display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center;
+    border: 1px solid var(--color-frost-line-soft); border-radius: var(--radius-xs);
+    color: var(--color-app-body); background: var(--color-frost-fill-faint);
+    font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: -0.02em;
+  }
+  .app-shell-brand-copy { min-width: 0; flex: 1; }
+  .app-shell-brand-title { display: block; overflow: hidden; color: currentColor; font-size: 12px; font-weight: 600; letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; }
+
+  .app-shell-nav { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow: hidden; padding: 8px 8px; }
+  .app-shell-nav-item {
+    display: flex; width: 100%; height: 32px; flex: 0 0 32px; align-items: center; gap: 9px;
+    border: 1px solid transparent; border-radius: var(--radius-xs); padding: 0 9px;
+    color: var(--color-app-subtle); background: transparent;
+    font-size: 12px; font-weight: 500; text-align: left;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+  .app-shell-nav-item:hover { color: var(--color-app-muted); background: var(--color-frost-fill-soft); }
+  .app-shell-nav-item[data-active="true"] {
+    color: var(--color-app-text);
+    background: transparent;
+    font-weight: 600;
+  }
+  .app-shell-nav-icon { width: 15px; height: 15px; flex: 0 0 15px; color: var(--color-app-subtle); transition: color 120ms ease; }
+  .app-shell-nav-item:hover .app-shell-nav-icon { color: var(--color-app-muted); }
+  .app-shell-nav-item[data-active="true"] .app-shell-nav-icon { color: var(--color-app-body); }
+
+  .app-shell-sidebar[data-collapsed="true"] .app-shell-brand,
+  .app-shell-sidebar[data-collapsed="true"] .app-shell-nav-item { justify-content: center; padding-inline: 0; }
+
+  .app-shell-sidebar-footer { flex: 0 0 auto; padding: 8px 8px 10px; }
+
+  .app-shell-workspace { position: relative; z-index: 10; display: flex; min-width: 0; flex: none; padding: 44px 8px 8px 0; }
+  .app-shell-header { position: absolute; top: 0; right: 8px; left: 0; z-index: 30; display: flex; height: 44px; align-items: center; gap: 12px; padding-left: 12px; -webkit-app-region: drag; }
+  .app-shell-header--friend-hidden { padding-right: 138px; }
+  .app-shell-header-title { color: var(--color-app-body); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
+  .app-shell-header-actions { display: flex; align-items: center; gap: 3px; margin-left: auto; -webkit-app-region: no-drag; }
+
+  .app-shell-icon-action {
+    position: relative; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid transparent;
+    border-radius: var(--radius-sm); color: var(--color-app-muted); background: transparent;
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  }
+  .app-shell-icon-action:hover { border-color: var(--color-frost-line-soft); color: var(--color-app-text); background: var(--color-frost-fill-hover); }
+  .app-shell-icon-action[data-active="true"] { border-color: var(--color-frost-line); color: var(--color-app-text); background: var(--color-frost-fill-active); }
+  .app-shell-alert-badge { position: absolute; top: -3px; right: -3px; display: flex; height: 15px; min-width: 15px; align-items: center; justify-content: center; border: 2px solid var(--color-app-shell); border-radius: 999px; padding: 0 3px; color: var(--color-app-on-danger); background: var(--color-app-danger); font-size: 9px; font-weight: 700; line-height: 1; }
+
+  .app-shell-frame {
+    position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--color-frost-line); border-radius: 10px;
+    background: var(--fill-frost-frame), var(--color-frame-panel);
+    box-shadow: inset 0 1px var(--color-frost-line-faint), 0 18px 44px -34px var(--color-frost-shadow-deep);
+  }
+  .app-shell-frame::before { position: absolute; inset: 0; z-index: 0; content: ""; background-image: var(--app-frost-grain); background-size: 112px 112px; opacity: 0.012; mix-blend-mode: soft-light; pointer-events: none; }
+  .app-shell-main { position: relative; z-index: 1; flex: 1; overflow-y: auto; background: transparent; }
+
+  .app-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-app-subtle); }
+  .app-orbit { display: inline-block; width: 38px; height: 38px; border: 1px solid var(--color-app-border); border-top-color: var(--color-app-body); border-radius: 50%; animation: 2.5s linear infinite app-orbit-rotate; }
+
+  @keyframes app-orbit-rotate { to { transform: rotate(360deg); } }
 }

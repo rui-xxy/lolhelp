@@ -1,45 +1,47 @@
 @theme {
-  --color-app-bg: #0b0f14;
-  --color-app-bg-soft: #10161f;
-  --color-app-shell: #0d1219;
-  --color-app-sidebar: #0c1118;
+  /* Graphite Frost — neutral matte mineral greys. */
+  --color-app-bg: #303131;
+  --color-app-bg-soft: #353636;
+  --color-app-shell: #292a2a;
+  --color-app-sidebar: #242525;
 
-  --color-app-surface: #121923;
-  --color-app-surface-soft: #18212c;
+  --color-app-surface: #383939;
+  --color-app-surface-soft: #404141;
+  --color-app-elevated: #484949;
 
-  --color-app-border: #222c39;
-  --color-app-border-strong: #344255;
+  --color-app-border: #4a4c4b;
+  --color-app-border-strong: #5f615f;
 
-  --color-app-nav-hover: rgba(255, 255, 255, 0.045);
-  --color-app-selected: rgba(213, 180, 105, 0.11);
-  --color-app-focus: #d5b469;
+  --color-app-nav-hover: rgba(255, 255, 250, 0.045);
+  --color-app-selected: rgba(238, 238, 232, 0.085);
+  --color-app-focus: #c7c8c2;
 
-  --color-app-text: #f2f5f8;
-  --color-app-body: #c4ced9;
-  --color-app-muted: #929dab;
-  --color-app-subtle: #687586;
+  --color-app-text: #f1f1ed;
+  --color-app-body: #d0d1cc;
+  --color-app-muted: #a0a29d;
+  --color-app-subtle: #767873;
 
-  --color-app-primary: #d5b469;
-  --color-app-primary-hover: #e2c47d;
-  --color-app-primary-soft: rgba(213, 180, 105, 0.14);
-  --color-app-primary-foreground: #17130b;
-  --color-app-accent: #d5b469;
+  --color-app-primary: #d8d9d3;
+  --color-app-primary-hover: #efefe9;
+  --color-app-primary-soft: rgba(224, 225, 218, 0.1);
+  --color-app-primary-foreground: #262727;
+  --color-app-accent: #c8c9c3;
 
-  --color-app-danger: #f07178;
-  --color-app-danger-hover: #f6848a;
-  --color-app-success: #55c58a;
-  --color-app-link: #78aef2;
-  --color-app-info: #339cff;
-  --color-app-info-soft: rgba(51, 156, 255, 0.1);
-  --color-app-team-mine: #5da9ff;
-  --color-app-team-enemy: #f07178;
+  --color-app-danger: #d77a7c;
+  --color-app-danger-hover: #e18b8d;
+  --color-app-success: #83b08e;
+  --color-app-link: #a6b5bf;
+  --color-app-info: #91a8b4;
+  --color-app-info-soft: rgba(145, 168, 180, 0.11);
+  --color-app-team-mine: #8daabd;
+  --color-app-team-enemy: #cb8587;
 
-  --color-app-win: #55c58a;
-  --color-app-win-bg: rgba(85, 197, 138, 0.11);
-  --color-app-win-border: rgba(85, 197, 138, 0.28);
-  --color-app-loss: #f07178;
-  --color-app-loss-bg: rgba(240, 113, 120, 0.1);
-  --color-app-loss-border: rgba(240, 113, 120, 0.28);
+  --color-app-win: #83b08e;
+  --color-app-win-bg: rgba(131, 176, 142, 0.11);
+  --color-app-win-border: rgba(131, 176, 142, 0.25);
+  --color-app-loss: #d77a7c;
+  --color-app-loss-bg: rgba(215, 122, 124, 0.1);
+  --color-app-loss-border: rgba(215, 122, 124, 0.25);
 
   --font-sans: Inter, "Microsoft YaHei UI", "PingFang SC", "Segoe UI",
     ui-sans-serif, system-ui, sans-serif;
@@ -52,20 +54,44 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  --shadow-ui-sm: none;
-  --shadow-ui-shell: 0 0 0 1px rgba(255, 255, 255, 0.025);
-  --shadow-ui-popover: 0 0 0 1px #344255, 0 18px 44px -24px rgba(0, 0, 0, 0.86);
-  --shadow-ui-focus: 0 0 0 3px rgba(213, 180, 105, 0.12);
-  --shadow-ui-focus-soft: 0 0 0 3px rgba(213, 180, 105, 0.08);
-  --shadow-ui-focus-compact: 0 0 0 2px rgba(213, 180, 105, 0.18);
-  --shadow-ui-info-focus: 0 0 0 3px rgba(51, 156, 255, 0.1);
-  --shadow-ui-primary-hover: 0 2px 8px rgba(213, 180, 105, 0.16);
-  --shadow-ui-neutral-ring: 0 0 0 3px rgba(26, 28, 31, 0.05);
-  --shadow-ui-neutral-sm: 0 1px 2px rgba(26, 28, 31, 0.05);
+  --shadow-ui-sm: inset 0 1px 0 rgba(255, 255, 250, 0.035);
+  --shadow-ui-shell: inset 0 1px 0 rgba(255, 255, 250, 0.035), 0 14px 34px -28px rgba(0, 0, 0, 0.72);
+  --shadow-ui-popover: 0 0 0 1px #5f615f, 0 20px 46px -24px rgba(0, 0, 0, 0.72);
+  --shadow-ui-focus: 0 0 0 3px rgba(216, 217, 211, 0.13);
+  --shadow-ui-focus-soft: 0 0 0 3px rgba(216, 217, 211, 0.08);
+  --shadow-ui-focus-compact: 0 0 0 2px rgba(216, 217, 211, 0.14);
+  --shadow-ui-info-focus: 0 0 0 3px rgba(145, 168, 180, 0.1);
+  --shadow-ui-primary-hover: inset 0 1px 0 rgba(255, 255, 250, 0.05);
+  --shadow-ui-neutral-ring: 0 0 0 3px rgba(255, 255, 250, 0.045);
+  --shadow-ui-neutral-sm: 0 1px 2px rgba(0, 0, 0, 0.16);
   --shadow-ui-rank-emblem: 0 2px 5px rgba(0, 0, 0, 0.18);
-  --shadow-ui-switch-thumb: 0 0 0 4px rgba(213, 180, 105, 0.08);
-  --shadow-ui-switch-track: inset 0 0 0 1px rgba(23, 18, 8, 0.12);
+  --shadow-ui-switch-thumb: 0 0 0 4px rgba(216, 217, 211, 0.08);
+  --shadow-ui-switch-track: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
   --drop-shadow-ui-rank-emblem: 0 2px 5px rgba(0, 0, 0, 0.18);
+
+  /* Material recipes: keep feature CSS free from ad-hoc neutral colors. */
+  --color-frost-line-faint: rgba(255, 255, 250, 0.04);
+  --color-frost-line-soft: rgba(255, 255, 250, 0.055);
+  --color-frost-line: rgba(255, 255, 250, 0.075);
+  --color-frost-line-strong: rgba(255, 255, 250, 0.13);
+  --color-frost-fill-faint: rgba(255, 255, 250, 0.018);
+  --color-frost-fill-soft: rgba(255, 255, 250, 0.035);
+  --color-frost-fill-hover: rgba(255, 255, 250, 0.04);
+  --color-frost-fill-active: rgba(255, 255, 250, 0.075);
+  --color-frost-highlight: rgba(255, 255, 250, 0.18);
+  --color-frost-shadow-soft: rgba(0, 0, 0, 0.18);
+  --color-frost-shadow-medium: rgba(0, 0, 0, 0.22);
+  --color-frost-shadow-deep: rgba(0, 0, 0, 0.85);
+  --color-frost-indicator: rgba(222, 223, 217, 0.78);
+  --color-frame-panel: #303131;
+  --color-app-on-danger: #ffffff;
+  --color-scrollbar: rgba(235, 235, 229, 0.16);
+  --color-scrollbar-hover: rgba(235, 235, 229, 0.25);
+  --color-scrollbar-active: rgba(235, 235, 229, 0.34);
+  --color-scrollbar-firefox: rgba(235, 235, 229, 0.18);
+  --fill-frost-shell: radial-gradient(circle at 50% -18%, rgba(255, 255, 250, 0.035), transparent 42%);
+  --fill-frost-active: linear-gradient(180deg, rgba(255, 255, 250, 0.055), rgba(255, 255, 250, 0.025));
+  --fill-frost-frame: linear-gradient(180deg, rgba(255, 255, 250, 0.018), transparent 18%);
 
   --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
   --duration-ui-fast: 150ms;
@@ -77,7 +103,7 @@
   --color-foreground: var(--color-app-text);
   --color-card: var(--color-app-surface);
   --color-card-foreground: var(--color-app-text);
-  --color-popover: var(--color-app-surface);
+  --color-popover: var(--color-app-elevated);
   --color-popover-foreground: var(--color-app-text);
   --color-primary: var(--color-app-primary);
   --color-primary-foreground: var(--color-app-primary-foreground);
@@ -95,11 +121,5 @@
 }
 
 :root {
-  --app-logo-gradient: conic-gradient(
-    from 45deg,
-    #d5b469 0 25%,
-    #8d7442 0 50%,
-    #344255 0 75%,
-    #687586 0
-  );
+  --app-frost-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
 }

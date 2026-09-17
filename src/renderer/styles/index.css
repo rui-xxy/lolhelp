@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./tokens.css";
 @import "./base.css";
+@import "./shell.css";
 @import "./primitives.css";
 @import "./features/friends.css";
 @import "./features/live.css";

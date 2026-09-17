@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
+  Activity,
   Bell,
-  ChartNoAxesColumnIncreasing,
-  Crosshair,
   BookmarkCheck,
+  ChartNoAxesColumnIncreasing,
+  History,
   Home,
   MailPlus,
   MessageCircleMore,
-  PanelLeft,
-  Radar,
+  ScanSearch,
   Settings,
-  Sparkles,
-  Swords,
   Users,
+  Wrench,
 } from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
 import type { ScoutHit, ScoutPlayerEvent, ScoutProgress } from '../../shared/api';
@@ -23,12 +22,12 @@ import { GameIcon } from './match/GameIcon';
 export type View = 'home' | 'matches' | 'live' | 'scout' | 'ranking' | 'assist';
 
 const NAV_ITEMS = [
-  { view: 'home', label: '主页', icon: Home },
-  { view: 'matches', label: '战绩', icon: Swords },
-  { view: 'live', label: '实时对局', icon: Radar },
-  { view: 'scout', label: '高手雷达', icon: Crosshair },
-  { view: 'ranking', label: '英雄排行', icon: ChartNoAxesColumnIncreasing },
-  { view: 'assist', label: '辅助功能', icon: Sparkles },
+  { view: 'home', label: '概览', title: '主页概览', icon: Home },
+  { view: 'matches', label: '战绩', title: '历史战绩', icon: History },
+  { view: 'live', label: '实时', title: '实时对局', icon: Activity },
+  { view: 'scout', label: '雷达', title: '高手雷达', icon: ScanSearch },
+  { view: 'ranking', label: '排行', title: '英雄排行', icon: ChartNoAxesColumnIncreasing },
+  { view: 'assist', label: '工具', title: '辅助功能', icon: Wrench },
 ] as const;
 
 export interface ScoutSidebarStatus {
@@ -345,33 +344,31 @@ export function AppShell({
   const toggleSidebar = () => setCollapsed((value) => !value);
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-app-shell text-app-text">
+    <div className="app-shell">
       <aside
-        className="relative z-10 flex shrink-0 flex-col border-r border-app-border/70 bg-app-sidebar pt-11 transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
+        className="app-shell-sidebar"
+        data-collapsed={effectiveCollapsed ? 'true' : 'false'}
         style={{ width: `${sidebarWidth}px` }}
       >
-        <div className="absolute inset-x-0 top-0 h-11 [-webkit-app-region:drag]" aria-hidden="true" />
-        <div className="flex h-12 shrink-0 [-webkit-app-region:drag]">
+        <div className="app-shell-drag-region" aria-hidden="true" />
+        <div className="app-shell-brand-row">
           <button
             onClick={toggleSidebar}
             title={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
             aria-label={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-            className="group flex h-12 w-full items-center gap-2.5 px-3 text-left transition-colors [-webkit-app-region:no-drag] hover:bg-app-nav-hover"
+            className="app-shell-brand"
           >
-            <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-app-primary/25 bg-app-primary-soft shadow-[var(--shadow-ui-sm)] transition-colors group-hover:border-app-primary/45">
-              <span className="absolute inset-[5px] rotate-45 rounded-[3px] bg-[image:var(--app-logo-gradient)] transition-opacity group-hover:opacity-0" />
-              <span className="absolute inset-[8px] rotate-45 rounded-[2px] bg-app-surface-soft transition-opacity group-hover:opacity-0" />
-              <Sparkles className="absolute size-3.5 text-app-primary-foreground transition-opacity group-hover:opacity-0" />
-              <PanelLeft className="absolute size-4 text-app-primary opacity-0 transition-opacity group-hover:opacity-100" />
-            </span>
+            <span className="app-shell-brand-mark" aria-hidden="true">L</span>
             {!effectiveCollapsed && (
-              <span className="truncate text-sm font-semibold tracking-tight">LOL助手</span>
+              <span className="app-shell-brand-copy">
+                <span className="app-shell-brand-title">LOL 助手</span>
+              </span>
             )}
           </button>
         </div>
 
-        <nav className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
-          {NAV_ITEMS.map((item, index) => {
+        <nav className="app-shell-nav">
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = activeView === item.view;
             return (
@@ -379,17 +376,13 @@ export function AppShell({
                 key={item.view}
                 type="button"
                 onClick={() => onNavigate(item.view)}
-                title={effectiveCollapsed ? item.label : undefined}
+                title={effectiveCollapsed ? item.title : undefined}
+                aria-label={item.title}
                 aria-current={active ? 'page' : undefined}
-                className={`group relative flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] font-medium transition-colors ${
-                  index > 0 ? 'mt-1' : ''
-                } ${
-                  active
-                    ? 'bg-app-selected text-app-text before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-app-primary'
-                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                }`}
+                data-active={active ? 'true' : 'false'}
+                className="app-shell-nav-item"
               >
-                <Icon className={`size-4 shrink-0 transition-colors ${active ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-body'}`} />
+                <Icon className="app-shell-nav-icon" />
                 {!effectiveCollapsed && <span className="truncate">{item.label}</span>}
               </button>
             );
@@ -402,48 +395,37 @@ export function AppShell({
           />
         </nav>
 
-        <div className="shrink-0 border-t border-app-border p-2">
+        <div className="app-shell-sidebar-footer">
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
               title={effectiveCollapsed ? '设置' : undefined}
-              className={`group flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] font-medium transition-colors ${
-                settingsOpen
-                  ? 'bg-app-selected text-app-text'
-                  : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-              }`}
+              data-active={settingsOpen ? 'true' : 'false'}
+              className="app-shell-nav-item"
             >
-              <Settings className={`size-4 shrink-0 transition-colors ${settingsOpen ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-body'}`} />
+              <Settings className="app-shell-nav-icon" />
               {!effectiveCollapsed && <span className="truncate">设置</span>}
             </button>
           )}
         </div>
       </aside>
 
-      <div
-        className="relative z-10 flex min-w-0 flex-none pt-11 pr-2 pb-2"
-        style={{ width: `${workspaceWidth}px` }}
-      >
-        <header className={`absolute top-0 right-2 left-0 z-30 flex h-11 items-center gap-3 pl-3 [-webkit-app-region:drag] ${
-          friendPanelHidden ? 'pr-[138px]' : 'pr-1'
-        }`}>
+      <div className="app-shell-workspace" style={{ width: `${workspaceWidth}px` }}>
+        <header className={`app-shell-header ${friendPanelHidden ? 'app-shell-header--friend-hidden' : ''}`}>
           {headerExtra ? (
             <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
           ) : (
-            <span className="text-[13px] font-semibold tracking-tight text-app-body">{title}</span>
+            <span className="app-shell-header-title">{title}</span>
           )}
           {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onOpenFriendManager || onToggleFriendPanel) && (
-            <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
+            <div className="app-shell-header-actions">
               {onOpenSavedMatches && (
                 <button
                   type="button"
                   onClick={onOpenSavedMatches}
-                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
-                    savedMatchesOpen
-                      ? 'bg-app-selected text-app-text'
-                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                  }`}
+                  data-active={savedMatchesOpen ? 'true' : 'false'}
+                  className="app-shell-icon-action"
                   title="保存的战绩"
                   aria-label="保存的战绩"
                 >
@@ -454,17 +436,14 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={onOpenFollowAccounts}
-                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
-                    followAccountsOpen
-                      ? 'bg-app-selected text-app-text'
-                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                  }`}
+                  data-active={followAccountsOpen ? 'true' : 'false'}
+                  className="app-shell-icon-action"
                   title="关注账号"
                   aria-label="关注账号"
                 >
                   <Bell className="size-4" />
                   {followAlertCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-app-primary-foreground shadow-sm ring-2 ring-app-surface">
+                    <span className="app-shell-alert-badge">
                       {followAlertCount > 99 ? '99+' : followAlertCount}
                     </span>
                   )}
@@ -474,11 +453,8 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={onOpenChatSessions}
-                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
-                    chatSessionsOpen
-                      ? 'bg-app-selected text-app-text'
-                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                  }`}
+                  data-active={chatSessionsOpen ? 'true' : 'false'}
+                  className="app-shell-icon-action"
                   title="会话管理"
                   aria-label="会话管理"
                 >
@@ -489,17 +465,14 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={onOpenFriendManager}
-                  className={`relative flex size-8 items-center justify-center rounded-sm transition-colors ${
-                    friendManagerOpen
-                      ? 'bg-app-selected text-app-text'
-                      : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                  }`}
+                  data-active={friendManagerOpen ? 'true' : 'false'}
+                  className="app-shell-icon-action"
                   title="好友申请"
                   aria-label="好友申请"
                 >
                   <MailPlus className="size-4" />
                   {friendRequestAlertCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[10px] font-bold leading-none text-app-primary-foreground shadow-sm ring-2 ring-app-surface">
+                    <span className="app-shell-alert-badge">
                       {friendRequestAlertCount > 99 ? '99+' : friendRequestAlertCount}
                     </span>
                   )}
@@ -509,11 +482,8 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={onToggleFriendPanel}
-                  className={`flex size-8 items-center justify-center rounded-sm transition-colors ${
-                    friendPanelHidden
-                      ? 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                      : 'bg-app-selected text-app-text hover:bg-app-nav-hover'
-                  }`}
+                  data-active={friendPanelHidden ? 'false' : 'true'}
+                  className="app-shell-icon-action"
                   title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
                   aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
                 >
@@ -524,10 +494,10 @@ export function AppShell({
           )}
         </header>
 
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-app-border/80 bg-app-bg shadow-[var(--shadow-ui-shell)]">
-        <main className={`flex-1 overflow-y-auto bg-app-bg ${fullBleed ? '' : 'p-8'}`}>
-          <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
-        </main>
+        <section className="app-shell-frame">
+          <main className={`app-shell-main ${fullBleed ? '' : 'p-8'}`}>
+            <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
+          </main>
         </section>
       </div>
 

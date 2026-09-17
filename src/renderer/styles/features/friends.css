@@ -14,7 +14,7 @@
     min-width: 280px;
     overflow: hidden;
     border: 1px solid var(--color-app-border);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-ui-shell);
     opacity: 1;
     transform: translateX(0);

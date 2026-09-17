@@ -6,8 +6,8 @@ export const APP_LAYOUT = {
   minWindowHeight: 760,
   friendPanelWidth: 288,
   hiddenFriendPanelWidth: 0,
-  expandedSidebarWidth: 216,
-  collapsedSidebarWidth: 60,
+  expandedSidebarWidth: 200,
+  collapsedSidebarWidth: 52,
 } as const;
 
 export const LOL_REGIONS = [
