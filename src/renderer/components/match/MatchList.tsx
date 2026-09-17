@@ -1,4 +1,5 @@
 import type { PlayerMatchDetail } from '../../../shared/api';
+import { ChevronRight } from 'lucide-react';
 import { ProfileIcon } from '../ProfileIcon';
 import { GameIcon } from './GameIcon';
 
@@ -59,7 +60,7 @@ export function MatchList({
   }
 
   return (
-    <div className="flex h-full flex-col gap-0.5 overflow-hidden">
+    <div className="flex h-full flex-col gap-0 overflow-hidden">
       {matches.map((match) => {
         const isSelected = match.gameId === selectedGameId;
         const isChecked = selectedIds?.has(match.gameId) ?? false;
@@ -70,8 +71,9 @@ export function MatchList({
         const matesInThisGame = match.participants
           .filter((participant) => participant.teamId === myTeam)
           .filter((participant) => participant.puuid !== targetPuuid)
-          .filter((participant) => recurringMates.has(participant.puuid))
-          .slice(0, 3);
+          .filter((participant) => recurringMates.has(participant.puuid));
+        const visibleMates = matesInThisGame.slice(0, 2);
+        const hiddenMateCount = Math.max(0, matesInThisGame.length - visibleMates.length);
 
         return (
           <button
@@ -114,16 +116,16 @@ export function MatchList({
                   <span className="match-result-mode">{match.queueName}</span>
                   <span className="match-result-badge">{match.win ? '胜利' : '失败'}</span>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums">
-                  <span className="text-app-muted">
+                <div className="mt-0.5 flex items-center gap-2 tabular-nums">
+                  <span className="match-result-kda">
                     {match.kills}/{match.deaths}/{match.assists}
                   </span>
                 </div>
               </div>
 
-              {matesInThisGame.length > 0 && (
-                <div className="group/mates ml-1 flex shrink-0 items-center">
-                  {matesInThisGame.map((mate, index) => {
+              {visibleMates.length > 0 && (
+                <div className="match-result-mates ml-1 flex shrink-0 items-center" aria-label="常一起游戏的队友">
+                  {visibleMates.map((mate, index) => {
                     const info = recurringMates.get(mate.puuid);
                     if (!info) return null;
                     return (
@@ -133,24 +135,32 @@ export function MatchList({
                         src={info.profileIconUrl}
                         alt={info.riotId}
                         title={`${info.riotId}（一起 ${info.count} 场）`}
-                        size={24}
+                        size={20}
                         onClick={(event) => {
                           event.stopPropagation();
                           if (!selectionMode) {
                             onMateClick(info.riotId);
                           }
                         }}
-                        className="size-6 cursor-pointer rounded-full border border-app-surface object-cover transition-transform hover:z-10 hover:scale-105"
-                        style={{ marginLeft: index === 0 ? 0 : -8, zIndex: index }}
+                        className="match-result-mate-avatar size-5 cursor-pointer rounded-full object-cover"
+                        style={{ marginLeft: index === 0 ? 0 : -5 }}
                       />
                     );
                   })}
+                  {hiddenMateCount > 0 && (
+                    <span className="match-result-mate-more" title={`还有 ${hiddenMateCount} 名常一起游戏的队友`}>
+                      +{hiddenMateCount}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="match-result-time">
-              <div className="match-result-time-value">{playedAt}</div>
+            <div className="match-result-meta">
+              <div className="match-result-time">
+                <div className="match-result-time-value">{playedAt}</div>
+              </div>
+              {!selectionMode && <ChevronRight className="match-result-open-affordance" aria-hidden="true" />}
             </div>
           </button>
         );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, MailPlus, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, MailPlus, PanelRightOpen, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
@@ -91,20 +91,20 @@ function QueueFilterMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-8 min-w-[102px] items-center justify-between gap-2 rounded-sm border px-2.5 text-xs transition-[background-color,border-color,box-shadow] ${
+        className={`group flex h-8 min-w-[88px] items-center justify-between gap-1.5 rounded-sm border px-2 text-xs outline-none transition-[background-color,border-color,color] ${
           open
-            ? 'border-app-border-strong bg-app-surface shadow-ui-neutral-ring'
-            : 'border-app-border-strong bg-app-surface shadow-ui-neutral-sm hover:border-app-primary/25'
+            ? 'border-app-border bg-app-nav-hover text-app-text'
+            : 'border-transparent bg-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover'
         }`}
       >
-        <span className="truncate text-app-body">{activeFilter.name}</span>
-        <ChevronDown className={`size-3.5 text-app-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="truncate font-medium">{activeFilter.name}</span>
+        <ChevronDown className={`size-3.5 text-app-subtle transition-transform duration-150 group-hover:text-app-muted ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute top-10 right-0 z-30 w-40 rounded-md border border-app-border bg-app-surface p-1 shadow-[var(--shadow-ui-popover)]"
+          className="absolute top-9 right-0 z-30 w-40 rounded-md border border-app-border-strong bg-app-surface p-1 shadow-[var(--shadow-ui-popover)]"
         >
           {QUEUE_FILTERS.map((filter) => {
             const selected = filter.key === activeFilter.key;
@@ -118,10 +118,10 @@ function QueueFilterMenu({
                   setOpen(false);
                   if (!selected) onChange(filter.key);
                 }}
-                className={`flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-xs transition-colors ${
+                className={`flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-xs outline-none transition-colors ${
                   selected
-                    ? 'bg-app-selected font-medium text-app-text'
-                    : 'text-app-body hover:bg-app-nav-hover hover:text-app-text'
+                    ? 'bg-app-nav-hover font-medium text-app-text'
+                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover'
                 }`}
               >
                 <Check className={`size-3.5 ${selected ? 'opacity-100' : 'opacity-0'}`} />
@@ -872,15 +872,31 @@ export function MatchHistoryPage({
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
-      <div className="flex h-11 shrink-0 items-center border-b border-app-border bg-app-surface px-2 [-webkit-app-region:no-drag]">
-        <div className="scrollbar-none flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden py-1.5">
+      <div className="flex h-10 shrink-0 items-end border-b border-app-border bg-app-bg-soft px-1 [-webkit-app-region:no-drag]">
+        <div
+          role="tablist"
+          aria-label="已打开玩家"
+          className="scrollbar-none flex h-full min-w-0 flex-1 items-end gap-0 overflow-x-auto overflow-y-hidden"
+        >
           {tabs.map((tab) => {
             const tabLabel = getTabLabel(tab);
             const isPressedOrDragging = tab.id === draggingTabId || tab.id === pressedTabId;
+            const isActive = tab.id === activeTabId;
             return (
               <div
                 key={tab.id}
                 draggable
+                role="tab"
+                tabIndex={0}
+                aria-selected={isActive}
+                title={tabLabel}
+                onClick={() => setActiveTabId(tab.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setActiveTabId(tab.id);
+                  }
+                }}
                 onMouseDown={(event) => {
                   if (event.button === 0) setPressedTabId(tab.id);
                 }}
@@ -901,41 +917,30 @@ export function MatchHistoryPage({
                   handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
                 }}
                 onDrop={(event) => event.preventDefault()}
-                className={`group flex h-8 min-w-[108px] max-w-52 shrink-0 items-center gap-2 rounded-md border px-2.5 pr-1.5 text-xs transition-[background-color,color,border-color,opacity,transform,box-shadow] duration-150 ${
-                  isPressedOrDragging ? 'cursor-grabbing' : 'cursor-default'
-                } ${
-                  tab.id === activeTabId
-                    ? 'border-app-border bg-app-selected text-app-text shadow-[var(--shadow-ui-sm)]'
-                    : 'border-transparent bg-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                } ${tab.id === draggingTabId ? 'z-10 scale-[0.98] opacity-[0.65] shadow-airbnb' : ''}`}
+                className={
+                  'group relative flex h-9 min-w-[124px] max-w-56 shrink-0 cursor-pointer items-center gap-2 border-r border-app-border/60 px-2.5 pr-1.5 text-xs outline-none transition-[background-color,color,opacity] duration-150 ' +
+                  (isPressedOrDragging ? 'cursor-grabbing ' : '') +
+                  (isActive
+                    ? 'bg-app-surface text-app-text '
+                    : 'bg-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover ') +
+                  (tab.id === draggingTabId ? 'z-10 opacity-60' : '')
+                }
               >
-                <button
-                  type="button"
-                  onClick={() => setActiveTabId(tab.id)}
-                  className="flex min-w-0 flex-1 cursor-inherit items-center gap-2 text-left"
+                {isActive && (
+                  <span className="pointer-events-none absolute right-3 bottom-[-1px] left-3 h-px bg-app-text" />
+                )}
+                <ProfileIcon
+                  iconId={tab.result?.profile.profileIconId}
+                  src={tab.result?.profile.profileIconUrl}
+                  alt={tabLabel}
                   title={tabLabel}
-                >
-                  <ProfileIcon
-                    iconId={tab.result?.profile.profileIconId}
-                    src={tab.result?.profile.profileIconUrl}
-                    alt={tabLabel}
-                    title={tabLabel}
-                    size={22}
-                    className={`ring-1 ${
-                      tab.id === activeTabId ? 'ring-app-border-strong' : 'ring-app-border'
-                    }`}
-                  />
-                  <span
-                    className={`min-w-0 truncate ${
-                      tab.id === activeTabId ? 'font-semibold text-app-text' : 'font-medium'
-                    }`}
-                  >
-                    {tabLabel}
-                  </span>
-                  {tab.loading && (
-                    <span className="size-1.5 shrink-0 rounded-full bg-app-primary shadow-ui-focus" />
-                  )}
-                </button>
+                  size={20}
+                  className={isActive ? 'ring-1 ring-app-border-strong' : 'ring-1 ring-app-border/70'}
+                />
+                <span className={isActive ? 'min-w-0 flex-1 truncate font-semibold text-app-text' : 'min-w-0 flex-1 truncate font-medium'}>
+                  {tabLabel}
+                </span>
+                {tab.loading && <span className="size-1.5 shrink-0 rounded-full bg-app-primary" />}
                 <button
                   type="button"
                   title="关闭"
@@ -945,9 +950,10 @@ export function MatchHistoryPage({
                     event.stopPropagation();
                     handleCloseTab(tab.id);
                   }}
-                  className={`flex size-5 shrink-0 items-center justify-center rounded-sm text-app-subtle transition-[background-color,color,opacity] hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus:opacity-100 ${
-                    tab.id === activeTabId ? 'opacity-60' : 'opacity-0'
-                  }`}
+                  className={
+                    'flex size-5 shrink-0 items-center justify-center rounded-sm text-app-subtle outline-none transition-[background-color,color,opacity] hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus-visible:bg-app-nav-hover focus-visible:text-app-text focus-visible:opacity-100 ' +
+                    (isActive ? 'opacity-55' : 'opacity-0')
+                  }
                 >
                   <X className="size-3" />
                 </button>
@@ -960,7 +966,7 @@ export function MatchHistoryPage({
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
         <div className="flex w-[292px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           {activeTab && (
-            <div className="relative shrink-0 border-b border-app-border bg-app-surface px-3 py-3">
+            <div className="relative shrink-0 border-b border-app-border bg-app-bg-soft px-3 py-2.5">
               <div className="flex items-center gap-2">
                 {activeTab.result?.profile ? (
                   <button
@@ -969,10 +975,8 @@ export function MatchHistoryPage({
                     onClick={() =>
                       setProfilePanelTabId((current) => (current === activeTab.id ? null : activeTab.id))
                     }
-                    className={`flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 text-left transition-colors disabled:cursor-default disabled:opacity-50 ${
-                      isProfilePanelOpen
-                        ? 'bg-app-selected text-app-text'
-                        : 'text-app-body hover:bg-app-nav-hover hover:text-app-text'
+                    className={`group flex h-8 min-w-0 flex-1 items-center gap-2.5 text-left outline-none transition-colors disabled:cursor-default disabled:opacity-50 ${
+                      isProfilePanelOpen ? 'text-app-text' : 'text-app-body hover:text-app-text'
                     }`}
                     title={activeTab.result.profile.riotId}
                   >
@@ -980,22 +984,27 @@ export function MatchHistoryPage({
                       iconId={activeTab.result.profile.profileIconId}
                       src={activeTab.result.profile.profileIconUrl}
                       alt={getDisplayName(activeTab.result.profile.riotId)}
-                      size={28}
-                      className="ring-1 ring-app-border"
+                      size={26}
+                      className="ring-1 ring-app-border transition-[box-shadow] group-hover:ring-app-border-strong"
                     />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
                       {getDisplayName(activeTab.result.profile.riotId)}
                     </span>
+                    <PanelRightOpen
+                      className={`size-3.5 shrink-0 text-app-subtle transition-[color,opacity] ${
+                        isProfilePanelOpen ? 'opacity-100 text-app-muted' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                    />
                   </button>
                 ) : (
-                  <div className="flex h-10 min-w-0 flex-1 items-center text-xs text-app-subtle">
+                  <div className="flex h-8 min-w-0 flex-1 items-center text-xs text-app-subtle">
                     {activeTab.loading ? '正在读取玩家...' : '暂无玩家信息'}
                   </div>
                 )}
                 <QueueFilterMenu value={activeTab.filterQueue} onChange={handleFilterChange} />
               </div>
 
-              <div className="mt-2 flex h-7 items-center justify-between gap-2 border-t border-app-border pt-2 text-[11px] text-app-muted">
+              <div className="mt-1.5 flex h-6 items-center justify-between gap-2 text-[10px] text-app-muted">
                 <div className="min-w-0 truncate tabular-nums">
                   {activeTab.loading ? (
                     <span className="text-app-subtle">加载战绩中...</span>
@@ -1004,28 +1013,29 @@ export function MatchHistoryPage({
                       <span className="font-medium text-app-success">
                         {activeTab.matches.filter((match) => match.win).length} 胜
                       </span>
-                      <span className="mx-1.5 text-app-border-strong">/</span>
+                      <span className="mx-1.5 text-app-border-strong">·</span>
                       <span className="font-medium text-app-danger">
                         {activeTab.matches.filter((match) => !match.win).length} 负
                       </span>
-                      <span className="ml-2 text-app-subtle">已加载 {activeTab.matches.length} 场</span>
-                      {activeTab.pageLoading && <span className="ml-1.5 text-app-primary">读取中</span>}
+                      <span className="mx-1.5 text-app-border-strong">·</span>
+                      <span className="text-app-subtle">{activeTab.matches.length} 场</span>
+                      {activeTab.pageLoading && <span className="ml-1.5 text-app-body">读取中</span>}
                     </>
                   ) : (
                     <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-0.5">
                   {!isSaveMode && activeTab.result?.profile.riotId && (
                     <button
                       type="button"
+                      aria-label={addingFriendTabId === activeTab.id ? '正在发送好友请求' : '添加好友'}
                       disabled={addingFriendTabId === activeTab.id}
                       onClick={() => void handleAddCurrentPlayerFriend()}
-                      className="flex h-6 items-center gap-1 rounded-sm px-1.5 text-[11px] font-medium text-app-muted transition-colors hover:bg-app-primary-soft hover:text-app-primary disabled:opacity-50"
-                      title="添加好友"
+                      className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover focus-visible:text-app-body disabled:opacity-40"
+                      title={addingFriendTabId === activeTab.id ? '发送中' : '添加好友'}
                     >
-                      <MailPlus className="size-3" />
-                      {addingFriendTabId === activeTab.id ? '发送中' : '加好友'}
+                      <MailPlus className="size-3.5" />
                     </button>
                   )}
                   {isSaveMode ? (
@@ -1034,42 +1044,44 @@ export function MatchHistoryPage({
                         type="button"
                         disabled={selectedSaveCount === 0}
                         onClick={() => void handleSaveSelectedMatches()}
-                        className="h-6 rounded-sm bg-app-primary px-2 text-[11px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
+                        className="h-6 rounded-sm bg-app-primary px-2 text-[10px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
                       >
                         保存{selectedSaveCount > 0 ? selectedSaveCount : ''}
                       </button>
                       <button
                         type="button"
                         onClick={stopSaveMode}
-                        className="h-6 rounded-sm px-2 text-[11px] text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+                        className="h-6 rounded-sm px-2 text-[10px] text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
                       >
                         取消
                       </button>
                     </>
                   ) : activeTab.source === 'saved' ? (
-                    <span className="h-6 rounded-sm bg-app-surface-soft px-2 leading-6 text-[11px] font-medium text-app-muted">
-                      本地保存
+                    <span className="h-6 px-1.5 leading-6 text-[10px] font-medium text-app-subtle">
+                      已保存
                     </span>
                   ) : (
                     <button
                       type="button"
+                      aria-label="保存战绩"
+                      title="保存战绩"
                       onClick={() => {
                         setProfilePanelTabId(null);
                         setSaveModeTabId(activeTab.id);
                       }}
-                      className="h-6 rounded-sm px-2 text-[11px] font-medium text-app-primary transition-colors hover:bg-app-primary-soft"
+                      className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover focus-visible:text-app-body"
                     >
-                      保存战绩
+                      <BookmarkPlus className="size-3.5" />
                     </button>
                   )}
                 </div>
               </div>
               {friendNotice?.tabId === activeTab.id && (
                 <div
-                  className={`absolute right-3 top-[calc(100%_-_2px)] z-30 max-w-[250px] rounded-sm border px-2.5 py-1.5 text-[11px] shadow-md ${
+                  className={`absolute right-3 top-[calc(100%_-_2px)] z-30 max-w-[250px] rounded-sm border bg-app-surface px-2.5 py-1.5 text-[11px] shadow-[var(--shadow-ui-popover)] ${
                     friendNotice.success
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-app-danger/20 bg-app-danger/10 text-app-danger'
+                      ? 'border-app-success/20 text-app-success'
+                      : 'border-app-danger/20 text-app-danger'
                   }`}
                 >
                   {friendNotice.message}
@@ -1112,7 +1124,7 @@ export function MatchHistoryPage({
           </div>
 
           {activeTab && activeTab.matches.length > 0 && (
-            <div className="shrink-0 border-t border-app-border bg-app-surface px-3 py-2">
+            <div className="shrink-0 border-t border-app-border bg-app-bg-soft px-3 py-1">
               <div className="mx-auto flex h-7 w-max max-w-full items-center gap-0.5">
                 <button
                   type="button"
@@ -1120,7 +1132,7 @@ export function MatchHistoryPage({
                   aria-label="上一页"
                   disabled={activeTab.loading || activeTab.pageLoading || activeTab.currentPage <= 1}
                   onClick={() => handlePageChange(activeTab.currentPage - 1)}
-                  className="flex size-6 items-center justify-center rounded-sm text-app-muted transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-text disabled:opacity-25"
+                  className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-body focus-visible:bg-app-nav-hover disabled:opacity-20"
                 >
                   <ChevronLeft className="size-3.5" />
                 </button>
@@ -1131,10 +1143,10 @@ export function MatchHistoryPage({
                       type="button"
                       disabled={activeTab.loading || activeTab.pageLoading}
                       onClick={() => handlePageChange(page)}
-                      className={`h-6 min-w-6 rounded-sm px-1.5 text-[11px] font-medium tabular-nums transition-colors ${
+                      className={`relative h-6 min-w-6 px-1.5 text-[10px] font-medium tabular-nums outline-none transition-colors ${
                         page === activeTab.currentPage
-                          ? 'bg-app-primary-soft text-app-primary'
-                          : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
+                          ? 'text-app-text after:absolute after:right-1.5 after:bottom-0 after:left-1.5 after:h-px after:bg-app-text'
+                          : 'text-app-subtle hover:text-app-body focus-visible:text-app-body'
                       }`}
                     >
                       {page}
@@ -1151,7 +1163,7 @@ export function MatchHistoryPage({
                     (activeTab.currentPage >= totalPages && !activeTab.hasMore)
                   }
                   onClick={() => handlePageChange(activeTab.currentPage + 1)}
-                  className="flex size-6 items-center justify-center rounded-sm text-app-muted transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-text disabled:opacity-25"
+                  className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-body focus-visible:bg-app-nav-hover disabled:opacity-20"
                 >
                   <ChevronRight className="size-3.5" />
                 </button>

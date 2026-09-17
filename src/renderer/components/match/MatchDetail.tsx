@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Download, LoaderCircle } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
@@ -484,6 +484,8 @@ function rankDisplay(rank: PlayerRankSummary | null): string {
 
 export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlayerSearch }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [contentTab, setContentTab] = useState<DetailTab>('overview');
+  const [, startTabTransition] = useTransition();
   const [timelineResult, setTimelineResult] = useState<MatchTimelineResult | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [rankByPuuid, setRankByPuuid] = useState<Record<string, PlayerRankSummary[]>>({});
@@ -541,6 +543,12 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
     const timer = window.setTimeout(() => setReplayNotice(null), 5_000);
     return () => window.clearTimeout(timer);
   }, [replayNotice]);
+
+  const handleTabChange = (nextTab: DetailTab) => {
+    if (nextTab === activeTab) return;
+    setActiveTab(nextTab);
+    startTabTransition(() => setContentTab(nextTab));
+  };
 
   const handleReplayAction = async () => {
     if (replayPhase !== 'idle' || !replayAvailability?.available || replayAvailability.state === 'downloading') return;
@@ -679,7 +687,7 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
             role="tab"
             aria-selected={activeTab === tab.key}
             className={`lol-postgame-tab ${activeTab === tab.key ? 'lol-postgame-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
           >
             {tab.label}
           </button>
@@ -715,7 +723,7 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
       </div>
 
       <div className="lol-postgame-content">
-        {activeTab === 'overview' && (
+        {contentTab === 'overview' && (
           useRiftScoreboard ? (
             <RiftScoreboardTab
               participants={participants}
@@ -734,8 +742,8 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
             />
           )
         )}
-        {activeTab === 'details' && <DetailedTableTab participants={participants} targetPuuid={targetPuuid} />}
-        {activeTab === 'events' && (
+        {contentTab === 'details' && <DetailedTableTab participants={participants} targetPuuid={targetPuuid} />}
+        {contentTab === 'events' && (
           <EventsTab
             participants={participants}
             timeline={timelineResult?.timeline ?? null}
@@ -743,14 +751,14 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
             error={timelineResult?.error}
           />
         )}
-        {activeTab === 'builds' && (
+        {contentTab === 'builds' && (
           <BuildsTab
             participants={participants}
             timeline={timelineResult?.timeline ?? null}
             targetPuuid={targetPuuid}
           />
         )}
-        {activeTab === 'timeline' && (
+        {contentTab === 'timeline' && (
           <TimelineTab
             participants={participants}
             timeline={timelineResult?.timeline ?? null}
@@ -1265,6 +1273,32 @@ function StatsMetricComparison({
   );
 }
 
+function StatsMetricLabel({
+  metric,
+  participants,
+}: {
+  metric: StatsMetric;
+  participants: MatchParticipantSummary[];
+}) {
+  const [showComparison, setShowComparison] = useState(false);
+
+  return (
+    <div
+      className="lol-stats-label"
+      tabIndex={0}
+      aria-label={`${metric.label}，悬浮查看十名玩家对比`}
+      onMouseEnter={() => setShowComparison(true)}
+      onMouseLeave={() => setShowComparison(false)}
+      onFocus={() => setShowComparison(true)}
+      onBlur={() => setShowComparison(false)}
+    >
+      <span>{metric.label}</span>
+      <small>?</small>
+      {showComparison && <StatsMetricComparison metric={metric} participants={participants} />}
+    </div>
+  );
+}
+
 function DetailedTableTab({
   participants,
   targetPuuid,
@@ -1331,11 +1365,7 @@ function DetailedTableTab({
           <div className="lol-stats-group-title">{group.title}</div>
           {group.metrics.map((metric) => (
             <div key={metric.key} className="lol-stats-grid lol-stats-row" style={gridStyle}>
-              <div className="lol-stats-label" tabIndex={0} aria-label={`${metric.label}，悬浮查看十名玩家对比`}>
-                <span>{metric.label}</span>
-                <small>?</small>
-                <StatsMetricComparison metric={metric} participants={participants} />
-              </div>
+              <StatsMetricLabel metric={metric} participants={participants} />
               {participants.map((player) => (
                 <span
                   key={`${metric.key}-${player.puuid}`}

@@ -1,8 +1,9 @@
 import { Activity, memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Globe2, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { AppShell, type ScoutSidebarStatus, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
+import { MatchRegionPicker, type MatchRegionOption } from './components/match/MatchRegionPicker';
 import { FollowAccountsDialog, type FollowAccountRequest } from './components/match/FollowAccountsDialog';
 import { SavedMatchPickerDialog } from './components/match/SavedMatchPickerDialog';
 import {
@@ -264,8 +265,7 @@ export function App() {
     });
   }, []);
 
-  const regions = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
-  const formatRegionOption = (region: (typeof regions)[number]) => region.name;
+  const regions: MatchRegionOption[] = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
 
   const matchSearchBar = activeView === 'matches' ? (
     <form
@@ -273,23 +273,9 @@ export function App() {
         e.preventDefault();
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="flex h-8 items-stretch overflow-hidden rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-primary/40 focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
+      className="relative z-40 flex h-8 items-stretch rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-border-strong focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
     >
-      <div className="relative flex w-32 shrink-0 items-center border-r border-app-border bg-app-shell/45">
-        <Globe2 className="pointer-events-none absolute left-2.5 size-3.5 text-app-primary/75" />
-        <select
-          value={matchRegion}
-          onChange={(e) => setMatchRegion(e.target.value)}
-          className="h-full w-full appearance-none bg-transparent py-0 pr-7 pl-7 text-xs font-medium text-app-text outline-none"
-        >
-          {regions.map((r) => (
-            <option key={r.key} value={r.key} title={'description' in r ? r.description : undefined}>
-              {formatRegionOption(r)}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-app-subtle" />
-      </div>
+      <MatchRegionPicker value={matchRegion} options={regions} onChange={setMatchRegion} />
       <div className="relative flex items-center">
         <Search className="pointer-events-none absolute left-2.5 size-3.5 text-app-muted" />
         <input
@@ -302,7 +288,7 @@ export function App() {
       </div>
       <button
         type="submit"
-        className="shrink-0 bg-app-primary px-4 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover"
+        className="shrink-0 rounded-r-md bg-app-primary px-4 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover"
       >
         查询
       </button>

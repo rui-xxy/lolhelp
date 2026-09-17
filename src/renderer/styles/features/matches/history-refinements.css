@@ -1,39 +1,55 @@
 @layer components {
   .match-result-card {
-    min-height: 42px;
+    min-height: 48px;
     max-height: 48px;
-    flex: 1 1 44px;
-    gap: 8px;
+    flex: 0 0 48px;
+    gap: 9px;
     border: 0;
-    border-radius: var(--radius-sm);
-    padding: 0 8px 0 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-app-text) 4%, transparent);
+    border-radius: 0;
+    padding: 0 10px 0 12px;
     background: transparent;
     box-shadow: none;
     transform: none;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
   }
 
   .match-result-card::before {
     top: 50%;
     right: auto;
     bottom: auto;
-    left: 2px;
+    left: 0;
     z-index: 2;
     width: 2px;
-    height: 18px;
-    border-radius: 999px;
+    height: 24px;
+    border-radius: 0 999px 999px 0;
     background-image: none;
     background-color: transparent;
     opacity: 0;
     transform: translateY(-50%);
-    transition: opacity 150ms ease;
+    transition:
+      opacity 120ms ease,
+      height 120ms ease;
   }
 
   .match-result-card::after,
   .match-result-card--win::after,
   .match-result-card--loss::after {
+    inset: 4px;
     border-radius: var(--radius-sm);
-    background: var(--color-app-nav-hover);
+    background:
+      radial-gradient(
+        120px circle at 18% 50%,
+        color-mix(in srgb, var(--color-app-text) 4%, transparent),
+        transparent 72%
+      ),
+      color-mix(in srgb, var(--color-app-text) 2.4%, transparent);
     opacity: 0;
+    transition:
+      opacity 120ms ease,
+      background-color 120ms ease;
   }
 
   .match-result-card:hover,
@@ -46,15 +62,23 @@
   }
 
   .match-result-card:hover::after {
-    opacity: 0.7;
+    opacity: 1;
   }
 
   .match-result-card--selected::after {
+    background:
+      radial-gradient(
+        140px circle at 18% 50%,
+        color-mix(in srgb, var(--color-app-text) 6%, transparent),
+        transparent 74%
+      ),
+      color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
     opacity: 1;
   }
 
   .match-result-card--selected::before,
   .match-result-card--checked::before {
+    height: 28px;
     opacity: 1;
   }
 
@@ -85,13 +109,25 @@
   .match-result-avatar,
   .match-result-avatar--win,
   .match-result-avatar--loss {
-    border: 1px solid var(--color-app-border-strong);
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 12%, transparent);
+    border-radius: var(--radius-xs);
     box-shadow: none;
+    transition:
+      border-color 120ms ease,
+      filter 120ms ease;
+  }
+
+  .match-result-card:hover .match-result-avatar,
+  .match-result-card--selected .match-result-avatar {
+    border-color: color-mix(in srgb, var(--color-app-text) 22%, transparent);
+    filter: brightness(1.04);
   }
 
   .match-result-mode {
+    color: var(--color-app-body);
     font-size: 12px;
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .match-result-badge {
@@ -101,7 +137,7 @@
     padding: 0;
     background: transparent !important;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1;
     transform: none;
   }
@@ -114,31 +150,116 @@
     color: var(--color-app-danger);
   }
 
+  .match-result-kda {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .match-result-mates {
+    opacity: 0.82;
+    transition: opacity 120ms ease;
+  }
+
+  .match-result-card:hover .match-result-mates,
+  .match-result-card--selected .match-result-mates {
+    opacity: 1;
+  }
+
+  .match-result-mate-avatar {
+    position: relative;
+    border: 1px solid var(--color-app-bg-soft);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-text) 9%, transparent);
+    transition:
+      border-color 120ms ease,
+      filter 120ms ease;
+  }
+
+  .match-result-mate-avatar:hover {
+    z-index: 8;
+    border-color: var(--color-app-border-strong);
+    filter: brightness(1.08);
+  }
+
+  .match-result-mate-more {
+    position: relative;
+    z-index: 4;
+    display: inline-flex;
+    min-width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    margin-left: -4px;
+    border: 1px solid var(--color-app-bg-soft);
+    border-radius: 999px;
+    background: var(--color-app-surface-soft);
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .match-result-meta {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: 48px;
+    flex: 0 0 48px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+
   .match-result-time {
-    min-width: 40px;
+    min-width: 32px;
+    text-align: right;
   }
 
   .match-result-time-value {
+    color: var(--color-app-subtle);
     font-size: 10px;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    transition: color 120ms ease;
+  }
+
+  .match-result-open-affordance {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+    color: var(--color-app-subtle);
+    opacity: 0;
+    transform: translateX(-2px);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease,
+      color 120ms ease;
+  }
+
+  .match-result-card:hover .match-result-open-affordance,
+  .match-result-card--selected .match-result-open-affordance {
+    opacity: 0.72;
+    transform: translateX(0);
+  }
+
+  .match-result-card:hover .match-result-time-value,
+  .match-result-card--selected .match-result-time-value {
+    color: var(--color-app-muted);
   }
 
   .lol-rift-player-name,
   .lol-score-player-name {
     cursor: pointer;
-    transition:
-      color 140ms ease,
-      text-decoration-color 140ms ease;
+    transition: color 120ms ease;
   }
 
   .lol-rift-row .lol-rift-player-name:hover,
   .lol-rift-row .lol-rift-player-name:focus-visible,
   .lol-score-row .lol-score-player-name:hover,
   .lol-score-row .lol-score-player-name:focus-visible {
-    color: var(--color-app-primary);
-    text-decoration: underline;
-    text-decoration-color: rgba(213, 180, 105, 0.38);
-    text-underline-offset: 2px;
+    color: var(--color-app-text);
+    text-decoration: none;
     text-shadow: none;
     outline: none;
   }

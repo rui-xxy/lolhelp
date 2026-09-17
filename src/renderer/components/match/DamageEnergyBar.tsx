@@ -43,7 +43,7 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const particles: Firefly[] = [];
-    const spark = win ? { r: 226, g: 255, b: 247 } : { r: 255, g: 239, b: 244 };
+    const spark = win ? { r: 226, g: 241, b: 235 } : { r: 245, g: 224, b: 230 };
     const sparkColor = `rgb(${spark.r} ${spark.g} ${spark.b})`;
     let width = 1;
     let height = 1;
@@ -53,18 +53,18 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
     let elementVisible = false;
 
     const reset = (particle: Firefly, initial = false) => {
-      particle.x = initial ? random(0, width) : random(-14, -3);
-      particle.y = random(5, Math.max(6, height - 5));
-      particle.vx = random(12, 38);
-      particle.vy = random(-4, 4);
-      particle.targetVx = random(9, 52);
-      particle.targetVy = random(-15, 15);
-      particle.changeIn = random(0.14, 0.85);
-      particle.hesitateIn = random(0.45, 2.6);
+      particle.x = initial ? random(0, width) : random(-10, -2);
+      particle.y = random(6, Math.max(7, height - 6));
+      particle.vx = random(8, 24);
+      particle.vy = random(-2, 2);
+      particle.targetVx = random(10, 30);
+      particle.targetVy = random(-7, 7);
+      particle.changeIn = random(0.45, 1.5);
+      particle.hesitateIn = random(1.4, 4);
       particle.hesitateFor = 0;
-      particle.radius = random(0.75, 1.45);
+      particle.radius = random(0.45, 1.05);
       particle.phase = random(0, Math.PI * 2);
-      particle.flickerRate = random(2.2, 6.2);
+      particle.flickerRate = random(1.2, 3.4);
       particle.history = [];
     };
 
@@ -83,7 +83,7 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
       canvas.height = Math.max(1, Math.round(height * dpr));
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const desired = Math.max(5, Math.min(11, Math.round(width / 20)));
+      const desired = Math.max(3, Math.min(7, Math.round(width / 32)));
       while (particles.length < desired) particles.push(createParticle(true));
       if (particles.length > desired) particles.length = desired;
     };
@@ -93,24 +93,24 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
       particle.hesitateIn -= delta;
 
       if (particle.changeIn <= 0) {
-        particle.targetVx = random(8, 58);
-        particle.targetVy = random(-19, 19);
-        particle.changeIn = random(0.12, 0.82);
+        particle.targetVx = random(8, 34);
+        particle.targetVy = random(-9, 9);
+        particle.changeIn = random(0.4, 1.2);
       }
 
       if (particle.hesitateIn <= 0 && particle.hesitateFor <= 0) {
-        particle.hesitateFor = random(0.07, 0.3);
-        particle.hesitateIn = random(0.8, 3.1);
+        particle.hesitateFor = random(0.1, 0.24);
+        particle.hesitateIn = random(1.4, 4.2);
       }
 
-      const targetX = particle.hesitateFor > 0 ? random(1.5, 6) : particle.targetVx;
+      const targetX = particle.hesitateFor > 0 ? random(2, 5) : particle.targetVx;
       if (particle.hesitateFor > 0) particle.hesitateFor -= delta;
 
       const drift =
-        Math.sin(time * 0.0021 + particle.phase) * 4.8 +
-        Math.sin(time * 0.0053 + particle.phase * 1.7) * 2;
-      particle.vx += (targetX - particle.vx) * Math.min(1, delta * 2.4);
-      particle.vy += (particle.targetVy + drift - particle.vy) * Math.min(1, delta * 2.1);
+        Math.sin(time * 0.0017 + particle.phase) * 2.2 +
+        Math.sin(time * 0.0039 + particle.phase * 1.7);
+      particle.vx += (targetX - particle.vx) * Math.min(1, delta * 1.7);
+      particle.vy += (particle.targetVy + drift - particle.vy) * Math.min(1, delta * 1.5);
       particle.x += particle.vx * delta;
       particle.y += particle.vy * delta;
 
@@ -119,14 +119,14 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
       if (particle.y <= top) {
         particle.y = top;
         particle.vy = Math.abs(particle.vy) * 0.5;
-        particle.targetVy = random(4, 18);
+        particle.targetVy = random(3, 9);
       } else if (particle.y >= bottom) {
         particle.y = bottom;
         particle.vy = -Math.abs(particle.vy) * 0.5;
-        particle.targetVy = random(-18, -4);
+        particle.targetVy = random(-9, -3);
       }
 
-      const nextHistoryLength = Math.min(6, particle.history.length + 1);
+      const nextHistoryLength = Math.min(4, particle.history.length + 1);
       while (particle.history.length < nextHistoryLength) {
         particle.history.push({ x: particle.x, y: particle.y });
       }
@@ -148,21 +148,21 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
         for (let index = 1; index < particle.history.length; index++) {
           context.lineTo(particle.history[index].x, particle.history[index].y);
         }
-        context.globalAlpha = 0.16 * pulse;
+        context.globalAlpha = 0.09 * pulse;
         context.strokeStyle = sparkColor;
-        context.lineWidth = 0.65;
+        context.lineWidth = 0.55;
         context.stroke();
       }
 
-      context.globalAlpha = 0.1 * pulse;
+      context.globalAlpha = 0.055 * pulse;
       context.fillStyle = sparkColor;
       context.beginPath();
       context.arc(particle.x, particle.y, particle.radius * 4, 0, Math.PI * 2);
       context.fill();
 
-      context.globalAlpha = 0.44 + 0.42 * pulse;
+      context.globalAlpha = 0.28 + 0.3 * pulse;
       context.shadowColor = sparkColor;
-      context.shadowBlur = 5 + particle.radius * 2;
+      context.shadowBlur = 3 + particle.radius * 1.5;
       context.beginPath();
       context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
       context.fill();
