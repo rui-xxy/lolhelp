@@ -1,7 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { PlayerMatchDetail } from '../../../shared/api';
 import { ChevronRight } from 'lucide-react';
 import { ProfileIcon } from '../ProfileIcon';
 import { GameIcon } from './GameIcon';
+import { getHistoryDayKey } from './MatchActivityNavigator';
 
 export interface RecurringMate {
   puuid: string;
@@ -18,6 +21,7 @@ interface MatchListProps {
   recurringMates: Map<string, RecurringMate>;
   targetPuuid: string;
   onMateClick: (riotId: string) => void;
+  activeDayKey?: string | null;
   selectionMode?: boolean;
   selectedIds?: Set<number>;
   onToggleSelection?: (gameId: number) => void;
@@ -40,6 +44,17 @@ function formatPlayedAt(gameCreation: number): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+interface MatePeekState {
+  info: RecurringMate;
+  left: number;
+  top: number;
+}
+
+interface MateClickPulse {
+  left: number;
+  top: number;
+}
+
 export function MatchList({
   matches,
   selectedGameId,
@@ -47,10 +62,57 @@ export function MatchList({
   recurringMates,
   targetPuuid,
   onMateClick,
+  activeDayKey = null,
   selectionMode = false,
   selectedIds,
   onToggleSelection,
 }: MatchListProps) {
+  const [matePeek, setMatePeek] = useState<MatePeekState | null>(null);
+  const [mateClickPulse, setMateClickPulse] = useState<MateClickPulse | null>(null);
+  const peekTimerRef = useRef<number | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (peekTimerRef.current !== null) window.clearTimeout(peekTimerRef.current);
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+    };
+  }, []);
+
+  const hideMatePeek = () => {
+    if (peekTimerRef.current !== null) {
+      window.clearTimeout(peekTimerRef.current);
+      peekTimerRef.current = null;
+    }
+    setMatePeek(null);
+  };
+
+  const scheduleMatePeek = (info: RecurringMate, element: HTMLElement) => {
+    if (peekTimerRef.current !== null) window.clearTimeout(peekTimerRef.current);
+    const rect = element.getBoundingClientRect();
+    peekTimerRef.current = window.setTimeout(() => {
+      setMatePeek({
+        info,
+        left: rect.left + rect.width / 2,
+        top: rect.top - 8,
+      });
+      peekTimerRef.current = null;
+    }, 280);
+  };
+
+  const pulseMate = (element: HTMLElement) => {
+    if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+    const rect = element.getBoundingClientRect();
+    setMateClickPulse({
+      left: rect.left + rect.width / 2,
+      top: rect.top + rect.height / 2,
+    });
+    pulseTimerRef.current = window.setTimeout(() => {
+      setMateClickPulse(null);
+      pulseTimerRef.current = null;
+    }, 190);
+  };
+
   if (matches.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center text-xs text-app-subtle">
@@ -60,11 +122,16 @@ export function MatchList({
   }
 
   return (
-    <div className="flex h-full flex-col gap-0 overflow-hidden">
-      {matches.map((match) => {
+    <div className="match-history-stream">
+      {matches.map((match, index) => {
         const isSelected = match.gameId === selectedGameId;
         const isChecked = selectedIds?.has(match.gameId) ?? false;
         const playedAt = formatPlayedAt(match.gameCreation);
+        const dayKey = getHistoryDayKey(match.gameCreation);
+        const previousDayKey = index > 0 ? getHistoryDayKey(matches[index - 1].gameCreation) : null;
+        const startsDay = dayKey !== previousDayKey;
+        const [, monthPart, dayPart] = dayKey.split('-');
+        const isActiveDay = dayKey === activeDayKey;
         const resultClass = match.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
         const myTeam = match.participants.find((participant) => participant.puuid === targetPuuid)?.teamId;
@@ -76,9 +143,29 @@ export function MatchList({
         const hiddenMateCount = Math.max(0, matesInThisGame.length - visibleMates.length);
 
         return (
-          <button
+          <div
             key={match.gameId}
-            type="button"
+            className={`match-history-entry ${startsDay ? 'match-history-entry--day-start' : ''} ${
+              isActiveDay ? 'match-history-entry--active-day' : ''
+            }`}
+          >
+            <div
+              className="match-history-gutter"
+              data-history-day={startsDay ? dayKey : undefined}
+              title={startsDay ? `${monthPart}月${dayPart}日` : undefined}
+              aria-hidden="true"
+            >
+              {startsDay && (
+                <span className="match-history-gutter__stamp">
+                  <strong>{dayPart}</strong>
+                  <em>{monthPart}</em>
+                </span>
+              )}
+              <span className="match-history-gutter__node" />
+            </div>
+            <button
+              type="button"
+              data-history-day-row={dayKey}
             onClick={() => {
               if (selectionMode) {
                 onToggleSelection?.(match.gameId);
@@ -114,7 +201,10 @@ export function MatchList({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="match-result-mode">{match.queueName}</span>
-                  <span className="match-result-badge">{match.win ? '胜利' : '失败'}</span>
+                  <span className="match-result-badge" title={match.win ? '胜利' : '失败'}>
+                    <i aria-hidden="true" />
+                    <span>{match.win ? '胜' : '负'}</span>
+                  </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 tabular-nums">
                   <span className="match-result-kda">
@@ -125,26 +215,33 @@ export function MatchList({
 
               {visibleMates.length > 0 && (
                 <div className="match-result-mates ml-1 flex shrink-0 items-center" aria-label="常一起游戏的队友">
-                  {visibleMates.map((mate, index) => {
+                  {visibleMates.map((mate) => {
                     const info = recurringMates.get(mate.puuid);
                     if (!info) return null;
                     return (
-                      <ProfileIcon
+                      <span
                         key={mate.puuid}
-                        iconId={info.profileIconId}
-                        src={info.profileIconUrl}
-                        alt={info.riotId}
-                        title={`${info.riotId}（一起 ${info.count} 场）`}
-                        size={20}
+                        className="match-result-mate-item"
+                        onMouseEnter={(event) => scheduleMatePeek(info, event.currentTarget)}
+                        onMouseLeave={hideMatePeek}
                         onClick={(event) => {
                           event.stopPropagation();
+                          hideMatePeek();
                           if (!selectionMode) {
+                            pulseMate(event.currentTarget);
                             onMateClick(info.riotId);
                           }
                         }}
-                        className="match-result-mate-avatar size-5 cursor-pointer rounded-full object-cover"
-                        style={{ marginLeft: index === 0 ? 0 : -5 }}
-                      />
+                      >
+                        <ProfileIcon
+                          iconId={info.profileIconId}
+                          src={info.profileIconUrl}
+                          alt={info.riotId}
+                          title=""
+                          size={20}
+                          className="match-result-mate-avatar size-5 cursor-pointer rounded-full object-cover"
+                        />
+                      </span>
                     );
                   })}
                   {hiddenMateCount > 0 && (
@@ -162,9 +259,40 @@ export function MatchList({
               </div>
               {!selectionMode && <ChevronRight className="match-result-open-affordance" aria-hidden="true" />}
             </div>
-          </button>
+            </button>
+          </div>
         );
       })}
+      {mateClickPulse &&
+        createPortal(
+          <span
+            className="match-result-mate-click-pulse"
+            style={{ left: mateClickPulse.left, top: mateClickPulse.top }}
+            aria-hidden="true"
+          />,
+          document.body,
+        )}
+      {matePeek &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="match-result-player-peek"
+            style={{ left: matePeek.left, top: matePeek.top }}
+          >
+            <ProfileIcon
+              iconId={matePeek.info.profileIconId}
+              src={matePeek.info.profileIconUrl}
+              alt={matePeek.info.riotId}
+              size={26}
+              className="match-result-player-peek__avatar"
+            />
+            <div className="match-result-player-peek__copy">
+              <strong>{matePeek.info.riotId}</strong>
+              <span>一起 {matePeek.info.count} 场 · 点击查看战绩</span>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

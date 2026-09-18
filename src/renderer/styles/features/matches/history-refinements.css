@@ -1,4 +1,458 @@
 @layer components {
+  .match-history-stream {
+    position: relative;
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    padding: 2px 0 8px;
+  }
+
+  .match-history-entry {
+    position: relative;
+    display: grid;
+    min-height: 48px;
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .match-history-gutter {
+    position: relative;
+    min-height: 48px;
+    pointer-events: none;
+  }
+
+  .match-history-gutter::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 27px;
+    width: 1px;
+    background: color-mix(in srgb, var(--color-app-text) 6%, transparent);
+    content: "";
+    transition: background-color 120ms ease;
+  }
+
+  .match-history-entry:first-child .match-history-gutter::before {
+    top: 12px;
+  }
+
+  .match-history-entry:last-of-type .match-history-gutter::before {
+    bottom: 12px;
+  }
+
+  .match-history-gutter__node {
+    position: absolute;
+    top: 50%;
+    left: 27px;
+    z-index: 2;
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 18%, transparent);
+    transform: translate(-50%, -50%);
+    transition:
+      width 140ms var(--ease-ui),
+      height 140ms var(--ease-ui),
+      background-color 120ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .match-history-entry--day-start .match-history-gutter__node {
+    width: 6px;
+    height: 6px;
+    border: 2px solid var(--color-app-bg-soft);
+    background: var(--color-app-muted);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-text) 10%, transparent);
+  }
+
+  .match-history-entry:hover .match-history-gutter::before {
+    background: color-mix(in srgb, var(--color-app-text) 9%, transparent);
+  }
+
+  .match-history-entry:hover .match-history-gutter__node {
+    width: 4px;
+    height: 4px;
+    background: color-mix(in srgb, var(--color-app-text) 44%, transparent);
+  }
+
+  .match-history-entry--day-start:hover .match-history-gutter__node {
+    width: 7px;
+    height: 7px;
+  }
+
+  .match-history-gutter__stamp {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    display: flex;
+    width: 20px;
+    flex-direction: column;
+    align-items: flex-end;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .match-history-gutter__stamp strong {
+    color: var(--color-app-muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .match-history-gutter__stamp em {
+    margin-top: 2px;
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .match-history-entry--active-day .match-history-gutter::before {
+    background: color-mix(in srgb, var(--color-app-text) 12%, transparent);
+  }
+
+  .match-history-entry--active-day .match-history-gutter__node {
+    background: color-mix(in srgb, var(--color-app-text) 66%, transparent);
+  }
+
+  .match-history-entry--active-day.match-history-entry--day-start .match-history-gutter__node {
+    width: 8px;
+    height: 8px;
+    background: var(--color-app-text);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-app-text) 16%, transparent),
+      0 0 0 4px color-mix(in srgb, var(--color-app-text) 4%, transparent);
+  }
+
+  .match-history-entry--active-day .match-history-gutter__stamp strong {
+    color: var(--color-app-text);
+  }
+
+  .match-history-entry--active-day .match-history-gutter__stamp em {
+    color: var(--color-app-muted);
+  }
+
+  .match-history-loading {
+    display: flex;
+    height: 30px;
+    flex: 0 0 30px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--color-app-subtle);
+  }
+
+  .match-history-loading > span {
+    position: relative;
+    width: 38px;
+    height: 1px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--color-app-text) 6%, transparent);
+  }
+
+  .match-history-loading > span::after {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-app-text) 48%, transparent),
+      transparent
+    );
+    content: "";
+    transform: translateX(-100%);
+    animation: matchHistoryLoading 900ms linear infinite;
+  }
+
+  .match-history-loading > em {
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .match-calendar-scrubber {
+    position: relative;
+    flex: 0 0 auto;
+    border-top: 1px solid var(--color-app-border);
+    padding: 7px 8px 8px;
+    background: var(--color-app-bg-soft);
+  }
+
+  .match-calendar-head {
+    position: relative;
+    display: flex;
+    height: 18px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .match-calendar-month,
+  .match-calendar-current,
+  .match-calendar-meta {
+    display: inline-flex;
+    align-items: baseline;
+  }
+
+  .match-calendar-month {
+    gap: 4px;
+  }
+
+  .match-calendar-month strong {
+    color: var(--color-app-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .match-calendar-month em {
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .match-calendar-current {
+    position: absolute;
+    left: 50%;
+    gap: 5px;
+    transform: translateX(-50%);
+  }
+
+  .match-calendar-current strong {
+    color: var(--color-app-text);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .match-calendar-current em {
+    color: var(--color-app-muted);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .match-calendar-meta {
+    gap: 3px;
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .match-calendar-meta strong {
+    color: var(--color-app-body);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .match-calendar-meta em,
+  .match-calendar-meta i {
+    font-style: normal;
+  }
+
+  .match-calendar-meta i {
+    margin-left: 4px;
+    color: var(--color-app-subtle);
+  }
+
+  .match-calendar-stage {
+    position: relative;
+    height: 47px;
+    margin-top: 3px;
+    border-radius: var(--radius-md);
+    padding: 5px 4px 11px;
+    background: color-mix(in srgb, var(--color-app-text) 2%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
+  }
+
+  .match-calendar-depth,
+  .match-calendar-range,
+  .match-calendar-cursor {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .match-calendar-depth {
+    top: 5px;
+    right: 4px;
+    bottom: 11px;
+    border-radius: 5px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-app-text) 2.8%, transparent)
+    );
+    transition: width 110ms linear;
+  }
+
+  .match-calendar-range {
+    top: 5px;
+    bottom: 11px;
+    z-index: 1;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--color-app-text) 2.3%, transparent);
+    transition:
+      left 140ms var(--ease-ui),
+      width 140ms var(--ease-ui);
+  }
+
+  .match-calendar-cursor {
+    top: 3px;
+    bottom: 9px;
+    z-index: 3;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 14%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-bg) 22%, transparent);
+    transition: left 140ms var(--ease-ui);
+  }
+
+  .match-calendar-days {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    height: 31px;
+    align-items: flex-start;
+  }
+
+  .match-calendar-day {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    height: 31px;
+    flex: 1 1 0;
+    cursor: pointer;
+    align-items: flex-start;
+    justify-content: center;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    outline: none;
+  }
+
+  .match-calendar-day[aria-disabled="true"] {
+    cursor: default;
+  }
+
+  .match-calendar-day__well {
+    position: relative;
+    display: flex;
+    width: 5px;
+    height: 27px;
+    align-items: flex-end;
+    overflow: hidden;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
+    transition:
+      width 120ms var(--ease-ui),
+      background-color 120ms ease;
+  }
+
+  .match-calendar-day__fill {
+    display: block;
+    width: 100%;
+    min-height: 2px;
+    border-radius: 3px 3px 0 0;
+    background: var(--color-app-body);
+    transform-origin: bottom;
+    transition:
+      height 160ms var(--ease-ui),
+      opacity 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .match-calendar-day:hover .match-calendar-day__well,
+  .match-calendar-day:focus-visible .match-calendar-day__well {
+    width: 6px;
+    background: color-mix(in srgb, var(--color-app-text) 7%, transparent);
+  }
+
+  .match-calendar-day:hover .match-calendar-day__fill,
+  .match-calendar-day:focus-visible .match-calendar-day__fill,
+  .match-calendar-day--active .match-calendar-day__fill {
+    background: var(--color-app-text);
+  }
+
+  .match-calendar-day--unknown .match-calendar-day__well {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 7%, transparent);
+    background: transparent;
+  }
+
+  .match-calendar-day--unknown .match-calendar-day__fill {
+    background: color-mix(in srgb, var(--color-app-text) 20%, transparent);
+  }
+
+  .match-calendar-day--future {
+    pointer-events: none;
+    opacity: 0.16;
+  }
+
+  .match-calendar-day__index {
+    position: absolute;
+    top: 31px;
+    left: 50%;
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1;
+    transform: translateX(-50%);
+  }
+
+  .match-calendar-day--active .match-calendar-day__index {
+    color: var(--color-app-body);
+  }
+
+  .match-calendar-day__tooltip {
+    position: absolute;
+    bottom: calc(100% + 9px);
+    left: 50%;
+    z-index: 70;
+    display: flex;
+    width: max-content;
+    min-width: 104px;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--color-app-border-strong);
+    border-radius: var(--radius-sm);
+    padding: 6px 7px;
+    background: var(--color-app-elevated);
+    box-shadow: var(--shadow-ui-popover);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 3px);
+    transition:
+      opacity 100ms ease,
+      transform 120ms var(--ease-ui);
+  }
+
+  .match-calendar-day:hover .match-calendar-day__tooltip,
+  .match-calendar-day:focus-visible .match-calendar-day__tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .match-calendar-day__tooltip strong {
+    color: var(--color-app-text);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .match-calendar-day__tooltip em {
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  @keyframes matchHistoryLoading {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
   .match-result-card {
     min-height: 48px;
     max-height: 48px;
@@ -23,15 +477,27 @@
     left: 0;
     z-index: 2;
     width: 2px;
-    height: 24px;
+    height: 12px;
     border-radius: 0 999px 999px 0;
     background-image: none;
-    background-color: transparent;
-    opacity: 0;
+    opacity: 0.28;
     transform: translateY(-50%);
     transition:
-      opacity 120ms ease,
-      height 120ms ease;
+      opacity 150ms var(--ease-ui),
+      height 170ms var(--ease-ui);
+  }
+
+  .match-result-card--win::before {
+    background-color: var(--color-app-success);
+  }
+
+  .match-result-card--loss::before {
+    background-color: var(--color-app-danger);
+  }
+
+  .match-result-card:hover::before {
+    height: 18px;
+    opacity: 0.62;
   }
 
   .match-result-card::after,
@@ -80,6 +546,17 @@
   .match-result-card--checked::before {
     height: 28px;
     opacity: 1;
+  }
+
+  .match-result-card:active::after {
+    opacity: 1;
+    background:
+      radial-gradient(
+        140px circle at 18% 50%,
+        color-mix(in srgb, var(--color-app-text) 8%, transparent),
+        transparent 74%
+      ),
+      color-mix(in srgb, var(--color-app-text) 5.5%, transparent);
   }
 
   .match-result-card--win.match-result-card--selected::before {
@@ -131,7 +608,10 @@
   }
 
   .match-result-badge {
+    display: inline-flex;
     height: auto;
+    align-items: center;
+    gap: 4px;
     border: 0 !important;
     border-radius: 0;
     padding: 0;
@@ -140,6 +620,17 @@
     font-weight: 500;
     line-height: 1;
     transform: none;
+    opacity: 0.9;
+  }
+
+  .match-result-badge > i {
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    flex: 0 0 3px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.78;
   }
 
   .match-result-card--win .match-result-badge {
@@ -158,13 +649,38 @@
   }
 
   .match-result-mates {
-    opacity: 0.82;
-    transition: opacity 120ms ease;
+    opacity: 0.8;
+    transition: opacity 140ms ease;
   }
 
   .match-result-card:hover .match-result-mates,
-  .match-result-card--selected .match-result-mates {
+  .match-result-card--selected .match-result-mates,
+  .match-result-mates:hover {
     opacity: 1;
+  }
+
+  .match-result-mate-item {
+    position: relative;
+    display: inline-flex;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    align-items: center;
+    justify-content: center;
+    margin-left: -5px;
+    cursor: pointer;
+    border-radius: 999px;
+    transition:
+      margin-left 150ms var(--ease-ui),
+      transform 90ms ease;
+  }
+
+  .match-result-mate-item:first-child {
+    margin-left: 0;
+  }
+
+  .match-result-mates:hover .match-result-mate-item + .match-result-mate-item {
+    margin-left: 2px;
   }
 
   .match-result-mate-avatar {
@@ -173,13 +689,40 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-text) 9%, transparent);
     transition:
       border-color 120ms ease,
-      filter 120ms ease;
+      box-shadow 120ms ease,
+      filter 120ms ease,
+      opacity 120ms ease,
+      transform 90ms ease;
   }
 
-  .match-result-mate-avatar:hover {
+  .match-result-mate-item:hover .match-result-mate-avatar {
     z-index: 8;
     border-color: var(--color-app-border-strong);
-    filter: brightness(1.08);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-text) 16%, transparent);
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+  }
+
+  .match-result-mate-item:active .match-result-mate-avatar {
+    transform: translateY(0) scale(0.94);
+  }
+
+  .match-result-mates:has(.match-result-mate-item:hover)
+    .match-result-mate-item:not(:hover)
+    .match-result-mate-avatar {
+    opacity: 0.62;
+  }
+
+  .match-result-mate-click-pulse {
+    position: fixed;
+    z-index: 420;
+    width: 22px;
+    height: 22px;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 24%, transparent);
+    border-radius: 999px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: matchMatePulse 180ms var(--ease-ui) both;
   }
 
   .match-result-mate-more {
@@ -198,6 +741,88 @@
     font-size: 9px;
     font-weight: 600;
     line-height: 1;
+    transition:
+      margin-left 150ms var(--ease-ui),
+      color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .match-result-mates:hover .match-result-mate-more {
+    margin-left: 2px;
+    color: var(--color-app-muted);
+    background: var(--color-app-elevated);
+  }
+
+  .match-result-player-peek {
+    position: fixed;
+    z-index: 300;
+    display: flex;
+    width: 176px;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid var(--color-app-border-strong);
+    border-radius: var(--radius-md);
+    padding: 8px 9px;
+    background: var(--color-app-elevated);
+    color: var(--color-app-body);
+    box-shadow: var(--shadow-ui-popover);
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+    animation: matchPlayerPeekIn 120ms var(--ease-ui) both;
+  }
+
+  .match-result-player-peek__avatar {
+    flex: 0 0 auto;
+    border: 1px solid var(--color-app-border-strong);
+    border-radius: 999px;
+  }
+
+  .match-result-player-peek__copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .match-result-player-peek__copy strong {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .match-result-player-peek__copy span {
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  @keyframes matchMatePulse {
+    0% {
+      opacity: 0.38;
+      transform: translate(-50%, -50%) scale(0.84);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.28);
+    }
+  }
+
+  @keyframes matchPlayerPeekIn {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-100% + 3px));
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -100%);
+    }
   }
 
   .match-result-meta {
@@ -246,6 +871,33 @@
   .match-result-card:hover .match-result-time-value,
   .match-result-card--selected .match-result-time-value {
     color: var(--color-app-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .match-history-loading > span::after {
+      animation: none;
+    }
+
+    .match-calendar-day__well,
+    .match-calendar-day__fill,
+    .match-calendar-day__tooltip,
+    .match-calendar-cursor,
+    .match-calendar-range,
+    .match-calendar-depth {
+      transition-duration: 0ms;
+    }
+
+    .match-result-card::before,
+    .match-result-mate-item,
+    .match-result-mate-avatar,
+    .match-result-mate-more {
+      transition-duration: 0ms;
+    }
+
+    .match-result-mate-click-pulse,
+    .match-result-player-peek {
+      animation: none;
+    }
   }
 
   .lol-rift-player-name,

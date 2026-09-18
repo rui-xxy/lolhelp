@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, MailPlus, PanelRightOpen, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, MailPlus, PanelRightOpen, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
+import { MonthActivityNavigator, getHistoryDayKey } from './MatchActivityNavigator';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
 import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesStore';
 import { LOL_REGIONS } from '../../../shared/constants';
 
-const PAGE_SIZE = 12;
 const SGP_BATCH = 50;
 
 interface MatchHistoryPageProps {
@@ -133,19 +133,6 @@ function QueueFilterMenu({
       )}
     </div>
   );
-}
-
-function getPageNumbers(currentPage: number, totalPages: number): number[] {
-  const maxVisible = 5;
-  const half = Math.floor(maxVisible / 2);
-  const start = Math.max(1, Math.min(currentPage - half, totalPages - maxVisible + 1));
-  const end = Math.min(totalPages, start + maxVisible - 1);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-}
-
-function getDisplayedMatches(matches: PlayerMatchDetail[], page: number): PlayerMatchDetail[] {
-  const start = (page - 1) * PAGE_SIZE;
-  return matches.slice(start, start + PAGE_SIZE);
 }
 
 function createEmptyResult(error: string): PlayerLookupResult {
@@ -417,6 +404,11 @@ export function MatchHistoryPage({
   const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const tabLoadSeqRef = useRef<Record<string, number>>({});
   const friendNoticeTimerRef = useRef<number | null>(null);
+  const historyScrollRef = useRef<HTMLDivElement | null>(null);
+  const historyScrollRafRef = useRef<number | null>(null);
+  const historyLoadLockRef = useRef(false);
+  const [activeHistoryDay, setActiveHistoryDay] = useState<string | null>(null);
+  const [historyScrollProgress, setHistoryScrollProgress] = useState(0);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -632,7 +624,7 @@ export function MatchHistoryPage({
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const selectedMatch = activeTab?.matches.find((match) => match.gameId === activeTab.selectedGameId);
   // SGP 已按 tag 筛选，直接用 matches（不再前端过滤）
-  const displayedMatches = activeTab ? getDisplayedMatches(activeTab.matches, activeTab.currentPage) : [];
+  const displayedMatches = activeTab?.matches ?? [];
 
   // 计算经常一起玩的队友（所有已加载对局中出现≥2次的同队玩家）
   const recurringMates = new Map<string, RecurringMate>();
@@ -667,9 +659,6 @@ export function MatchHistoryPage({
       }
     }
   }
-  const knownPages = activeTab ? Math.max(1, Math.ceil(activeTab.matches.length / PAGE_SIZE)) : 1;
-  const totalPages = activeTab?.hasMore ? knownPages + 5 : knownPages;
-  const pageNumbers = activeTab ? getPageNumbers(activeTab.currentPage, totalPages) : [];
   const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
   const isSaveMode = activeTab ? saveModeTabId === activeTab.id : false;
   const selectedSaveIds = new Set(activeTab ? saveSelections[activeTab.id] ?? [] : []);
@@ -761,66 +750,111 @@ export function MatchHistoryPage({
     void loadInitialTab(activeTab.id, activeTab.query, activeTab.region, tag);
   };
 
-  const handlePageChange = async (page: number) => {
-    if (!activeTab || activeTab.loading || activeTab.pageLoading) return;
-    setProfilePanelTabId(null);
-
-    const targetEnd = page * PAGE_SIZE;
-    if (targetEnd <= activeTab.matches.length || !activeTab.hasMore) {
-      const pageMatches = getDisplayedMatches(activeTab.matches, page);
-      updateTab(activeTab.id, (tab) => ({
-        ...tab,
-        currentPage: page,
-        selectedGameId: pageMatches[0]?.gameId ?? tab.selectedGameId,
-      }));
+  const loadMoreHistory = async () => {
+    const tab = tabsRef.current.find((item) => item.id === activeTabId);
+    if (
+      !tab ||
+      tab.loading ||
+      tab.pageLoading ||
+      !tab.hasMore ||
+      tab.source === 'saved' ||
+      historyLoadLockRef.current
+    ) {
       return;
     }
 
-    const requestSeq = (tabLoadSeqRef.current[activeTab.id] ?? 0) + 1;
-    tabLoadSeqRef.current[activeTab.id] = requestSeq;
-    const isLatestRequest = () => tabLoadSeqRef.current[activeTab.id] === requestSeq;
+    historyLoadLockRef.current = true;
+    const requestSeq = (tabLoadSeqRef.current[tab.id] ?? 0) + 1;
+    tabLoadSeqRef.current[tab.id] = requestSeq;
+    const isLatestRequest = () => tabLoadSeqRef.current[tab.id] === requestSeq;
 
-    updateTab(activeTab.id, (tab) => ({ ...tab, pageLoading: true }));
+    updateTab(tab.id, (current) => ({ ...current, pageLoading: true }));
 
     try {
-      let nextMatches = [...activeTab.matches];
-      let loadedUpTo = activeTab.loadedUpTo;
-      let hasMore: boolean = activeTab.hasMore;
-      let result = activeTab.result;
-      let guard = 0;
-
-      while (hasMore && targetEnd > nextMatches.length && guard < 5) {
-        const currentTag = QUEUE_FILTERS.find((f) => f.key === activeTab.filterQueue)?.tag;
-        const response = await requestBatch(activeTab.query, activeTab.region, loadedUpTo, currentTag);
-        if (!isLatestRequest()) return;
-        const existingIds = new Set(nextMatches.map((match) => match.gameId));
-        const additions = response.matches.filter((match) => !existingIds.has(match.gameId));
-        nextMatches = [...nextMatches, ...additions];
-        loadedUpTo += response.matches.length;
-        hasMore = response.matches.length >= SGP_BATCH;
-        result = result ?? response;
-        if (additions.length === 0) break;
-        guard++;
-      }
-
+      const currentTag = QUEUE_FILTERS.find((filter) => filter.key === tab.filterQueue)?.tag;
+      const response = await requestBatch(tab.query, tab.region, tab.loadedUpTo, currentTag);
       if (!isLatestRequest()) return;
-      const pageMatches = getDisplayedMatches(nextMatches, page);
-      updateTab(activeTab.id, (tab) => ({
-        ...tab,
+
+      const existingIds = new Set(tab.matches.map((match) => match.gameId));
+      const additions = response.matches.filter((match) => !existingIds.has(match.gameId));
+      const loadedUpTo = tab.loadedUpTo + response.matches.length;
+
+      updateTab(tab.id, (current) => ({
+        ...current,
         pageLoading: false,
-        result,
-        matches: nextMatches,
+        result: current.result ?? response,
+        matches: [...current.matches, ...additions],
         loadedUpTo,
-        hasMore,
-        currentPage: page,
-        selectedGameId: pageMatches[0]?.gameId ?? tab.selectedGameId,
+        hasMore: response.matches.length >= SGP_BATCH,
       }));
     } catch (err) {
       if (!isLatestRequest()) return;
-      console.error('[match] 翻页加载失败:', err);
-      updateTab(activeTab.id, (tab) => ({ ...tab, pageLoading: false }));
+      console.error('[match] 加载更早战绩失败:', err);
+      updateTab(tab.id, (current) => ({ ...current, pageLoading: false }));
+    } finally {
+      historyLoadLockRef.current = false;
     }
   };
+
+  const handleHistoryScroll = () => {
+    if (historyScrollRafRef.current !== null) return;
+    historyScrollRafRef.current = window.requestAnimationFrame(() => {
+      historyScrollRafRef.current = null;
+      const container = historyScrollRef.current;
+      if (!container) return;
+
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      setHistoryScrollProgress(maxScroll > 0 ? container.scrollTop / maxScroll : 0);
+
+      const containerRect = container.getBoundingClientRect();
+      const anchorY = containerRect.top + 32;
+      const rows = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-history-day-row]'),
+      );
+      const currentRow =
+        rows.find((row) => row.getBoundingClientRect().bottom > anchorY) ??
+        rows[rows.length - 1];
+      const currentDay = currentRow?.dataset.historyDayRow;
+      if (currentDay) setActiveHistoryDay(currentDay);
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceToBottom < 180) {
+        void loadMoreHistory();
+      }
+    });
+  };
+
+  const scrollToHistoryDay = (dayKey: string) => {
+    const container = historyScrollRef.current;
+    if (!container) return;
+    const marker = container.querySelector<HTMLElement>(`[data-history-day="${dayKey}"]`);
+    if (!marker) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const markerRect = marker.getBoundingClientRect();
+    const targetTop = container.scrollTop + markerRect.top - containerRect.top - 6;
+    setActiveHistoryDay(dayKey);
+    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+  };
+
+  const firstHistoryDay =
+    activeTab?.matches[0] ? getHistoryDayKey(activeTab.matches[0].gameCreation) : null;
+
+  useEffect(() => {
+    const container = historyScrollRef.current;
+    if (container) container.scrollTop = 0;
+    setHistoryScrollProgress(0);
+    setActiveHistoryDay(firstHistoryDay);
+  }, [activeTabId, activeTab?.filterQueue, firstHistoryDay]);
+
+  useEffect(() => {
+    return () => {
+      if (historyScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(historyScrollRafRef.current);
+      }
+    };
+  }, []);
 
   const handleCloseTab = (tabId: string) => {
     delete tabLoadSeqRef.current[tabId];
@@ -964,7 +998,7 @@ export function MatchHistoryPage({
       </div>
 
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
-        <div className="flex w-[292px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
+        <div className="flex w-[320px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           {activeTab && (
             <div className="relative shrink-0 border-b border-app-border bg-app-bg-soft px-3 py-2.5">
               <div className="flex items-center gap-2">
@@ -1090,7 +1124,11 @@ export function MatchHistoryPage({
             </div>
           )}
 
-          <div className="min-h-0 flex-1 p-2.5">
+          <div
+            ref={historyScrollRef}
+            onScroll={handleHistoryScroll}
+            className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-1.5 pb-2"
+          >
             {activeTab?.loading ? (
               <div className="flex h-full items-center justify-center text-xs text-app-subtle">加载中...</div>
             ) : displayedMatches.length > 0 ? (
@@ -1111,6 +1149,7 @@ export function MatchHistoryPage({
                   setProfilePanelTabId(null);
                   openSearchTab(riotId, activeTab?.region ?? '');
                 }}
+                activeDayKey={activeHistoryDay}
               />
             ) : activeTab?.result?.error ? (
               <div className="flex h-full items-center justify-center p-4 text-center text-xs text-app-danger">
@@ -1121,54 +1160,23 @@ export function MatchHistoryPage({
                 查询战绩
               </div>
             )}
+            {activeTab?.pageLoading && (
+              <div className="match-history-loading" aria-live="polite">
+                <span />
+                <em>正在读取更早战绩</em>
+              </div>
+            )}
           </div>
 
           {activeTab && activeTab.matches.length > 0 && (
-            <div className="shrink-0 border-t border-app-border bg-app-bg-soft px-3 py-1">
-              <div className="mx-auto flex h-7 w-max max-w-full items-center gap-0.5">
-                <button
-                  type="button"
-                  title="上一页"
-                  aria-label="上一页"
-                  disabled={activeTab.loading || activeTab.pageLoading || activeTab.currentPage <= 1}
-                  onClick={() => handlePageChange(activeTab.currentPage - 1)}
-                  className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-body focus-visible:bg-app-nav-hover disabled:opacity-20"
-                >
-                  <ChevronLeft className="size-3.5" />
-                </button>
-                <div className="flex items-center gap-0.5">
-                  {pageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      disabled={activeTab.loading || activeTab.pageLoading}
-                      onClick={() => handlePageChange(page)}
-                      className={`relative h-6 min-w-6 px-1.5 text-[10px] font-medium tabular-nums outline-none transition-colors ${
-                        page === activeTab.currentPage
-                          ? 'text-app-text after:absolute after:right-1.5 after:bottom-0 after:left-1.5 after:h-px after:bg-app-text'
-                          : 'text-app-subtle hover:text-app-body focus-visible:text-app-body'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  title="下一页"
-                  aria-label="下一页"
-                  disabled={
-                    activeTab.loading ||
-                    activeTab.pageLoading ||
-                    (activeTab.currentPage >= totalPages && !activeTab.hasMore)
-                  }
-                  onClick={() => handlePageChange(activeTab.currentPage + 1)}
-                  className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors enabled:hover:bg-app-nav-hover enabled:hover:text-app-body focus-visible:bg-app-nav-hover disabled:opacity-20"
-                >
-                  <ChevronRight className="size-3.5" />
-                </button>
-              </div>
-            </div>
+            <MonthActivityNavigator
+              matches={activeTab.matches}
+              activeDayKey={activeHistoryDay}
+              hasMore={activeTab.hasMore}
+              loading={activeTab.pageLoading}
+              scrollProgress={historyScrollProgress}
+              onDaySelect={scrollToHistoryDay}
+            />
           )}
         </div>
 
