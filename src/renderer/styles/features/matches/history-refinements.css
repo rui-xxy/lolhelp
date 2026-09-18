@@ -1,4 +1,21 @@
 @layer components {
+  .match-history-focus-viewport {
+    background:
+      radial-gradient(
+        ellipse 118% 48% at 50% 49%,
+        color-mix(in srgb, var(--color-app-text) 3.4%, transparent) 0%,
+        color-mix(in srgb, var(--color-app-text) 1.2%, transparent) 48%,
+        transparent 72%
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-app-bg) 26%, transparent) 0%,
+        transparent 17%,
+        transparent 82%,
+        color-mix(in srgb, var(--color-app-bg) 30%, transparent) 100%
+      );
+  }
+
   .match-history-stream {
     position: relative;
     display: flex;
@@ -14,6 +31,98 @@
     grid-template-columns: 36px minmax(0, 1fr);
   }
 
+  .match-history-entry {
+    opacity: var(--history-row-opacity, 1);
+    filter:
+      brightness(var(--history-row-brightness, 1))
+      saturate(var(--history-row-saturation, 1));
+    transition:
+      opacity 72ms linear,
+      filter 72ms linear;
+    will-change: opacity, filter;
+  }
+
+  .match-history-entry::before {
+    position: absolute;
+    inset: 2px 0;
+    z-index: 0;
+    border-radius: var(--radius-sm);
+    background: radial-gradient(
+      190px circle at 52% 50%,
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-row-ambient, 0%),
+        transparent
+      ),
+      transparent 76%
+    );
+    content: "";
+    pointer-events: none;
+  }
+
+  .match-history-entry::after {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-app-text) 1%, transparent) 0%,
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-day-glow-percent, 1.5%),
+        transparent
+      ) 42%,
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-day-glow-percent, 1.5%),
+        transparent
+      ) 72%,
+      color-mix(in srgb, var(--color-app-text) 1.2%, transparent) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-app-text) 2.5%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--color-app-text) 1.8%, transparent),
+      0 0 18px
+        color-mix(
+          in srgb,
+          var(--color-app-text) var(--history-day-shadow-percent, 0%),
+          transparent
+        );
+    content: "";
+    pointer-events: none;
+    opacity: var(--history-day-glow-opacity, 0.05);
+    transition:
+      opacity 72ms linear,
+      box-shadow 72ms linear;
+  }
+
+  .match-history-entry--day-start::after {
+    top: 2px;
+    border-radius: 9px 9px 0 0;
+  }
+
+  .match-history-entry--day-end::after {
+    bottom: 2px;
+    border-radius: 0 0 9px 9px;
+  }
+
+  .match-history-entry--day-start.match-history-entry--day-end::after {
+    border-radius: 9px;
+  }
+
+  .match-history-entry > .match-history-gutter,
+  .match-history-entry > .match-result-card {
+    position: relative;
+    z-index: 1;
+  }
+
+  .match-history-entry:hover {
+    opacity: min(1, calc(var(--history-row-opacity, 1) + 0.12));
+    filter:
+      brightness(calc(var(--history-row-brightness, 1) + 0.035))
+      saturate(var(--history-row-saturation, 1));
+  }
+
   .match-history-gutter {
     position: relative;
     min-height: 48px;
@@ -26,9 +135,69 @@
     bottom: 0;
     left: 27px;
     width: 1px;
-    background: color-mix(in srgb, var(--color-app-text) 6%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--color-app-text) var(--history-day-rail-percent, 6%),
+      transparent
+    );
+    box-shadow: 0 0 8px
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
+        transparent
+      );
     content: "";
-    transition: background-color 120ms ease;
+    transition:
+      background-color 72ms linear,
+      box-shadow 72ms linear;
+  }
+
+  .match-history-gutter::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 26px;
+    z-index: 1;
+    width: 2px;
+    border-radius: 0;
+    background: color-mix(
+      in srgb,
+      var(--color-app-text) var(--history-day-rail-percent, 18%),
+      transparent
+    );
+    box-shadow: 0 0 7px
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
+        transparent
+      );
+    content: "";
+    opacity: 0;
+    transition:
+      top 110ms linear,
+      bottom 110ms linear,
+      opacity 110ms ease,
+      background-color 72ms linear,
+      box-shadow 72ms linear;
+  }
+
+  .match-history-entry--in-viewport .match-history-gutter::after {
+    opacity: 1;
+  }
+
+  .match-history-entry--viewport-start .match-history-gutter::after {
+    top: 8px;
+    border-radius: 999px 999px 0 0;
+  }
+
+  .match-history-entry--viewport-end .match-history-gutter::after {
+    bottom: 8px;
+    border-radius: 0 0 999px 999px;
+  }
+
+  .match-history-entry--viewport-start.match-history-entry--viewport-end
+    .match-history-gutter::after {
+    border-radius: 999px;
   }
 
   .match-history-entry:first-child .match-history-gutter::before {
@@ -43,40 +212,71 @@
     position: absolute;
     top: 50%;
     left: 27px;
-    z-index: 2;
+    z-index: 3;
     width: 3px;
     height: 3px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-app-text) 18%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--color-app-text) var(--history-day-node-percent, 18%),
+      transparent
+    );
+    box-shadow: 0 0 6px
+      color-mix(
+        in srgb,
+        var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
+        transparent
+      );
     transform: translate(-50%, -50%);
     transition:
-      width 140ms var(--ease-ui),
-      height 140ms var(--ease-ui),
-      background-color 120ms ease,
-      box-shadow 140ms ease;
+      width 120ms var(--ease-ui),
+      height 120ms var(--ease-ui),
+      background-color 72ms linear,
+      box-shadow 72ms linear;
   }
 
   .match-history-entry--day-start .match-history-gutter__node {
     width: 6px;
     height: 6px;
     border: 2px solid var(--color-app-bg-soft);
-    background: var(--color-app-muted);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-text) 10%, transparent);
-  }
-
-  .match-history-entry:hover .match-history-gutter::before {
-    background: color-mix(in srgb, var(--color-app-text) 9%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-app-text) 10%, transparent),
+      0 0 8px
+        color-mix(
+          in srgb,
+          var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
+          transparent
+        );
   }
 
   .match-history-entry:hover .match-history-gutter__node {
     width: 4px;
     height: 4px;
-    background: color-mix(in srgb, var(--color-app-text) 44%, transparent);
   }
 
   .match-history-entry--day-start:hover .match-history-gutter__node {
     width: 7px;
     height: 7px;
+  }
+
+  .match-history-gutter__handoff {
+    position: absolute;
+    top: -7px;
+    left: 25px;
+    z-index: 5;
+    width: 4px;
+    height: 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 82%, transparent);
+    box-shadow:
+      0 0 4px color-mix(in srgb, var(--color-app-text) 42%, transparent),
+      0 0 12px color-mix(in srgb, var(--color-app-text) 24%, transparent);
+    pointer-events: none;
+    opacity: var(--history-day-bridge, 0);
+    transform: translateY(var(--history-day-bridge-offset, 0px));
+    transition:
+      opacity 60ms linear,
+      transform 60ms linear;
   }
 
   .match-history-gutter__stamp {
@@ -89,10 +289,12 @@
     align-items: flex-end;
     font-variant-numeric: tabular-nums;
     line-height: 1;
+    opacity: var(--history-day-stamp-opacity, 0.46);
+    transition: opacity 72ms linear;
   }
 
   .match-history-gutter__stamp strong {
-    color: var(--color-app-muted);
+    color: var(--color-app-text);
     font-size: 10px;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -100,36 +302,11 @@
 
   .match-history-gutter__stamp em {
     margin-top: 2px;
-    color: var(--color-app-subtle);
+    color: var(--color-app-muted);
     font-size: 9px;
     font-style: normal;
     font-weight: 600;
     letter-spacing: 0.06em;
-  }
-
-  .match-history-entry--active-day .match-history-gutter::before {
-    background: color-mix(in srgb, var(--color-app-text) 12%, transparent);
-  }
-
-  .match-history-entry--active-day .match-history-gutter__node {
-    background: color-mix(in srgb, var(--color-app-text) 66%, transparent);
-  }
-
-  .match-history-entry--active-day.match-history-entry--day-start .match-history-gutter__node {
-    width: 8px;
-    height: 8px;
-    background: var(--color-app-text);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-app-text) 16%, transparent),
-      0 0 0 4px color-mix(in srgb, var(--color-app-text) 4%, transparent);
-  }
-
-  .match-history-entry--active-day .match-history-gutter__stamp strong {
-    color: var(--color-app-text);
-  }
-
-  .match-history-entry--active-day .match-history-gutter__stamp em {
-    color: var(--color-app-muted);
   }
 
   .match-history-loading {
@@ -260,10 +437,23 @@
     position: relative;
     height: 47px;
     margin-top: 3px;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
     border-radius: var(--radius-md);
     padding: 5px 4px 11px;
     background: color-mix(in srgb, var(--color-app-text) 2%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .match-calendar-stage--dragging {
+    background: color-mix(in srgb, var(--color-app-text) 3.2%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 8%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--color-app-text) 2.5%, transparent);
   }
 
   .match-calendar-depth,
@@ -306,6 +496,40 @@
     background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-bg) 22%, transparent);
     transition: left 140ms var(--ease-ui);
+  }
+
+  .match-calendar-cursor::before {
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    width: 5px;
+    height: 1px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 36%, transparent);
+    content: "";
+    transform: translateX(-50%);
+    transition:
+      width 120ms var(--ease-ui),
+      background-color 120ms ease;
+  }
+
+  .match-calendar-stage--dragging .match-calendar-cursor {
+    border-color: color-mix(in srgb, var(--color-app-text) 24%, transparent);
+    background: color-mix(in srgb, var(--color-app-text) 7%, transparent);
+    transition: none;
+  }
+
+  .match-calendar-stage--dragging .match-calendar-cursor::before {
+    width: 7px;
+    background: color-mix(in srgb, var(--color-app-text) 62%, transparent);
+  }
+
+  .match-calendar-stage--dragging .match-calendar-day {
+    cursor: ew-resize;
+  }
+
+  .match-calendar-stage--dragging .match-calendar-day__tooltip {
+    opacity: 0;
   }
 
   .match-calendar-days {
@@ -884,6 +1108,14 @@
     .match-calendar-cursor,
     .match-calendar-range,
     .match-calendar-depth {
+      transition-duration: 0ms;
+    }
+
+    .match-history-gutter::after {
+      transition-duration: 0ms;
+    }
+
+    .match-history-entry {
       transition-duration: 0ms;
     }
 

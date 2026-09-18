@@ -407,8 +407,17 @@ export function MatchHistoryPage({
   const historyScrollRef = useRef<HTMLDivElement | null>(null);
   const historyScrollRafRef = useRef<number | null>(null);
   const historyLoadLockRef = useRef(false);
+  const activeHistoryDayRef = useRef<string | null>(null);
   const [activeHistoryDay, setActiveHistoryDay] = useState<string | null>(null);
   const [historyScrollProgress, setHistoryScrollProgress] = useState(0);
+  const [historyViewportRange, setHistoryViewportRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+
+  useEffect(() => {
+    activeHistoryDayRef.current = activeHistoryDay;
+  }, [activeHistoryDay]);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -796,26 +805,201 @@ export function MatchHistoryPage({
     }
   };
 
+  const updateHistoryFocusWindow = (container: HTMLDivElement): string | null => {
+    const containerRect = container.getBoundingClientRect();
+    const viewportCenter = containerRect.top + containerRect.height / 2;
+    const fadeZone = Math.max(78, Math.min(126, containerRect.height * 0.23));
+    const handoffZone = Math.max(104, Math.min(132, containerRect.height * 0.22));
+    const handoffHalf = handoffZone / 2;
+    const focusY =
+      containerRect.top + Math.max(116, Math.min(190, containerRect.height * 0.36));
+    const entries = Array.from(
+      container.querySelectorAll<HTMLElement>('.match-history-entry[data-history-day-key]'),
+    );
+
+    const groups: Array<{
+      key: string;
+      entries: HTMLElement[];
+      top: number;
+      bottom: number;
+    }> = [];
+
+    for (const entry of entries) {
+      const key = entry.dataset.historyDayKey;
+      if (!key) continue;
+      const rect = entry.getBoundingClientRect();
+      const lastGroup = groups[groups.length - 1];
+      if (!lastGroup || lastGroup.key !== key) {
+        groups.push({ key, entries: [entry], top: rect.top, bottom: rect.bottom });
+      } else {
+        lastGroup.entries.push(entry);
+        lastGroup.bottom = rect.bottom;
+      }
+    }
+
+    const baselineFocus = 0.08;
+    const focusWeights = new Map<string, number>();
+    groups.forEach((group) => focusWeights.set(group.key, baselineFocus));
+
+    let bridgeGroup: (typeof groups)[number] | null = null;
+    let bridgeStrength = 0;
+    let bridgeOffset = 0;
+
+    let nearestBoundaryIndex = -1;
+    let nearestBoundaryDistance = Number.POSITIVE_INFINITY;
+    let nearestBoundaryY = 0;
+
+    for (let index = 0; index < groups.length - 1; index++) {
+      const boundaryY = (groups[index].bottom + groups[index + 1].top) / 2;
+      const distance = Math.abs(boundaryY - focusY);
+      if (distance < nearestBoundaryDistance) {
+        nearestBoundaryDistance = distance;
+        nearestBoundaryIndex = index;
+        nearestBoundaryY = boundaryY;
+      }
+    }
+
+    if (nearestBoundaryIndex >= 0 && nearestBoundaryDistance <= handoffHalf) {
+      const upperGroup = groups[nearestBoundaryIndex];
+      const lowerGroup = groups[nearestBoundaryIndex + 1];
+      const progress = Math.max(
+        0,
+        Math.min(1, (focusY + handoffHalf - nearestBoundaryY) / handoffZone),
+      );
+      const easedProgress = progress * progress * (3 - 2 * progress);
+      const upperFocus = baselineFocus + (1 - baselineFocus) * (1 - easedProgress);
+      const lowerFocus = baselineFocus + (1 - baselineFocus) * easedProgress;
+      focusWeights.set(upperGroup.key, upperFocus);
+      focusWeights.set(lowerGroup.key, lowerFocus);
+
+      bridgeGroup = lowerGroup;
+      bridgeStrength = 1 - Math.abs(easedProgress - 0.5) * 2;
+      bridgeOffset = (0.5 - easedProgress) * 12;
+    } else if (groups.length > 0) {
+      const containingGroup =
+        groups.find((group) => focusY >= group.top && focusY <= group.bottom) ??
+        groups.reduce((nearest, group) => {
+          const groupCenter = (group.top + group.bottom) / 2;
+          const nearestCenter = (nearest.top + nearest.bottom) / 2;
+          return Math.abs(groupCenter - focusY) < Math.abs(nearestCenter - focusY)
+            ? group
+            : nearest;
+        }, groups[0]);
+      focusWeights.set(containingGroup.key, 1);
+    }
+
+    let candidateDay: string | null = null;
+    let candidateWeight = -1;
+    for (const [key, weight] of focusWeights) {
+      if (weight > candidateWeight) {
+        candidateDay = key;
+        candidateWeight = weight;
+      }
+    }
+
+    const currentDay = activeHistoryDayRef.current;
+    const currentWeight = currentDay ? (focusWeights.get(currentDay) ?? baselineFocus) : 0;
+    if (
+      candidateDay &&
+      (currentDay === null ||
+        (candidateDay !== currentDay && candidateWeight >= 0.62 && currentWeight <= 0.46))
+    ) {
+      activeHistoryDayRef.current = candidateDay;
+      setActiveHistoryDay(candidateDay);
+    }
+
+    entries.forEach((entry) => {
+      const rect = entry.getBoundingClientRect();
+      const rowCenter = rect.top + rect.height / 2;
+      const edgeDistance = Math.min(
+        rowCenter - containerRect.top,
+        containerRect.bottom - rowCenter,
+      );
+      const edgeRatio = Math.max(0, Math.min(1, edgeDistance / fadeZone));
+      const easedEdge = edgeRatio * edgeRatio * (3 - 2 * edgeRatio);
+      const centerDistance = Math.abs(rowCenter - viewportCenter);
+      const centerRatio = Math.max(
+        0,
+        1 - centerDistance / Math.max(1, containerRect.height * 0.46),
+      );
+      const dayFocus = focusWeights.get(entry.dataset.historyDayKey ?? '') ?? baselineFocus;
+
+      const opacity = (0.46 + easedEdge * 0.54) * (0.7 + dayFocus * 0.3);
+      const brightness = 0.79 + easedEdge * 0.08 + centerRatio * 0.015 + dayFocus * 0.185;
+      const saturation = 0.68 + easedEdge * 0.1 + dayFocus * 0.24;
+      const ambient = 0.35 + centerRatio * 0.55 + dayFocus * 5.8;
+      const glowPercent = 1.1 + dayFocus * 7.9;
+      const glowOpacity = 0.05 + dayFocus * 0.95;
+      const shadowPercent = dayFocus * 4.4;
+      const railPercent = 6 + dayFocus * 44;
+      const railShadowPercent = dayFocus * 19;
+      const nodePercent = 18 + dayFocus * 66;
+      const stampOpacity = 0.42 + dayFocus * 0.58;
+
+      entry.style.setProperty('--history-row-opacity', opacity.toFixed(3));
+      entry.style.setProperty('--history-row-brightness', brightness.toFixed(3));
+      entry.style.setProperty('--history-row-saturation', saturation.toFixed(3));
+      entry.style.setProperty('--history-row-ambient', `${ambient.toFixed(2)}%`);
+      entry.style.setProperty('--history-day-focus', dayFocus.toFixed(3));
+      entry.style.setProperty('--history-day-glow-percent', `${glowPercent.toFixed(2)}%`);
+      entry.style.setProperty('--history-day-glow-opacity', glowOpacity.toFixed(3));
+      entry.style.setProperty('--history-day-shadow-percent', `${shadowPercent.toFixed(2)}%`);
+      entry.style.setProperty('--history-day-rail-percent', `${railPercent.toFixed(2)}%`);
+      entry.style.setProperty(
+        '--history-day-rail-shadow-percent',
+        `${railShadowPercent.toFixed(2)}%`,
+      );
+      entry.style.setProperty('--history-day-node-percent', `${nodePercent.toFixed(2)}%`);
+      entry.style.setProperty('--history-day-stamp-opacity', stampOpacity.toFixed(3));
+      entry.style.setProperty('--history-day-bridge', '0');
+      entry.style.setProperty('--history-day-bridge-offset', '0px');
+    });
+
+    if (bridgeGroup?.entries[0]) {
+      bridgeGroup.entries[0].style.setProperty(
+        '--history-day-bridge',
+        Math.max(0, bridgeStrength).toFixed(3),
+      );
+      bridgeGroup.entries[0].style.setProperty(
+        '--history-day-bridge-offset',
+        `${bridgeOffset.toFixed(2)}px`,
+      );
+    }
+
+    return activeHistoryDayRef.current ?? candidateDay;
+  };
+
   const handleHistoryScroll = () => {
     if (historyScrollRafRef.current !== null) return;
     historyScrollRafRef.current = window.requestAnimationFrame(() => {
       historyScrollRafRef.current = null;
       const container = historyScrollRef.current;
       if (!container) return;
+      updateHistoryFocusWindow(container);
 
       const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
       setHistoryScrollProgress(maxScroll > 0 ? container.scrollTop / maxScroll : 0);
 
       const containerRect = container.getBoundingClientRect();
-      const anchorY = containerRect.top + 32;
       const rows = Array.from(
         container.querySelectorAll<HTMLElement>('[data-history-day-row]'),
       );
-      const currentRow =
-        rows.find((row) => row.getBoundingClientRect().bottom > anchorY) ??
-        rows[rows.length - 1];
-      const currentDay = currentRow?.dataset.historyDayRow;
-      if (currentDay) setActiveHistoryDay(currentDay);
+      let firstVisibleIndex = -1;
+      let lastVisibleIndex = -1;
+      rows.forEach((row, index) => {
+        const rect = row.getBoundingClientRect();
+        if (rect.bottom > containerRect.top + 3 && rect.top < containerRect.bottom - 3) {
+          if (firstVisibleIndex < 0) firstVisibleIndex = index;
+          lastVisibleIndex = index;
+        }
+      });
+      if (firstVisibleIndex >= 0 && lastVisibleIndex >= firstVisibleIndex) {
+        setHistoryViewportRange((current) =>
+          current?.start === firstVisibleIndex && current.end === lastVisibleIndex
+            ? current
+            : { start: firstVisibleIndex, end: lastVisibleIndex },
+        );
+      }
 
       const distanceToBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight;
@@ -825,7 +1009,7 @@ export function MatchHistoryPage({
     });
   };
 
-  const scrollToHistoryDay = (dayKey: string) => {
+  const scrollToHistoryDay = (dayKey: string, behavior: ScrollBehavior = 'smooth') => {
     const container = historyScrollRef.current;
     if (!container) return;
     const marker = container.querySelector<HTMLElement>(`[data-history-day="${dayKey}"]`);
@@ -834,8 +1018,13 @@ export function MatchHistoryPage({
     const containerRect = container.getBoundingClientRect();
     const markerRect = marker.getBoundingClientRect();
     const targetTop = container.scrollTop + markerRect.top - containerRect.top - 6;
+    activeHistoryDayRef.current = dayKey;
     setActiveHistoryDay(dayKey);
-    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    container.scrollTo({ top: Math.max(0, targetTop), behavior });
+  };
+
+  const previewHistoryDay = (dayKey: string) => {
+    scrollToHistoryDay(dayKey, 'auto');
   };
 
   const firstHistoryDay =
@@ -845,7 +1034,31 @@ export function MatchHistoryPage({
     const container = historyScrollRef.current;
     if (container) container.scrollTop = 0;
     setHistoryScrollProgress(0);
+    setHistoryViewportRange(null);
+    activeHistoryDayRef.current = firstHistoryDay;
     setActiveHistoryDay(firstHistoryDay);
+
+    window.requestAnimationFrame(() => {
+      const currentContainer = historyScrollRef.current;
+      if (!currentContainer) return;
+      const containerRect = currentContainer.getBoundingClientRect();
+      const rows = Array.from(
+        currentContainer.querySelectorAll<HTMLElement>('[data-history-day-row]'),
+      );
+      let start = -1;
+      let end = -1;
+      rows.forEach((row, index) => {
+        const rect = row.getBoundingClientRect();
+        if (rect.bottom > containerRect.top + 3 && rect.top < containerRect.bottom - 3) {
+          if (start < 0) start = index;
+          end = index;
+        }
+      });
+      if (start >= 0 && end >= start) {
+        setHistoryViewportRange({ start, end });
+      }
+      updateHistoryFocusWindow(currentContainer);
+    });
   }, [activeTabId, activeTab?.filterQueue, firstHistoryDay]);
 
   useEffect(() => {
@@ -1127,7 +1340,7 @@ export function MatchHistoryPage({
           <div
             ref={historyScrollRef}
             onScroll={handleHistoryScroll}
-            className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-1.5 pb-2"
+            className="match-history-focus-viewport scrollbar-none relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-1.5 pb-2"
           >
             {activeTab?.loading ? (
               <div className="flex h-full items-center justify-center text-xs text-app-subtle">加载中...</div>
@@ -1150,6 +1363,7 @@ export function MatchHistoryPage({
                   openSearchTab(riotId, activeTab?.region ?? '');
                 }}
                 activeDayKey={activeHistoryDay}
+                viewportRange={historyViewportRange}
               />
             ) : activeTab?.result?.error ? (
               <div className="flex h-full items-center justify-center p-4 text-center text-xs text-app-danger">
@@ -1176,6 +1390,7 @@ export function MatchHistoryPage({
               loading={activeTab.pageLoading}
               scrollProgress={historyScrollProgress}
               onDaySelect={scrollToHistoryDay}
+              onDayPreview={previewHistoryDay}
             />
           )}
         </div>

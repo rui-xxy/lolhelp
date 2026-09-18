@@ -22,6 +22,7 @@ interface MatchListProps {
   targetPuuid: string;
   onMateClick: (riotId: string) => void;
   activeDayKey?: string | null;
+  viewportRange?: { start: number; end: number } | null;
   selectionMode?: boolean;
   selectedIds?: Set<number>;
   onToggleSelection?: (gameId: number) => void;
@@ -63,6 +64,7 @@ export function MatchList({
   targetPuuid,
   onMateClick,
   activeDayKey = null,
+  viewportRange = null,
   selectionMode = false,
   selectedIds,
   onToggleSelection,
@@ -129,9 +131,17 @@ export function MatchList({
         const playedAt = formatPlayedAt(match.gameCreation);
         const dayKey = getHistoryDayKey(match.gameCreation);
         const previousDayKey = index > 0 ? getHistoryDayKey(matches[index - 1].gameCreation) : null;
+        const nextDayKey = index < matches.length - 1 ? getHistoryDayKey(matches[index + 1].gameCreation) : null;
         const startsDay = dayKey !== previousDayKey;
+        const endsDay = dayKey !== nextDayKey;
         const [, monthPart, dayPart] = dayKey.split('-');
         const isActiveDay = dayKey === activeDayKey;
+        const isActiveDayStart = isActiveDay && startsDay;
+        const isActiveDayEnd = isActiveDay && endsDay;
+        const isInViewport =
+          viewportRange !== null && index >= viewportRange.start && index <= viewportRange.end;
+        const isViewportStart = viewportRange?.start === index;
+        const isViewportEnd = viewportRange?.end === index;
         const resultClass = match.win ? 'match-result-card--win' : 'match-result-card--loss';
         const selectedClass = isSelected ? 'match-result-card--selected' : '';
         const myTeam = match.participants.find((participant) => participant.puuid === targetPuuid)?.teamId;
@@ -145,8 +155,15 @@ export function MatchList({
         return (
           <div
             key={match.gameId}
+            data-history-day-key={dayKey}
             className={`match-history-entry ${startsDay ? 'match-history-entry--day-start' : ''} ${
-              isActiveDay ? 'match-history-entry--active-day' : ''
+              endsDay ? 'match-history-entry--day-end' : ''
+            } ${isActiveDay ? 'match-history-entry--active-day' : ''} ${
+              isActiveDayStart ? 'match-history-entry--active-day-start' : ''
+            } ${isActiveDayEnd ? 'match-history-entry--active-day-end' : ''} ${
+              isInViewport ? 'match-history-entry--in-viewport' : ''
+            } ${isViewportStart ? 'match-history-entry--viewport-start' : ''} ${
+              isViewportEnd ? 'match-history-entry--viewport-end' : ''
             }`}
           >
             <div
@@ -155,6 +172,7 @@ export function MatchList({
               title={startsDay ? `${monthPart}月${dayPart}日` : undefined}
               aria-hidden="true"
             >
+              {startsDay && <span className="match-history-gutter__handoff" aria-hidden="true" />}
               {startsDay && (
                 <span className="match-history-gutter__stamp">
                   <strong>{dayPart}</strong>

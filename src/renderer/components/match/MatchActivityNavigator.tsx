@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import type { PlayerMatchDetail } from '../../../shared/api';
 
 export function getHistoryDayKey(timestamp: number): string {
@@ -30,6 +30,7 @@ interface MonthActivityNavigatorProps {
   loading: boolean;
   scrollProgress: number;
   onDaySelect: (dayKey: string) => void;
+  onDayPreview?: (dayKey: string) => void;
 }
 
 interface DayActivity {
@@ -89,7 +90,14 @@ export function MonthActivityNavigator({
   loading,
   scrollProgress,
   onDaySelect,
+  onDayPreview,
 }: MonthActivityNavigatorProps) {
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const dragStartXRef = useRef<number | null>(null);
+  const dragMovedRef = useRef(false);
+  const lastPreviewKeyRef = useRef<string | null>(null);
+  const [dragPreviewKey, setDragPreviewKey] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   if (matches.length === 0) return null;
 
   const fallbackDayKey = getHistoryDayKey(matches[0].gameCreation);
@@ -101,10 +109,12 @@ export function MonthActivityNavigator({
   const [year, month] = monthKey.split('-').map(Number);
   const monthTotal = monthMatches.length;
   const progress = Math.max(0, Math.min(1, scrollProgress));
-  const activeIndex = Math.max(0, monthDays.findIndex((day) => day.key === resolvedDayKey));
   const loadedIndexes = monthDays
     .map((day, index) => (day.count > 0 ? index : -1))
     .filter((index) => index >= 0);
+  const visualDayKey =
+    dragPreviewKey && getMonthKey(dragPreviewKey) === monthKey ? dragPreviewKey : resolvedDayKey;
+  const activeIndex = Math.max(0, monthDays.findIndex((day) => day.key === visualDayKey));
   const latestLoadedIndex = loadedIndexes.length > 0
     ? Math.max(...loadedIndexes)
     : activeIndex;
@@ -116,6 +126,72 @@ export function MonthActivityNavigator({
     new Date(year, month - 1, activeDay).getDay()
   ];
   const tickDays = new Set([1, 8, 15, 22, dayCount]);
+
+  const resolveNearestLoadedDay = (clientX: number): DayActivity | null => {
+    const stage = stageRef.current;
+    if (!stage || loadedIndexes.length === 0) return null;
+
+    const rect = stage.getBoundingClientRect();
+    const left = rect.left + 4;
+    const width = Math.max(1, rect.width - 8);
+    const ratio = Math.max(0, Math.min(0.999999, (clientX - left) / width));
+    const rawIndex = Math.max(0, Math.min(dayCount - 1, Math.floor(ratio * dayCount)));
+
+    let nearestIndex = loadedIndexes[0];
+    let nearestDistance = Math.abs(nearestIndex - rawIndex);
+    for (const loadedIndex of loadedIndexes) {
+      const distance = Math.abs(loadedIndex - rawIndex);
+      if (distance < nearestDistance) {
+        nearestIndex = loadedIndex;
+        nearestDistance = distance;
+      }
+    }
+
+    return monthDays[nearestIndex] ?? null;
+  };
+
+  const previewPointerDay = (clientX: number) => {
+    const day = resolveNearestLoadedDay(clientX);
+    if (!day) return null;
+    setDragPreviewKey((current) => (current === day.key ? current : day.key));
+    if (lastPreviewKeyRef.current !== day.key) {
+      lastPreviewKeyRef.current = day.key;
+      onDayPreview?.(day.key);
+    }
+    return day;
+  };
+
+  const handleStagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    dragStartXRef.current = event.clientX;
+    dragMovedRef.current = false;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    previewPointerDay(event.clientX);
+  };
+
+  const handleStagePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    if (dragStartXRef.current !== null && Math.abs(event.clientX - dragStartXRef.current) > 3) {
+      dragMovedRef.current = true;
+    }
+    previewPointerDay(event.clientX);
+  };
+
+  const finishStageDrag = (event: ReactPointerEvent<HTMLDivElement>, commit: boolean) => {
+    if (!isDragging) return;
+    const snappedDay = resolveNearestLoadedDay(event.clientX);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsDragging(false);
+    setDragPreviewKey(null);
+    dragStartXRef.current = null;
+    lastPreviewKeyRef.current = null;
+    if (commit && snappedDay) {
+      onDaySelect(snappedDay.key);
+    }
+  };
 
   return (
     <div className="match-calendar-scrubber">
@@ -138,9 +214,14 @@ export function MonthActivityNavigator({
       </div>
 
       <div
-        className="match-calendar-stage"
+        ref={stageRef}
+        className={`match-calendar-stage ${isDragging ? 'match-calendar-stage--dragging' : ''}`}
         role="list"
-        aria-label={`${year}年${month}月对局历史`}
+        aria-label={`${year}年${month}月对局历史，可左右拖动定位日期`}
+        onPointerDown={handleStagePointerDown}
+        onPointerMove={handleStagePointerMove}
+        onPointerUp={(event) => finishStageDrag(event, true)}
+        onPointerCancel={(event) => finishStageDrag(event, false)}
       >
         <span
           className="match-calendar-depth"
@@ -168,7 +249,7 @@ export function MonthActivityNavigator({
           {monthDays.map((day) => {
             const ratio = day.count / maxCount;
             const fillHeight = day.count > 0 ? 6 + Math.round(ratio * 19) : 2;
-            const isActive = day.key === resolvedDayKey;
+            const isActive = day.key === visualDayKey;
             const opacity = isActive
               ? 1
               : day.count > 0
@@ -190,6 +271,10 @@ export function MonthActivityNavigator({
                 }
                 aria-disabled={!canJump}
                 onClick={() => {
+                  if (dragMovedRef.current) {
+                    dragMovedRef.current = false;
+                    return;
+                  }
                   if (canJump) onDaySelect(day.key);
                 }}
                 className={`match-calendar-day ${
