@@ -787,6 +787,7 @@ function ScoreboardTab({
     () => Math.max(0, ...participants.map((player) => Math.max(0, player.damage || 0))),
     [participants],
   );
+  const badgesByPuuid = useMemo(() => buildRiftBadges(participants), [participants]);
 
   return (
     <div className="lol-scoreboard lol-result-scoreboard">
@@ -799,6 +800,7 @@ function ScoreboardTab({
           recurringMates={recurringMates}
           onPlayerSearch={onPlayerSearch}
           maxPlayerDamage={maxPlayerDamage}
+          badgesByPuuid={badgesByPuuid}
         />
       ))}
     </div>
@@ -1049,6 +1051,7 @@ function ScoreboardTeam({
   recurringMates,
   onPlayerSearch,
   maxPlayerDamage,
+  badgesByPuuid,
 }: {
   teamId: number;
   players: MatchParticipantSummary[];
@@ -1056,6 +1059,7 @@ function ScoreboardTeam({
   recurringMates?: Map<string, RecurringMate>;
   onPlayerSearch?: (riotId: string) => void;
   maxPlayerDamage: number;
+  badgesByPuuid: Map<string, RiftBadge[]>;
 }) {
   const tone = teamTone(teamId);
   const hasRecurringMate = players.some(
@@ -1091,6 +1095,7 @@ function ScoreboardTeam({
             onPlayerSearch={onPlayerSearch}
             linkTone={linkTone}
             damageShare={resolveDamageScale(player, maxPlayerDamage)}
+            badges={badgesByPuuid.get(player.puuid) ?? []}
           />
         );
       })}
@@ -1115,6 +1120,7 @@ function ScoreboardRow({
   onPlayerSearch,
   linkTone,
   damageShare,
+  badges,
 }: {
   participant: MatchParticipantSummary;
   isTarget: boolean;
@@ -1122,6 +1128,7 @@ function ScoreboardRow({
   onPlayerSearch?: (riotId: string) => void;
   linkTone?: LinkTone;
   damageShare: number;
+  badges: RiftBadge[];
 }) {
   const slots = itemSlots(participant);
   const enhancements = visibleEnhancements(participant);
@@ -1164,6 +1171,21 @@ function ScoreboardRow({
           >
             {name}
           </button>
+          {badges.length > 0 && (
+            <div className="lol-score-performance-badges" aria-label="本局表现徽章">
+              {badges.map((badge) => (
+                <img
+                  key={badge.key}
+                  className={`lol-score-performance-badge ${
+                    badge.wide ? 'lol-score-performance-badge--wide' : ''
+                  }`}
+                  src={badge.src}
+                  alt={badge.title}
+                  title={badge.title}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="lol-score-runes">
