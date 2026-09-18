@@ -181,6 +181,7 @@ function MessageBubble({
           <span>{formatMessageTime(message.timestamp)}</span>
         </div>
         <div
+          data-selectable="true"
           className={`whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-5 shadow-sm ${
             message.fromSelf
               ? 'rounded-tr-xs bg-app-primary text-app-primary-foreground'

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { BookmarkPlus, Check, ChevronDown, MailPlus, PanelRightOpen, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, Reorder } from 'framer-motion';
+import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, Ellipsis, MailPlus, PanelRightOpen, Trash2, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import { MonthActivityNavigator, getHistoryDayKey } from './MatchActivityNavigator';
@@ -388,6 +389,8 @@ export function MatchHistoryPage({
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
   const [pressedTabId, setPressedTabId] = useState<string | null>(null);
+  const [tabsMenuOpen, setTabsMenuOpen] = useState(false);
+  const [tabsScrollState, setTabsScrollState] = useState({ overflowing: false, canLeft: false, canRight: false });
   const [profilePanelTabId, setProfilePanelTabId] = useState<string | null>(null);
   const [saveModeTabId, setSaveModeTabId] = useState<string | null>(null);
   const [saveSelections, setSaveSelections] = useState<Record<string, number[]>>({});
@@ -401,9 +404,10 @@ export function MatchHistoryPage({
   const tabsRef = useRef<MatchTab[]>([]);
   const lastTriggerRef = useRef(0);
   const lastSavedAccountNonceRef = useRef(0);
-  const transparentDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const tabLoadSeqRef = useRef<Record<string, number>>({});
   const friendNoticeTimerRef = useRef<number | null>(null);
+  const tabsViewportRef = useRef<HTMLDivElement | null>(null);
+  const tabsMenuRef = useRef<HTMLDivElement | null>(null);
   const historyScrollRef = useRef<HTMLDivElement | null>(null);
   const historyScrollRafRef = useRef<number | null>(null);
   const historyLoadLockRef = useRef(false);
@@ -415,6 +419,24 @@ export function MatchHistoryPage({
     end: number;
   } | null>(null);
 
+  const syncTabsScrollState = useCallback(() => {
+    const viewport = tabsViewportRef.current;
+    if (!viewport) {
+      setTabsScrollState({ overflowing: false, canLeft: false, canRight: false });
+      return;
+    }
+    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    setTabsScrollState({
+      overflowing: maxScrollLeft > 2,
+      canLeft: viewport.scrollLeft > 2,
+      canRight: viewport.scrollLeft < maxScrollLeft - 2,
+    });
+  }, []);
+
+  const scrollTabsBy = (direction: -1 | 1) => {
+    tabsViewportRef.current?.scrollBy({ left: direction * 220, behavior: 'smooth' });
+  };
+
   useEffect(() => {
     activeHistoryDayRef.current = activeHistoryDay;
   }, [activeHistoryDay]);
@@ -422,6 +444,44 @@ export function MatchHistoryPage({
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
+
+  useEffect(() => {
+    const viewport = tabsViewportRef.current;
+    if (!viewport) return;
+    const observer = new ResizeObserver(syncTabsScrollState);
+    observer.observe(viewport);
+    const frame = window.requestAnimationFrame(syncTabsScrollState);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [syncTabsScrollState, tabs.length]);
+
+  useEffect(() => {
+    const viewport = tabsViewportRef.current;
+    if (!viewport || !activeTabId) return;
+    const activeElement = viewport.querySelector<HTMLElement>('[data-player-tab-active="true"]');
+    if (!activeElement) return;
+    activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    const frame = window.requestAnimationFrame(syncTabsScrollState);
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTabId, syncTabsScrollState]);
+
+  useEffect(() => {
+    if (!tabsMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!tabsMenuRef.current?.contains(event.target as Node)) setTabsMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTabsMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tabsMenuOpen]);
 
   useEffect(() => {
     if (!pressedTabId) return;
@@ -442,16 +502,6 @@ export function MatchHistoryPage({
 
   const updateTab = (tabId: string, updater: (tab: MatchTab) => MatchTab) => {
     setTabs((currentTabs) => currentTabs.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
-  };
-
-  const getTransparentDragImage = () => {
-    if (!transparentDragImageRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
-      transparentDragImageRef.current = canvas;
-    }
-    return transparentDragImageRef.current;
   };
 
   const requestBatch = async (
@@ -635,10 +685,12 @@ export function MatchHistoryPage({
   // SGP 已按 tag 筛选，直接用 matches（不再前端过滤）
   const displayedMatches = activeTab?.matches ?? [];
 
-  // 计算经常一起玩的队友（所有已加载对局中出现≥2次的同队玩家）
-  const recurringMates = new Map<string, RecurringMate>();
+  // 只在当前标签的战绩数据变化时重算关系，避免每次标签交互都重复扫描整批对局。
   const targetPuuid = activeTab?.result?.profile.puuid ?? '';
-  if (activeTab && targetPuuid) {
+  const recurringMates = useMemo(() => {
+    const mates = new Map<string, RecurringMate>();
+    if (!activeTab || !targetPuuid) return mates;
+
     const counts: Record<string, { count: number; riotId: string; iconId: number; icon: string }> = {};
     for (const m of activeTab.matches) {
       const myTeam = m.participants.find((p) => p.puuid === targetPuuid)?.teamId;
@@ -656,18 +708,19 @@ export function MatchHistoryPage({
         counts[p.puuid].count++;
       }
     }
+
     for (const [puuid, info] of Object.entries(counts)) {
-      if (info.count >= 2) {
-        recurringMates.set(puuid, {
-          puuid,
-          riotId: info.riotId,
-          profileIconId: info.iconId,
-          profileIconUrl: info.icon,
-          count: info.count,
-        });
-      }
+      if (info.count < 2) continue;
+      mates.set(puuid, {
+        puuid,
+        riotId: info.riotId,
+        profileIconId: info.iconId,
+        profileIconUrl: info.icon,
+        count: info.count,
+      });
     }
-  }
+    return mates;
+  }, [activeTab, targetPuuid]);
   const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
   const isSaveMode = activeTab ? saveModeTabId === activeTab.id : false;
   const selectedSaveIds = new Set(activeTab ? saveSelections[activeTab.id] ?? [] : []);
@@ -1089,22 +1142,20 @@ export function MatchHistoryPage({
     });
   };
 
-  const handleDragOverTab = (overTabId: string, clientX: number, targetRect: DOMRect) => {
-    if (!draggingTabId || draggingTabId === overTabId) return;
-    const targetMiddleX = targetRect.left + targetRect.width / 2;
-
-    setTabs((currentTabs) => {
-      const from = currentTabs.findIndex((tab) => tab.id === draggingTabId);
-      const to = currentTabs.findIndex((tab) => tab.id === overTabId);
-      if (from < 0 || to < 0) return currentTabs;
-      if (from < to && clientX < targetMiddleX) return currentTabs;
-      if (from > to && clientX > targetMiddleX) return currentTabs;
-
-      const nextTabs = [...currentTabs];
-      const [moved] = nextTabs.splice(from, 1);
-      nextTabs.splice(to, 0, moved);
-      return nextTabs;
-    });
+  const handleCloseAllTabs = () => {
+    tabLoadSeqRef.current = {};
+    setTabs([]);
+    setActiveTabId(null);
+    setDraggingTabId(null);
+    setPressedTabId(null);
+    setProfilePanelTabId(null);
+    setSaveModeTabId(null);
+    setSaveSelections({});
+    setFriendNotice(null);
+    setTabsMenuOpen(false);
+    setActiveHistoryDay(null);
+    setHistoryScrollProgress(0);
+    setHistoryViewportRange(null);
   };
 
   const handlePlayerSearch = (riotId: string) => {
@@ -1119,95 +1170,238 @@ export function MatchHistoryPage({
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
-      <div className="flex h-10 shrink-0 items-end border-b border-app-border bg-app-bg-soft px-1 [-webkit-app-region:no-drag]">
-        <div
+      <div className="match-player-tabs-bar [-webkit-app-region:no-drag]">
+        <Reorder.Group
+          ref={tabsViewportRef}
+          as="div"
+          axis="x"
+          values={tabs}
+          onReorder={setTabs}
           role="tablist"
           aria-label="已打开玩家"
-          className="scrollbar-none flex h-full min-w-0 flex-1 items-end gap-0 overflow-x-auto overflow-y-hidden"
+          onScroll={syncTabsScrollState}
+          onWheel={(event) => {
+            if (!tabsScrollState.overflowing) return;
+            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+            event.preventDefault();
+            event.currentTarget.scrollLeft += event.deltaY;
+          }}
+          className="match-player-tabs-viewport scrollbar-none"
         >
-          {tabs.map((tab) => {
-            const tabLabel = getTabLabel(tab);
-            const isPressedOrDragging = tab.id === draggingTabId || tab.id === pressedTabId;
-            const isActive = tab.id === activeTabId;
-            return (
-              <div
-                key={tab.id}
-                draggable
-                role="tab"
-                tabIndex={0}
-                aria-selected={isActive}
-                title={tabLabel}
-                onClick={() => setActiveTabId(tab.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    setActiveTabId(tab.id);
-                  }
-                }}
-                onMouseDown={(event) => {
-                  if (event.button === 0) setPressedTabId(tab.id);
-                }}
-                onDragStart={(event) => {
-                  setDraggingTabId(tab.id);
-                  setPressedTabId(null);
-                  setActiveTabId(tab.id);
-                  event.dataTransfer.effectAllowed = 'move';
-                  event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                }}
-                onDragEnd={() => {
-                  setDraggingTabId(null);
-                  setPressedTabId(null);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = 'move';
-                  handleDragOverTab(tab.id, event.clientX, event.currentTarget.getBoundingClientRect());
-                }}
-                onDrop={(event) => event.preventDefault()}
-                className={
-                  'group relative flex h-9 min-w-[124px] max-w-56 shrink-0 cursor-pointer items-center gap-2 border-r border-app-border/60 px-2.5 pr-1.5 text-xs outline-none transition-[background-color,color,opacity] duration-150 ' +
-                  (isPressedOrDragging ? 'cursor-grabbing ' : '') +
-                  (isActive
-                    ? 'bg-app-surface text-app-text '
-                    : 'bg-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover ') +
-                  (tab.id === draggingTabId ? 'z-10 opacity-60' : '')
-                }
-              >
-                {isActive && (
-                  <span className="pointer-events-none absolute right-3 bottom-[-1px] left-3 h-px bg-app-text" />
-                )}
-                <ProfileIcon
-                  iconId={tab.result?.profile.profileIconId}
-                  src={tab.result?.profile.profileIconUrl}
-                  alt={tabLabel}
+          <AnimatePresence initial={false}>
+            {tabs.map((tab) => {
+              const tabLabel = getTabLabel(tab);
+              const isPressedOrDragging = tab.id === draggingTabId || tab.id === pressedTabId;
+              const isActive = tab.id === activeTabId;
+              return (
+                <Reorder.Item
+                  key={tab.id}
+                  as="div"
+                  value={tab}
+                  role="tab"
+                  tabIndex={0}
+                  aria-selected={isActive}
+                  data-player-tab-active={isActive ? 'true' : 'false'}
                   title={tabLabel}
-                  size={20}
-                  className={isActive ? 'ring-1 ring-app-border-strong' : 'ring-1 ring-app-border/70'}
-                />
-                <span className={isActive ? 'min-w-0 flex-1 truncate font-semibold text-app-text' : 'min-w-0 flex-1 truncate font-medium'}>
-                  {tabLabel}
-                </span>
-                {tab.loading && <span className="size-1.5 shrink-0 rounded-full bg-app-primary" />}
-                <button
-                  type="button"
-                  title="关闭"
-                  aria-label="关闭标签页"
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleCloseTab(tab.id);
+                  dragElastic={0.06}
+                  dragMomentum={false}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0) return;
+                    setPressedTabId(tab.id);
+                    if (!isActive) setActiveTabId(tab.id);
+                  }}
+                  onClick={() => {
+                    if (!isActive) setActiveTabId(tab.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setActiveTabId(tab.id);
+                    }
+                  }}
+                  onDragStart={() => {
+                    setDraggingTabId(tab.id);
+                    setPressedTabId(null);
+                    if (!isActive) setActiveTabId(tab.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingTabId(null);
+                    setPressedTabId(null);
+                  }}
+                  initial={{ opacity: 0, y: 3, scale: 0.985 }}
+                  animate={{
+                    opacity: tab.id === draggingTabId ? 0.72 : 1,
+                    y: 0,
+                    scale: tab.id === draggingTabId ? 0.985 : 1,
+                  }}
+                  exit={{ opacity: 0, y: 2, scale: 0.97 }}
+                  transition={{
+                    duration: 0.13,
+                    layout: { type: 'spring', stiffness: 520, damping: 40, mass: 0.72 },
                   }}
                   className={
-                    'flex size-5 shrink-0 items-center justify-center rounded-sm text-app-subtle outline-none transition-[background-color,color,opacity] hover:bg-app-nav-hover hover:text-app-text group-hover:opacity-100 focus-visible:bg-app-nav-hover focus-visible:text-app-text focus-visible:opacity-100 ' +
-                    (isActive ? 'opacity-55' : 'opacity-0')
+                    'match-player-tab group ' +
+                    (isPressedOrDragging ? 'match-player-tab--pressed ' : '') +
+                    (isActive ? 'match-player-tab--active' : '')
                   }
                 >
-                  <X className="size-3" />
+                  {isActive && (
+                    <>
+                      <motion.span
+                        layoutId="match-player-tab-surface"
+                        className="match-player-tab__surface"
+                        transition={{ type: 'spring', stiffness: 560, damping: 42, mass: 0.68 }}
+                      />
+                      <motion.span
+                        layoutId="match-player-tab-indicator"
+                        className="match-player-tab__indicator"
+                        transition={{ type: 'spring', stiffness: 620, damping: 44, mass: 0.65 }}
+                      />
+                    </>
+                  )}
+                  <span className="match-player-tab__content">
+                    <ProfileIcon
+                      iconId={tab.result?.profile.profileIconId}
+                      src={tab.result?.profile.profileIconUrl}
+                      alt={tabLabel}
+                      title={tabLabel}
+                      size={20}
+                      className={`match-player-tab__avatar ${
+                        isActive ? 'ring-1 ring-app-border-strong' : 'ring-1 ring-app-border/50'
+                      }`}
+                    />
+                    <span
+                      className={`match-player-tab__label ${
+                        isActive ? 'match-player-tab__label--active' : ''
+                      }`}
+                    >
+                      {tabLabel}
+                    </span>
+                    {tab.loading && <span className="match-player-tab__loading" />}
+                    <button
+                      type="button"
+                      title="关闭"
+                      aria-label="关闭标签页"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleCloseTab(tab.id);
+                      }}
+                      className={
+                        'match-player-tab__close ' +
+                        (isActive ? 'match-player-tab__close--visible' : '')
+                      }
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                </Reorder.Item>
+              );
+            })}
+          </AnimatePresence>
+        </Reorder.Group>
+
+        {tabs.length > 0 && (
+          <div ref={tabsMenuRef} className="match-player-tabs-tools">
+            {tabsScrollState.overflowing && (
+              <div className="match-player-tabs-scroll-controls">
+                <button
+                  type="button"
+                  aria-label="向左查看更多标签页"
+                  title="向左"
+                  disabled={!tabsScrollState.canLeft}
+                  onClick={() => scrollTabsBy(-1)}
+                >
+                  <ChevronLeft />
+                </button>
+                <button
+                  type="button"
+                  aria-label="向右查看更多标签页"
+                  title="向右"
+                  disabled={!tabsScrollState.canRight}
+                  onClick={() => scrollTabsBy(1)}
+                >
+                  <ChevronRight />
                 </button>
               </div>
-            );
-          })}
-        </div>
+            )}
+            <button
+              type="button"
+              className={`match-player-tabs-more ${tabsMenuOpen ? 'match-player-tabs-more--open' : ''}`}
+              aria-haspopup="menu"
+              aria-expanded={tabsMenuOpen}
+              aria-label="标签页选项"
+              title="标签页选项"
+              onClick={() => setTabsMenuOpen((current) => !current)}
+            >
+              <Ellipsis />
+            </button>
+
+            {tabsMenuOpen && (
+              <div className="match-player-tabs-menu" role="menu">
+                <div className="match-player-tabs-menu__head">
+                  <span>已打开标签</span>
+                  <strong>{tabs.length}</strong>
+                </div>
+                <div className="match-player-tabs-menu__list scrollbar-none">
+                  {tabs.map((tab) => {
+                    const tabLabel = getTabLabel(tab);
+                    const isActive = tab.id === activeTabId;
+                    return (
+                      <div
+                        key={tab.id}
+                        className={`match-player-tabs-menu__row ${isActive ? 'is-active' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="match-player-tabs-menu__item"
+                          onClick={() => {
+                            setActiveTabId(tab.id);
+                            setTabsMenuOpen(false);
+                          }}
+                        >
+                          <ProfileIcon
+                            iconId={tab.result?.profile.profileIconId}
+                            src={tab.result?.profile.profileIconUrl}
+                            alt={tabLabel}
+                            title={tabLabel}
+                            size={18}
+                          />
+                          <span>{tabLabel}</span>
+                          {isActive && <Check />}
+                        </button>
+                        <button
+                          type="button"
+                          className="match-player-tabs-menu__remove"
+                          aria-label={`关闭 ${tabLabel}`}
+                          title={`关闭 ${tabLabel}`}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleCloseTab(tab.id);
+                          }}
+                        >
+                          <X />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="match-player-tabs-menu__divider" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="match-player-tabs-menu__danger"
+                  onClick={handleCloseAllTabs}
+                >
+                  <Trash2 />
+                  <span>关闭全部标签页</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">

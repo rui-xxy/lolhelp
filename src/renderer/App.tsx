@@ -60,6 +60,19 @@ const APP_SESSION_STORAGE_KEY = 'lolhelp:ui-session:v1';
 const APP_VIEWS: View[] = ['home', 'matches', 'live', 'scout', 'ranking', 'assist'];
 const RANKING_CHAPTERS: RankingChapter[] = ['mayhem', 'ranking'];
 
+const NATIVE_SELECTABLE_SELECTOR =
+  'input, textarea, [contenteditable="true"], [data-selectable="true"], .select-text, pre, code';
+
+function allowsNativeTextSelection(target: EventTarget | Node | null): boolean {
+  const element =
+    target instanceof Element
+      ? target
+      : target instanceof Node
+        ? target.parentElement
+        : null;
+  return Boolean(element?.closest(NATIVE_SELECTABLE_SELECTOR));
+}
+
 interface AppSessionState {
   activeView?: View;
   matchSearchName?: string;
@@ -149,6 +162,55 @@ export function App() {
   const friendPanelTimerRef = useRef<number | null>(null);
   const trackedOutgoingRequestsRef = useRef(loadTrackedOutgoingRequests());
   const friendRequestCheckInFlightRef = useRef(false);
+
+  useEffect(() => {
+    const clearSelection = () => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) selection.removeAllRanges();
+    };
+
+    const handleSelectStart = (event: Event) => {
+      if (allowsNativeTextSelection(event.target)) return;
+      event.preventDefault();
+      clearSelection();
+    };
+
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      if (allowsNativeTextSelection(selection.anchorNode) && allowsNativeTextSelection(selection.focusNode)) {
+        return;
+      }
+      clearSelection();
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (allowsNativeTextSelection(event.target)) return;
+      clearSelection();
+    };
+
+    const handleNativeDragStart = (event: DragEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        event.preventDefault();
+        return;
+      }
+      if (target.closest('[data-native-drag="true"]')) return;
+      event.preventDefault();
+    };
+
+    document.addEventListener('selectstart', handleSelectStart, true);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('dragstart', handleNativeDragStart, true);
+
+    return () => {
+      document.removeEventListener('selectstart', handleSelectStart, true);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('dragstart', handleNativeDragStart, true);
+    };
+  }, []);
 
   useEffect(() => {
     try {

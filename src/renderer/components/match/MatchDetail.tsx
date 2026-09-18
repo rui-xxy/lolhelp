@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, CirclePlay, Download, LoaderCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CirclePlay, Download, History, LoaderCircle, Users } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
@@ -277,6 +277,49 @@ function buildPremadeToneMap(players: MatchParticipantSummary[], reserveAmber: b
     toneById.set(premadeId, tones[toneById.size % tones.length]);
   }
   return toneById;
+}
+
+function buildPremadeCountMap(players: MatchParticipantSummary[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const player of players) {
+    if (!player.premadeId) continue;
+    counts.set(player.premadeId, (counts.get(player.premadeId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+type PlayerRelationship = {
+  kind: 'premade' | 'recurring';
+  label: string;
+};
+
+function resolvePlayerRelationship(
+  player: MatchParticipantSummary,
+  isLinkedByHistory: boolean,
+  premadeCountById: Map<string, number>,
+): PlayerRelationship | undefined {
+  const premadeCount = player.premadeId ? (premadeCountById.get(player.premadeId) ?? 0) : 0;
+  if (premadeCount >= 2) {
+    return { kind: 'premade', label: `开黑·${premadeCount}` };
+  }
+  if (isLinkedByHistory) {
+    return { kind: 'recurring', label: '常玩' };
+  }
+  return undefined;
+}
+
+function PlayerRelationshipBadge({ relationship }: { relationship?: PlayerRelationship }) {
+  if (!relationship) return null;
+  const Icon = relationship.kind === 'premade' ? Users : History;
+  return (
+    <span
+      className={`lol-player-relation lol-player-relation--${relationship.kind}`}
+      title={relationship.kind === 'premade' ? '本局组队关系' : '历史上多次同队；本场组队标识缺失'}
+    >
+      <Icon aria-hidden="true" />
+      <span>{relationship.label}</span>
+    </span>
+  );
 }
 
 function stat(participant: MatchParticipantSummary, key: keyof MatchParticipantStats): number {
@@ -874,6 +917,7 @@ function RiftScoreboardTeam({
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
   const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const premadeCountById = buildPremadeCountMap(players);
   const won = players[0]?.win ?? false;
 
   return (
@@ -889,11 +933,9 @@ function RiftScoreboardTeam({
         {players.map((player) => {
           const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
           const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
-          const linkTone = isLinkedByHistory
-            ? 'amber'
-            : player.premadeId
-              ? premadeToneById.get(player.premadeId)
-              : undefined;
+          const premadeTone = player.premadeId ? premadeToneById.get(player.premadeId) : undefined;
+          const linkTone = premadeTone ?? (isLinkedByHistory ? 'amber' : undefined);
+          const relationship = resolvePlayerRelationship(player, isLinkedByHistory, premadeCountById);
 
           return (
             <RiftScoreboardRow
@@ -904,6 +946,7 @@ function RiftScoreboardTeam({
               onPlayerSearch={onPlayerSearch}
               linkTone={linkTone}
               queueId={queueId}
+              relationship={relationship}
               rankByPuuid={rankByPuuid}
               badges={badgesByPuuid.get(player.puuid) ?? []}
               damageShare={resolveDamageScale(player, maxPlayerDamage)}
@@ -921,6 +964,7 @@ function RiftScoreboardRow({
   isRecurring,
   onPlayerSearch,
   linkTone,
+  relationship,
   queueId,
   rankByPuuid,
   badges,
@@ -931,6 +975,7 @@ function RiftScoreboardRow({
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
   linkTone?: LinkTone;
+  relationship?: PlayerRelationship;
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
   badges: RiftBadge[];
@@ -985,16 +1030,19 @@ function RiftScoreboardRow({
       </div>
 
       <div className="lol-rift-identity">
-        <button
-          type="button"
-          className={`lol-rift-player-name ${
-            linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
-          }`}
-          title={name}
-          onClick={() => onPlayerSearch?.(name)}
-        >
-          {name}
-        </button>
+        <div className="lol-player-relation-line">
+          <button
+            type="button"
+            className={`lol-rift-player-name ${
+              linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
+            }`}
+            title={name}
+            onClick={() => onPlayerSearch?.(name)}
+          >
+            {name}
+          </button>
+          <PlayerRelationshipBadge relationship={relationship} />
+        </div>
         <div className="lol-rift-badges">
           {badges.map((badge) => (
             <img
@@ -1028,8 +1076,14 @@ function RiftScoreboardRow({
           ),
         )}
       </div>
-      <div className="lol-rift-kda">
-        <strong>{`${participant.kills} / ${participant.deaths} / ${participant.assists}`}</strong>
+      <div className="lol-rift-kda" aria-label={`KDA ${participant.kills} / ${participant.deaths} / ${participant.assists}`}>
+        <strong className="lol-kda-cluster">
+          <span className="lol-kda-value">{participant.kills}</span>
+          <i className="lol-kda-separator">/</i>
+          <span className="lol-kda-value lol-kda-value--death">{participant.deaths}</span>
+          <i className="lol-kda-separator">/</i>
+          <span className="lol-kda-value">{participant.assists}</span>
+        </strong>
       </div>
       <span className="lol-rift-damage">{formatCompact(participant.damage)}</span>
     </div>
@@ -1066,6 +1120,7 @@ function ScoreboardTeam({
     (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
   );
   const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const premadeCountById = buildPremadeCountMap(players);
   const won = players[0]?.win ?? false;
 
   return (
@@ -1080,11 +1135,9 @@ function ScoreboardTeam({
       {players.map((player) => {
         const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
         const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
-        const linkTone = isLinkedByHistory
-          ? 'amber'
-          : player.premadeId
-            ? premadeToneById.get(player.premadeId)
-            : undefined;
+        const premadeTone = player.premadeId ? premadeToneById.get(player.premadeId) : undefined;
+        const linkTone = premadeTone ?? (isLinkedByHistory ? 'amber' : undefined);
+        const relationship = resolvePlayerRelationship(player, isLinkedByHistory, premadeCountById);
 
         return (
           <ScoreboardRow
@@ -1095,6 +1148,7 @@ function ScoreboardTeam({
             onPlayerSearch={onPlayerSearch}
             linkTone={linkTone}
             damageShare={resolveDamageScale(player, maxPlayerDamage)}
+            relationship={relationship}
             badges={badgesByPuuid.get(player.puuid) ?? []}
           />
         );
@@ -1119,6 +1173,7 @@ function ScoreboardRow({
   isRecurring,
   onPlayerSearch,
   linkTone,
+  relationship,
   damageShare,
   badges,
 }: {
@@ -1127,6 +1182,7 @@ function ScoreboardRow({
   isRecurring: boolean;
   onPlayerSearch?: (riotId: string) => void;
   linkTone?: LinkTone;
+  relationship?: PlayerRelationship;
   damageShare: number;
   badges: RiftBadge[];
 }) {
@@ -1161,16 +1217,19 @@ function ScoreboardRow({
           <span>{participant.champLevel}</span>
         </div>
         <div className="lol-score-player-copy">
-          <button
-            type="button"
-            className={`lol-score-player-name ${
-              linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
-            }`}
-            title={name}
-            onClick={() => onPlayerSearch?.(name)}
-          >
-            {name}
-          </button>
+          <div className="lol-player-relation-line">
+            <button
+              type="button"
+              className={`lol-score-player-name ${
+                linkTone ? `lol-score-player-name--linked lol-score-player-name--linked-${linkTone}` : ''
+              }`}
+              title={name}
+              onClick={() => onPlayerSearch?.(name)}
+            >
+              {name}
+            </button>
+            <PlayerRelationshipBadge relationship={relationship} />
+          </div>
           {badges.length > 0 && (
             <div className="lol-score-performance-badges" aria-label="本局表现徽章">
               {badges.map((badge) => (
@@ -1218,8 +1277,14 @@ function ScoreboardRow({
           ),
         )}
       </div>
-      <div className="lol-score-kda">
-        <strong>{`${participant.kills} / ${participant.deaths} / ${participant.assists}`}</strong>
+      <div className="lol-score-kda" aria-label={`KDA ${participant.kills} / ${participant.deaths} / ${participant.assists}`}>
+        <strong className="lol-kda-cluster">
+          <span className="lol-kda-value">{participant.kills}</span>
+          <i className="lol-kda-separator">/</i>
+          <span className="lol-kda-value lol-kda-value--death">{participant.deaths}</span>
+          <i className="lol-kda-separator">/</i>
+          <span className="lol-kda-value">{participant.assists}</span>
+        </strong>
       </div>
       <span className="lol-score-number">{formatCompact(participant.damage)}</span>
     </div>

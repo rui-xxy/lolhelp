@@ -12,7 +12,7 @@
     height: 44px;
     align-items: flex-end;
     gap: 2px;
-    border-bottom: 1px solid var(--color-app-border);
+    border-bottom: 0;
     padding: 4px 8px 0;
     background: transparent;
   }
@@ -108,11 +108,9 @@
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    gap: 0;
-    padding: 0 4px 2px;
+    gap: 3px;
+    padding: 0 4px 4px;
     border: 0;
-    border-top: 1px solid var(--color-app-border);
-    border-bottom: 1px solid color-mix(in srgb, var(--color-app-text) 5%, transparent);
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -120,7 +118,7 @@
 
   .lol-result-team--win,
   .lol-result-team--loss {
-    border-color: var(--color-app-border);
+    border: 0;
     background: transparent;
     box-shadow: none;
   }
@@ -131,35 +129,49 @@
   }
 
   .lol-result-team + .lol-result-team {
-    margin-top: 8px;
+    position: relative;
+    margin-top: 20px;
+    padding-top: 0;
+  }
+
+  .lol-result-team + .lol-result-team::before {
+    display: none;
+    content: none;
   }
 
   .lol-result-team .lol-rift-grid--head,
   .lol-result-team .lol-score-grid--head {
-    min-height: 24px;
-    padding-inline: 4px;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-app-text) 5%, transparent);
-    color: var(--color-app-subtle);
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 24px;
+    min-height: 28px;
+    padding-inline: 8px;
+    border: 0;
+    background: color-mix(in srgb, var(--color-app-text) 1.2%, transparent);
+    box-shadow: none;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    line-height: 1;
+  }
+
+  .lol-result-team .lol-rift-grid--head > span:not(.lol-result-heading),
+  .lol-result-team .lol-score-grid--head > span:not(.lol-result-heading) {
+    color: color-mix(in srgb, var(--color-app-text) 52%, var(--color-app-muted));
+    font-size: 11px;
+    font-weight: 620;
+    letter-spacing: 0.035em;
   }
 
   .lol-result-team .lol-rift-row,
   .lol-result-team .lol-score-row {
     min-height: 52px;
     padding-inline: 4px;
-    border-radius: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-app-text) 4%, transparent);
+    border: 0;
+    border-radius: 7px;
     background: transparent;
     transition:
       background-color 120ms ease,
-      color 120ms ease;
-  }
-
-  .lol-result-team .lol-rift-row:last-child,
-  .lol-result-team .lol-score-row:last-child {
-    border-bottom: 0;
+      color 120ms ease,
+      filter 120ms ease;
   }
 
   .lol-result-heading {
@@ -171,8 +183,9 @@
   }
 
   .lol-result-heading b {
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 680;
+    letter-spacing: 0.015em;
   }
 
   .lol-result-heading i {
@@ -184,10 +197,11 @@
   }
 
   .lol-result-heading em {
-    color: var(--color-app-subtle);
-    font-size: 9px;
+    color: var(--color-app-muted);
+    font-size: 10px;
     font-style: normal;
-    font-weight: 500;
+    font-weight: 560;
+    letter-spacing: 0.03em;
   }
 
   .lol-result-heading--win {
@@ -202,7 +216,30 @@
   .lol-result-team--win .lol-score-row:hover,
   .lol-result-team--loss .lol-rift-row:hover,
   .lol-result-team--loss .lol-score-row:hover {
-    background: color-mix(in srgb, var(--color-app-text) 3.5%, transparent);
+    background: color-mix(in srgb, var(--color-app-text) 2.8%, transparent);
+    box-shadow: none;
+  }
+
+  .lol-result-team .lol-rift-row--target,
+  .lol-result-team .lol-score-row--target {
+    background: color-mix(in srgb, var(--color-app-text) 3.8%, transparent);
+    box-shadow: none;
+  }
+
+  .lol-result-team .lol-rift-row--target:hover,
+  .lol-result-team .lol-score-row--target:hover {
+    background: color-mix(in srgb, var(--color-app-text) 4.8%, transparent);
+    box-shadow: none;
+  }
+
+  .lol-result-team .lol-rift-row:hover .lol-rift-player-name,
+  .lol-result-team .lol-score-row:hover .lol-score-player-name {
+    color: var(--color-app-text);
+  }
+
+  .lol-result-team .lol-rift-row:hover .lol-rift-champion img,
+  .lol-result-team .lol-score-row:hover .lol-score-champion img {
+    filter: brightness(1.04) saturate(1.03);
   }
 
   .lol-result-team .lol-rift-player-name {
@@ -224,6 +261,57 @@
     font-size: 12px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+  }
+
+  .lol-result-team .lol-score-kda,
+  .lol-result-team .lol-rift-kda {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lol-result-team .lol-score-kda .lol-kda-cluster,
+  .lol-result-team .lol-rift-kda .lol-kda-cluster {
+    display: inline-flex;
+    width: auto;
+    min-width: 58px;
+    align-items: baseline;
+    justify-content: center;
+    gap: 3px;
+    color: var(--color-app-body);
+    font-size: 12px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .lol-result-team .lol-kda-cluster > .lol-kda-value {
+    display: inline-block;
+    min-width: 12px;
+    margin-top: 0;
+    color: inherit;
+    font-size: inherit;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .lol-result-team .lol-kda-cluster > .lol-kda-value--death {
+    color: color-mix(in srgb, var(--color-app-danger) 32%, var(--color-app-body));
+    font-weight: 600;
+  }
+
+  .lol-result-team .lol-kda-cluster > .lol-kda-separator {
+    display: inline-block;
+    margin: 0;
+    color: var(--color-app-subtle);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0.52;
+    text-align: center;
   }
 
   .lol-result-team .lol-rift-champion img,
@@ -324,6 +412,79 @@
     gap: 4px;
   }
 
+  .lol-player-relation-line {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lol-player-relation-line > .lol-rift-player-name,
+  .lol-player-relation-line > .lol-score-player-name {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .lol-player-relation {
+    display: inline-flex;
+    height: 17px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    margin-top: 0;
+    border: 1px solid color-mix(in srgb, var(--lol-score-link-color, var(--color-app-text)) 30%, transparent);
+    border-radius: 999px;
+    padding: 0 6px;
+    background: color-mix(in srgb, var(--lol-score-link-color, var(--color-app-text)) 7%, transparent);
+    color: color-mix(
+      in srgb,
+      var(--lol-score-link-color, var(--color-app-text)) 74%,
+      var(--color-app-body)
+    );
+    font-size: 8px;
+    font-weight: 650;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .lol-score-player-copy .lol-player-relation,
+  .lol-score-player-copy .lol-player-relation > span {
+    display: inline-flex;
+    margin-top: 0;
+    color: inherit;
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  .lol-player-relation > svg {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 10px;
+    color: currentColor;
+    stroke-width: 1.9;
+  }
+
+  .lol-player-relation--recurring {
+    border-style: dashed;
+    opacity: 0.9;
+  }
+
+  .lol-rift-row:hover .lol-player-relation,
+  .lol-score-row:hover .lol-player-relation {
+    border-color: color-mix(
+      in srgb,
+      var(--lol-score-link-color, var(--color-app-text)) 42%,
+      transparent
+    );
+    background: color-mix(
+      in srgb,
+      var(--lol-score-link-color, var(--color-app-text)) 10%,
+      transparent
+    );
+  }
+
+
   .lol-score-performance-badges,
   .lol-rift-badges {
     display: flex;
@@ -358,6 +519,147 @@
   .lol-rift-row:hover .lol-rift-badge {
     transform: translateY(-1px);
     filter: saturate(1.1) brightness(1.1);
+  }
+
+  .lol-result-team .lol-score-items .lol-score-item-empty,
+  .lol-result-team .lol-rift-items .lol-score-item-empty {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 7%, transparent);
+    border-radius: 5px;
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--color-app-text) 2.8%, transparent),
+        transparent 52%
+      ),
+      color-mix(in srgb, var(--color-app-bg) 34%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-app-text) 3.8%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-app-bg) 28%, transparent);
+  }
+
+  .lol-result-team .lol-score-items .lol-score-item-empty::after,
+  .lol-result-team .lol-rift-items .lol-score-item-empty::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 12%, transparent);
+    border-radius: 1px;
+    content: "";
+    opacity: 0.72;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .lol-result-team .lol-score-runes {
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 4%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-app-bg) 20%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-app-text) 2.2%, transparent),
+      inset 0 0 12px color-mix(in srgb, var(--color-app-bg) 16%, transparent);
+    opacity: 0.88;
+    filter: saturate(0.9) brightness(0.98);
+    transition:
+      opacity 120ms ease,
+      filter 120ms ease;
+  }
+
+  .lol-result-team .lol-score-row:hover .lol-score-runes,
+  .lol-result-team .lol-score-row--target .lol-score-runes {
+    opacity: 1;
+    filter: saturate(0.98) brightness(1);
+  }
+
+  .lol-result-team .lol-score-enhancement {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 9%, transparent);
+    border-radius: 6px;
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--color-app-text) 4.5%, transparent),
+        transparent 48%
+      ),
+      color-mix(in srgb, var(--color-app-bg) 36%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-app-text) 4%, transparent),
+      0 1px 2px color-mix(in srgb, var(--color-app-bg) 22%, transparent);
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease,
+      box-shadow 120ms ease,
+      transform 100ms ease;
+  }
+
+  .lol-result-team .lol-score-enhancement--rune {
+    border-color: color-mix(in srgb, var(--color-app-text) 10%, transparent);
+    background:
+      radial-gradient(
+        circle at 50% 48%,
+        color-mix(in srgb, var(--color-app-text) 4%, transparent),
+        transparent 72%
+      ),
+      color-mix(in srgb, var(--color-app-bg) 32%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--augment {
+    border-color: color-mix(in srgb, var(--color-app-link) 22%, transparent);
+    background:
+      radial-gradient(
+        circle at 50% 45%,
+        color-mix(in srgb, var(--color-app-link) 10%, transparent),
+        transparent 68%
+      ),
+      color-mix(in srgb, var(--color-app-bg) 34%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--kgold {
+    border-color: color-mix(in srgb, #d8aa43 34%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--kprismatic {
+    border-color: color-mix(in srgb, #b985ff 34%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--ksilver {
+    border-color: color-mix(in srgb, #cfd5df 22%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--kbronze {
+    border-color: color-mix(in srgb, #ba7a3d 30%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--empty {
+    border-color: color-mix(in srgb, var(--color-app-text) 5.5%, transparent);
+    background: color-mix(in srgb, var(--color-app-bg) 22%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 1.5%, transparent);
+  }
+
+  .lol-result-team .lol-score-enhancement--empty::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 9%, transparent);
+    border-radius: 1px;
+    content: "";
+    opacity: 0.64;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .lol-result-team .lol-score-enhancement:not(.lol-score-enhancement--empty):hover {
+    border-color: color-mix(in srgb, var(--color-app-text) 22%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-app-text) 6%, transparent),
+      0 2px 8px color-mix(in srgb, var(--color-app-bg) 28%, transparent);
+    transform: translateY(-1px);
   }
 
   .lol-rift-player-cell > :not(.lol-rift-damage-energy),

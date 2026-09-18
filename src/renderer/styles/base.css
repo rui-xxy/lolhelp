@@ -16,6 +16,30 @@
     color: var(--color-app-body);
   }
 
+  /* Desktop-app interaction model: ordinary UI should not enter Chromium's
+     native text-selection or image-drag states on pointer drags. */
+  #root,
+  #root * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #root input,
+  #root textarea,
+  #root [contenteditable="true"],
+  #root [data-selectable="true"],
+  #root .select-text,
+  #root pre,
+  #root code {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  #root img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-scrollbar-firefox) transparent;
