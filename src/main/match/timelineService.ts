@@ -1,5 +1,6 @@
 import type {
   MatchTimeline,
+  MatchTimelineDamageRecord,
   MatchTimelineEvent,
   MatchTimelineFrame,
   MatchTimelineParticipantFrame,
@@ -17,6 +18,35 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeDamageRecord(raw: Record<string, unknown>): MatchTimelineDamageRecord {
+  const physicalDamage = number(raw.physicalDamage);
+  const magicDamage = number(raw.magicDamage);
+  const trueDamage = number(raw.trueDamage);
+  const componentDamage = physicalDamage + magicDamage + trueDamage;
+  const explicitDamage = number(raw.damage);
+
+  return {
+    ...(raw as unknown as MatchTimelineDamageRecord),
+    participantId: number(raw.participantId) || undefined,
+    name: raw.name == null ? undefined : String(raw.name),
+    type: raw.type == null ? undefined : String(raw.type),
+    damage: explicitDamage > 0 ? explicitDamage : componentDamage,
+    physicalDamage,
+    magicDamage,
+    trueDamage,
+    basic: Boolean(raw.basic),
+    spellName: raw.spellName == null ? undefined : String(raw.spellName),
+    spellSlot: raw.spellSlot == null ? undefined : number(raw.spellSlot),
+  };
+}
+
+function normalizeDamageRecords(value: unknown): MatchTimelineDamageRecord[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object'))
+    .map((row) => normalizeDamageRecord(row));
+}
+
 function normalizeEvent(raw: Record<string, unknown>): MatchTimelineEvent {
   const itemId = number(raw.itemId);
   const item = itemId > 0 ? getItemById(itemId) : null;
@@ -27,6 +57,8 @@ function normalizeEvent(raw: Record<string, unknown>): MatchTimelineEvent {
     itemId: itemId || undefined,
     itemName: item?.name,
     itemIcon: item?.icon,
+    victimDamageReceived: normalizeDamageRecords(raw.victimDamageReceived),
+    victimDamageDealt: normalizeDamageRecords(raw.victimDamageDealt),
   };
 }
 

@@ -12,11 +12,17 @@ interface DDragonChampion {
   name?: string;
   title?: string;
   stats?: Record<string, number>;
+  passive?: {
+    name?: string;
+    description?: string;
+    image?: { full?: string };
+  };
   spells?: Array<{
     name?: string;
     description?: string;
     cooldownBurn?: string;
     costBurn?: string;
+    image?: { full?: string };
   }>;
 }
 
@@ -41,6 +47,13 @@ let dataDragonVersionCache: { value: string; expiresAt: number } | null = null;
 
 function stripMarkup(value: string): string {
   return value.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function buildDataDragonImage(version: string, kind: 'spell' | 'passive', full?: string): string {
+  const file = String(full ?? '').trim();
+  return file
+    ? `https://ddragon.leagueoflegends.com/cdn/${version}/img/${kind}/${file}`
+    : '';
 }
 
 async function resolveDataDragonVersion(): Promise<string> {
@@ -81,10 +94,13 @@ async function resolveCurrentChampion(client: LcuClient): Promise<number> {
 export async function getAssistChampionGuide(
   requestedChampionId = 0,
 ): Promise<AssistChampionGuide> {
-  const creds = getCachedCredentials();
-  if (!creds) throw new Error('未连接英雄联盟客户端');
-  const client = new LcuClient(creds);
-  const championId = requestedChampionId || await resolveCurrentChampion(client);
+  let championId = Number(requestedChampionId || 0);
+  if (!championId) {
+    const creds = getCachedCredentials();
+    if (!creds) throw new Error('未连接英雄联盟客户端');
+    const client = new LcuClient(creds);
+    championId = await resolveCurrentChampion(client);
+  }
   if (!championId) throw new Error('当前没有可识别的英雄');
   const cached = guideCache.get(championId);
   if (cached) return structuredClone(cached);
@@ -115,12 +131,18 @@ export async function getAssistChampionGuide(
       { label: '移动速度', base: stats.movespeed ?? 0 },
       { label: '攻击距离', base: stats.attackrange ?? 0 },
     ],
+    passive: data.passive ? {
+      name: data.passive.name ?? '被动',
+      description: stripMarkup(data.passive.description ?? ''),
+      icon: buildDataDragonImage(version, 'passive', data.passive.image?.full),
+    } : undefined,
     spells: (data.spells ?? []).map((spell, index) => ({
       key: ['Q', 'W', 'E', 'R'][index] ?? String(index + 1),
       name: spell.name ?? '',
       description: stripMarkup(spell.description ?? ''),
       cooldown: spell.cooldownBurn ?? '',
       cost: spell.costBurn ?? '',
+      icon: buildDataDragonImage(version, 'spell', spell.image?.full),
     })),
   };
   guideCache.set(championId, guide);

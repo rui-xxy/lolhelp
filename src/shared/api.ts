@@ -316,12 +316,18 @@ export interface AssistChampionGuide {
   name: string;
   title: string;
   stats: Array<{ label: string; base: number; perLevel?: number }>;
+  passive?: {
+    name: string;
+    description: string;
+    icon?: string;
+  };
   spells: Array<{
     key: string;
     name: string;
     description: string;
     cooldown: string;
     cost: string;
+    icon?: string;
   }>;
 }
 
@@ -943,6 +949,9 @@ export interface MatchTimelineDamageRecord {
   name?: string;
   type?: string;
   damage?: number;
+  physicalDamage?: number;
+  magicDamage?: number;
+  trueDamage?: number;
   basic?: boolean;
   spellName?: string;
   spellSlot?: number;

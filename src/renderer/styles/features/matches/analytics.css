@@ -968,45 +968,182 @@
     height: 100%;
     min-width: 0;
     overflow: auto;
-    padding: 7px 9px 16px;
+    padding: 5px 10px 18px;
     scrollbar-gutter: stable;
   }
-  .lol-stats-grid { min-width: 828px; }
+
+  .lol-stats-grid {
+    min-width: 828px;
+  }
+
   .lol-stats > section {
     content-visibility: auto;
     contain-intrinsic-size: 320px;
   }
+
   .lol-stats-grid--icons {
+    position: sticky;
     top: 0;
     z-index: 12;
-    min-height: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 5px 5px 0 0;
-    background: rgba(19, 22, 24, 0.98);
+    min-height: 58px;
+    border: 0;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-app-bg) 94%, transparent);
+    box-shadow: 0 12px 24px -24px color-mix(in srgb, #000 72%, transparent);
+    backdrop-filter: blur(10px);
   }
-  .lol-stats-filter { display: flex; padding: 6px 9px; }
+
+  .lol-stats-filter {
+    display: flex;
+    height: 32px;
+    align-self: center;
+    align-items: center;
+    gap: 7px;
+    margin: 0 7px;
+    border-radius: 7px;
+    padding: 0 9px;
+    background: color-mix(in srgb, var(--color-app-text) 2.6%, transparent);
+    color: var(--color-app-subtle);
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease,
+      color 120ms ease;
+  }
+
+  .lol-stats-filter:focus-within {
+    background: color-mix(in srgb, var(--color-app-text) 4%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 8%, transparent);
+    color: var(--color-app-muted);
+  }
+
+  .lol-stats-filter > svg {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+  }
+
   .lol-stats-filter input {
     width: 100%;
-    height: 31px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-    padding: 0 9px;
-    color: #e4e8eb;
-    background: rgba(255, 255, 255, 0.07);
-    font-size: 11px;
+    height: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    color: var(--color-app-body);
+    background: transparent;
+    font-size: 10.5px;
     outline: none;
   }
-  .lol-stats-filter input:focus { border-color: rgba(76, 211, 184, 0.52); }
-  .lol-stats-group-title { margin-top: 9px; padding: 7px 10px; font-size: 12px; }
+
+  .lol-stats-filter input::placeholder {
+    color: var(--color-app-subtle);
+  }
+
+  .lol-stats-player-head {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 54px;
+    align-content: center;
+    justify-items: center;
+    gap: 3px;
+    border-radius: 7px;
+    padding: 4px 3px 3px;
+    color: var(--color-app-subtle);
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+
+  .lol-stats-player-head img {
+    justify-self: center;
+    border-width: 1px;
+    border-color: color-mix(in srgb, var(--color-app-text) 12%, transparent);
+    transition:
+      filter 120ms ease,
+      box-shadow 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .lol-stats-player-head .lol-stats-avatar--blue {
+    border-color: color-mix(in srgb, var(--color-app-link) 34%, transparent);
+  }
+
+  .lol-stats-player-head .lol-stats-avatar--red {
+    border-color: color-mix(in srgb, var(--color-app-danger) 30%, transparent);
+  }
+
+  .lol-stats-player-head > span {
+    width: 100%;
+    overflow: hidden;
+    padding-inline: 3px;
+    font-size: 8.5px;
+    font-weight: 560;
+    line-height: 1;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-player-head--target {
+    background: color-mix(in srgb, var(--color-app-text) 4%, transparent);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-player-head--target img {
+    border-color: color-mix(in srgb, var(--color-app-text) 28%, transparent);
+    filter: brightness(1.05) saturate(1.02);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-app-text) 4%, transparent);
+  }
+
+  .lol-stats-section {
+    padding: 2px 0 4px;
+  }
+
+  .lol-stats-section + .lol-stats-section {
+    margin-top: 11px;
+  }
+
+  .lol-stats-group-title {
+    display: flex;
+    min-height: 25px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 3px;
+    border: 0;
+    border-radius: 0;
+    padding: 0 9px;
+    background: transparent;
+  }
+
+  .lol-stats-group-title > span {
+    color: var(--color-app-body);
+    font-size: 11.5px;
+    font-weight: 680;
+    letter-spacing: 0.025em;
+  }
+
+  .lol-stats-group-title > small {
+    color: var(--color-app-subtle);
+    font-size: 8.5px;
+    font-weight: 560;
+    letter-spacing: 0.03em;
+  }
+
   .lol-stats-row {
     position: relative;
-    min-height: 33px;
-    border-right: 1px solid rgba(255, 255, 255, 0.055);
-    border-left: 1px solid rgba(255, 255, 255, 0.055);
+    min-height: 31px;
+    border: 0;
+    border-radius: 6px;
     font-size: 11px;
-    transition: background 100ms ease;
+    transition: background-color 100ms ease;
   }
-  .lol-stats-row:hover { z-index: 20; background: rgba(255, 255, 255, 0.055); }
+
+  .lol-stats-row:hover {
+    z-index: 2;
+    background: color-mix(in srgb, var(--color-app-text) 2.8%, transparent);
+  }
+
   .lol-stats-label {
     position: relative;
     display: flex;
@@ -1015,41 +1152,656 @@
     align-items: center;
     justify-content: space-between;
     gap: 7px;
-    padding: 0 10px;
-    color: #e4e7e9;
-    cursor: help;
+    padding: 0 9px;
+    color: var(--color-app-muted);
+    cursor: default;
     outline: none;
   }
-  .lol-stats-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-stats-label > small { display: grid; width: 15px; height: 15px; flex: 0 0 15px; place-items: center; border-radius: 50%; color: #7f8991; background: rgba(255, 255, 255, 0.07); font-size: 9px; }
-  .lol-stats-value { overflow: hidden; padding: 0 4px; color: #c5cbd0; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-stats-compare {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    z-index: 100;
-    display: none;
-    width: min(570px, calc(100vw - 72px));
-    transform: translate(-50%, -46%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 7px;
-    padding: 14px;
-    background: rgba(25, 26, 27, 0.98);
-    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.56);
-    pointer-events: none;
+
+  .lol-stats-label > span {
+    overflow: hidden;
+    font-size: 10.5px;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .lol-stats-label:hover .lol-stats-compare,
-  .lol-stats-label:focus .lol-stats-compare,
-  .lol-stats-label:focus-within .lol-stats-compare { display: block; }
-  .lol-stats-compare > strong { display: block; color: #f0f2f4; font-size: 14px; text-align: center; }
-  .lol-stats-compare > small { display: block; margin: 3px 0 10px; color: #89939b; font-size: 10px; text-align: center; }
-  .lol-stats-compare__rows { display: grid; gap: 4px; }
-  .lol-stats-compare__row { display: grid; grid-template-columns: 20px 104px minmax(120px, 1fr) 72px; min-height: 24px; align-items: center; gap: 7px; }
-  .lol-stats-compare__row > span { overflow: hidden; color: #cbd1d5; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-stats-compare__row > i { height: 10px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, 0.065); }
-  .lol-stats-compare__row > i > b { display: block; height: 100%; border-radius: inherit; background: #438be6; }
-  .lol-stats-compare__row:nth-child(n + 6) > i > b { background: #e34c56; }
-  .lol-stats-compare__row > em { color: #eef1f3; font-size: 11px; font-style: normal; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .lol-stats-label > small {
+    display: grid;
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-app-subtle);
+    background: color-mix(in srgb, var(--color-app-text) 3.8%, transparent);
+    font-size: 7.5px;
+    font-weight: 650;
+    opacity: 0.66;
+  }
+
+  .lol-stats-value {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0 5px;
+    color: var(--color-app-muted);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition:
+      background-color 100ms ease,
+      color 100ms ease,
+      opacity 100ms ease;
+  }
+
+  .lol-stats-value > b {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 4px;
+    width: var(--stats-ratio, 0%);
+    max-width: calc(100% - 8px);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-app-text) 5.5%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      width 160ms var(--ease-ui),
+      opacity 100ms ease;
+  }
+
+  .lol-stats-value > em {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    font-style: normal;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-row:hover .lol-stats-value > b {
+    opacity: 1;
+  }
+
+  .lol-stats-value--target {
+    background: color-mix(in srgb, var(--color-app-text) 2.5%, transparent);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-value--target > em {
+    font-weight: 640;
+  }
+
+  .lol-stats-value--max:not(.lol-stats-value--zero) {
+    color: var(--color-app-text);
+  }
+
+  .lol-stats-value--max:not(.lol-stats-value--zero) > em {
+    font-weight: 690;
+  }
+
+  .lol-stats-value--max:not(.lol-stats-value--zero) > b {
+    background: color-mix(in srgb, var(--color-app-text) 8%, transparent);
+  }
+
+  .lol-stats-value--zero {
+    opacity: 0.46;
+  }
+
+  .lol-stats-value--target.lol-stats-value--zero {
+    opacity: 0.64;
+  }
+
+
+  /* Detailed stats — Focus + Context explorer */
+  .lol-stats-explorer {
+    padding: 0 12px 24px;
+    background: transparent;
+  }
+
+  .lol-stats--empty,
+  .lol-stats-explorer__empty {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    color: var(--color-app-subtle);
+    font-size: 11px;
+  }
+
+  .lol-stats-explorer__sticky {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin: 0 -2px;
+    padding: 9px 2px 8px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-app-bg) 98%, transparent) 0%,
+        color-mix(in srgb, var(--color-app-bg) 96%, transparent) 78%,
+        color-mix(in srgb, var(--color-app-bg) 84%, transparent) 100%
+      );
+    backdrop-filter: blur(12px);
+  }
+
+  .lol-stats-explorer__toolbar {
+    display: grid;
+    min-height: 34px;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 238px);
+    align-items: center;
+    gap: 14px;
+  }
+
+  .lol-stats-explorer__focus {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 8px;
+    padding-inline: 3px;
+  }
+
+  .lol-stats-explorer__focus > span {
+    flex: 0 0 auto;
+    color: var(--color-app-subtle);
+    font-size: 8.5px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+  }
+
+  .lol-stats-explorer__focus > strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 680;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-explorer__focus > small {
+    flex: 0 1 auto;
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 9.5px;
+    font-weight: 520;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-explorer .lol-stats-filter {
+    display: flex;
+    width: 100%;
+    height: 30px;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    border: 0;
+    border-radius: 7px;
+    padding: 0 9px;
+    background: color-mix(in srgb, var(--color-app-text) 2.5%, transparent);
+    color: var(--color-app-subtle);
+    box-shadow: none;
+  }
+
+  .lol-stats-explorer .lol-stats-filter:focus-within {
+    background: color-mix(in srgb, var(--color-app-text) 3.8%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 7%, transparent);
+    color: var(--color-app-muted);
+  }
+
+  .lol-stats-player-strip {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 7px 0 8px;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+
+  .lol-stats-player-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lol-stats-player-choice {
+    position: relative;
+    display: grid;
+    width: 72px;
+    min-width: 72px;
+    height: 46px;
+    flex: 0 0 72px;
+    grid-template-rows: 28px 11px;
+    justify-items: center;
+    align-content: center;
+    gap: 2px;
+    border: 0;
+    border-radius: 8px;
+    padding: 2px 4px;
+    background: transparent;
+    color: var(--color-app-subtle);
+    outline: none;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      transform 100ms ease;
+  }
+
+  .lol-stats-player-choice.is-team-break {
+    margin-left: 10px;
+  }
+
+  .lol-stats-player-choice:hover {
+    background: color-mix(in srgb, var(--color-app-text) 2.8%, transparent);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-player-choice.is-active {
+    background: color-mix(in srgb, var(--color-app-text) 4.8%, transparent);
+    color: var(--color-app-text);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 6.5%, transparent);
+  }
+
+  .lol-stats-player-choice:active {
+    transform: translateY(1px);
+  }
+
+  .lol-stats-player-choice img {
+    justify-self: center;
+    border: 1px solid color-mix(in srgb, var(--color-app-text) 12%, transparent);
+    filter: saturate(0.92) brightness(0.98);
+    transition:
+      border-color 120ms ease,
+      filter 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .lol-stats-player-choice.is-active img {
+    border-color: color-mix(in srgb, var(--color-app-text) 28%, transparent);
+    filter: saturate(1.03) brightness(1.05);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-app-text) 4%, transparent);
+  }
+
+  .lol-stats-player-choice .lol-stats-avatar--blue {
+    border-color: color-mix(in srgb, var(--color-app-link) 30%, transparent);
+  }
+
+  .lol-stats-player-choice .lol-stats-avatar--red {
+    border-color: color-mix(in srgb, var(--color-app-danger) 26%, transparent);
+  }
+
+  .lol-stats-player-choice > span {
+    width: 100%;
+    overflow: hidden;
+    font-size: 8.5px;
+    font-weight: 560;
+    line-height: 11px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-player-choice.is-query-target::after {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 56%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--color-app-text) 12%, transparent);
+    content: "";
+  }
+
+  .lol-stats-category-rail {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 2px;
+    scrollbar-width: none;
+  }
+
+  .lol-stats-category-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lol-stats-category-rail > button {
+    display: inline-flex;
+    height: 26px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0 8px;
+    background: transparent;
+    color: var(--color-app-subtle);
+    font-size: 9.5px;
+    font-weight: 570;
+    outline: none;
+    transition:
+      background-color 100ms ease,
+      color 100ms ease;
+  }
+
+  .lol-stats-category-rail > button:hover {
+    background: color-mix(in srgb, var(--color-app-text) 2.8%, transparent);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-category-rail > button.is-active {
+    background: color-mix(in srgb, var(--color-app-text) 4.4%, transparent);
+    color: var(--color-app-text);
+  }
+
+  .lol-stats-category-rail > button > small {
+    color: var(--color-app-subtle);
+    font-size: 8px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-stats-explorer__content {
+    padding-top: 10px;
+  }
+
+  .lol-stats-explorer .lol-stats-section {
+    padding: 0;
+  }
+
+  .lol-stats-explorer .lol-stats-section + .lol-stats-section {
+    margin-top: 18px;
+  }
+
+  .lol-stats-explorer .lol-stats-group-title {
+    display: flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 4px;
+    padding: 0 9px;
+    background: transparent;
+  }
+
+  .lol-stats-explorer .lol-stats-group-title > span {
+    color: var(--color-app-body);
+    font-size: 11.5px;
+    font-weight: 690;
+    letter-spacing: 0.02em;
+  }
+
+  .lol-stats-explorer .lol-stats-group-title > small {
+    overflow: hidden;
+    color: var(--color-app-subtle);
+    font-size: 8.5px;
+    font-weight: 520;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-focus-list {
+    display: grid;
+    gap: 2px;
+  }
+
+  .lol-stats-focus-item {
+    overflow: hidden;
+    border-radius: 8px;
+    background: transparent;
+    transition: background-color 120ms ease;
+  }
+
+  .lol-stats-focus-item:hover,
+  .lol-stats-focus-item.is-expanded {
+    background: color-mix(in srgb, var(--color-app-text) 2.4%, transparent);
+  }
+
+  .lol-stats-focus-item.is-expanded {
+    background: color-mix(in srgb, var(--color-app-text) 3.2%, transparent);
+  }
+
+  .lol-stats-focus-item__summary {
+    display: grid;
+    width: 100%;
+    min-height: 50px;
+    grid-template-columns: minmax(160px, 230px) minmax(94px, 116px) minmax(150px, 1fr) 18px;
+    align-items: center;
+    gap: 14px;
+    border: 0;
+    padding: 0 10px;
+    background: transparent;
+    text-align: left;
+    outline: none;
+  }
+
+  .lol-stats-focus-item__summary:focus-visible {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 9%, transparent);
+  }
+
+  .lol-stats-focus-item__label {
+    min-width: 0;
+  }
+
+  .lol-stats-explorer .lol-stats-label {
+    display: flex;
+    min-width: 0;
+    height: auto;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 0;
+    color: var(--color-app-muted);
+  }
+
+  .lol-stats-explorer .lol-stats-label > span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 10.5px;
+    font-weight: 570;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-explorer .lol-stats-label > small {
+    display: inline;
+    width: auto;
+    height: auto;
+    flex: 0 0 auto;
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-app-subtle);
+    font-size: 7.5px;
+    font-weight: 650;
+    opacity: 0.52;
+  }
+
+  .lol-stats-focus-item__reading {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+    justify-items: start;
+  }
+
+  .lol-stats-focus-item__reading > strong {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 14px;
+    font-weight: 680;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-focus-item__reading > span {
+    color: var(--color-app-subtle);
+    font-size: 8.5px;
+    font-weight: 540;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-stats-focus-item__meter {
+    position: relative;
+    height: 6px;
+    overflow: visible;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 4%, transparent);
+  }
+
+  .lol-stats-focus-item__meter > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 0;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--color-app-text) 18%, transparent);
+    transition: width 180ms var(--ease-ui);
+  }
+
+  .lol-stats-focus-item__meter > b {
+    position: absolute;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 72%, transparent);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--color-app-text) 14%, transparent);
+    transform: translate(-50%, -50%);
+    transition: left 180ms var(--ease-ui);
+  }
+
+  .lol-stats-focus-item__chevron {
+    width: 13px;
+    height: 13px;
+    color: var(--color-app-subtle);
+    transition:
+      color 120ms ease,
+      transform 160ms var(--ease-ui);
+  }
+
+  .lol-stats-focus-item__chevron.is-open {
+    color: var(--color-app-body);
+    transform: rotate(90deg);
+  }
+
+  .lol-stats-compare-inline {
+    padding: 2px 10px 11px;
+  }
+
+  .lol-stats-compare-inline__head {
+    display: flex;
+    height: 25px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px 0 4px;
+  }
+
+  .lol-stats-compare-inline__head > span {
+    color: var(--color-app-muted);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+  }
+
+  .lol-stats-compare-inline__head > small {
+    color: var(--color-app-subtle);
+    font-size: 8px;
+    font-weight: 520;
+  }
+
+  .lol-stats-compare-inline__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 10px;
+  }
+
+  .lol-stats-compare-inline__row {
+    display: grid;
+    min-width: 0;
+    min-height: 31px;
+    grid-template-columns: 20px 22px minmax(74px, 0.8fr) minmax(70px, 1fr) minmax(48px, auto);
+    align-items: center;
+    gap: 7px;
+    border-radius: 6px;
+    padding: 0 7px;
+    color: var(--color-app-muted);
+  }
+
+  .lol-stats-compare-inline__row.is-focused {
+    background: color-mix(in srgb, var(--color-app-text) 4.2%, transparent);
+    color: var(--color-app-body);
+  }
+
+  .lol-stats-compare-inline__row > em {
+    color: var(--color-app-subtle);
+    font-size: 8px;
+    font-style: normal;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lol-stats-compare-inline__row > span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 9px;
+    font-weight: 550;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lol-stats-compare-inline__row > i {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-text) 4%, transparent);
+  }
+
+  .lol-stats-compare-inline__row > i > b {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--color-app-text) 16%, transparent);
+  }
+
+  .lol-stats-compare-inline__row.is-focused > i > b {
+    background: color-mix(in srgb, var(--color-app-text) 32%, transparent);
+  }
+
+  .lol-stats-compare-inline__row > strong {
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 10px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+
+  @media (max-width: 1120px) {
+    .lol-stats-focus-item__summary {
+      grid-template-columns: minmax(140px, 190px) minmax(86px, 105px) minmax(110px, 1fr) 16px;
+      gap: 10px;
+    }
+
+    .lol-stats-compare-inline__grid {
+      grid-template-columns: 1fr;
+    }
+  }
 
   .lol-builds {
     position: relative;

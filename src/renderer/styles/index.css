@@ -15,3 +15,5 @@
 @import "./features/mayhem.css";
 @import "./features/matches/history-refinements.css";
 @import "./features/matches/analytics.css";
+@import "./features/matches/event-analyzer.css";
+@import "./features/matches/stats-explorer-colors.css";
