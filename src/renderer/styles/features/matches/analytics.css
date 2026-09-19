@@ -330,9 +330,13 @@
     filter: brightness(1.08);
   }
 
-  .lol-result-team .lol-rift-row--linked .lol-rift-player-name {
-    color: var(--color-app-body);
-    text-shadow: none;
+  .lol-result-team .lol-rift-row--linked .lol-rift-player-name,
+  .lol-result-team .lol-score-player-name--linked,
+  .lol-result-team .lol-rift-row--linked:hover .lol-rift-player-name,
+  .lol-result-team .lol-score-row:hover .lol-score-player-name--linked {
+    color: var(--lol-score-link-color);
+    font-weight: 800;
+    text-shadow: 0 0 10px var(--lol-score-link-glow);
   }
 
   @media (max-width: 1080px) {
@@ -463,11 +467,6 @@
     flex: 0 0 10px;
     color: currentColor;
     stroke-width: 1.9;
-  }
-
-  .lol-player-relation--recurring {
-    border-style: dashed;
-    opacity: 0.9;
   }
 
   .lol-rift-row:hover .lol-player-relation,

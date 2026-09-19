@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CirclePlay, Coins, Database, Download, Eye, Flame, HeartPulse, History, Layers3, LoaderCircle, Map as MapIcon, Radio, RotateCcw, Search, Shield, Skull, Swords, Users, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronLeft, ChevronRight, CirclePlay, Coins, Database, Download, Eye, Flame, HeartPulse, Layers3, LoaderCircle, Map as MapIcon, Radio, RotateCcw, Search, Shield, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
@@ -292,34 +292,28 @@ function buildPremadeCountMap(players: MatchParticipantSummary[]): Map<string, n
 }
 
 type PlayerRelationship = {
-  kind: 'premade' | 'recurring';
   label: string;
 };
 
 function resolvePlayerRelationship(
   player: MatchParticipantSummary,
-  isLinkedByHistory: boolean,
   premadeCountById: Map<string, number>,
 ): PlayerRelationship | undefined {
   const premadeCount = player.premadeId ? (premadeCountById.get(player.premadeId) ?? 0) : 0;
   if (premadeCount >= 2) {
-    return { kind: 'premade', label: `开黑·${premadeCount}` };
-  }
-  if (isLinkedByHistory) {
-    return { kind: 'recurring', label: '常玩' };
+    return { label: `开黑·${premadeCount}` };
   }
   return undefined;
 }
 
 function PlayerRelationshipBadge({ relationship }: { relationship?: PlayerRelationship }) {
   if (!relationship) return null;
-  const Icon = relationship.kind === 'premade' ? Users : History;
   return (
     <span
-      className={`lol-player-relation lol-player-relation--${relationship.kind}`}
-      title={relationship.kind === 'premade' ? '本局组队关系' : '历史上多次同队；本场组队标识缺失'}
+      className="lol-player-relation lol-player-relation--premade"
+      title="本局组队关系"
     >
-      <Icon aria-hidden="true" />
+      <Users aria-hidden="true" />
       <span>{relationship.label}</span>
     </span>
   );
@@ -837,6 +831,9 @@ function ScoreboardTab({
     [participants],
   );
   const badgesByPuuid = useMemo(() => buildRiftBadges(participants), [participants]);
+  const hasRecurringPlayerInMatch = participants.some(
+    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
+  );
 
   return (
     <div className="lol-scoreboard lol-result-scoreboard">
@@ -847,6 +844,7 @@ function ScoreboardTab({
           players={participants.filter((player) => player.teamId === id)}
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
+          hasRecurringPlayerInMatch={hasRecurringPlayerInMatch}
           onPlayerSearch={onPlayerSearch}
           maxPlayerDamage={maxPlayerDamage}
           badgesByPuuid={badgesByPuuid}
@@ -876,6 +874,9 @@ function RiftScoreboardTab({
     () => Math.max(0, ...participants.map((player) => Math.max(0, player.damage || 0))),
     [participants],
   );
+  const hasRecurringPlayerInMatch = participants.some(
+    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
+  );
 
   return (
     <div className="lol-rift-scoreboard lol-result-scoreboard">
@@ -886,6 +887,7 @@ function RiftScoreboardTab({
           players={participants.filter((player) => player.teamId === id)}
           targetPuuid={targetPuuid}
           recurringMates={recurringMates}
+          hasRecurringPlayerInMatch={hasRecurringPlayerInMatch}
           onPlayerSearch={onPlayerSearch}
           queueId={queueId}
           rankByPuuid={rankByPuuid}
@@ -902,6 +904,7 @@ function RiftScoreboardTeam({
   players,
   targetPuuid,
   recurringMates,
+  hasRecurringPlayerInMatch,
   onPlayerSearch,
   queueId,
   rankByPuuid,
@@ -912,6 +915,7 @@ function RiftScoreboardTeam({
   players: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
+  hasRecurringPlayerInMatch: boolean;
   onPlayerSearch?: (riotId: string) => void;
   queueId: number;
   rankByPuuid: Record<string, PlayerRankSummary[]>;
@@ -919,10 +923,7 @@ function RiftScoreboardTeam({
   maxPlayerDamage: number;
 }) {
   const tone = teamTone(teamId);
-  const hasRecurringMate = players.some(
-    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
-  );
-  const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const premadeToneById = buildPremadeToneMap(players, hasRecurringPlayerInMatch);
   const premadeCountById = buildPremadeCountMap(players);
   const won = players[0]?.win ?? false;
 
@@ -938,10 +939,10 @@ function RiftScoreboardTeam({
       <div className="lol-rift-team-rows">
         {players.map((player) => {
           const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
-          const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
+          const isLinkedByHistory = hasRecurringPlayerInMatch && (player.puuid === targetPuuid || isRecurring);
           const premadeTone = player.premadeId ? premadeToneById.get(player.premadeId) : undefined;
           const linkTone = premadeTone ?? (isLinkedByHistory ? 'amber' : undefined);
-          const relationship = resolvePlayerRelationship(player, isLinkedByHistory, premadeCountById);
+          const relationship = resolvePlayerRelationship(player, premadeCountById);
 
           return (
             <RiftScoreboardRow
@@ -1109,6 +1110,7 @@ function ScoreboardTeam({
   players,
   targetPuuid,
   recurringMates,
+  hasRecurringPlayerInMatch,
   onPlayerSearch,
   maxPlayerDamage,
   badgesByPuuid,
@@ -1117,15 +1119,13 @@ function ScoreboardTeam({
   players: MatchParticipantSummary[];
   targetPuuid: string;
   recurringMates?: Map<string, RecurringMate>;
+  hasRecurringPlayerInMatch: boolean;
   onPlayerSearch?: (riotId: string) => void;
   maxPlayerDamage: number;
   badgesByPuuid: Map<string, RiftBadge[]>;
 }) {
   const tone = teamTone(teamId);
-  const hasRecurringMate = players.some(
-    (player) => player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid)),
-  );
-  const premadeToneById = buildPremadeToneMap(players, hasRecurringMate);
+  const premadeToneById = buildPremadeToneMap(players, hasRecurringPlayerInMatch);
   const premadeCountById = buildPremadeCountMap(players);
   const won = players[0]?.win ?? false;
 
@@ -1140,10 +1140,10 @@ function ScoreboardTeam({
       </div>
       {players.map((player) => {
         const isRecurring = player.puuid !== targetPuuid && Boolean(recurringMates?.has(player.puuid));
-        const isLinkedByHistory = hasRecurringMate && (player.puuid === targetPuuid || isRecurring);
+        const isLinkedByHistory = hasRecurringPlayerInMatch && (player.puuid === targetPuuid || isRecurring);
         const premadeTone = player.premadeId ? premadeToneById.get(player.premadeId) : undefined;
         const linkTone = premadeTone ?? (isLinkedByHistory ? 'amber' : undefined);
-        const relationship = resolvePlayerRelationship(player, isLinkedByHistory, premadeCountById);
+        const relationship = resolvePlayerRelationship(player, premadeCountById);
 
         return (
           <ScoreboardRow
