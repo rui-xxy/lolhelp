@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import { ChevronLeft, ChevronRight, CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DetailedStatsView } from './DetailedStatsView';
+import { EventTimeline } from './EventTimeline';
+import type { TimelinePoint } from './eventTimelineModel';
 import { MatchRoster } from './MatchRoster';
 import { LeagueArtImage, leagueArtUrl } from './LeagueArtImage';
 import type { StatsMetric, StatsGroup, StatsDisplayValue } from './matchStatsModel';
@@ -2219,6 +2221,18 @@ function EventsTab({
   const mapUrl = eventMapAssetUrl(mapId, gameVersion);
   const mapLabel = mapId === 11 ? '召唤师峡谷' : mapId === 12 ? '嚎哭深渊' : '事件坐标';
 
+  const timelinePoints = useMemo<TimelinePoint[]>(() => filteredEntries.map((entry) => {
+    const actor = names.get(entry.event.killerId ?? entry.event.participantId ?? 0);
+    const victim = names.get(entry.event.victimId ?? 0);
+    return {
+      ...entry,
+      lane: entry.event.type === 'CHAMPION_KILL' ? (actor?.teamId === 200 ? 'red' : 'blue') : 'objective',
+      label: entry.event.type === 'CHAMPION_KILL'
+        ? (actor?.championName ?? '地图单位') + ' 击杀 ' + (victim?.championName ?? '未知英雄')
+        : eventCopy(entry.event, names).title,
+    };
+  }), [filteredEntries, names]);
+
   if (!timeline) return <TimelineEmpty loading={loading} error={error} />;
 
   const toggleChampion = (participantId: number) => {
@@ -2432,6 +2446,7 @@ function EventsTab({
         role="button"
         tabIndex={0}
         aria-expanded={selected}
+        data-event-key={entry.key}
         className={[
           'lol-event-analyzer__event',
           `lol-event-analyzer__event--${copy.tone}`,
@@ -2531,44 +2546,8 @@ function EventsTab({
   return (
     <div className="lol-event-analyzer match-analytics" onKeyDown={(event) => { if (event.key === 'Escape' && selectedEventKey) { eventRefs.current.get(selectedEventKey)?.focus(); setSelectedEventKey(null); } }}>
       <header className="lol-event-analyzer__overview">
-        <div className="lol-event-analyzer__overview-copy">
-          <strong>事件 <b>{filteredEntries.length}</b><small> / {entries.length}</small></strong>
-        </div>
-
-        <div className="lol-event-density" aria-label="整局事件密度">
-          <div className="lol-event-density__labels">
-            <span>00:00</span>
-            <span>{formatEventTime(durationMs)}</span>
-          </div>
-          <div className="lol-event-density__track">
-            {entries.map((entry) => {
-              const filter = eventFilterKey(entry.event);
-              const copy = eventCopy(entry.event, names);
-              const left = Math.max(0, Math.min(100, (entry.event.timestamp / durationMs) * 100));
-              return (
-                <button
-                  key={`density-${entry.key}`}
-                  type="button"
-                  className={[
-                    'lol-event-density__mark',
-                    filter ? `lol-event-density__mark--${filter}` : '',
-                    `lol-event-density__mark--${copy.tone}`,
-                    filteredKeys.has(entry.key) ? '' : 'is-muted',
-                    selectedEventKey === entry.key ? 'is-selected' : '',
-                  ].filter(Boolean).join(' ')}
-                  style={{
-                    left: `${left}%`,
-                    top: `${copy.tone === 'blue' ? 5 : copy.tone === 'red' ? 23 : 14}px`,
-                  }}
-                  title={`${formatEventTime(entry.event.timestamp)} · ${eventCopy(entry.event, names).title}`}
-                  aria-label={`跳转到 ${formatEventTime(entry.event.timestamp)} ${eventCopy(entry.event, names).title}`}
-                  disabled={!filteredKeys.has(entry.key)}
-                  onClick={() => scrollToEvent(entry)}
-                />
-              );
-            })}
-          </div>
-        </div>
+        <EventTimeline points={timelinePoints} duration={durationMs} selectedKey={selectedEventKey}
+          onSelect={(key) => { const entry = filteredEntries.find((item) => item.key === key); if (entry) scrollToEvent(entry); }} />
       </header>
 
       <div className="lol-event-analyzer__layout">
@@ -2599,25 +2578,16 @@ function EventsTab({
             }
 
             const blueKills = node.entries.filter((entry) => names.get(entry.event.killerId ?? 0)?.teamId === 100).length;
-            const redKills = node.entries.length - blueKills;
+            const redKills = node.entries.filter((entry) => names.get(entry.event.killerId ?? 0)?.teamId === 200).length;
             return (
               <section
                 key={`fight-${node.start}-${nodeIndex}`}
                 className={`lol-fight-window ${eventGapClass(node.gapMs)}`}
               >
-                <div className="lol-fight-window__head">
-                  <time>
-                    {formatEventTime(node.start)}
-                    {node.end !== node.start ? <span>—{formatEventTime(node.end)}</span> : null}
-                  </time>
-                  <div>
-                    <small>
-                      {node.entries.length} 次连续击杀 ·
-                      <b className="is-blue"> 蓝 {blueKills}</b>
-                      <b className="is-red"> 红 {redKills}</b>
-                    </small>
-                  </div>
-                </div>
+                <header className="lol-fight-window__head">
+                  <div className="md-fight-period"><time>{formatEventTime(node.start)}{node.end !== node.start ? ' — ' + formatEventTime(node.end) : ''}</time><span>{node.entries.length} 次击杀</span></div>
+                  <div className="md-fight-score" aria-label={'蓝方 ' + blueKills + ' 次击杀，红方 ' + redKills + ' 次击杀'}><span className="is-blue">蓝方 <b>{blueKills}</b></span><i aria-hidden="true">:</i><span className="is-red"><b>{redKills}</b> 红方</span></div>
+                </header>
                 <div className="lol-fight-window__events">
                   {node.entries.map((entry) => renderEventEntry(entry, true))}
                 </div>

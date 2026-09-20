@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>对局详情 · 重设计预览</title>
+<title>对局详情 · 数据与时间轴精修</title>
 <style>
 :root { color-scheme: dark; font-family: 'Segoe UI','Microsoft YaHei UI',sans-serif; background: #202222; color: #e8e9e5; }
 body { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
@@ -18,11 +18,12 @@ img { display: block; max-width: 100%; width: auto; height: auto; border: 1px so
 </style>
 </head>
 <body>
-<h1>对局详情重设计</h1>
+<h1>双人对比与事件时间轴</h1>
 <p>以下截图来自实际 React 页面组件与样式，使用演示对局数据。不是设计稿，也不是用户真实战绩。</p>
 <nav><a href="#stats">详尽表格</a><a href="#events">事件列表</a><a href="#event-detail">事件详情</a><a href="report.json">交互检查结果</a></nav>
-<section id="stats"><h2>详尽表格 · 固定玩家区与侧边分类</h2><img src="stats.png" alt="新版详尽表格真实组件渲染截图"></section>
-<section id="events"><h2>事件列表 · 保留筛选位置</h2><img src="events.png" alt="新版事件列表真实组件渲染截图"></section>
+<section id="stats"><h2>双人对比 · 双方姓名、独立数值、差值</h2><a href="stats.png"><img src="stats.png" alt="双方数值、等宽刻度与差值同时显示"></a></section>
+<section id="events"><h2>事件 · 分泳道时间图与清晰的交战分组</h2><a href="events.png"><img src="events.png" alt="全宽时间图、分组标题带与组内事件分隔"></a></section>
+<section><h2>时间定位 · 悬停预览与逐事件切换</h2><a href="timeline-hover.png"><img src="timeline-hover.png" alt="事件时间图的悬停预览"></a></section>
 <section id="event-detail"><h2>事件详情 · 原位展开、按英雄分组伤害</h2><img src="event-detail.png" alt="新版事件详情展开截图"></section>
 </body>
 </html>

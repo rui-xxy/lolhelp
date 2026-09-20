@@ -33,11 +33,36 @@
       "value": true
     },
     {
+      "label": "both named value columns and signed differences are visible without expanding",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "labels are upright and numbers use restrained weight",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "comparison preserves both values at 1100px",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "comparison preserves both values at 900px",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "comparison preserves both values at 650px",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "header stays fixed across former collapse threshold",
       "passed": true,
       "value": {
-        "before": 149,
-        "after": 149
+        "before": 223,
+        "after": 223
       }
     },
     {
@@ -66,6 +91,26 @@
       "value": true
     },
     {
+      "label": "headline counts and confetti chart are replaced by three navigable lanes",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "time axis has intermediate ticks and group headers are distinct",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "hover previews a concrete event",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "clicking the broad chart locates an event and opens it",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "details open beside event while filters remain visible",
       "passed": true,
       "value": true
@@ -86,6 +131,11 @@
     },
     {
       "label": "timeline navigation preserves event-type filter",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "keyboard timeline navigation reaches the last filtered event",
       "passed": true,
       "value": true
     },

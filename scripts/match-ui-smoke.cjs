@@ -30,7 +30,11 @@ async function screenshot(name) { const image = await window.webContents.capture
   await evaluate(() => { document.querySelector('.md-stats__toolbar .md-control').click(); }); await sleep(60);
   await evaluate(() => document.querySelectorAll('.md-stats .match-roster__player')[6].click()); await sleep(70);
   await check('comparison selection and value display work', () => Boolean(document.querySelector('.match-roster__player.is-comparing')) && Boolean(document.querySelector('.md-stat__other')));
-  await check('both comparison bars share the same track width', () => { const row = document.querySelector('.md-stat__other').closest('.md-stat__visual'); const bars = row.querySelectorAll('.md-meter'); return Math.abs(bars[0].getBoundingClientRect().width - bars[1].getBoundingClientRect().width) < 1; });
+  await check('both comparison bars share the same track width', () => { const row = [...document.querySelectorAll('.md-stat__row')].find((node) => node.querySelectorAll('.md-meter').length === 2); const bars = row.querySelectorAll('.md-meter'); return Math.abs(bars[0].getBoundingClientRect().width - bars[1].getBoundingClientRect().width) < 1; });
+  await check('both named value columns and signed differences are visible without expanding', () => document.querySelectorAll('.md-stat__row .md-stat__number > strong').length >= 10 && document.querySelectorAll('.md-player-heading').length === 2 && document.querySelectorAll('.md-stat__delta').length >= 5);
+  await check('labels are upright and numbers use restrained weight', () => getComputedStyle(document.querySelector('.md-stat__label')).fontStyle === 'normal' && Number(getComputedStyle(document.querySelector('.md-stat__number strong')).fontWeight) <= 500);
+  await evaluate(() => [...document.querySelectorAll('.md-stats__categories > button')].find((node) => node.title === '承受与资源').click());
+  for (const width of [1100, 900, 650]) { await window.setContentSize(width, 820); await sleep(250); await check(`comparison preserves both values at ${width}px`, () => [...document.querySelectorAll('.md-stat__number')].every((node) => node.getBoundingClientRect().width > 0) && document.querySelector('.md-stats__content').scrollWidth <= document.querySelector('.md-stats__content').clientWidth + 1); await screenshot(`comparison-${width}`); }
   await evaluate(() => document.querySelector('[aria-label="退出双人对比"]').click());
   await evaluate(() => document.querySelector('.md-stats__categories > button').click()); await sleep(100);
   const before = await evaluate(() => document.querySelector('.md-stats__header').getBoundingClientRect().height);
@@ -48,6 +52,17 @@ async function screenshot(name) { const image = await window.webContents.capture
   window.setContentSize(980, 760); await tab('事件'); await sleep(1200);
   await check('event stream and persistent filters render', () => document.querySelectorAll('.lol-event-control-types button').length === 5 && document.querySelectorAll('.lol-event-analyzer__event').length > 20);
   await screenshot('events-980');
+  await check('headline counts and confetti chart are replaced by three navigable lanes', () => !document.querySelector('.lol-event-analyzer__overview-copy') && !document.querySelector('.lol-event-density') && document.querySelectorAll('.md-timeline__lane').length === 3 && document.querySelector('.md-timeline__plot').getAttribute('role') === 'slider');
+  await check('time axis has intermediate ticks and group headers are distinct', () => document.querySelectorAll('.md-timeline__axis > span').length >= 4 && getComputedStyle(document.querySelector('.lol-fight-window')).borderTopWidth === '1px' && getComputedStyle(document.querySelector('.lol-fight-window__head')).backgroundColor !== getComputedStyle(document.querySelector('.lol-fight-window')).backgroundColor);
+  const plot = await evaluate(() => { const r = document.querySelector('.md-timeline__plot').getBoundingClientRect(); return { x: r.x + r.width * .45, y: r.y + 15 }; });
+  await window.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...plot }); await sleep(100);
+  await check('hover previews a concrete event', () => Boolean(document.querySelector('.md-timeline__cursor')) && document.querySelector('.md-timeline__preview').textContent.includes('击杀'));
+  await screenshot('timeline-hover-980');
+  await window.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...plot });
+  await window.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...plot }); await sleep(250);
+  await check('clicking the broad chart locates an event and opens it', () => Boolean(document.querySelector('.lol-event-analyzer__event.is-selected')));
+  await evaluate(() => document.querySelector('[aria-label="收起事件详情"]').click());
+  await evaluate(() => { document.querySelector('.lol-event-analyzer__stream').scrollTop = 0; }); await sleep(250);
   const railBefore = await evaluate(() => document.querySelector('.lol-event-inspector').getBoundingClientRect().x);
   await evaluate(() => document.querySelector('.lol-event-analyzer__event').click()); await sleep(350);
   await check('details open beside event while filters remain visible', () => Boolean(document.querySelector('.md-event-entry .lol-event-inspector__selected')) && document.querySelectorAll('.lol-event-control-types button').length === 5 && document.querySelectorAll('.lol-event-damage-group').length === 2);
@@ -61,8 +76,10 @@ async function screenshot(name) { const image = await window.webContents.capture
   await evaluate(() => document.querySelector('.lol-event-analyzer__event').click()); await sleep(60);
   await check('clicking the selected event toggles it closed', () => !document.querySelector('.lol-event-inspector__selected'));
   await evaluate(() => document.querySelectorAll('.lol-event-control-types button')[1].click()); await sleep(80);
-  await evaluate(() => document.querySelector('.lol-event-density__mark:not(:disabled)').click()); await sleep(150);
+  await evaluate(() => document.querySelector('[aria-label="下一个事件"]').click()); await sleep(150);
   await check('timeline navigation preserves event-type filter', () => document.querySelectorAll('.lol-event-control-types button')[1].getAttribute('aria-pressed') === 'true');
+  await evaluate(() => document.querySelector('.md-timeline__plot').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+  await check('keyboard timeline navigation reaches the last filtered event', () => { const rows = [...document.querySelectorAll('.lol-event-analyzer__event')]; return rows.at(-1).classList.contains('is-selected'); });
   await evaluate(() => document.querySelector('.lol-event-analyzer').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await check('Escape closes details', () => !document.querySelector('.lol-event-inspector__selected'));
   await evaluate(() => document.querySelector('[aria-label="重置筛选"]').click());
@@ -78,6 +95,7 @@ async function screenshot(name) { const image = await window.webContents.capture
   for (const width of [900, 650]) {
     window.setContentSize(width, 760); await sleep(200);
     await check(`events fit ${width}px viewport`, () => document.documentElement.scrollWidth <= innerWidth && document.querySelector('.lol-event-analyzer__stream').scrollWidth <= document.querySelector('.lol-event-analyzer__stream').clientWidth + 1);
+    await screenshot(`events-${width}`);
   }
   const fatal = consoleErrors.filter((message) => /Uncaught|ReferenceError|TypeError|Each child/.test(message));
   if (fatal.length) throw new Error(fatal.join('\n'));

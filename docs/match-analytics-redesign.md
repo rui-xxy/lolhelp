@@ -9,6 +9,12 @@ The two match-detail tabs now share one player-selection component and two expli
 - **Events:** chronological stream with hero name as primary identity and player ID as secondary identity. Filters remain on the right when an event is opened; details expand directly below the selected event. Damage is grouped by champion, with skills beneath each champion. Event selection toggles open/closed and Escape closes the panel. Filter counts respect participant scope; timeline navigation does not reset filters.
 - **Information density:** rank pills, repetitive instruction text, duplicate selected-player portraits on timeline nodes, and stacked patch styles are removed. Missing damage data is shown as unavailable rather than zero.
 
+## Readability refinement (2026-09-20)
+
+Comparison mode now has named player columns, two full-size numeric values, equal-width quantitative tracks and a signed current-minus-comparison difference visible in each row. Summary values include the comparison player too; the compact viewport preserves both values. UI typography uses a local system text stack with upright glyphs, regular/medium numeric weights and tabular numerals; no font files or dependencies are added.
+
+The event headline count is removed. A full-width three-lane time histogram groups events into 48 time bins, with regular time ticks, nearest-event pointer targeting, preview text, a position marker and previous/next buttons. Arrow keys navigate individual events (including equal timestamps), Home/End jump to bounds, and selection preserves filters. Histogram heights are a visual density cue, not damage values or a kill-difference graph. Fight groups have complete boundaries, separate title bands and inset row dividers; event details remain nested below the selected row.
+
 ## Artwork
 
 Thirty small League client PNG assets (about 193 KiB) are bundled with a SHA-256 provenance manifest. Riot Games owns the artwork; CommunityDragon is the independent source mirror, not an official Riot CDN. The interface no longer needs to request these category and event icons from a mutable `latest` URL while opening a tab. Champion and ability data still use the existing asset services.
@@ -23,7 +29,7 @@ The browser test checks avatar selection, metrics, comparison scale, fixed heade
 
 ## Captured preview
 
-Open `docs/ui-review/index.html` for three captured states of the actual components with synthetic match data. `docs/ui-review/report.json` records the associated 23 browser checks. These are review snapshots, not live match data.
+Open `docs/ui-review/index.html` for captured states of the actual components with synthetic match data. `docs/ui-review/report.json` records the associated browser checks. These are review snapshots, not live match data.
 
 ## Review scope
 

@@ -37,6 +37,7 @@ exports.openBrowser = async function openBrowser(url, output) {
     await page('Page.navigate', { url });
     return {
       consoleErrors,
+      send: page,
       webContents: { executeJavaScript: async (expression) => {
         const response = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
         if (response.exceptionDetails) throw new Error(JSON.stringify(response.exceptionDetails));

@@ -49,14 +49,14 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
 
   if (!focus) return <div className="md-stats__empty">暂无可用的详细统计数据</div>;
   const summaries = [
-    { label: 'K / D / A', value: `${focus.kills} / ${focus.deaths} / ${focus.assists}` },
-    { label: '英雄伤害', value: Math.round(focus.damage || 0).toLocaleString('zh-CN') },
-    { label: '获得金币', value: Math.round(focus.gold || 0).toLocaleString('zh-CN') },
-    { label: '补刀', value: String(focus.cs || 0) },
+    { label: 'K / D / A', value: `${focus.kills} / ${focus.deaths} / ${focus.assists}`, other: compare ? `${compare.kills} / ${compare.deaths} / ${compare.assists}` : null },
+    { label: '英雄伤害', value: Math.round(focus.damage || 0).toLocaleString('zh-CN'), other: compare ? Math.round(compare.damage || 0).toLocaleString('zh-CN') : null },
+    { label: '获得金币', value: Math.round(focus.gold || 0).toLocaleString('zh-CN'), other: compare ? Math.round(compare.gold || 0).toLocaleString('zh-CN') : null },
+    { label: '补刀', value: String(focus.cs || 0), other: compare ? String(compare.cs || 0) : null },
   ];
 
   return (
-    <div className="md-stats match-analytics" onKeyDown={(event) => { if (event.key === 'Escape') setPicking(false); }}>
+    <div className={`md-stats match-analytics${compare ? ' is-comparing' : ''}`}  onKeyDown={(event) => { if (event.key === 'Escape') setPicking(false); }}>
       <header className="md-stats__header">
         <div className="md-stats__toolbar">
           <div className="md-stats__identity">
@@ -86,12 +86,17 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
         </nav>
         <div className="md-stats__content" ref={contentRef}>
           <div className="md-stats__summary" aria-label="当前玩家核心数据">
-            {summaries.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}
+            {summaries.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong>{item.other !== null && <span className="md-stats__summary-compare"><small>对比</small>{item.other}</span>}</div>)}
           </div>
           {visibleGroups.map((group) => (
             <section className="md-stats__section" key={group.title}>
               <h3>{CATEGORY_LABELS[group.title] ?? group.title}</h3>
-              <div className="md-stats__column-head" aria-hidden="true"><span>指标</span><span>当前玩家</span><span>{compare ? '双人对比' : '全场分布'}</span><span /></div>
+              <div className="md-stats__column-head">
+                <span className="md-stats__metric-heading">指标</span>
+                <span className="md-player-heading"><GameIcon src={focus.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(focus)}>{shortParticipantLabel(focus)}</b><small>当前 · {focus.championName}</small></span></span>
+                {compare ? <><span className="md-player-heading is-compare"><GameIcon src={compare.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(compare)}>{shortParticipantLabel(compare)}</b><small>对比 · {compare.championName}</small></span></span><span className="md-stats__delta-heading" title="当前玩家数值减去对比玩家数值">差值</span></> : <span>全场分布</span>}
+                <span />
+              </div>
               {group.metrics.map((metric) => {
                 const rows = participants.map((player) => { const value = readValue(metric, player); return { player, value, numeric: metricHasBar(metric, value) ? value : null }; });
                 const values = rows.flatMap((row) => row.numeric === null ? [] : [row.numeric]);
@@ -99,6 +104,7 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
                 const other = compare ? rows.find((row) => row.player.puuid === compare.puuid) : undefined;
                 const expanded = expandedKey === metric.key;
                 const comparable = current.numeric !== null;
+                const delta = other && current.numeric !== null && other.numeric !== null ? formatDelta(metric, current.numeric - other.numeric) : null;
                 const sorted = comparable ? [...rows].sort((a, b) => (b.numeric ?? -Infinity) - (a.numeric ?? -Infinity)) : rows;
                 const renderBar = (value: number | null, isCompare = false) => {
                   const bar = metricBar(value, values);
@@ -106,13 +112,13 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
                 };
                 return (
                   <article className={`md-stat${expanded ? ' is-expanded' : ''}`} key={metric.key}>
-                    <button type="button" className="md-stat__row" aria-expanded={expanded} aria-label={`${metric.label}，${formatValue(metric, current.value)}，${expanded ? '收起' : '展开'}全场对比`} onClick={() => setExpandedKey(expanded ? null : metric.key)}>
+                    <button type="button" className="md-stat__row" aria-expanded={expanded} aria-label={`${metric.label}，当前 ${formatValue(metric, current.value)}${other ? `，对比 ${formatValue(metric, other.value)}，差值 ${delta ?? '不适用'}` : ''}，${expanded ? '收起' : '展开'}全场对比`} onClick={() => setExpandedKey(expanded ? null : metric.key)}>
                       <span className="md-stat__label" title={metric.description ?? metric.label}>{metric.label}</span>
-                      <strong>{formatValue(metric, current.value)}</strong>
-                      <span className="md-stat__visual">
-                        {comparable ? renderBar(current.numeric) : <span className="md-stat__text-values">{other ? formatValue(metric, other.value) : '—'}</span>}
-                        {other && comparable && <span className="md-stat__other">{renderBar(other.numeric, true)}<span>{formatValue(metric, other.value)}</span></span>}
-                      </span>
+                      <span className="md-stat__number is-current"><strong>{formatValue(metric, current.value)}</strong>{compare && comparable && renderBar(current.numeric)}</span>
+                      {other ? <>
+                        <span className="md-stat__number md-stat__other"><strong>{formatValue(metric, other.value)}</strong>{other.numeric !== null && renderBar(other.numeric, true)}</span>
+                        <span className="md-stat__delta" title="当前玩家减去对比玩家">{delta ?? '—'}</span>
+                      </> : <span className="md-stat__visual">{comparable ? renderBar(current.numeric) : <span className="md-stat__text-values">—</span>}</span>}
                       <ChevronDown aria-hidden="true" className={expanded ? 'is-open' : ''} />
                     </button>
                     {expanded && <div className="md-stat__expanded">
