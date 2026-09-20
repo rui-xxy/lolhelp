@@ -100,6 +100,20 @@ const createWindow = () => {
   }
 
   closeLegacyFriendWindows(mainWindow);
+  if (!app.isPackaged) {
+    mainWindow.webContents.on('console-message', (_event, _level, message) => {
+      if (message.startsWith('[input-probe]')) console.log(message);
+    });
+    mainWindow.webContents.on('did-finish-load', () => {
+      void mainWindow.webContents.executeJavaScript(`
+        for (const type of ['focusin', 'focusout', 'keydown', 'beforeinput', 'input', 'selectionchange']) {
+          document.addEventListener(type, (event) => {
+            console.log('[input-probe]' + JSON.stringify({type, target:event.target?.tagName, active:document.activeElement?.tagName, length:document.querySelector('.app-shell-header-search input')?.value.length, selection:window.getSelection()?.anchorNode?.nodeName}));
+          }, true);
+        }
+      `);
+    });
+  }
   let rendererRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
   let lastRendererRecoveryAt = 0;
   mainWindow.webContents.once('did-finish-load', () => closeLegacyFriendWindows(mainWindow));

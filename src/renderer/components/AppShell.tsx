@@ -414,10 +414,11 @@ export function AppShell({
       <div className="app-shell-workspace" style={{ width: `${workspaceWidth}px` }}>
         <header className={`app-shell-header ${friendPanelHidden ? 'app-shell-header--friend-hidden' : ''}`}>
           {headerExtra ? (
-            <div className="[-webkit-app-region:no-drag]">{headerExtra}</div>
+            <div className="app-shell-header-interactive">{headerExtra}</div>
           ) : (
             <span className="app-shell-header-title">{title}</span>
           )}
+          <div className="app-shell-header-drag-region" aria-hidden="true" />
           {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onOpenFriendManager || onToggleFriendPanel) && (
             <div className="app-shell-header-actions">
               {onOpenSavedMatches && (

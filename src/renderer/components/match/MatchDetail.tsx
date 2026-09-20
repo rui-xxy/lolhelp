@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CirclePlay, Coins, Database, Download, Eye, Flame, HeartPulse, Layers3, LoaderCircle, Map as MapIcon, Radio, RotateCcw, Search, Shield, Skull, Swords, Users, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronLeft, ChevronRight, CirclePlay, Database, Download, Flame, Layers3, LoaderCircle, RotateCcw, Search, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
@@ -248,6 +248,26 @@ const POSITION_ORDER: Record<string, number> = {
 
 const LINK_TONES: LinkTone[] = ['amber', 'cyan', 'violet', 'rose', 'emerald'];
 const RIFT_SCOREBOARD_QUEUE_IDS = new Set([400, 420, 430, 440, 490]);
+
+const LOL_MATCH_HISTORY_ART_BASE =
+  'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/';
+
+function lolMatchHistoryArt(name: string): string {
+  return `${LOL_MATCH_HISTORY_ART_BASE}${name}`;
+}
+
+const STATS_GROUP_ART: Record<string, string> = {
+  '全部': 'icons.png',
+  '战斗': 'kills.png',
+  '造成伤害': 'roleicon-marksman.png',
+  '承受与资源': 'roleicon-tank.png',
+  '视野': 'roleicon-support.png',
+  '击杀与生存': 'roleicon-assassin.png',
+  '伤害、治疗与控制': 'roleicon-mage.png',
+  '经济与发育': 'icon_gold.png',
+  '地图资源与推进': 'baron-100.png',
+  '信号与对局状态': 'roleicon-fighter.png',
+};
 
 const RANK_TIER_NAMES: Record<string, string> = {
   CHALLENGER: '王者',
@@ -1582,30 +1602,22 @@ function statsToneForGroup(title: string): StatsTone {
 }
 
 function StatsGroupIcon({ title }: { title: string }) {
-  switch (title) {
-    case '战斗':
-      return <Swords aria-hidden="true" />;
-    case '造成伤害':
-      return <Flame aria-hidden="true" />;
-    case '承受与资源':
-      return <Shield aria-hidden="true" />;
-    case '视野':
-      return <Eye aria-hidden="true" />;
-    case '击杀与生存':
-      return <Skull aria-hidden="true" />;
-    case '伤害、治疗与控制':
-      return <HeartPulse aria-hidden="true" />;
-    case '经济与发育':
-      return <Coins aria-hidden="true" />;
-    case '地图资源与推进':
-      return <MapIcon aria-hidden="true" />;
-    case '信号与对局状态':
-      return <Radio aria-hidden="true" />;
-    case '更多原始统计':
-      return <Database aria-hidden="true" />;
-    default:
-      return <Layers3 aria-hidden="true" />;
+  const art = STATS_GROUP_ART[title];
+  if (art) {
+    return (
+      <img
+        className="lol-riot-art-icon"
+        src={lolMatchHistoryArt(art)}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
+    );
   }
+
+  if (title === '更多原始统计') return <Database aria-hidden="true" />;
+  return <Layers3 aria-hidden="true" />;
 }
 
 function StatsMetricLabel({ metric }: { metric: StatsMetric }) {
@@ -1890,7 +1902,7 @@ function DetailedTableTab({
               setExpandedMetricKey(null);
             }}
           >
-            <Layers3 aria-hidden="true" />
+            <StatsGroupIcon title="全部" />
             <span>全部</span>
           </button>
           {groups.map((group) => (
@@ -2195,6 +2207,23 @@ function eventPrimaryFilterLabel(filter: EventPrimaryFilter): string {
   return eventFilterLabel(filter);
 }
 
+function EventFilterArt({ filter }: { filter: EventPrimaryFilter }) {
+  const asset = filter === 'all'
+    ? 'icons.png'
+    : filter === 'kill' || filter === 'multi'
+      ? 'kills.png'
+      : filter === 'objective'
+        ? 'baron-100.png'
+        : 'tower-100.png';
+
+  return (
+    <i className="lol-event-filter-art" aria-hidden="true">
+      <img src={lolMatchHistoryArt(asset)} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      {filter === 'multi' && <b>×2</b>}
+    </i>
+  );
+}
+
 function eventMatchesPrimaryFilter(event: MatchTimelineEvent, filter: EventPrimaryFilter): boolean {
   if (filter === 'all') return eventFilterKey(event) !== null;
   if (filter === 'kill') return event.type === 'CHAMPION_KILL';
@@ -2221,11 +2250,47 @@ function eventTypeMark(event: MatchTimelineEvent): string {
   return '·';
 }
 
-function EventTypeMark({ event }: { event: MatchTimelineEvent }) {
+function eventArtAsset(event: MatchTimelineEvent, actorTeamId?: number): string {
+  const team = actorTeamId === 200 ? 200 : 100;
+  if (event.type === 'CHAMPION_KILL') return 'kills.png';
+
+  if (event.type === 'ELITE_MONSTER_KILL') {
+    const monster = String(event.monsterSubType || event.monsterType || '').toUpperCase();
+    if (monster.includes('BARON')) return `baron-${team}.png`;
+    if (monster.includes('HERALD')) return `herald-${team}.png`;
+    if (monster.includes('ELDER')) return `elder-${team}.png`;
+    if (monster.includes('AIR')) return `air-${team}.png`;
+    if (monster.includes('EARTH')) return `earth-${team}.png`;
+    if (monster.includes('FIRE')) return `fire-${team}.png`;
+    if (monster.includes('DRAGON')) return `dragon-${team}.png`;
+    return '';
+  }
+
+  if (event.type === 'BUILDING_KILL') {
+    const building = String(event.buildingType || '').toUpperCase();
+    return building.includes('INHIBITOR') ? `inhibitor-${team}.png` : `tower-${team}.png`;
+  }
+
+  if (event.type === 'TURRET_PLATE_DESTROYED') return `tower-${team}.png`;
+  return '';
+}
+
+function EventTypeMark({
+  event,
+  actorTeamId,
+}: {
+  event: MatchTimelineEvent;
+  actorTeamId?: number;
+}) {
   const filter = eventFilterKey(event);
+  const art = eventArtAsset(event, actorTeamId);
   return (
-    <span className={`lol-event-type-mark lol-event-type-mark--${filter ?? 'muted'}`}>
-      {eventTypeMark(event)}
+    <span className={`lol-event-type-mark lol-event-type-mark--${filter ?? 'muted'} ${art ? 'has-riot-art' : ''}`}>
+      {art ? (
+        <img src={lolMatchHistoryArt(art)} alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer" />
+      ) : (
+        eventTypeMark(event)
+      )}
     </span>
   );
 }
@@ -2765,7 +2830,7 @@ function EventsTab({
               )}
             </>
           ) : (
-            <EventTypeMark event={event} />
+            <EventTypeMark event={event} actorTeamId={killer?.teamId} />
           )}
         </span>
 
@@ -2788,7 +2853,12 @@ function EventsTab({
                   )}
                   <b>{killer ? playerName(killer) : '未知来源'}</b>
                 </span>
-                <ChevronRight aria-hidden="true" />
+                <img
+                  className="lol-event-analyzer__combat-arrow"
+                  src={lolMatchHistoryArt('arrow.png')}
+                  alt=""
+                  aria-hidden="true"
+                />
                 <span className="lol-event-analyzer__combatant lol-event-analyzer__combatant--victim">
                   {victim ? (
                     <GameIcon src={victim.championAvatar} alt={victim.championName} size={34} rounded />
@@ -2851,6 +2921,7 @@ function EventsTab({
     <div className="lol-event-analyzer">
       <header className="lol-event-analyzer__overview">
         <div className="lol-event-analyzer__overview-copy">
+          <span>事件轨迹</span>
           <strong>事件 <b>{filteredEntries.length}</b><small> / {entries.length}</small></strong>
           <small>
             {primaryCounts.kill} 击杀 · {primaryCounts.objective} 史诗目标 · {primaryCounts.building} 建筑
@@ -3002,7 +3073,7 @@ function EventsTab({
                       rounded
                     />
                   ) : (
-                    <EventTypeMark event={selectedEvent} />
+                    <EventTypeMark event={selectedEvent} actorTeamId={selectedKiller?.teamId} />
                   )}
                 </i>
               </div>
@@ -3016,7 +3087,12 @@ function EventsTab({
                       <strong>{selectedKiller ? playerName(selectedKiller) : '未知来源'}</strong>
                     </span>
                   </div>
-                  <ChevronRight aria-hidden="true" />
+                  <img
+                    className="lol-event-inspector__combat-arrow"
+                    src={lolMatchHistoryArt('arrow.png')}
+                    alt=""
+                    aria-hidden="true"
+                  />
                   <div>
                     {selectedVictim && <GameIcon src={selectedVictim.championAvatar} alt={selectedVictim.championName} size={38} rounded />}
                     <span>
@@ -3165,6 +3241,7 @@ function EventsTab({
                     aria-pressed={typeFilter === filter}
                     onClick={() => setTypeFilter(filter)}
                   >
+                    <EventFilterArt filter={filter} />
                     <span>{eventPrimaryFilterLabel(filter)}</span>
                     <small>{primaryCounts[filter]}</small>
                     <ChevronRight aria-hidden="true" className="lol-event-control-types__chevron" />

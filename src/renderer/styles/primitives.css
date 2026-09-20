@@ -65,10 +65,22 @@
   .app-shell-sidebar-footer { flex: 0 0 auto; padding: 8px 8px 10px; }
 
   .app-shell-workspace { position: relative; z-index: 10; display: flex; min-width: 0; flex: none; padding: 44px 8px 8px 0; }
-  .app-shell-header { position: absolute; top: 0; right: 8px; left: 0; z-index: 30; display: flex; height: 44px; align-items: center; gap: 12px; padding-left: 12px; -webkit-app-region: drag; }
+  .app-shell-header { position: absolute; top: 0; right: 8px; left: 0; z-index: 30; display: flex; height: 44px; align-items: center; gap: 12px; padding-left: 12px; -webkit-app-region: no-drag; }
   .app-shell-header--friend-hidden { padding-right: 138px; }
   .app-shell-header-title { color: var(--color-app-body); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
-  .app-shell-header-actions { display: flex; align-items: center; gap: 3px; margin-left: auto; -webkit-app-region: no-drag; }
+  .app-shell-header-drag-region { min-width: 24px; align-self: stretch; flex: 1 1 auto; -webkit-app-region: drag; }
+  .app-shell-header-interactive,
+  .app-shell-header-search,
+  .app-shell-header-search button,
+  .app-shell-header-search [role="button"] { -webkit-app-region: no-drag; }
+  .app-shell-header-search input {
+    pointer-events: auto;
+    cursor: text;
+    -webkit-app-region: no-drag;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .app-shell-header-actions { display: flex; align-items: center; gap: 3px; -webkit-app-region: no-drag; }
 
   .app-shell-icon-action {
     position: relative; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid transparent;

@@ -137,6 +137,7 @@ export function App() {
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(
     initialSession.activeView === 'matches' && initialSession.matchSearchName ? 1 : 0,
   ); // 自增触发搜索
+  const matchSearchInputRef = useRef<HTMLInputElement>(null);
   const [livePageTitle, setLivePageTitle] = useState('未进入对局');
   const [currentRegionKey, setCurrentRegionKey] = useState('');
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
@@ -176,6 +177,10 @@ export function App() {
     };
 
     const handleSelectionChange = () => {
+      // Chromium exposes an input's document selection on its surrounding
+      // container, not inside the input. Clearing that selection also clears
+      // its caret and can move keyboard focus back to the document.
+      if (allowsNativeTextSelection(document.activeElement)) return;
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
       if (allowsNativeTextSelection(selection.anchorNode) && allowsNativeTextSelection(selection.focusNode)) {
@@ -333,18 +338,22 @@ export function App() {
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        setMatchSearchName(matchSearchInputRef.current?.value ?? matchSearchName);
         setMatchSearchTrigger((n) => n + 1);
       }}
-      className="relative z-40 flex h-8 items-stretch rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-border-strong focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
+      className="app-shell-header-search relative z-40 flex h-8 items-stretch rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-border-strong focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
     >
       <MatchRegionPicker value={matchRegion} options={regions} onChange={setMatchRegion} />
       <div className="relative flex items-center">
         <Search className="pointer-events-none absolute left-2.5 size-3.5 text-app-muted" />
         <input
+          ref={matchSearchInputRef}
           type="text"
-          value={matchSearchName}
-          onChange={(e) => setMatchSearchName(e.target.value)}
+          defaultValue={matchSearchName}
+          onBlur={(event) => setMatchSearchName(event.currentTarget.value)}
           placeholder="名字#编号"
+          autoComplete="off"
+          spellCheck={false}
           className="h-full w-48 bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none"
         />
       </div>
@@ -361,6 +370,7 @@ export function App() {
   const handleFriendClick = useCallback((riotId: string) => {
     setActiveView('matches');
     setMatchSearchName(riotId);
+    if (matchSearchInputRef.current) matchSearchInputRef.current.value = riotId;
     setMatchRegion(''); // 好友默认使用已读取到的大区
     // 延迟触发搜索（等视图切换完成）
     setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
@@ -368,6 +378,7 @@ export function App() {
 
   const handlePlayerSearch = useCallback((name: string, region?: string) => {
     setMatchSearchName(name);
+    if (matchSearchInputRef.current) matchSearchInputRef.current.value = name;
     setMatchRegion(region ?? '');
     setActiveView('matches');
     setMatchSearchTrigger((n) => n + 1);
