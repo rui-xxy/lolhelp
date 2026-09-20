@@ -46,7 +46,8 @@ export function EventTimeline({ points, duration, selectedKey, onSelect, renderP
   };
   const restoreSelection = () => {
     const width = plotRef.current?.getBoundingClientRect().width ?? 0;
-    paintCursor(Math.max(0, Math.min(1, (selected?.event.timestamp ?? 0) / end)) * width, Boolean(selected));
+    const point = selected ?? sorted[0];
+    paintCursor(Math.max(0, Math.min(1, (point?.event.timestamp ?? 0) / end)) * width, Boolean(point));
   };
   const stopHover = () => {
     cancelFrame(); hovering.current = false; sample.current = null;
@@ -83,6 +84,7 @@ export function EventTimeline({ points, duration, selectedKey, onSelect, renderP
 
   return (
     <div className="md-timeline" aria-label="对局事件时间导航">
+      <div className="md-timeline__heading"><strong>对局进程</strong><span>柱高表示事件数量 · 点击定位</span></div>
       <div className="md-timeline__axis" aria-hidden="true">
         {ticks.map((time, i) => <span key={time} className={i === 0 ? 'is-first' : i === ticks.length - 1 ? 'is-last' : ''} style={{ left: `${time / end * 100}%` }}>{timelineTime(time)}</span>)}
       </div>

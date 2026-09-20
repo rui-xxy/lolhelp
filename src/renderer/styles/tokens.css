@@ -36,6 +36,12 @@
   --color-app-team-mine: #8daabd;
   --color-app-team-enemy: #cb8587;
 
+  /* Match analysis: quieter canvas and a distinct inset panel hierarchy. */
+  --color-analysis-bg: #222629;
+  --color-analysis-panel: #282d30;
+  --color-analysis-surface: #30373b;
+  --color-analysis-accent: #99bdcc;
+
   --color-app-win: #83b08e;
   --color-app-win-bg: rgba(131, 176, 142, 0.11);
   --color-app-win-border: rgba(131, 176, 142, 0.25);

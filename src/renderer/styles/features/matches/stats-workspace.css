@@ -1,11 +1,11 @@
 @layer components {
   /* Shared match controls: full-surface selection, no avatar underlines. */
   .match-analytics {
-    --analysis-bg: var(--color-app-bg);
-    --analysis-panel: var(--color-app-shell);
-    --analysis-surface: var(--color-app-surface);
+    --analysis-bg: var(--color-analysis-bg);
+    --analysis-panel: var(--color-analysis-panel);
+    --analysis-surface: var(--color-analysis-surface);
     --analysis-line: var(--color-frost-line);
-    --analysis-focus: var(--color-app-focus);
+    --analysis-focus: var(--color-analysis-accent);
     --analysis-blue: var(--color-app-team-mine);
     --analysis-red: var(--color-app-team-enemy);
     color: var(--color-app-body);
@@ -100,11 +100,16 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--roster-team) 4%, var(--analysis-bg));
   }
   .match-roster__team-name {
     flex: 0 0 auto;
     font-size: 11px;
-    color: var(--color-app-muted);
+    color: var(--roster-team);
+    writing-mode: vertical-rl;
+    letter-spacing: .15em;
   }
   .match-roster__team.is-blue {
     --roster-team: var(--analysis-blue);
@@ -148,8 +153,8 @@
     color: var(--color-app-text);
   }
   .match-roster__player.is-selected {
-    background: var(--analysis-surface);
-    border-color: var(--color-app-border-strong);
+    background: color-mix(in srgb, var(--roster-team) 12%, var(--analysis-panel));
+    border-color: color-mix(in srgb, var(--roster-team) 55%, transparent);
     color: var(--color-app-text);
   }
   .match-roster__player.is-comparing {
@@ -201,6 +206,12 @@
     flex-direction: column;
     align-items: stretch;
     gap: 5px;
+    padding: 6px 0;
+    background: transparent;
+  }
+  .match-roster--compact .match-roster__team-name {
+    writing-mode: horizontal-tb;
+    letter-spacing: normal;
   }
   .match-roster--compact .match-roster__player {
     padding: 5px 2px;
@@ -220,9 +231,9 @@
     background: var(--analysis-bg);
   }
   .md-stats__header {
-    padding: 14px 18px 12px;
+    padding: 16px 20px 14px;
     border-bottom: 1px solid var(--analysis-line);
-    background: var(--analysis-panel);
+    background: var(--analysis-bg);
   }
   .md-stats__toolbar {
     display: flex;
@@ -321,9 +332,9 @@
     color: var(--color-app-text);
   }
   .md-stats__categories > button.is-active {
-    background: var(--analysis-surface);
-    color: var(--color-app-text);
-    border-color: var(--analysis-line);
+    background: color-mix(in srgb, var(--analysis-focus) 10%, transparent);
+    color: var(--analysis-focus);
+    border-color: transparent;
     font-weight: 600;
   }
   .md-stats__content {
@@ -339,18 +350,25 @@
     display: grid;
     margin-top: 18px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin-bottom: 22px;
-    padding: 14px 16px;
+    margin-bottom: 26px;
+    padding: 18px 0;
     border: 1px solid var(--analysis-line);
     border-radius: 10px;
-    background: var(--analysis-surface);
-    gap: 14px;
+    background: var(--analysis-panel);
+    gap: 0;
   }
   .md-stats__summary > div {
     min-width: 0;
     display: grid;
     gap: 7px;
+    padding-inline: 18px;
   }
+  .md-stats__summary > div + div { border-left: 1px solid var(--analysis-line); }
+  .md-stats__summary > div:first-child strong { color: var(--analysis-focus); }
+  .md-stats__summary-context { font-size: 11px; color: var(--color-app-muted); font-variant-numeric: tabular-nums; }
+  .md-stats__section-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .md-stats__section-heading > span { color: var(--color-app-muted); font-size: 11px; }
+  .md-stats__section .md-stats__section-heading h3 { margin: 0; }
   .md-stats__summary span {
     color: var(--color-app-muted);
     font-size: 11px;
@@ -384,9 +402,9 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    background: var(--analysis-bg);
+    background: var(--analysis-panel);
     box-shadow: 0 1px 0 var(--analysis-line);
-    min-height: 56px;
+    min-height: 50px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--analysis-line);
     margin-bottom: 2px;
@@ -409,7 +427,7 @@
   }
   .md-stat__row {
     width: 100%;
-    min-height: 64px;
+    min-height: 56px;
     padding: 10px 12px;
     border-radius: 7px;
     color: var(--color-app-body);
@@ -451,6 +469,7 @@
     gap: 7px;
     min-width: 0;
   }
+  .md-stat__reference { color: var(--color-app-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
   .md-stat__text-values {
     color: var(--color-app-muted);
     font-size: 12px;
@@ -558,9 +577,10 @@
       grid-template-columns: 1fr;
     }
     .md-stats__summary {
-      gap: 9px;
-      padding: 12px;
+      gap: 0;
+      padding: 14px 0;
     }
+    .md-stats__summary > div { padding-inline: 12px; }
     .md-stats__summary strong {
       font-size: 17px;
     }
@@ -582,7 +602,7 @@
       grid-template-columns: 1fr;
     }
     .md-stats__workspace {
-      grid-template-columns: 118px minmax(0, 1fr);
+      grid-template-columns: 132px minmax(0, 1fr);
     }
     .md-stats__categories {
       padding-inline: 6px;
@@ -591,10 +611,17 @@
       grid-template-columns: 20px minmax(0, 1fr);
       gap: 5px;
       padding-inline: 5px;
+      font-size: 11px;
+      white-space: nowrap;
     }
+    .match-roster--compact .match-roster__players { grid-template-columns: 1fr; gap: 2px; }
+    .match-roster--compact .match-roster__player { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 5px; }
+    .match-roster--compact .match-roster__name { text-align: left; }
     .md-stats__summary {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: 18px;
     }
+    .md-stats__summary > div:nth-child(3) { border-left: 0; }
     .md-stats__column-head, .md-stat__row {
       grid-template-columns: minmax(90px, 1fr) minmax(70px, auto) 14px;
       gap: 8px;

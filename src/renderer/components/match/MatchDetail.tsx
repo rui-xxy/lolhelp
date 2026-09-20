@@ -2604,7 +2604,7 @@ function EventsTab({
                 className={`lol-fight-window ${eventGapClass(node.gapMs)}`}
               >
                 <header className="lol-fight-window__head">
-                  <div className="md-fight-period"><time>{formatEventTime(node.start)}{node.end !== node.start ? ' — ' + formatEventTime(node.end) : ''}</time><span>{node.entries.length} 次击杀</span></div>
+                  <div className="md-fight-period"><span className="md-fight-label">交战</span><time>{formatEventTime(node.start)}{node.end !== node.start ? ' — ' + formatEventTime(node.end) : ''}</time><span>{node.entries.length} 次击杀</span></div>
                   <div className="md-fight-score" aria-label={'蓝方 ' + blueKills + ' 次击杀，红方 ' + redKills + ' 次击杀'}><span className="is-blue">蓝方 <b>{blueKills}</b></span><i aria-hidden="true">:</i><span className="is-red"><b>{redKills}</b> 红方</span></div>
                 </header>
                 <div className="lol-fight-window__events">
@@ -2624,7 +2624,7 @@ function EventsTab({
         <aside className="lol-event-inspector">
             <div className="lol-event-inspector__controls">
               <div className="lol-event-control-head">
-                <strong>筛选</strong>
+                <strong>事件筛选</strong>
                 <button
                   type="button"
                   title="重置筛选"
@@ -2658,6 +2658,7 @@ function EventsTab({
                 ))}
               </nav>
 
+              <div className="md-event-scope-heading"><strong>参与玩家</strong><span>可多选</span></div>
               <div className="lol-event-player-scope" role="group" aria-label="队伍范围">
                 <button
                   type="button"
