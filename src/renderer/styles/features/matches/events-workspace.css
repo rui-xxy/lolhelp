@@ -1,0 +1,845 @@
+@layer components {
+  .lol-postgame-content:has(.lol-event-analyzer) {
+    overflow: hidden;
+    padding: 0;
+  }
+  .lol-event-analyzer {
+    --event-blue: var(--color-app-team-mine);
+    --event-red: var(--color-app-team-enemy);
+    --event-gold: var(--lol-gold);
+    --event-muted: var(--color-app-muted);
+    display: grid;
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    background: var(--analysis-bg);
+  }
+  .lol-event-analyzer__overview {
+    display: grid;
+    min-height: 78px;
+    grid-template-columns: 138px minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--analysis-line);
+    background: var(--analysis-panel);
+  }
+  .lol-event-analyzer__overview-copy > strong {
+    display: flex;
+    gap: 7px;
+    align-items: baseline;
+    color: var(--color-app-body);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .lol-event-analyzer__overview-copy b {
+    color: var(--color-app-text);
+    font-size: 22px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-analyzer__overview-copy small {
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .lol-event-density {
+    min-width: 0;
+  }
+  .lol-event-density__labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-density__track {
+    position: relative;
+    height: 36px;
+    margin-inline: 4px;
+    border-radius: 6px;
+    background: var(--analysis-surface);
+  }
+  .lol-event-density__track::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--analysis-line);
+    pointer-events: none;
+  }
+  .lol-event-density__mark {
+    position: absolute;
+    z-index: 1;
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--event-muted);
+    transform: translateX(-50%);
+  }
+  .lol-event-density__mark::after {
+    content: '';
+    display: block;
+    width: 3px;
+    height: 8px;
+    margin-inline: auto;
+    background: currentColor;
+    border-radius: 1px;
+  }
+  .lol-event-density__mark--blue {
+    color: var(--event-blue);
+  }
+  .lol-event-density__mark--red {
+    color: var(--event-red);
+  }
+  .lol-event-density__mark--gold {
+    color: var(--event-gold);
+  }
+  .lol-event-density__mark.is-muted {
+    opacity: .16;
+  }
+  .lol-event-density__mark:hover:not(:disabled), .lol-event-density__mark.is-selected {
+    outline: 1px solid var(--color-app-text);
+    outline-offset: 2px;
+  }
+  .lol-event-analyzer__layout {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) 248px;
+  }
+  .lol-event-analyzer__stream {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 18px 28px;
+    scrollbar-gutter: stable;
+  }
+  .lol-event-analyzer__boundary {
+    display: grid;
+    min-height: 36px;
+    grid-template-columns: 46px 24px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .lol-event-analyzer__boundary > time {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-analyzer__boundary > span {
+    display: grid;
+    place-items: center;
+  }
+  .lol-event-analyzer__boundary svg {
+    width: 14px;
+    height: 14px;
+  }
+  .lol-event-analyzer__boundary > strong {
+    font-weight: 500;
+  }
+  .lol-event-analyzer__boundary--end {
+    margin-top: 14px;
+  }
+  .lol-event-gap--tight {
+    margin-top: 2px;
+  }
+  .lol-event-gap--near {
+    margin-top: 10px;
+  }
+  .lol-event-gap--far {
+    margin-top: 20px;
+  }
+  .lol-event-analyzer__event {
+    --event-accent: var(--event-muted);
+    display: grid;
+    grid-template-columns: 46px 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 82px;
+    padding: 10px 9px 10px 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .lol-event-analyzer__event--blue {
+    --event-accent: var(--event-blue);
+  }
+  .lol-event-analyzer__event--red {
+    --event-accent: var(--event-red);
+  }
+  .lol-event-analyzer__event--gold {
+    --event-accent: var(--event-gold);
+  }
+  .lol-event-analyzer__event:hover {
+    background: var(--color-frost-fill-hover);
+  }
+  .lol-event-analyzer__event.is-selected {
+    background: var(--analysis-surface);
+    border-color: var(--color-app-border-strong);
+  }
+  .lol-event-analyzer__event:focus-visible {
+    outline: 2px solid var(--analysis-focus);
+    outline-offset: -2px;
+  }
+  .lol-event-analyzer__event > time {
+    color: var(--color-app-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .lol-event-analyzer__node {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 26px;
+    color: var(--event-accent);
+  }
+  .md-event-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--event-accent);
+  }
+  .lol-event-type-mark {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    font-size: 12px;
+  }
+  .lol-event-type-mark img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+  .lol-event-analyzer__event-body {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+  }
+  .lol-event-analyzer__kill-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .lol-event-analyzer__combatant {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 9px;
+  }
+  .lol-event-analyzer__combatant > img {
+    flex-shrink: 0;
+    border: 1px solid var(--analysis-line);
+  }
+  .md-event-identity {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+  .md-event-identity b {
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .md-event-identity small {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .md-event-action {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    color: var(--color-app-muted);
+  }
+  .md-event-action img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+  .md-event-action small {
+    font-size: 10px;
+  }
+  .lol-event-analyzer__unknown-avatar {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--analysis-surface);
+  }
+  .lol-event-analyzer__unknown-avatar svg {
+    width: 16px;
+    height: 16px;
+  }
+  .lol-event-analyzer__kill-meta, .lol-event-analyzer__objective-head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--event-accent);
+    font-size: 11px;
+  }
+  .lol-event-analyzer__kind {
+    font-weight: 600;
+  }
+  .lol-event-analyzer__kill-meta > em {
+    color: var(--event-gold);
+    font-style: normal;
+  }
+  .lol-event-analyzer__assists {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .lol-event-analyzer__assists > div {
+    display: flex;
+    gap: 3px;
+  }
+  .lol-event-analyzer__assists img {
+    border: 1px solid var(--analysis-line);
+  }
+  .lol-event-analyzer__objective-copy {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+  }
+  .lol-event-analyzer__objective-copy > div {
+    min-width: 0;
+  }
+  .lol-event-analyzer__objective-copy strong {
+    display: block;
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 550;
+    overflow-wrap: anywhere;
+  }
+  .lol-fight-window {
+    border-radius: 9px;
+    padding: 4px;
+    background: color-mix(in srgb, var(--analysis-panel) 55%, transparent);
+  }
+  .lol-fight-window__head {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 10px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .lol-fight-window__head time {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-fight-window__head small {
+    font-size: 11px;
+  }
+  .lol-fight-window__head b {
+    font-weight: 500;
+    margin-left: 6px;
+  }
+  .lol-fight-window .is-blue {
+    color: var(--event-blue);
+  }
+  .lol-fight-window .is-red {
+    color: var(--event-red);
+  }
+  .lol-event-analyzer__empty {
+    min-height: 180px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    color: var(--color-app-muted);
+  }
+  .lol-event-analyzer__empty svg {
+    width: 24px;
+    height: 24px;
+  }
+  /* The right rail never switches into a different mode on event selection. */
+  .lol-event-inspector {
+    min-height: 0;
+    overflow-y: auto;
+    border-left: 1px solid var(--analysis-line);
+    background: var(--analysis-panel);
+  }
+  .lol-event-inspector__controls {
+    padding: 14px 12px 20px;
+  }
+  .lol-event-control-head {
+    display: flex;
+    min-height: 32px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .lol-event-control-head > strong {
+    color: var(--color-app-body);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .lol-event-control-head > button {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--color-app-muted);
+  }
+  .lol-event-control-head > button:hover:not(:disabled) {
+    background: var(--analysis-surface);
+  }
+  .lol-event-control-head > button:disabled {
+    opacity: .35;
+  }
+  .lol-event-control-head svg {
+    width: 14px;
+    height: 14px;
+  }
+  .lol-event-control-types {
+    display: grid;
+    gap: 4px;
+  }
+  .lol-event-control-types > button {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 6px 9px;
+    background: transparent;
+    color: var(--color-app-muted);
+    text-align: left;
+    font-size: 12px;
+  }
+  .lol-event-control-types > button:hover {
+    background: var(--color-frost-fill-hover);
+  }
+  .lol-event-control-types > button.is-active {
+    background: var(--analysis-surface);
+    border-color: var(--analysis-line);
+    color: var(--color-app-text);
+  }
+  .lol-event-control-types > button small {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-app-muted);
+  }
+  .lol-event-filter-art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+  }
+  .lol-event-filter-art > img {
+    width: 23px;
+    height: 23px;
+    object-fit: contain;
+  }
+  .lol-event-filter-art > svg {
+    width: 18px;
+    height: 18px;
+  }
+  .lol-event-filter-art > b {
+    position: absolute;
+    right: -4px;
+    bottom: -2px;
+    font-size: 9px;
+    line-height: 12px;
+    font-weight: 600;
+    background: var(--analysis-panel);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+  .lol-event-player-scope {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    padding: 3px;
+    margin: 20px 0 14px;
+    border: 1px solid var(--analysis-line);
+    border-radius: 7px;
+  }
+  .lol-event-player-scope > button {
+    min-height: 29px;
+    border-radius: 5px;
+    color: var(--color-app-muted);
+    font-size: 12px;
+  }
+  .lol-event-player-scope > button.is-active {
+    background: var(--analysis-surface);
+    color: var(--color-app-text);
+  }
+  /* Context stays next to the selected event; damage is grouped by champion. */
+  .lol-event-inspector__selected {
+    margin: 4px 0 12px 80px;
+    padding: 14px;
+    border: 1px solid var(--color-app-border);
+    border-radius: 9px;
+    background: var(--analysis-panel);
+  }
+  .lol-event-inspector__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .lol-event-inspector__head > button {
+    order: 3;
+    margin-left: auto;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 6px;
+    background: var(--analysis-surface);
+    color: var(--color-app-muted);
+  }
+  .lol-event-inspector__head > button svg {
+    width: 14px;
+    height: 14px;
+  }
+  .lol-event-inspector__head > div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .lol-event-inspector__head strong {
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .lol-event-inspector__head small {
+    color: var(--color-app-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-inspector__event-icon {
+    display: none;
+  }
+  .lol-event-inspector__combat {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+  .lol-event-inspector__combat > div {
+    min-width: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .lol-event-inspector__combat > div > span {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+  .lol-event-inspector__combat strong {
+    font-size: 12px;
+    font-weight: 550;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .lol-event-inspector__combat small {
+    font-size: 11px;
+    color: var(--color-app-muted);
+  }
+  .lol-event-inspector__combat-arrow {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+  .lol-event-inspector__section {
+    margin-top: 16px;
+  }
+  .lol-event-inspector__section-title {
+    display: flex;
+    min-height: 32px;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    color: var(--color-app-body);
+    font-size: 12px;
+    font-weight: 550;
+  }
+  .lol-event-inspector__section-title small {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .lol-event-inspector__assist-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .lol-event-inspector__assist-grid > div {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+  }
+  .lol-event-inspector__assist-grid span {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lol-event-damage-groups {
+    display: grid;
+    gap: 7px;
+  }
+  .lol-event-damage-group {
+    border: 1px solid var(--analysis-line);
+    border-radius: 7px;
+    background: var(--analysis-surface);
+  }
+  .lol-event-damage-group__head {
+    display: grid;
+    grid-template-columns: 36px minmax(70px, 1fr) minmax(35px, .65fr) auto 36px;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .lol-event-damage-group__head::-webkit-details-marker {
+    display: none;
+  }
+  .lol-event-damage-group__head > span {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+  .lol-event-damage-group__head strong {
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .lol-event-damage-group__head small {
+    font-size: 11px;
+    color: var(--color-app-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lol-event-damage-group__head > em {
+    color: var(--color-app-text);
+    font-size: 14px;
+    font-weight: 600;
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-damage-group__head > b {
+    color: var(--color-app-muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-align: right;
+  }
+  .lol-event-damage-group__head > div, .lol-event-damage-source > div {
+    height: 4px;
+    border-radius: 3px;
+    background: var(--color-frost-fill-active);
+    overflow: hidden;
+  }
+  .lol-event-damage-group__head > div > i, .lol-event-damage-source > div > i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--analysis-focus);
+  }
+  .lol-event-damage-group__unknown {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+  }
+  .lol-event-damage-group__unknown svg {
+    width: 18px;
+    height: 18px;
+  }
+  .lol-event-damage-sources {
+    display: grid;
+    gap: 2px;
+    padding: 4px 10px 9px;
+    border-top: 1px solid var(--analysis-line);
+  }
+  .lol-event-damage-source {
+    display: grid;
+    grid-template-columns: 26px minmax(75px, 1fr) minmax(40px, .65fr) auto 36px;
+    align-items: center;
+    gap: 8px;
+    min-height: 37px;
+  }
+  .lol-event-damage-source > span {
+    color: var(--color-app-body);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lol-event-damage-source > em {
+    color: var(--color-app-text);
+    font-style: normal;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .lol-event-damage-source > small {
+    color: var(--color-app-muted);
+    text-align: right;
+    font-size: 11px;
+  }
+  .lol-event-damage-source__icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    object-fit: cover;
+  }
+  .lol-event-damage-source__fallback {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    background: var(--analysis-panel);
+    border-radius: 4px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-style: normal;
+  }
+  .lol-event-damage-empty {
+    padding: 14px 0 0;
+    color: var(--color-app-muted);
+    font-size: 12px;
+  }
+  .lol-event-location {
+    border-top: 1px solid var(--analysis-line);
+  }
+  .lol-event-location > summary {
+    cursor: pointer;
+  }
+  .lol-event-location > summary::after {
+    content: '+';
+    margin-left: auto;
+    font-size: 16px;
+    color: var(--color-app-muted);
+  }
+  .lol-event-location[open] > summary::after {
+    content: '−';
+  }
+  .lol-event-map {
+    position: relative;
+    width: min(260px, 100%);
+    aspect-ratio: 1;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--analysis-surface);
+  }
+  .lol-event-map > img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .lol-event-map__dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid var(--color-app-text);
+    background: var(--event-red);
+    transform: translate(-50%, 50%);
+  }
+  .lol-event-map__dot--blue {
+    background: var(--event-blue);
+  }
+  .lol-event-map > small {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    background: var(--analysis-panel);
+    padding: 3px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+  @container (max-width: 900px) {
+    .lol-event-analyzer__layout {
+      grid-template-columns: minmax(0, 1fr) 222px;
+    }
+    .lol-event-analyzer__stream {
+      padding-inline: 10px;
+    }
+    .lol-event-analyzer__event {
+      grid-template-columns: 40px 22px minmax(0, 1fr);
+      gap: 7px;
+    }
+    .lol-event-inspector__selected {
+      margin-left: 54px;
+      padding: 12px;
+    }
+    .lol-event-analyzer__kill-flow {
+      gap: 6px;
+    }
+  }
+  @container (max-width: 650px) {
+    .lol-event-analyzer__layout {
+      grid-template-columns: minmax(0, 1fr) 174px;
+    }
+    .lol-event-analyzer__overview {
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 12px;
+      padding-inline: 12px;
+    }
+    .lol-event-analyzer__event {
+      grid-template-columns: 36px minmax(0, 1fr);
+    }
+    .lol-event-analyzer__node {
+      display: none;
+    }
+    .lol-event-inspector__selected {
+      margin-left: 0;
+    }
+    .lol-event-analyzer__combatant {
+      gap: 5px;
+    }
+    .md-event-identity small {
+      display: none;
+    }
+    .lol-event-control-types > button {
+      gap: 6px;
+      padding-inline: 5px;
+    }
+    .lol-event-inspector__controls {
+      padding-inline: 7px;
+    }
+    .lol-event-damage-source > div, .lol-event-damage-group__head > div {
+      display: none;
+    }
+    .lol-event-damage-source, .lol-event-damage-group__head {
+      grid-template-columns: 26px minmax(60px, 1fr) auto 30px;
+      gap: 6px;
+    }
+  }
+}

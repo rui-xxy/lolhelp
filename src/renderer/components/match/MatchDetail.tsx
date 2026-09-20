@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CirclePlay, Database, Download, Flame, Layers3, LoaderCircle, RotateCcw, Search, Skull, Swords, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
+import { DetailedStatsView } from './DetailedStatsView';
+import { MatchRoster } from './MatchRoster';
+import { LeagueArtImage, leagueArtUrl } from './LeagueArtImage';
+import type { StatsMetric, StatsGroup, StatsDisplayValue } from './matchStatsModel';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
 import { MATCH_TEAM_COLORS, MATCH_TIMELINE_COLORS } from '../../styles/palette';
@@ -44,21 +48,6 @@ interface MatchDetailProps {
   onPlayerSearch?: (riotId: string) => void;
 }
 
-interface StatsMetric {
-  key: string;
-  label: string;
-  value?: (participant: MatchParticipantSummary) => number;
-  text?: (participant: MatchParticipantSummary) => string;
-  rawKey?: string;
-  kind?: 'number' | 'decimal' | 'percent' | 'duration' | 'boolean';
-  description?: string;
-}
-
-interface StatsGroup {
-  title: string;
-  metrics: StatsMetric[];
-}
-
 const DETAIL_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '总览' },
   { key: 'details', label: '详尽表格' },
@@ -71,7 +60,7 @@ const STATS_GROUPS: StatsGroup[] = [
   {
     title: '战斗',
     metrics: [
-      { key: 'kda', label: '战损比', text: (p) => `${p.kills}/${p.deaths}/${p.assists}` },
+      { key: 'kda', label: 'K / D / A', text: (p) => `${p.kills}/${p.deaths}/${p.assists}` },
       { key: 'largestKillingSpree', label: '最高连杀', value: (p) => stat(p, 'largestKillingSpree') },
       { key: 'largestMultiKill', label: '最高多杀', value: (p) => stat(p, 'largestMultiKill') },
       { key: 'timeCCingOthers', label: '控制得分', value: (p) => stat(p, 'timeCCingOthers') },
@@ -249,11 +238,8 @@ const POSITION_ORDER: Record<string, number> = {
 const LINK_TONES: LinkTone[] = ['amber', 'cyan', 'violet', 'rose', 'emerald'];
 const RIFT_SCOREBOARD_QUEUE_IDS = new Set([400, 420, 430, 440, 490]);
 
-const LOL_MATCH_HISTORY_ART_BASE =
-  'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/';
-
 function lolMatchHistoryArt(name: string): string {
-  return `${LOL_MATCH_HISTORY_ART_BASE}${name}`;
+  return leagueArtUrl(name);
 }
 
 const STATS_GROUP_ART: Record<string, string> = {
@@ -1317,8 +1303,6 @@ function ScoreboardRow({
   );
 }
 
-type StatsDisplayValue = number | string | boolean;
-
 function getMetricValue(metric: StatsMetric, participant: MatchParticipantSummary): StatsDisplayValue {
   if (metric.text) return metric.text(participant);
   if (metric.value) return metric.value(participant);
@@ -1561,102 +1545,17 @@ function rawFieldLabel(key: string): string {
   return RAW_FIELD_LABELS[key] ?? `其他统计 #${rawFieldFallbackCode(key)}`;
 }
 
-type StatsTone =
-  | 'combat'
-  | 'damage'
-  | 'defense'
-  | 'vision'
-  | 'slayer'
-  | 'support'
-  | 'economy'
-  | 'objective'
-  | 'signal'
-  | 'raw'
-  | 'neutral';
-
-function statsToneForGroup(title: string): StatsTone {
-  switch (title) {
-    case '战斗':
-      return 'combat';
-    case '造成伤害':
-      return 'damage';
-    case '承受与资源':
-      return 'defense';
-    case '视野':
-      return 'vision';
-    case '击杀与生存':
-      return 'slayer';
-    case '伤害、治疗与控制':
-      return 'support';
-    case '经济与发育':
-      return 'economy';
-    case '地图资源与推进':
-      return 'objective';
-    case '信号与对局状态':
-      return 'signal';
-    case '更多原始统计':
-      return 'raw';
-    default:
-      return 'neutral';
-  }
-}
-
 function StatsGroupIcon({ title }: { title: string }) {
   const art = STATS_GROUP_ART[title];
-  if (art) {
-    return (
-      <img
-        className="lol-riot-art-icon"
-        src={lolMatchHistoryArt(art)}
-        alt=""
-        aria-hidden="true"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-      />
-    );
-  }
-
-  if (title === '更多原始统计') return <Database aria-hidden="true" />;
-  return <Layers3 aria-hidden="true" />;
+  return art && title !== '全部'
+    ? <LeagueArtImage name={art} className="lol-riot-art-icon" />
+    : <Layers3 aria-hidden="true" />;
 }
 
-function StatsMetricLabel({ metric }: { metric: StatsMetric }) {
-  const helpText = metric.description || (metric.rawKey ? `SGP 原始统计字段：${metric.rawKey}` : '');
-  return (
-    <div
-      className="lol-stats-label"
-      title={helpText || metric.label}
-      aria-label={helpText ? `${metric.label}：${helpText}` : metric.label}
-    >
-      <span>{metric.label}</span>
-      {helpText && <small aria-hidden="true">i</small>}
-    </div>
-  );
-}
-
-function DetailedTableTab({
-  participants,
-  targetPuuid,
-}: {
+function DetailedTableTab({ participants, targetPuuid }: {
   participants: MatchParticipantSummary[];
   targetPuuid: string;
 }) {
-  const [metricFilter, setMetricFilter] = useState('');
-  const [focusPuuid, setFocusPuuid] = useState(targetPuuid);
-  const [comparePuuid, setComparePuuid] = useState<string | null>(null);
-  const [comparePicking, setComparePicking] = useState(false);
-  const [expandedMetricKey, setExpandedMetricKey] = useState<string | null>(null);
-  const [activeGroupTitle, setActiveGroupTitle] = useState('战斗');
-  const [headerCompact, setHeaderCompact] = useState(false);
-
-  useEffect(() => {
-    setFocusPuuid(targetPuuid);
-    setComparePuuid(null);
-    setComparePicking(false);
-    setExpandedMetricKey(null);
-    setHeaderCompact(false);
-  }, [targetPuuid]);
-
   const extraRawMetrics = useMemo(() => {
     const keys = new Set<string>();
     participants.forEach((participant) => {
@@ -1680,435 +1579,9 @@ function DetailedTableTab({
     ...(extraRawMetrics.length > 0 ? [{ title: '更多原始统计', metrics: extraRawMetrics }] : []),
   ], [extraRawMetrics]);
 
-  useEffect(() => {
-    if (activeGroupTitle === '全部') return;
-    if (!groups.some((group) => group.title === activeGroupTitle)) {
-      setActiveGroupTitle(groups[0]?.title ?? '全部');
-    }
-  }, [activeGroupTitle, groups]);
-
-  const focusPlayer = participants.find((participant) => participant.puuid === focusPuuid)
-    ?? participants.find((participant) => participant.puuid === targetPuuid)
-    ?? participants[0];
-
-  const comparePlayer = comparePuuid
-    ? participants.find((participant) => participant.puuid === comparePuuid)
-    : undefined;
-
-  const highlights = useMemo(() => {
-    if (!focusPlayer || participants.length < 2) return [];
-    const candidates = STATS_GROUPS.flatMap((group) => (
-      group.metrics.flatMap((metric) => {
-        const rows = participants.map((player) => {
-          const value = getMetricValue(metric, player);
-          return {
-            player,
-            value,
-            numericValue: typeof value === 'number' && Number.isFinite(value) ? value : null,
-          };
-        });
-        const numericRows = rows.filter((row) => row.numericValue !== null);
-        if (numericRows.length < 2) return [];
-        const values = numericRows.map((row) => row.numericValue as number);
-        if (Math.max(...values) === Math.min(...values)) return [];
-        const sorted = [...numericRows].sort((left, right) => (
-          (right.numericValue ?? 0) - (left.numericValue ?? 0)
-        ));
-        const rank = sorted.findIndex((row) => row.player.puuid === focusPlayer.puuid) + 1;
-        const focusRow = rows.find((row) => row.player.puuid === focusPlayer.puuid);
-        if (rank <= 0 || !focusRow || focusRow.numericValue === null) return [];
-        const normalizedRank = numericRows.length <= 1 ? 0.5 : (rank - 1) / (numericRows.length - 1);
-        return [{
-          metric,
-          groupTitle: group.title,
-          tone: statsToneForGroup(group.title),
-          value: focusRow.value,
-          rank,
-          total: numericRows.length,
-          extremity: Math.abs(normalizedRank - 0.5) * 2,
-        }];
-      })
-    ));
-    candidates.sort((left, right) => right.extremity - left.extremity || left.rank - right.rank);
-
-    const picked: typeof candidates = [];
-    const usedGroups = new Set<string>();
-    for (const candidate of candidates) {
-      if (usedGroups.has(candidate.groupTitle)) continue;
-      picked.push(candidate);
-      usedGroups.add(candidate.groupTitle);
-      if (picked.length === 4) return picked;
-    }
-    for (const candidate of candidates) {
-      if (picked.some((item) => item.metric.key === candidate.metric.key)) continue;
-      picked.push(candidate);
-      if (picked.length === 4) break;
-    }
-    return picked;
-  }, [focusPlayer, participants]);
-
-  const visibleGroups = useMemo(() => {
-    const query = metricFilter.trim().toLocaleLowerCase();
-    if (query) {
-      return groups
-        .map((group) => ({
-          ...group,
-          metrics: group.metrics.filter((metric) => (
-            `${metric.label} ${metric.rawKey || metric.key}`.toLocaleLowerCase().includes(query)
-          )),
-        }))
-        .filter((group) => group.metrics.length > 0);
-    }
-    if (activeGroupTitle === '全部') return groups;
-    return groups.filter((group) => group.title === activeGroupTitle);
-  }, [activeGroupTitle, groups, metricFilter]);
-
-  if (!focusPlayer) {
-    return <div className="lol-stats lol-stats--empty">暂无可用的详细统计数据</div>;
-  }
-
-  return (
-    <div
-      className={[
-        'lol-stats',
-        'lol-stats-explorer',
-        headerCompact ? 'is-header-compact' : '',
-        comparePlayer ? 'is-comparing' : '',
-        comparePlayer?.teamId === 100 ? 'is-compare-blue' : '',
-        comparePlayer?.teamId === 200 ? 'is-compare-red' : '',
-      ].filter(Boolean).join(' ')}
-      onScroll={(event) => {
-        const scrollTop = event.currentTarget.scrollTop;
-        // The compact state removes roughly one player-strip height. A wide
-        // hysteresis prevents the resulting scrollTop adjustment from toggling
-        // the sticky header back and forth near the collapse threshold.
-        setHeaderCompact((current) => (current ? scrollTop > 12 : scrollTop > 104));
-      }}
-    >
-      <div className="lol-stats-explorer__sticky">
-        <div className="lol-stats-explorer__toolbar">
-          <div className="lol-stats-explorer__focus">
-            <GameIcon
-              src={focusPlayer.championAvatar}
-              alt={focusPlayer.championName}
-              size={32}
-              rounded
-              className={focusPlayer.teamId === 100 ? 'lol-stats-avatar--blue' : 'lol-stats-avatar--red'}
-            />
-            <div className="lol-stats-explorer__focus-copy">
-              <span>观察对象</span>
-              <strong>{playerName(focusPlayer)}</strong>
-              <small>{focusPlayer.championName}</small>
-            </div>
-            {comparePlayer ? (
-              <div className="lol-stats-compare-chip">
-                <ArrowLeftRight aria-hidden="true" />
-                <GameIcon
-                  src={comparePlayer.championAvatar}
-                  alt={comparePlayer.championName}
-                  size={20}
-                  rounded
-                />
-                <span>{playerName(comparePlayer)}</span>
-                <button
-                  type="button"
-                  aria-label="退出双人对比"
-                  title="退出双人对比"
-                  onClick={() => {
-                    setComparePuuid(null);
-                    setComparePicking(false);
-                  }}
-                >
-                  <X aria-hidden="true" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className={`lol-stats-compare-trigger ${comparePicking ? 'is-picking' : ''}`}
-                onClick={() => {
-                  setHeaderCompact(false);
-                  setComparePicking((current) => !current);
-                }}
-              >
-                <ArrowLeftRight aria-hidden="true" />
-                <span>{comparePicking ? '选择玩家' : '对比玩家'}</span>
-              </button>
-            )}
-          </div>
-          <label className="lol-stats-filter">
-            <Search aria-hidden="true" />
-            <input
-              value={metricFilter}
-              onChange={(event) => setMetricFilter(event.target.value)}
-              placeholder="搜索指标…"
-              aria-label="搜索统计指标"
-            />
-          </label>
-        </div>
-
-        <div className="lol-stats-player-strip" role="listbox" aria-label="切换观察玩家">
-          {participants.map((player, index) => {
-            const isFocused = player.puuid === focusPlayer.puuid;
-            const isQueryTarget = player.puuid === targetPuuid;
-            return (
-              <button
-                key={player.puuid}
-                type="button"
-                role="option"
-                aria-selected={isFocused}
-                title={`${playerName(player)} · ${player.championName}`}
-                className={[
-                  'lol-stats-player-choice',
-                  player.teamId === 100 ? 'is-blue-team' : 'is-red-team',
-                  isFocused ? 'is-active' : '',
-                  isQueryTarget ? 'is-query-target' : '',
-                  comparePicking && !isFocused ? 'is-compare-candidate' : '',
-                  comparePlayer?.puuid === player.puuid ? 'is-compare-target' : '',
-                  index === 5 ? 'is-team-break' : '',
-                ].filter(Boolean).join(' ')}
-                onClick={() => {
-                  if (comparePicking) {
-                    if (player.puuid === focusPlayer.puuid) {
-                      setComparePicking(false);
-                      return;
-                    }
-                    setComparePuuid(player.puuid);
-                    setComparePicking(false);
-                    setExpandedMetricKey(null);
-                    return;
-                  }
-                  setFocusPuuid(player.puuid);
-                  if (comparePuuid === player.puuid) setComparePuuid(null);
-                  setExpandedMetricKey(null);
-                }}
-              >
-                <GameIcon
-                  src={player.championAvatar}
-                  alt={player.championName}
-                  size={34}
-                  rounded
-                  className={player.teamId === 100 ? 'lol-stats-avatar--blue' : 'lol-stats-avatar--red'}
-                />
-                <span>{playerName(player)}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="lol-stats-category-rail" aria-label="统计分类">
-          <button
-            type="button"
-            className={`lol-stats-tone--neutral ${activeGroupTitle === '全部' ? 'is-active' : ''}`}
-            onClick={() => {
-              setActiveGroupTitle('全部');
-              setExpandedMetricKey(null);
-            }}
-          >
-            <StatsGroupIcon title="全部" />
-            <span>全部</span>
-          </button>
-          {groups.map((group) => (
-            <button
-              key={group.title}
-              type="button"
-              className={`lol-stats-tone--${statsToneForGroup(group.title)} ${activeGroupTitle === group.title ? 'is-active' : ''}`}
-              onClick={() => {
-                setActiveGroupTitle(group.title);
-                setExpandedMetricKey(null);
-              }}
-            >
-              <StatsGroupIcon title={group.title} />
-              <span>{group.title}</span>
-              <small>{group.metrics.length}</small>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {highlights.length > 0 && (
-        <div className="lol-stats-highlights" aria-label="本局特征">
-          <div className="lol-stats-highlights__lead">
-            <span>本局特征</span>
-          </div>
-          <div className="lol-stats-highlights__items">
-            {highlights.map((highlight) => (
-              <button
-                key={highlight.metric.key}
-                type="button"
-                className={`lol-stats-highlight lol-stats-tone--${highlight.tone}`}
-                onClick={() => {
-                  setMetricFilter('');
-                  setActiveGroupTitle(highlight.groupTitle);
-                  setExpandedMetricKey(highlight.metric.key);
-                }}
-              >
-                <i aria-hidden="true"><StatsGroupIcon title={highlight.groupTitle} /></i>
-                <span>
-                  <small>{highlight.metric.label}</small>
-                  <strong>{formatMetricValue(highlight.metric, highlight.value)}</strong>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="lol-stats-explorer__content">
-        {visibleGroups.map((group) => {
-          const groupTone = statsToneForGroup(group.title);
-          return (
-          <section
-            key={group.title}
-            className={`lol-stats-section lol-stats-tone--${groupTone}`}
-          >
-            <div className="lol-stats-group-title">
-              <div className="lol-stats-group-title__identity">
-                <i aria-hidden="true"><StatsGroupIcon title={group.title} /></i>
-                <span>{group.title}</span>
-              </div>
-            </div>
-
-            <div className="lol-stats-focus-list">
-              {group.metrics.map((metric) => {
-                const rows = participants.map((player) => {
-                  const value = getMetricValue(metric, player);
-                  const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : null;
-                  return { player, value, numericValue };
-                });
-                const numericRows = rows.filter((row) => row.numericValue !== null);
-                const sortedNumericRows = [...numericRows].sort((left, right) => (
-                  (right.numericValue ?? 0) - (left.numericValue ?? 0)
-                ));
-                const focusRow = rows.find((row) => row.player.puuid === focusPlayer.puuid) ?? rows[0];
-                const focusNumeric = focusRow?.numericValue ?? null;
-                const numericValues = numericRows.map((row) => row.numericValue as number);
-                const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
-                const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
-                const compareRow = comparePlayer
-                  ? rows.find((row) => row.player.puuid === comparePlayer.puuid)
-                  : undefined;
-                const compareNumeric = compareRow?.numericValue ?? null;
-                const focusRatio = focusNumeric === null
-                  ? 0
-                  : maxValue === minValue
-                    ? (maxValue === 0 ? 0 : 100)
-                    : Math.max(0, Math.min(100, ((focusNumeric - minValue) / (maxValue - minValue)) * 100));
-                const compareRatio = compareNumeric === null
-                  ? 0
-                  : maxValue === minValue
-                    ? (maxValue === 0 ? 0 : 100)
-                    : Math.max(0, Math.min(100, ((compareNumeric - minValue) / (maxValue - minValue)) * 100));
-                const deltaLabel = focusNumeric !== null && compareNumeric !== null
-                  ? formatMetricDelta(metric, focusNumeric - compareNumeric)
-                  : null;
-                const expanded = expandedMetricKey === metric.key;
-                const comparisonRows = numericRows.length > 0 ? sortedNumericRows : rows;
-
-                return (
-                  <article
-                    key={metric.key}
-                    className={`lol-stats-focus-item lol-stats-tone--${groupTone} ${expanded ? 'is-expanded' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="lol-stats-focus-item__summary"
-                      aria-expanded={expanded}
-                      onClick={() => setExpandedMetricKey((current) => (
-                        current === metric.key ? null : metric.key
-                      ))}
-                    >
-                      <div className="lol-stats-focus-item__label">
-                        <i className="lol-stats-focus-item__dot" aria-hidden="true" />
-                        <StatsMetricLabel metric={metric} />
-                      </div>
-
-                      <div
-                        key={`${focusPlayer.puuid}-${comparePlayer?.puuid ?? 'solo'}-${metric.key}`}
-                        className="lol-stats-focus-item__reading lol-stats-value-swap"
-                      >
-                        <strong>{formatMetricValue(metric, focusRow?.value ?? 0)}</strong>
-                        {compareRow && (
-                          <span className="lol-stats-focus-item__compare-reading">
-                            <ArrowLeftRight aria-hidden="true" />
-                            <b>{formatMetricValue(metric, compareRow.value)}</b>
-                            {deltaLabel && <em>Δ {deltaLabel}</em>}
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        className={`lol-stats-focus-item__meter ${compareNumeric !== null ? 'is-comparing' : ''}`}
-                        aria-hidden="true"
-                      >
-                        <i className="is-focus" style={{ width: `${focusRatio}%` }} />
-                        {compareNumeric !== null && (
-                          <i className="is-compare" style={{ width: `${compareRatio}%` }} />
-                        )}
-                        {focusNumeric !== null && numericRows.length > 0 && compareNumeric === null && (
-                          <b style={{ left: `${focusRatio}%` }} />
-                        )}
-                      </div>
-
-                      <ChevronRight
-                        aria-hidden="true"
-                        className={`lol-stats-focus-item__chevron ${expanded ? 'is-open' : ''}`}
-                      />
-                    </button>
-
-                    {expanded && (
-                      <div className="lol-stats-compare-inline">
-                        <div className="lol-stats-compare-inline__head">
-                          <span>全场对比</span>
-                        </div>
-                        <div className="lol-stats-compare-inline__grid">
-                          {comparisonRows.map((row, index) => {
-                            const ratio = row.numericValue === null
-                              ? 0
-                              : maxValue === minValue
-                                ? (maxValue === 0 ? 0 : 100)
-                                : Math.max(0, Math.min(
-                                    100,
-                                    ((row.numericValue - minValue) / (maxValue - minValue)) * 100,
-                                  ));
-                            const isFocused = row.player.puuid === focusPlayer.puuid;
-                            return (
-                              <div
-                                key={`${metric.key}-compare-${row.player.puuid}`}
-                                className={`lol-stats-compare-inline__row ${isFocused ? 'is-focused' : ''}`}
-                              >
-                                <em>{String(index + 1).padStart(2, '0')}</em>
-                                <GameIcon
-                                  src={row.player.championAvatar}
-                                  alt={row.player.championName}
-                                  size={26}
-                                  rounded
-                                />
-                                <span title={playerName(row.player)}>{playerName(row.player)}</span>
-                                <i aria-hidden="true"><b style={{ width: `${ratio}%` }} /></i>
-                                <strong>{formatMetricValue(metric, row.value)}</strong>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-          );
-        })}
-
-        {visibleGroups.length === 0 && (
-          <div className="lol-stats-explorer__empty">
-            没有找到与“{metricFilter}”匹配的统计指标
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <DetailedStatsView participants={participants} targetPuuid={targetPuuid} groups={groups}
+    readValue={getMetricValue} formatValue={formatMetricValue} formatDelta={formatMetricDelta}
+    groupIcon={(title) => <StatsGroupIcon title={title} />} />;
 }
 
 function timelineEvents(timeline: MatchTimeline | null): MatchTimelineEvent[] {
@@ -2202,7 +1675,7 @@ function EventFilterArt({ filter }: { filter: EventPrimaryFilter }) {
 
   return (
     <i className="lol-event-filter-art" aria-hidden="true">
-      <img src={lolMatchHistoryArt(asset)} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      {filter === 'all' ? <Layers3 /> : <LeagueArtImage name={asset} />}
       {filter === 'multi' && <b>×2</b>}
     </i>
   );
@@ -2246,6 +1719,8 @@ function eventArtAsset(event: MatchTimelineEvent, actorTeamId?: number): string 
     if (monster.includes('AIR')) return `air-${team}.png`;
     if (monster.includes('EARTH')) return `earth-${team}.png`;
     if (monster.includes('FIRE')) return `fire-${team}.png`;
+    if (monster.includes('WATER')) return `water-${team}.png`;
+    if (monster.includes('HORDE')) return 'right_icons_grub.png';
     if (monster.includes('DRAGON')) return `dragon-${team}.png`;
     return '';
   }
@@ -2271,7 +1746,7 @@ function EventTypeMark({
   return (
     <span className={`lol-event-type-mark lol-event-type-mark--${filter ?? 'muted'} ${art ? 'has-riot-art' : ''}`}>
       {art ? (
-        <img src={lolMatchHistoryArt(art)} alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer" />
+        <LeagueArtImage name={art} fallback={eventTypeMark(event)} />
       ) : (
         eventTypeMark(event)
       )}
@@ -2659,17 +2134,18 @@ function EventsTab({
       .filter((entry) => eventFilterKey(entry.event) !== null)
   ), [allEvents]);
 
+  const scopedEntries = useMemo(() => entries.filter((entry) => championFilters === null || eventParticipantIds(entry.event).some((id) => championFilters.has(id))), [entries, championFilters]);
   const primaryCounts = useMemo<Record<EventPrimaryFilter, number>>(() => ({
-    all: entries.length,
-    kill: entries.filter((entry) => entry.event.type === 'CHAMPION_KILL').length,
-    multi: entries.filter((entry) => (
+    all: scopedEntries.length,
+    kill: scopedEntries.filter((entry) => entry.event.type === 'CHAMPION_KILL').length,
+    multi: scopedEntries.filter((entry) => (
       entry.event.type === 'CHAMPION_KILL' && (entry.event.multiKillLength ?? 0) >= 2
     )).length,
-    objective: entries.filter((entry) => entry.event.type === 'ELITE_MONSTER_KILL').length,
-    building: entries.filter((entry) => (
+    objective: scopedEntries.filter((entry) => entry.event.type === 'ELITE_MONSTER_KILL').length,
+    building: scopedEntries.filter((entry) => (
       entry.event.type === 'BUILDING_KILL' || entry.event.type === 'TURRET_PLATE_DESTROYED'
     )).length,
-  }), [entries]);
+  }), [scopedEntries]);
 
   const filteredEntries = useMemo(() => entries.filter((entry) => {
     if (!eventMatchesPrimaryFilter(entry.event, typeFilter)) return false;
@@ -2684,7 +2160,7 @@ function EventsTab({
 
   const streamNodes = useMemo(() => buildEventStreamNodes(filteredEntries), [filteredEntries]);
   const selectedEntry = selectedEventKey
-    ? entries.find((entry) => entry.key === selectedEventKey)
+    ? filteredEntries.find((entry) => entry.key === selectedEventKey)
     : undefined;
   const selectedEvent = selectedEntry?.event;
   const selectedCopy = selectedEvent ? eventCopy(selectedEvent, names) : undefined;
@@ -2732,6 +2208,10 @@ function EventsTab({
     };
   }, [abilityGuides, names, selectedDamageGroups]);
 
+  useEffect(() => {
+    if (selectedEventKey && !filteredKeys.has(selectedEventKey)) setSelectedEventKey(null);
+  }, [filteredKeys, selectedEventKey]);
+
   const lastTimelineTimestamp = timeline?.frames.at(-1)?.timestamp ?? 0;
   const gameDurationMs = gameDuration > 100_000 ? gameDuration : gameDuration * 1_000;
   const durationMs = Math.max(1, lastTimelineTimestamp, gameDurationMs);
@@ -2752,291 +2232,28 @@ function EventsTab({
   };
 
   const scrollToEvent = (entry: EventEntry) => {
-    setTypeFilter('all');
-    setChampionFilters(null);
+    if (!filteredKeys.has(entry.key)) return;
     setSelectedEventKey(entry.key);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        eventRefs.current.get(entry.key)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        eventRefs.current.get(entry.key)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
       });
     });
   };
 
-  const renderEventEntry = (entry: EventEntry, clustered = false) => {
-    const { event } = entry;
-    const filter = eventFilterKey(event);
-    const copy = eventCopy(event, names);
-    const killer = names.get(event.killerId ?? event.participantId ?? event.creatorId ?? 0);
-    const victim = names.get(event.victimId ?? 0);
-    const assists = (event.assistingParticipantIds ?? [])
-      .map((id) => names.get(id))
-      .filter(Boolean) as MatchParticipantSummary[];
-    const selected = selectedEventKey === entry.key;
-
-    return (
-      <article
-        key={entry.key}
-        ref={(node) => {
-          if (node) eventRefs.current.set(entry.key, node);
-          else eventRefs.current.delete(entry.key);
-        }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-        className={[
-          'lol-event-analyzer__event',
-          `lol-event-analyzer__event--${copy.tone}`,
-          filter ? `lol-event-analyzer__event--${filter}` : '',
-          clustered ? 'is-clustered' : '',
-          selected ? 'is-selected' : '',
-        ].filter(Boolean).join(' ')}
-        onClick={() => setSelectedEventKey(entry.key)}
-        onKeyDown={(keyboardEvent) => {
-          if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
-            keyboardEvent.preventDefault();
-            setSelectedEventKey(entry.key);
-          }
-        }}
-      >
-        <time>{formatEventTime(event.timestamp)}</time>
-        <span
-          className={[
-            'lol-event-analyzer__node',
-            event.type === 'CHAMPION_KILL' && killer ? 'is-champion' : '',
-          ].filter(Boolean).join(' ')}
-          aria-hidden="true"
-        >
-          {event.type === 'CHAMPION_KILL' && killer ? (
-            <>
-              <GameIcon src={killer.championAvatar} alt="" size={24} rounded />
-              {(event.multiKillLength ?? 0) >= 2 && (
-                <b className="lol-event-analyzer__node-count">{event.multiKillLength}</b>
-              )}
-            </>
-          ) : (
-            <EventTypeMark event={event} actorTeamId={killer?.teamId} />
-          )}
-        </span>
-
-        <div className="lol-event-analyzer__event-body">
-          {event.type === 'CHAMPION_KILL' ? (
-            <>
-              <div className="lol-event-analyzer__kill-meta">
-                <span className={`lol-event-analyzer__kind lol-event-analyzer__kind--${filter ?? 'kill'}`}>
-                  {filter === 'multi' ? `${event.multiKillLength} 杀` : '击杀'}
-                </span>
-                {event.shutdownBounty ? <em>终结赏金 {event.shutdownBounty}</em> : null}
-              </div>
-
-              <div className="lol-event-analyzer__kill-flow">
-                <span className="lol-event-analyzer__combatant">
-                  {killer ? (
-                    <GameIcon src={killer.championAvatar} alt={killer.championName} size={34} rounded />
-                  ) : (
-                    <i className="lol-event-analyzer__unknown-avatar"><Swords aria-hidden="true" /></i>
-                  )}
-                  <b>{killer ? playerName(killer) : '未知来源'}</b>
-                </span>
-                <img
-                  className="lol-event-analyzer__combat-arrow"
-                  src={lolMatchHistoryArt('arrow.png')}
-                  alt=""
-                  aria-hidden="true"
-                />
-                <span className="lol-event-analyzer__combatant lol-event-analyzer__combatant--victim">
-                  {victim ? (
-                    <GameIcon src={victim.championAvatar} alt={victim.championName} size={34} rounded />
-                  ) : (
-                    <i className="lol-event-analyzer__unknown-avatar"><Skull aria-hidden="true" /></i>
-                  )}
-                  <b>{victim ? playerName(victim) : '未知英雄'}</b>
-                </span>
-              </div>
-
-              {assists.length > 0 && (
-                <div className="lol-event-analyzer__assists">
-                  <span>助攻</span>
-                  <div>
-                    {assists.map((participant) => (
-                      <GameIcon
-                        key={participant.puuid}
-                        src={participant.championAvatar}
-                        alt={participant.championName}
-                        title={playerName(participant)}
-                        size={22}
-                        rounded
-                      />
-                    ))}
-                  </div>
-                  <small>{assists.length} 人参与</small>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="lol-event-analyzer__objective-head">
-                <span className={`lol-event-analyzer__kind lol-event-analyzer__kind--${filter ?? 'building'}`}>
-                  {filter ? eventFilterLabel(filter) : '事件'}
-                </span>
-              </div>
-              <div className="lol-event-analyzer__objective-copy">
-                {killer && <GameIcon src={killer.championAvatar} alt={killer.championName} size={30} rounded />}
-                <div>
-                  <strong>{copy.title}</strong>
-                  <small>{copy.detail}</small>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </article>
-    );
-  };
-
-  const bluePlayers = participants.filter((participant) => participant.teamId === 100);
-  const redPlayers = participants.filter((participant) => participant.teamId === 200);
-  const blueParticipantIds = bluePlayers.map((participant, index) => participant.participantId || index + 1);
-  const redParticipantIds = redPlayers.map((participant, index) => participant.participantId || index + 6);
-  const allPlayersActive = championFilters === null;
-  const blueScopeActive = championFilters !== null && sameParticipantSet(championFilters, blueParticipantIds);
-  const redScopeActive = championFilters !== null && sameParticipantSet(championFilters, redParticipantIds);
-
-  return (
-    <div className="lol-event-analyzer">
-      <header className="lol-event-analyzer__overview">
-        <div className="lol-event-analyzer__overview-copy">
-          <strong>事件 <b>{filteredEntries.length}</b><small> / {entries.length}</small></strong>
-        </div>
-
-        <div className="lol-event-density" aria-label="整局事件密度">
-          <div className="lol-event-density__labels">
-            <span>00:00</span>
-            <span>{formatEventTime(durationMs)}</span>
-          </div>
-          <div className="lol-event-density__track">
-            {entries.map((entry, index) => {
-              const filter = eventFilterKey(entry.event);
-              const copy = eventCopy(entry.event, names);
-              const left = Math.max(0, Math.min(100, (entry.event.timestamp / durationMs) * 100));
-              return (
-                <button
-                  key={`density-${entry.key}`}
-                  type="button"
-                  className={[
-                    'lol-event-density__mark',
-                    filter ? `lol-event-density__mark--${filter}` : '',
-                    `lol-event-density__mark--${copy.tone}`,
-                    filteredKeys.has(entry.key) ? '' : 'is-muted',
-                    selectedEventKey === entry.key ? 'is-selected' : '',
-                  ].filter(Boolean).join(' ')}
-                  style={{
-                    left: `${left}%`,
-                    top: `${3 + (index % 3) * 5}px`,
-                  }}
-                  title={`${formatEventTime(entry.event.timestamp)} · ${eventCopy(entry.event, names).title}`}
-                  aria-label={`跳转到 ${formatEventTime(entry.event.timestamp)} ${eventCopy(entry.event, names).title}`}
-                  onClick={() => scrollToEvent(entry)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      </header>
-
-      <div className="lol-event-analyzer__layout">
-        <div className="lol-event-analyzer__stream">
-          <div className="lol-event-analyzer__boundary">
-            <time>00:00</time>
-            <span><CirclePlay aria-hidden="true" /></span>
-            <strong>开始游戏</strong>
-          </div>
-
-          {streamNodes.length === 0 && (
-            <div className="lol-event-analyzer__empty">
-              <Layers3 aria-hidden="true" />
-              <strong>无匹配事件</strong>
-            </div>
-          )}
-
-          {streamNodes.map((node, nodeIndex) => {
-            if (node.kind === 'event') {
-              return (
-                <div
-                  key={`node-${node.entry.key}`}
-                  className={`lol-event-analyzer__node-wrap ${eventGapClass(node.gapMs)}`}
-                >
-                  {renderEventEntry(node.entry)}
-                </div>
-              );
-            }
-
-            const blueKills = node.entries.filter((entry) => names.get(entry.event.killerId ?? 0)?.teamId === 100).length;
-            const redKills = node.entries.length - blueKills;
-            const fightKillers = node.entries
-              .map((entry) => names.get(entry.event.killerId ?? 0))
-              .filter((participant): participant is MatchParticipantSummary => Boolean(participant))
-              .filter((participant, index, list) => (
-                list.findIndex((item) => item.puuid === participant.puuid) === index
-              ))
-              .slice(0, 3);
-            return (
-              <section
-                key={`fight-${node.start}-${nodeIndex}`}
-                className={`lol-fight-window ${eventGapClass(node.gapMs)}`}
-              >
-                <div className="lol-fight-window__head">
-                  <time>
-                    {formatEventTime(node.start)}
-                    {node.end !== node.start ? <span>—{formatEventTime(node.end)}</span> : null}
-                  </time>
-                  <span className="lol-fight-window__killers" aria-hidden="true">
-                    {fightKillers.map((participant) => (
-                      <GameIcon
-                        key={participant.puuid}
-                        src={participant.championAvatar}
-                        alt=""
-                        size={22}
-                        rounded
-                      />
-                    ))}
-                  </span>
-                  <div>
-                    <strong>战斗窗口</strong>
-                    <small>
-                      {node.entries.length} 次连续击杀 ·
-                      <b className="is-blue"> 蓝 {blueKills}</b>
-                      <b className="is-red"> 红 {redKills}</b>
-                    </small>
-                  </div>
-                </div>
-                <div className="lol-fight-window__events">
-                  {node.entries.map((entry) => renderEventEntry(entry, true))}
-                </div>
-              </section>
-            );
-          })}
-
-          <div className="lol-event-analyzer__boundary lol-event-analyzer__boundary--end">
-            <time>{formatEventTime(lastTimelineTimestamp || durationMs)}</time>
-            <span><Layers3 aria-hidden="true" /></span>
-            <strong>对局结束</strong>
-          </div>
-        </div>
-
-        <aside className="lol-event-inspector">
-          {selectedEvent && selectedEntry && selectedCopy ? (
+  const selectedPanel = selectedEvent && selectedEntry && selectedCopy ? (
             <div className="lol-event-inspector__selected">
               <div className="lol-event-inspector__head">
                 <button
                   type="button"
-                  onClick={() => setSelectedEventKey(null)}
-                  aria-label="返回事件筛选"
-                  title="返回事件筛选"
+                  onClick={() => { eventRefs.current.get(selectedEventKey ?? '')?.focus(); setSelectedEventKey(null); }}
+                  aria-label="收起事件详情"
+                  title="收起事件详情"
                 >
-                  <ChevronLeft aria-hidden="true" />
+                  <X aria-hidden="true" />
                 </button>
                 <div>
-                  <strong>{formatEventTime(selectedEvent.timestamp)}</strong>
+                  <strong>{eventPrimaryFilterLabel(eventFilterKey(selectedEvent) ?? 'all')}</strong><small>{formatEventTime(selectedEvent.timestamp)}</small>
                 </div>
                 <i
                   className={[
@@ -3100,34 +2317,6 @@ function EventsTab({
                 </section>
               )}
 
-              {selectedEvent.position && (
-                <section className="lol-event-inspector__section">
-                  <div className="lol-event-inspector__section-title">
-                    <span>发生位置</span>
-                    <small>{mapLabel}</small>
-                  </div>
-                  <div className={`lol-event-map lol-event-map--${mapId ?? 'fallback'}`}>
-                    {mapUrl && (
-                      <img
-                        src={mapUrl}
-                        alt={`${mapLabel}事件位置`}
-                        onError={(imageEvent) => {
-                          imageEvent.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <span
-                      className={`lol-event-map__dot lol-event-map__dot--${selectedCopy.tone}`}
-                      style={{
-                        left: `${Math.max(3, Math.min(97, (selectedEvent.position.x / 15000) * 100))}%`,
-                        bottom: `${Math.max(3, Math.min(97, (selectedEvent.position.y / 15000) * 100))}%`,
-                      }}
-                    />
-                    <small>X {selectedEvent.position.x} · Y {selectedEvent.position.y}</small>
-                  </div>
-                </section>
-              )}
-
               {selectedDamageGroups.length > 0 && (
                 <section className="lol-event-inspector__section lol-event-inspector__section--damage">
                   <div className="lol-event-inspector__section-title">
@@ -3135,31 +2324,31 @@ function EventsTab({
                     <small>{formatInteger(selectedDamageTotal)}</small>
                   </div>
                   <div className="lol-event-damage-groups">
-                    {selectedDamageGroups.map((group) => {
+                    {selectedDamageGroups.map((group, groupIndex) => {
                       const dealer = names.get(group.participantId);
                       const guide = dealer ? abilityGuides[dealer.championId] : undefined;
                       const totalShare = selectedDamageTotal > 0 ? (group.total / selectedDamageTotal) * 100 : 0;
                       return (
-                        <article
-                          key={`damage-group-${group.participantId}`}
+                        <details open={groupIndex === 0}
+                          key={`damage-group-${selectedEvent.timestamp}-${group.participantId}`}
                           className="lol-event-damage-group"
                         >
-                          <div className="lol-event-damage-group__head">
+                          <summary className="lol-event-damage-group__head">
                             {dealer ? (
                               <GameIcon src={dealer.championAvatar} alt={dealer.championName} size={36} rounded />
                             ) : (
                               <i className="lol-event-damage-group__unknown"><Flame aria-hidden="true" /></i>
                             )}
                             <span>
-                              <strong>{dealer ? playerName(dealer) : '其他来源'}</strong>
-                              <small>{group.sources.length} 个伤害来源</small>
+                              <strong>{dealer ? dealer.championName : '其他来源'}</strong>
+                              <small>{dealer ? playerName(dealer) : '环境伤害'}</small>
                             </span>
                             <div aria-hidden="true">
                               <i style={{ width: `${totalShare}%` }} />
                             </div>
                             <em>{formatInteger(group.total)}</em>
                             <b>{totalShare.toFixed(0)}%</b>
-                          </div>
+                          </summary>
 
                           <div className="lol-event-damage-sources">
                             {group.sources.map((row, sourceIndex) => {
@@ -3181,7 +2370,7 @@ function EventsTab({
                               );
                             })}
                           </div>
-                        </article>
+                        </details>
                       );
                     })}
                   </div>
@@ -3189,12 +2378,264 @@ function EventsTab({
               )}
 
 
+              {selectedEvent.type === 'CHAMPION_KILL' && selectedDamageGroups.length === 0 && <p className="lol-event-damage-empty">此事件未提供伤害明细</p>}
+              {selectedEvent.position && (
+                <details className="lol-event-inspector__section lol-event-location">
+                  <summary className="lol-event-inspector__section-title">
+                    <span>发生位置</span>
+                    <small>{mapLabel}</small>
+                  </summary>
+                  <div className={`lol-event-map lol-event-map--${mapId ?? 'fallback'}`}>
+                    {mapUrl && (
+                      <img
+                        src={mapUrl}
+                        alt={`${mapLabel}事件位置`}
+                        onError={(imageEvent) => {
+                          imageEvent.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <span
+                      className={`lol-event-map__dot lol-event-map__dot--${selectedCopy.tone}`}
+                      style={{
+                        left: `${Math.max(3, Math.min(97, (selectedEvent.position.x / 15000) * 100))}%`,
+                        bottom: `${Math.max(3, Math.min(97, (selectedEvent.position.y / 15000) * 100))}%`,
+                      }}
+                    />
+                    <small>X {selectedEvent.position.x} · Y {selectedEvent.position.y}</small>
+                  </div>
+                </details>
+              )}
+
             </div>
+  ) : null;
+
+  const renderEventEntry = (entry: EventEntry, clustered = false) => {
+    const { event } = entry;
+    const filter = eventFilterKey(event);
+    const copy = eventCopy(event, names);
+    const killer = names.get(event.killerId ?? event.participantId ?? event.creatorId ?? 0);
+    const victim = names.get(event.victimId ?? 0);
+    const assists = (event.assistingParticipantIds ?? [])
+      .map((id) => names.get(id))
+      .filter(Boolean) as MatchParticipantSummary[];
+    const selected = selectedEventKey === entry.key;
+
+    return (
+      <div className="md-event-entry" key={entry.key}>
+      <article
+        key={entry.key}
+        ref={(node) => {
+          if (node) eventRefs.current.set(entry.key, node);
+          else eventRefs.current.delete(entry.key);
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={selected}
+        className={[
+          'lol-event-analyzer__event',
+          `lol-event-analyzer__event--${copy.tone}`,
+          filter ? `lol-event-analyzer__event--${filter}` : '',
+          clustered ? 'is-clustered' : '',
+          selected ? 'is-selected' : '',
+        ].filter(Boolean).join(' ')}
+        onClick={() => setSelectedEventKey(selected ? null : entry.key)}
+        onKeyDown={(keyboardEvent) => {
+          if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+            keyboardEvent.preventDefault();
+            setSelectedEventKey(selected ? null : entry.key);
+          }
+        }}
+      >
+        <time>{formatEventTime(event.timestamp)}</time>
+        <span className="lol-event-analyzer__node" aria-hidden="true">{event.type === 'CHAMPION_KILL' ? <i className="md-event-dot" /> : <EventTypeMark event={event} actorTeamId={killer?.teamId} />}</span>
+
+        <div className="lol-event-analyzer__event-body">
+          {event.type === 'CHAMPION_KILL' ? (
+            <>
+              {((event.multiKillLength ?? 0) >= 2 || Boolean(event.shutdownBounty)) && <div className="lol-event-analyzer__kill-meta">
+                <span className={`lol-event-analyzer__kind lol-event-analyzer__kind--${filter ?? 'kill'}`}>
+                  {filter === 'multi' ? `${event.multiKillLength} 杀` : '击杀'}
+                </span>
+                {event.shutdownBounty ? <em>终结赏金 {event.shutdownBounty}</em> : null}
+              </div>}
+
+              <div className="lol-event-analyzer__kill-flow">
+                <span className="lol-event-analyzer__combatant">
+                  {killer ? (
+                    <GameIcon src={killer.championAvatar} alt={killer.championName} size={34} rounded />
+                  ) : (
+                    <i className="lol-event-analyzer__unknown-avatar"><Swords aria-hidden="true" /></i>
+                  )}
+                  <span className="md-event-identity"><b>{killer?.championName ?? '未知来源'}</b><small title={killer ? playerName(killer) : ''}>{killer ? playerName(killer) : '地图单位'}</small></span>
+                </span>
+                <span className="md-event-action"><LeagueArtImage name="kills.png" /><small>击杀</small></span>
+                <span className="lol-event-analyzer__combatant lol-event-analyzer__combatant--victim">
+                  {victim ? (
+                    <GameIcon src={victim.championAvatar} alt={victim.championName} size={34} rounded />
+                  ) : (
+                    <i className="lol-event-analyzer__unknown-avatar"><Skull aria-hidden="true" /></i>
+                  )}
+                  <span className="md-event-identity"><b>{victim?.championName ?? '未知英雄'}</b><small title={victim ? playerName(victim) : ''}>{victim ? playerName(victim) : ''}</small></span>
+                </span>
+              </div>
+
+              {assists.length > 0 && (
+                <div className="lol-event-analyzer__assists">
+                  <span>助攻</span>
+                  <div>
+                    {assists.map((participant) => (
+                      <GameIcon
+                        key={participant.puuid}
+                        src={participant.championAvatar}
+                        alt={participant.championName}
+                        title={playerName(participant)}
+                        size={22}
+                        rounded
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
+            <>
+              <div className="lol-event-analyzer__objective-head">
+                <span className={`lol-event-analyzer__kind lol-event-analyzer__kind--${filter ?? 'building'}`}>
+                  {filter ? eventFilterLabel(filter) : '事件'}
+                </span>
+              </div>
+              <div className="lol-event-analyzer__objective-copy">
+                {killer && <GameIcon src={killer.championAvatar} alt={killer.championName} size={30} rounded />}
+                <div>
+                  <strong>{copy.title}</strong>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </article>
+      {selected && selectedPanel}
+      </div>
+    );
+  };
+
+  const bluePlayers = participants.filter((participant) => participant.teamId === 100);
+  const redPlayers = participants.filter((participant) => participant.teamId === 200);
+  const blueParticipantIds = bluePlayers.map((participant, index) => participant.participantId || index + 1);
+  const redParticipantIds = redPlayers.map((participant, index) => participant.participantId || index + 6);
+  const allPlayersActive = championFilters === null;
+  const blueScopeActive = championFilters !== null && sameParticipantSet(championFilters, blueParticipantIds);
+  const redScopeActive = championFilters !== null && sameParticipantSet(championFilters, redParticipantIds);
+
+  return (
+    <div className="lol-event-analyzer match-analytics" onKeyDown={(event) => { if (event.key === 'Escape' && selectedEventKey) { eventRefs.current.get(selectedEventKey)?.focus(); setSelectedEventKey(null); } }}>
+      <header className="lol-event-analyzer__overview">
+        <div className="lol-event-analyzer__overview-copy">
+          <strong>事件 <b>{filteredEntries.length}</b><small> / {entries.length}</small></strong>
+        </div>
+
+        <div className="lol-event-density" aria-label="整局事件密度">
+          <div className="lol-event-density__labels">
+            <span>00:00</span>
+            <span>{formatEventTime(durationMs)}</span>
+          </div>
+          <div className="lol-event-density__track">
+            {entries.map((entry) => {
+              const filter = eventFilterKey(entry.event);
+              const copy = eventCopy(entry.event, names);
+              const left = Math.max(0, Math.min(100, (entry.event.timestamp / durationMs) * 100));
+              return (
+                <button
+                  key={`density-${entry.key}`}
+                  type="button"
+                  className={[
+                    'lol-event-density__mark',
+                    filter ? `lol-event-density__mark--${filter}` : '',
+                    `lol-event-density__mark--${copy.tone}`,
+                    filteredKeys.has(entry.key) ? '' : 'is-muted',
+                    selectedEventKey === entry.key ? 'is-selected' : '',
+                  ].filter(Boolean).join(' ')}
+                  style={{
+                    left: `${left}%`,
+                    top: `${copy.tone === 'blue' ? 5 : copy.tone === 'red' ? 23 : 14}px`,
+                  }}
+                  title={`${formatEventTime(entry.event.timestamp)} · ${eventCopy(entry.event, names).title}`}
+                  aria-label={`跳转到 ${formatEventTime(entry.event.timestamp)} ${eventCopy(entry.event, names).title}`}
+                  disabled={!filteredKeys.has(entry.key)}
+                  onClick={() => scrollToEvent(entry)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </header>
+
+      <div className="lol-event-analyzer__layout">
+        <div className="lol-event-analyzer__stream">
+          <div className="lol-event-analyzer__boundary">
+            <time>00:00</time>
+            <span><CirclePlay aria-hidden="true" /></span>
+            <strong>开始游戏</strong>
+          </div>
+
+          {streamNodes.length === 0 && (
+            <div className="lol-event-analyzer__empty">
+              <Layers3 aria-hidden="true" />
+              <strong>无匹配事件</strong>
+            </div>
+          )}
+
+          {streamNodes.map((node, nodeIndex) => {
+            if (node.kind === 'event') {
+              return (
+                <div
+                  key={`node-${node.entry.key}`}
+                  className={`lol-event-analyzer__node-wrap ${eventGapClass(node.gapMs)}`}
+                >
+                  {renderEventEntry(node.entry)}
+                </div>
+              );
+            }
+
+            const blueKills = node.entries.filter((entry) => names.get(entry.event.killerId ?? 0)?.teamId === 100).length;
+            const redKills = node.entries.length - blueKills;
+            return (
+              <section
+                key={`fight-${node.start}-${nodeIndex}`}
+                className={`lol-fight-window ${eventGapClass(node.gapMs)}`}
+              >
+                <div className="lol-fight-window__head">
+                  <time>
+                    {formatEventTime(node.start)}
+                    {node.end !== node.start ? <span>—{formatEventTime(node.end)}</span> : null}
+                  </time>
+                  <div>
+                    <small>
+                      {node.entries.length} 次连续击杀 ·
+                      <b className="is-blue"> 蓝 {blueKills}</b>
+                      <b className="is-red"> 红 {redKills}</b>
+                    </small>
+                  </div>
+                </div>
+                <div className="lol-fight-window__events">
+                  {node.entries.map((entry) => renderEventEntry(entry, true))}
+                </div>
+              </section>
+            );
+          })}
+
+          <div className="lol-event-analyzer__boundary lol-event-analyzer__boundary--end">
+            <time>{formatEventTime(lastTimelineTimestamp || durationMs)}</time>
+            <span><Layers3 aria-hidden="true" /></span>
+            <strong>对局结束</strong>
+          </div>
+        </div>
+
+        <aside className="lol-event-inspector">
             <div className="lol-event-inspector__controls">
               <div className="lol-event-control-head">
                 <strong>筛选</strong>
-                <span>{filteredEntries.length}<small> / {entries.length}</small></span>
                 <button
                   type="button"
                   title="重置筛选"
@@ -3224,15 +2665,15 @@ function EventsTab({
                     <EventFilterArt filter={filter} />
                     <span>{eventPrimaryFilterLabel(filter)}</span>
                     <small>{primaryCounts[filter]}</small>
-                    <ChevronRight aria-hidden="true" className="lol-event-control-types__chevron" />
                   </button>
                 ))}
               </nav>
 
-              <div className="lol-event-player-scope">
+              <div className="lol-event-player-scope" role="group" aria-label="队伍范围">
                 <button
                   type="button"
                   className={allPlayersActive ? 'is-active' : ''}
+                  aria-pressed={allPlayersActive}
                   onClick={() => setChampionFilters(null)}
                 >
                   全部
@@ -3240,6 +2681,7 @@ function EventsTab({
                 <button
                   type="button"
                   className={blueScopeActive ? 'is-active is-blue' : ''}
+                  aria-pressed={blueScopeActive}
                   onClick={() => setChampionFilters(new Set(blueParticipantIds))}
                 >
                   蓝方
@@ -3247,59 +2689,17 @@ function EventsTab({
                 <button
                   type="button"
                   className={redScopeActive ? 'is-active is-red' : ''}
+                  aria-pressed={redScopeActive}
                   onClick={() => setChampionFilters(new Set(redParticipantIds))}
                 >
                   红方
                 </button>
               </div>
 
-              <div className={`lol-event-player-filter lol-event-player-filter--compact ${allPlayersActive ? 'is-all' : ''}`}>
-                <div>
-                  <span className="is-blue">蓝</span>
-                  <div>
-                    {bluePlayers.map((participant, index) => {
-                      const participantId = participant.participantId || index + 1;
-                      const included = championFilters === null || championFilters.has(participantId);
-                      return (
-                        <button
-                          key={`blue-${participant.puuid}`}
-                          type="button"
-                          className={included ? 'is-active is-blue' : 'is-blue'}
-                          aria-pressed={included}
-                          title={playerName(participant)}
-                          onClick={() => toggleChampion(participantId)}
-                        >
-                          <GameIcon src={participant.championAvatar} alt={participant.championName} size={34} rounded />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="is-red">红</span>
-                  <div>
-                    {redPlayers.map((participant, index) => {
-                      const participantId = participant.participantId || index + 6;
-                      const included = championFilters === null || championFilters.has(participantId);
-                      return (
-                        <button
-                          key={`red-${participant.puuid}`}
-                          type="button"
-                          className={included ? 'is-active is-red' : 'is-red'}
-                          aria-pressed={included}
-                          title={playerName(participant)}
-                          onClick={() => toggleChampion(participantId)}
-                        >
-                          <GameIcon src={participant.championAvatar} alt={participant.championName} size={34} rounded />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              <MatchRoster compact participants={participants}
+                selectedPuuids={championFilters === null ? [] : [...names.entries()].filter(([id]) => championFilters.has(id)).map(([, player]) => player.puuid)}
+                label="筛选参与玩家" onPick={(player) => { const entry = [...names.entries()].find(([, value]) => value.puuid === player.puuid); if (entry) toggleChampion(entry[0]); }} />
             </div>
-          )}
         </aside>
       </div>
     </div>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>对局详情 · 重设计预览</title>
+<style>
+:root { color-scheme: dark; font-family: 'Segoe UI','Microsoft YaHei UI',sans-serif; background: #202222; color: #e8e9e5; }
+body { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+h1 { margin: 0 0 10px; font-size: 24px; font-weight: 600; }
+p { color: #aaa; line-height: 1.7; }
+nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 32px; }
+a { color: #d8d9d3; border: 1px solid #4a4c4b; border-radius: 7px; text-decoration: none; padding: 8px 12px; }
+a:hover, a:focus-visible { background: #383939; }
+section { margin: 0 0 32px; scroll-margin-top: 20px; }
+h2 { font-size: 16px; font-weight: 550; margin-bottom: 12px; }
+img { display: block; max-width: 100%; width: auto; height: auto; border: 1px solid #4a4c4b; border-radius: 10px; }
+</style>
+</head>
+<body>
+<h1>对局详情重设计</h1>
+<p>以下截图来自实际 React 页面组件与样式，使用演示对局数据。不是设计稿，也不是用户真实战绩。</p>
+<nav><a href="#stats">详尽表格</a><a href="#events">事件列表</a><a href="#event-detail">事件详情</a><a href="report.json">交互检查结果</a></nav>
+<section id="stats"><h2>详尽表格 · 固定玩家区与侧边分类</h2><img src="stats.png" alt="新版详尽表格真实组件渲染截图"></section>
+<section id="events"><h2>事件列表 · 保留筛选位置</h2><img src="events.png" alt="新版事件列表真实组件渲染截图"></section>
+<section id="event-detail"><h2>事件详情 · 原位展开、按英雄分组伤害</h2><img src="event-detail.png" alt="新版事件详情展开截图"></section>
+</body>
+</html>

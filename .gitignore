@@ -88,6 +88,9 @@ typings/
 # Vite
 .vite/
 
+# Local browser regression captures and isolated test profiles
+.ui-review/
+
 # Electron-Forge
 out/
 out-*/

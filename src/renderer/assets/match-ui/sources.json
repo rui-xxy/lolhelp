@@ -1,0 +1,247 @@
+{
+  "retrievedAt": "2026-09-20T07:30:42.998Z",
+  "copyright": "Riot Games",
+  "mirror": "CommunityDragon (independent community project, not a Riot CDN)",
+  "assets": [
+    {
+      "name": "kills.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/kills.png",
+      "sha256": "6fc3427b6307e02f5475187263a0291a23f6e46ae9a86d45e48cf0cbda303b9c",
+      "bytes": 294,
+      "width": 14,
+      "height": 14
+    },
+    {
+      "name": "arrow.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/arrow.png",
+      "sha256": "72ff9717055402a4e81d7970b530ddee51d692b9c5e31c8057c2a928a8aafa72",
+      "bytes": 651,
+      "width": 22,
+      "height": 30
+    },
+    {
+      "name": "icon_gold.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/icon_gold.png",
+      "sha256": "90a39143718bd331636ee415aeb9bf04af1275bcfd21ad572b63bf87ff3999b5",
+      "bytes": 1030,
+      "width": 56,
+      "height": 96
+    },
+    {
+      "name": "roleicon-marksman.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-marksman.png",
+      "sha256": "1e1349beccb07ba86fe792f91d00c812de1b35938f5af6c809d6770810fa945f",
+      "bytes": 1481,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "roleicon-tank.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-tank.png",
+      "sha256": "ed011badbc33adb2f1b5ecf57b82e2791a3b733113f8a877e7889badf7d2604c",
+      "bytes": 1679,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "roleicon-support.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-support.png",
+      "sha256": "bbfb4430bdba0a019423711cec6b4af9e3623cc24978cfd4a03e98c3eea56211",
+      "bytes": 1523,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "roleicon-assassin.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-assassin.png",
+      "sha256": "35e775c247d6e1b5c60dcde25c0d06c4151629695e6a550959acabea6a114757",
+      "bytes": 1624,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "roleicon-mage.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-mage.png",
+      "sha256": "cff24c62b3a3e210b56be93f2a4c29092f0344c117eba6b2c0989ec688a778d6",
+      "bytes": 1288,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "roleicon-fighter.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/roleicon-fighter.png",
+      "sha256": "7bb81057fe37aadbbf0b478b62d4e7771ca5fed5c50aa2ded22d0b895b00bba5",
+      "bytes": 1905,
+      "width": 72,
+      "height": 72
+    },
+    {
+      "name": "right_icons_grub.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/right_icons_grub.png",
+      "sha256": "a94790e46339bcbc63c08f9ec467fbcb4c2d20e445204b2c97c86022e1243978",
+      "bytes": 48576,
+      "width": 80,
+      "height": 560
+    },
+    {
+      "name": "baron-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/baron-100.png",
+      "sha256": "87c8cd9fb9fc7d344e11bcc0b1568f43c1ab0c86523db207299f7527f695a505",
+      "bytes": 6475,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "baron-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/baron-200.png",
+      "sha256": "910b2fc785eddd44daf631de2877b257f15c1b2feea415d2f2f4b3f19685730f",
+      "bytes": 8887,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "herald-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/herald-100.png",
+      "sha256": "23ae976f58e9849d3e2256cf97704ee64321a11cada39c4e265e6b9a97972dab",
+      "bytes": 8842,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "herald-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/herald-200.png",
+      "sha256": "3834b8082ef5e893709cf94f5604dce21c3fe12a8e5e5bc0305fc82afdfc3d3a",
+      "bytes": 9218,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "elder-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/elder-100.png",
+      "sha256": "ce2acce9db9c5ca9885ecb8f985341ff38278e851693f95e2d55c0c05afb59fb",
+      "bytes": 8185,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "elder-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/elder-200.png",
+      "sha256": "763ddee8861e2a20f7632679ad8e70a03ee08831e521cd19121c3bce1253da4d",
+      "bytes": 8605,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "air-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/air-100.png",
+      "sha256": "56fb2a13599a3dc3a62dc578e070de27d44391afeb03a01726c2d9dd12f62280",
+      "bytes": 8576,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "air-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/air-200.png",
+      "sha256": "f49a6323a19961ceab7d8a5c6eb068a37036218319a44eeb4b54d9590abb80c7",
+      "bytes": 8948,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "earth-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/earth-100.png",
+      "sha256": "bcd935cacf823a4771ed68e561f5493b7fcd09be956f9321ff4ae907307a5e1a",
+      "bytes": 5954,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "earth-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/earth-200.png",
+      "sha256": "f987cff2c52463da458c8d37f331a1b46da09989386c1ec358f26820ca957745",
+      "bytes": 6230,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "fire-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/fire-100.png",
+      "sha256": "c622bdb7ae4890954254f1365b1011379eca255617c87605e2094fb1687fc55a",
+      "bytes": 6628,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "fire-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/fire-200.png",
+      "sha256": "fe0759e6ba6f0ee99b6c6d39ebfcd93642e19be0761d5ef28d76894348eab7c4",
+      "bytes": 6909,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "water-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/water-100.png",
+      "sha256": "bfe6936168f7bf757ec53670f82a132f0e041598bb6dff2131d08638059ca7b1",
+      "bytes": 7695,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "water-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/water-200.png",
+      "sha256": "2bc5d036416dfae8ec7ff69403475b06b49cde655378bdd044d75e9a1b953bb1",
+      "bytes": 7992,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "dragon-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/dragon-100.png",
+      "sha256": "9050046230d6fc8e315a3d54cec7c81a638f34b2a135f68ba94c9cad9e3f543f",
+      "bytes": 5448,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "dragon-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/dragon-200.png",
+      "sha256": "6158be61565632d89309ce0feb9713b42298a80193c9b1fad533c9de4435c54d",
+      "bytes": 5553,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "inhibitor-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/inhibitor-100.png",
+      "sha256": "061a2c762f95d9339fd6978b4c9a7a9008f4ff42b635ceed924a5b32de81061f",
+      "bytes": 8742,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "inhibitor-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/inhibitor-200.png",
+      "sha256": "c02c514ba97432af361712a7068666622ae595a55ec27bb4c154e25a7961c18e",
+      "bytes": 6794,
+      "width": 144,
+      "height": 144
+    },
+    {
+      "name": "tower-100.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/tower-100.png",
+      "sha256": "f91f67a212fb283e39aafb8e64dd496661083f84bee7caef44ff7efdc7b1b6aa",
+      "bytes": 802,
+      "width": 36,
+      "height": 36
+    },
+    {
+      "name": "tower-200.png",
+      "source": "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-match-history/global/default/tower-200.png",
+      "sha256": "32653311ff788fbedb6a35a092890bc2f1528815a4bbd710b065275a71fc0362",
+      "bytes": 796,
+      "width": 36,
+      "height": 36
+    }
+  ]
+}

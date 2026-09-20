@@ -13,6 +13,7 @@
     "lint": "eslint --ext .ts,.tsx .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "check:styles": "node scripts/check-ui-styles.mjs",
+    "check:match-ui": "node scripts/check-match-ui.mjs",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run check:styles && npm test"
   },
