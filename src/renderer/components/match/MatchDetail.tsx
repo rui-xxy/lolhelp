@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import { CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { BuildSkillMatrix } from './BuildSkillMatrix';
+import { TimelineWorkbench } from './TimelineWorkbench';
 import { DetailedStatsView } from './DetailedStatsView';
 import { EventTimeline } from './EventTimeline';
 import { hasMultiKillSummary, isMultiKillEvent, isSpecialMultiKill, multiKillLabel, prepareEventTimeline } from './matchEventModel';
@@ -11,7 +12,6 @@ import { LeagueArtImage, leagueArtUrl } from './LeagueArtImage';
 import type { StatsMetric, StatsGroup, StatsDisplayValue } from './matchStatsModel';
 import { DamageEnergyBar } from './DamageEnergyBar';
 import { RankEmblem } from '../RankEmblem';
-import { MATCH_TEAM_COLORS, MATCH_TIMELINE_COLORS } from '../../styles/palette';
 import badgeLegendary from '../../assets/match-badges/legendary.png';
 import badgeMaxAssist from '../../assets/match-badges/max-assist.png';
 import badgeMaxDamage from '../../assets/match-badges/max-damage.png';
@@ -812,7 +812,8 @@ export function MatchDetail({ match, targetPuuid, region, recurringMates, onPlay
           />
         )}
         {contentTab === 'timeline' && (
-          <TimelineTab
+          <TimelineWorkbench
+            key={match.gameId}
             participants={participants}
             timeline={timelineResult?.timeline ?? null}
             loading={timelineLoading}
@@ -2927,132 +2928,6 @@ function BuildsTab({
           ) : <p className="lol-build-empty">无装备购买记录</p>}
         </section>
       </div>
-    </div>
-  );
-}
-
-type TimelineMetric = 'gold' | 'cs' | 'xp' | 'damageDealt' | 'damageTaken';
-
-const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string }> = [
-  { key: 'gold', label: '金币' },
-  { key: 'cs', label: '补刀' },
-  { key: 'xp', label: '经验' },
-  { key: 'damageDealt', label: '已造成英雄伤害' },
-  { key: 'damageTaken', label: '已承受伤害' },
-];
-
-const TIMELINE_COLORS = MATCH_TIMELINE_COLORS;
-
-function timelineMetricValue(frame: MatchTimeline['frames'][number]['participantFrames'][string] | undefined, metric: TimelineMetric): number {
-  if (!frame) return 0;
-  if (metric === 'gold') return frame.totalGold;
-  if (metric === 'cs') return frame.minionsKilled + frame.jungleMinionsKilled;
-  if (metric === 'xp') return frame.xp;
-  if (metric === 'damageDealt') return frame.damageStats?.totalDamageDoneToChampions ?? frame.damageStats?.totalDamageDone ?? 0;
-  return frame.damageStats?.totalDamageTaken ?? 0;
-}
-
-function TimelineTab({
-  participants,
-  timeline,
-  loading,
-  error,
-  targetPuuid,
-}: {
-  participants: MatchParticipantSummary[];
-  timeline: MatchTimeline | null;
-  loading: boolean;
-  error?: string;
-  targetPuuid: string;
-}) {
-  const [view, setView] = useState<'chart' | 'stats'>('chart');
-  const [metric, setMetric] = useState<TimelineMetric>('gold');
-  const [showBlueAverage, setShowBlueAverage] = useState(true);
-  const [showRedAverage, setShowRedAverage] = useState(true);
-  const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
-  const [statsParticipantId, setStatsParticipantId] = useState<number>(() => {
-    const target = participants.find((participant) => participant.puuid === targetPuuid);
-    return target?.participantId || participants.indexOf(target ?? participants[0]) + 1;
-  });
-  if (!timeline) return <TimelineEmpty loading={loading} error={error} />;
-  const names = participantIndex(participants);
-  const playerMeta = participants.map((participant, index) => ({ participant, participantId: participant.participantId || index + 1, color: TIMELINE_COLORS[index % TIMELINE_COLORS.length] }));
-  const buildSeries = (ids: number[], label: string, color: string, dashed = false) => ({
-    label,
-    color,
-    dashed,
-    values: timeline.frames.map((frame) => {
-      const values = ids.map((id) => timelineMetricValue(frame.participantFrames[String(id)], metric));
-      return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
-    }),
-  });
-  const series = [
-    ...(showBlueAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 100).map(({ participantId }) => participantId), '蓝队平均', MATCH_TEAM_COLORS.blue, true)] : []),
-    ...(showRedAverage ? [buildSeries(playerMeta.filter(({ participant }) => participant.teamId === 200).map(({ participantId }) => participantId), '红队平均', MATCH_TEAM_COLORS.red, true)] : []),
-    ...playerMeta.filter(({ participantId }) => selectedPlayers.has(participantId)).map(({ participant, participantId, color }) => buildSeries([participantId], playerName(participant), color)),
-  ];
-  const maxValue = Math.max(1, ...series.flatMap((line) => line.values));
-  const chartLine = (values: number[]) => values.map((value, index) => {
-    const x = 56 + (index / Math.max(1, values.length - 1)) * 624;
-    const y = 430 - (value / maxValue) * 390;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const statsPlayer = names.get(statsParticipantId) ?? participants[0];
-  const togglePlayer = (participantId: number) => setSelectedPlayers((current) => {
-    const next = new Set(current);
-    if (next.has(participantId)) next.delete(participantId);
-    else next.add(participantId);
-    return next;
-  });
-
-  return (
-    <div className="lol-timeline">
-      <div className="lol-timeline__subtabs">
-        <button type="button" className={view === 'chart' ? 'is-active' : ''} onClick={() => setView('chart')}>差距线图表</button>
-        <button type="button" className={view === 'stats' ? 'is-active' : ''} onClick={() => setView('stats')}>属性时间线</button>
-      </div>
-      {view === 'chart' ? <>
-        <section className="lol-timeline__chart">
-          <svg viewBox="0 0 700 470" role="img" aria-label="玩家数据增长曲线">
-            {Array.from({ length: 6 }, (_, index) => {
-              const y = 40 + index * 78;
-              const label = Math.round(maxValue * (1 - index / 5));
-              return <g key={`grid-${index}`}><line x1="56" y1={y} x2="680" y2={y} /><text x="48" y={y + 4}>{formatInteger(label)}</text></g>;
-            })}
-            {Array.from({ length: 8 }, (_, index) => {
-              const x = 56 + index * (624 / 7);
-              const frameIndex = Math.round(index * Math.max(0, timeline.frames.length - 1) / 7);
-              const timestamp = timeline.frames[frameIndex]?.timestamp ?? 0;
-              return <g className="lol-timeline__x-grid" key={`x-grid-${index}`}><line x1={x} y1="40" x2={x} y2="430" /><text x={x} y="447">{Math.floor(timestamp / 60000)}min</text></g>;
-            })}
-            {series.map((line) => <polyline key={line.label} points={chartLine(line.values)} style={{ stroke: line.color, strokeDasharray: line.dashed ? '8 4' : undefined }} />)}
-            <text x="360" y="462" className="lol-timeline__axis-title">游戏时间</text>
-          </svg>
-        </section>
-        <aside className="lol-timeline__controls">
-          <strong>数据类型</strong>
-          {TIMELINE_METRICS.map((option) => <label key={option.key}><input type="radio" name="timeline-metric" checked={metric === option.key} onChange={() => setMetric(option.key)} /> {option.label}</label>)}
-          <strong>队伍平均</strong>
-          <label><input type="checkbox" checked={showBlueAverage} onChange={(event) => setShowBlueAverage(event.target.checked)} /><i style={{ background: MATCH_TEAM_COLORS.blue }} /> 蓝队平均</label>
-          <label><input type="checkbox" checked={showRedAverage} onChange={(event) => setShowRedAverage(event.target.checked)} /><i style={{ background: MATCH_TEAM_COLORS.red }} /> 红队平均</label>
-          <strong>玩家</strong>
-          <button type="button" onClick={() => setSelectedPlayers(selectedPlayers.size === playerMeta.length ? new Set() : new Set(playerMeta.map(({ participantId }) => participantId)))}>全选</button>
-          {playerMeta.map(({ participant, participantId, color }) => <label key={`${participant.puuid}-timeline`}><input type="checkbox" checked={selectedPlayers.has(participantId)} onChange={() => togglePlayer(participantId)} /><i style={{ background: color }} /><span>{playerName(participant)}</span></label>)}
-        </aside>
-      </> : <>
-        <section className="lol-timeline__table">
-          <div className="lol-timeline__table-title"><strong>{statsPlayer ? playerName(statsPlayer) : '玩家'} · 属性时间线</strong><span>此为服务器返回的数据，部分字段可能存在误差</span></div>
-          <div className="lol-timeline__row lol-timeline__row--head"><span>时间</span><span>等级</span><span>金币</span><span>补刀</span><span>经验</span><span>攻击力</span><span>护甲</span><span>魔抗</span></div>
-          {timeline.frames.map((frame) => {
-            const data = frame.participantFrames[String(statsParticipantId)];
-            return <div className="lol-timeline__row" key={`${frame.timestamp}-stats`}><span>{formatEventTime(frame.timestamp)}</span><span>{data?.level ?? '—'}</span><span>{formatInteger(data?.totalGold ?? 0)}</span><span>{data ? data.minionsKilled + data.jungleMinionsKilled : '—'}</span><span>{formatInteger(data?.xp ?? 0)}</span><span>{formatInteger(data?.championStats?.attackDamage ?? 0)}</span><span>{formatInteger(data?.championStats?.armor ?? 0)}</span><span>{formatInteger(data?.championStats?.magicResist ?? 0)}</span></div>;
-          })}
-        </section>
-        <aside className="lol-timeline__players">
-          <strong>玩家</strong>
-          {playerMeta.map(({ participant, participantId, color }) => <button type="button" className={statsParticipantId === participantId ? 'is-active' : ''} key={`${participant.puuid}-stats-player`} onClick={() => setStatsParticipantId(participantId)}><i style={{ background: color }} /><GameIcon src={participant.championAvatar} alt={participant.championName} size={22} rounded /><span>{playerName(participant)}</span></button>)}
-        </aside>
-      </>}
     </div>
   );
 }

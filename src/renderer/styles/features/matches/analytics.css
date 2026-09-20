@@ -788,27 +788,9 @@
   .lol-event__copy strong { color: var(--lol-text); font-size: 11px; font-weight: 650; }
   .lol-event__copy small { color: var(--lol-muted); font-size: 9.5px; }
 
-  .lol-timeline { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(310px, 0.8fr); gap: 10px; padding: 10px; }
-  .lol-timeline__chart,
-  .lol-timeline__table { border: 1px solid rgba(200, 170, 110, 0.14); border-radius: 5px; background: rgba(255, 255, 255, 0.018); }
-  .lol-timeline__chart { padding: 12px; }
-  .lol-timeline__chart > div { display: flex; align-items: baseline; justify-content: space-between; }
-  .lol-timeline__chart strong { font-size: 12px; }
-  .lol-timeline__chart span { color: var(--lol-muted); font-size: 9px; }
-  .lol-timeline__chart svg { display: block; width: 100%; margin-top: 12px; overflow: visible; }
-  .lol-timeline__chart line { stroke: rgba(200, 170, 110, 0.25); stroke-width: 1; stroke-dasharray: 5 5; }
-  .lol-timeline__chart polyline { fill: none; stroke: #59b7ee; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(89, 183, 238, 0.3)); }
-  .lol-timeline__table { overflow: hidden; }
-  .lol-timeline__row { display: grid; grid-template-columns: 54px 76px repeat(3, minmax(62px, 1fr)); min-height: 30px; align-items: center; border-top: 1px solid rgba(200, 170, 110, 0.1); font-size: 10px; }
-  .lol-timeline__row > * { padding: 0 8px; font-variant-numeric: tabular-nums; }
-  .lol-timeline__row--head { min-height: 34px; border-top: 0; color: var(--lol-muted); background: rgba(255, 255, 255, 0.035); }
-  .lol-timeline__row .is-blue { color: #62c5f5; }
-  .lol-timeline__row .is-red { color: #ff7893; }
-
   @media (max-width: 850px) {
     .lol-postgame-tabs { gap: 8px; }
     .lol-postgame-tab { padding-inline: 7px; font-size: 11px; }
-    .lol-timeline { grid-template-columns: 1fr; }
   }
 
   .lol-events {
@@ -1227,49 +1209,9 @@
   .lol-postgame { display: flex; height: 100%; min-height: 0; flex-direction: column; }
   .lol-postgame-tabs { flex: 0 0 auto; }
   .lol-postgame-content { min-height: 0; flex: 1 1 auto; }
-  .lol-timeline {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 205px;
-    grid-template-rows: 32px minmax(0, 1fr);
-    gap: 0 14px;
-    overflow: hidden;
-    padding: 5px 12px 10px;
-  }
-  .lol-timeline__subtabs { display: flex; grid-column: 1 / -1; gap: 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
-  .lol-timeline__subtabs button { position: relative; height: 32px; color: #c3c9cf; font-size: 10px; }
-  .lol-timeline__subtabs button.is-active { color: #5fe0c6; }
-  .lol-timeline__subtabs button.is-active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; content: ""; background: #5fe0c6; }
-  .lol-timeline__chart { min-width: 0; overflow: hidden; border: 0; border-radius: 0; padding: 4px 0 0; background: transparent; }
-  .lol-timeline__chart svg { width: 100%; height: 100%; margin: 0; }
-  .lol-timeline__chart line { stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; stroke-dasharray: none; }
-  .lol-timeline__chart .lol-timeline__x-grid line { stroke: rgba(255, 255, 255, 0.1); }
-  .lol-timeline__chart .lol-timeline__x-grid text { text-anchor: middle; }
-  .lol-timeline__chart polyline { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; filter: none; }
-  .lol-timeline__chart text { fill: #818a92; font-size: 9px; text-anchor: end; }
-  .lol-timeline__chart .lol-timeline__axis-title { text-anchor: middle; }
-  .lol-timeline__controls { min-width: 0; overflow-y: auto; padding: 8px 2px; }
-  .lol-timeline__controls > strong { display: block; margin: 8px 0 5px; color: #9ba3ab; font-size: 9px; }
-  .lol-timeline__controls label { display: flex; min-height: 28px; align-items: center; gap: 7px; color: #d4d8dc; font-size: 10px; cursor: pointer; }
-  .lol-timeline__controls input { width: 14px; height: 14px; accent-color: #54d9bd; }
-  .lol-timeline__controls label > i { width: 11px; height: 11px; flex: 0 0 11px; border-radius: 4px; }
-  .lol-timeline__controls label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-timeline__controls > button { margin: 2px 0 3px; color: #60d9c2; font-size: 9px; }
-  .lol-timeline__players { min-width: 0; overflow-y: auto; border-left: 1px solid rgba(255, 255, 255, 0.09); padding: 8px 0 8px 8px; }
-  .lol-timeline__players > strong { display: block; margin-bottom: 7px; color: #9ba3ab; font-size: 9px; }
-  .lol-timeline__players button { display: grid; width: 100%; grid-template-columns: 5px 24px minmax(0, 1fr); align-items: center; gap: 6px; border-radius: 4px; padding: 4px; color: #c5cbd0; font-size: 9px; text-align: left; }
-  .lol-timeline__players button:hover,
-  .lol-timeline__players button.is-active { background: rgba(255, 255, 255, 0.07); color: #fff; }
-  .lol-timeline__players button > i { width: 4px; height: 20px; border-radius: 3px; }
-  .lol-timeline__players button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-timeline__table { overflow: auto; border: 0; border-radius: 0; background: transparent; }
-  .lol-timeline__table-title { display: flex; justify-content: space-between; padding: 10px 8px; }
-  .lol-timeline__table-title strong { font-size: 10px; }
-  .lol-timeline__table-title span { color: #818a92; font-size: 8px; }
-  .lol-timeline__row { grid-template-columns: 56px repeat(7, minmax(62px, 1fr)); min-width: 600px; }
 
   @media (max-width: 850px) {
     .lol-events { grid-template-columns: minmax(0, 1fr) 160px; }
-    .lol-timeline { grid-template-columns: minmax(0, 1fr) 175px; }
   }
 
 }
