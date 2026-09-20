@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
+import { CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
+import { BuildSkillMatrix } from './BuildSkillMatrix';
 import { DetailedStatsView } from './DetailedStatsView';
 import { EventTimeline } from './EventTimeline';
 import { hasMultiKillSummary, isMultiKillEvent, isSpecialMultiKill, multiKillLabel, prepareEventTimeline } from './matchEventModel';
@@ -1602,26 +1603,56 @@ function formatBuildTime(timestamp: number): string {
   return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
 }
 
-type BuildPurchaseNode =
-  | { kind: 'item'; event: MatchTimelineEvent }
-  | { kind: 'spacer'; timestamp: number };
-
-function buildPurchaseSequence(events: MatchTimelineEvent[]): BuildPurchaseNode[] {
-  const nodes: BuildPurchaseNode[] = [];
-  let previousTimestamp = 0;
-  events
-    .filter((event) => event.type === 'ITEM_PURCHASED')
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .forEach((event) => {
-      if (previousTimestamp > 0 && event.timestamp - previousTimestamp > 30_000) {
-        nodes.push({ kind: 'spacer', timestamp: event.timestamp });
-      }
-      nodes.push({ kind: 'item', event });
-      previousTimestamp = event.timestamp;
-    });
-  return nodes;
+interface BuildPurchaseTrip {
+  timestamp: number;
+  lastTimestamp: number;
+  gapMs: number;
+  events: MatchTimelineEvent[];
 }
 
+function buildPurchaseTrips(events: MatchTimelineEvent[]): BuildPurchaseTrip[] {
+  const purchases = events
+    .filter((event) => event.type === 'ITEM_PURCHASED')
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const trips: BuildPurchaseTrip[] = [];
+
+  purchases.forEach((event) => {
+    const current = trips.at(-1);
+    if (current && event.timestamp - current.lastTimestamp <= 15_000) {
+      current.events.push(event);
+      current.lastTimestamp = event.timestamp;
+      return;
+    }
+
+    const previousTimestamp = current?.lastTimestamp ?? 0;
+    trips.push({
+      timestamp: event.timestamp,
+      lastTimestamp: event.timestamp,
+      gapMs: previousTimestamp > 0 ? Math.max(0, event.timestamp - previousTimestamp) : 0,
+      events: [event],
+    });
+  });
+
+  return trips;
+}
+
+function buildSkillKey(skillSlot?: number): 'Q' | 'W' | 'E' | 'R' | '?' {
+  return ['?', 'Q', 'W', 'E', 'R'][skillSlot ?? 0] as 'Q' | 'W' | 'E' | 'R' | '?';
+}
+
+function buildPositionLabel(position: string): string {
+  const labels: Record<string, string> = {
+    TOP: '上路',
+    JUNGLE: '打野',
+    MIDDLE: '中路',
+    MID: '中路',
+    BOTTOM: '下路',
+    ADC: '下路',
+    UTILITY: '辅助',
+    SUPPORT: '辅助',
+  };
+  return labels[String(position || '').toUpperCase()] ?? position ?? '';
+}
 function participantIndex(participants: MatchParticipantSummary[]) {
   return new Map(participants.map((participant, index) => [
     participant.participantId || index + 1,
@@ -2705,102 +2736,197 @@ function BuildsTab({
   timeline: MatchTimeline | null;
   targetPuuid: string;
 }) {
-  const events = timelineEvents(timeline);
-  const sectionRefs = useRef(new Map<number, HTMLElement>());
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [railExpanded, setRailExpanded] = useState(false);
+  const events = useMemo(() => timelineEvents(timeline), [timeline]);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [activeParticipantId, setActiveParticipantId] = useState(() => {
     const target = participants.find((participant) => participant.puuid === targetPuuid);
     return target?.participantId || participants[0]?.participantId || 1;
   });
+  const [buildGuide, setBuildGuide] = useState<AssistChampionGuide | null>(null);
 
-  const scrollToParticipant = (participantId: number) => {
-    const content = contentRef.current;
-    const section = sectionRefs.current.get(participantId);
-    if (!content || !section) return;
-    setActiveParticipantId(participantId);
-    content.scrollTo({
-      top: Math.max(0, section.offsetTop - content.offsetTop),
-      behavior: 'smooth',
-    });
+  useEffect(() => {
+    const target = participants.find((participant) => participant.puuid === targetPuuid);
+    if (target?.participantId) setActiveParticipantId(target.participantId);
+  }, [participants, targetPuuid]);
+
+  const activeParticipant = participants.find((participant, index) => (
+    (participant.participantId || index + 1) === activeParticipantId
+  )) ?? participants[0];
+
+  const activeId = activeParticipant
+    ? activeParticipant.participantId || participants.indexOf(activeParticipant) + 1
+    : 0;
+
+  useEffect(() => {
+    const championId = activeParticipant?.championId ?? 0;
+    if (!championId) {
+      setBuildGuide(null);
+      return;
+    }
+
+    let cancelled = false;
+    setBuildGuide(null);
+    void window.lolHelper.assist.getChampionGuide(championId)
+      .then((guide) => {
+        if (!cancelled) setBuildGuide(guide);
+      })
+      .catch(() => {
+        if (!cancelled) setBuildGuide(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeParticipant?.championId]);
+
+  if (!activeParticipant) return null;
+
+  const playerEvents = events.filter((event) => event.participantId === activeId);
+  const normalSkillEvents = playerEvents
+    .filter((event) => event.type === 'SKILL_LEVEL_UP' && event.levelUpType !== 'EVOLVE')
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const evolveEvents = playerEvents
+    .filter((event) => event.type === 'SKILL_LEVEL_UP' && event.levelUpType === 'EVOLVE')
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const purchaseTrips = buildPurchaseTrips(playerEvents);
+  const finalItems = activeParticipant.items.filter((item) => item.id > 0);
+  const finalItemIds = new Set(finalItems.map((item) => item.id));
+  const inventorySlots = Array.from(
+    { length: Math.max(7, ...finalItems.map((item) => item.slot + 1)) },
+    (_, slot) => ({ slot, item: finalItems.find((item) => item.slot === slot) }),
+  );
+  const teamLabel = activeParticipant.teamId === 100 ? '蓝方' : '红方';
+  const positionLabel = buildPositionLabel(activeParticipant.teamPosition);
+  const bluePlayers = participants.filter((participant) => participant.teamId === 100);
+  const redPlayers = participants.filter((participant) => participant.teamId === 200);
+
+  const selectPlayer = (participant: MatchParticipantSummary) => {
+    const participantIndex = participants.indexOf(participant);
+    setActiveParticipantId(participant.participantId || participantIndex + 1);
+    profileRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleBuildScroll = () => {
-    const content = contentRef.current;
-    if (!content) return;
-    const readingLine = content.scrollTop + 48;
-    let nextParticipantId = participants[0]?.participantId || 1;
-    participants.forEach((participant, index) => {
-      const participantId = participant.participantId || index + 1;
-      const section = sectionRefs.current.get(participantId);
-      if (section && section.offsetTop - content.offsetTop <= readingLine) {
-        nextParticipantId = participantId;
-      }
-    });
-    setActiveParticipantId((current) => current === nextParticipantId ? current : nextParticipantId);
-  };
-
-  return (
-    <div className="lol-builds">
-      <div ref={contentRef} className="lol-builds__content" onScroll={handleBuildScroll}>
-        {participants.map((participant, index) => {
-          const participantId = participant.participantId || index + 1;
-          const skillEvents = events.filter((event) => event.participantId === participantId && event.type === 'SKILL_LEVEL_UP');
-          const purchases = buildPurchaseSequence(events.filter((event) => event.participantId === participantId));
-          const anvilCount = purchases.filter((node) => node.kind === 'item' && [6032, 22000].includes(node.event.itemId ?? 0)).length;
+  const renderRosterTeam = (players: MatchParticipantSummary[], team: 'blue' | 'red') => (
+    <div className={`lol-build-roster__team is-${team}`}>
+      <span>{team === 'blue' ? '蓝方' : '红方'}</span>
+      <div>
+        {players.map((participant) => {
+          const participantIndex = participants.indexOf(participant);
+          const participantId = participant.participantId || participantIndex + 1;
+          const active = participantId === activeId;
           return (
-            <section
-              ref={(element) => {
-                if (element) sectionRefs.current.set(participantId, element);
-                else sectionRefs.current.delete(participantId);
-              }}
-              key={`${participant.puuid}-build`}
-              className={`lol-build ${participant.puuid === targetPuuid ? 'lol-build--target' : ''}`}
+            <button
+              type="button"
+              key={`${participant.puuid}-build-roster`}
+              className={active ? 'is-active' : ''}
+              aria-pressed={active}
+              aria-label={`${playerName(participant)} · ${participant.championName}`}
+              title={`${playerName(participant)} · ${participant.championName}`}
+              onClick={() => selectPlayer(participant)}
             >
-              <div className="lol-build__player">
-                <GameIcon src={participant.championAvatar} alt={participant.championName} size={38} rounded />
-                <span><strong>{playerName(participant)}</strong><small>{participant.championName} · #{participantId}</small></span>
-                {anvilCount > 0 && <em className="lol-build__anvil">{anvilCount} 锻</em>}
-              </div>
-              <div className="lol-build__sequence">
-                <small>技能构建</small>
-                <div>{skillEvents.length > 0 ? skillEvents.map((event, skillIndex) => {
-                  const skill = ['?', 'Q', 'W', 'E', 'R'][event.skillSlot ?? 0] ?? '?';
-                  return <span className={`lol-build__skill lol-build__skill--${skill.toLowerCase()} ${event.levelUpType === 'EVOLVE' ? 'is-evolve' : ''}`} key={`${event.timestamp}-skill-${skillIndex}`} title={`${formatBuildTime(event.timestamp)} · ${skill}`}><b>{skill}</b><em>{skillIndex + 1}</em></span>;
-                }) : <i>无技能升级数据</i>}</div>
-              </div>
-              <div className="lol-build__sequence">
-                <small>装备购买</small>
-                <div className="lol-build__purchases">{purchases.some((node) => node.kind === 'item') ? purchases.map((node, eventIndex) => {
-                  if (node.kind === 'spacer') {
-                    return <span className="lol-build__purchase-spacer" key={`${node.timestamp}-spacer-${eventIndex}`}>→</span>;
-                  }
-                  const event = node.event;
-                  return (
-                    <span className="lol-build__purchase" key={`${event.timestamp}-${event.itemId}-${eventIndex}`} title={`${formatBuildTime(event.timestamp)} · ${event.itemName || event.itemId}`}>
-                      {event.itemIcon ? <img src={event.itemIcon} alt={event.itemName || ''} /> : <b>{event.itemId || '?'}</b>}
-                      <time>{formatBuildTime(event.timestamp)}</time>
-                    </span>
-                  );
-                }) : <i>无装备购买数据</i>}</div>
-              </div>
-            </section>
+              <GameIcon src={participant.championAvatar} alt="" size={40} rounded />
+              <small>{participant.champLevel}</small>
+            </button>
           );
         })}
       </div>
-      <aside className={`lol-builds__rail ${railExpanded ? 'is-expanded' : ''}`}>
-        <button type="button" className="lol-builds__rail-toggle" onClick={() => setRailExpanded((current) => !current)} title={railExpanded ? '收起玩家导航' : '展开玩家导航'}>
-          {railExpanded ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-        </button>
-        {participants.map((participant, index) => {
-          const participantId = participant.participantId || index + 1;
-          const teamClass = participant.teamId === 100 ? 'is-blue' : 'is-red';
-          return <button type="button" key={`${participant.puuid}-rail`} className={`${teamClass} ${activeParticipantId === participantId ? 'is-active' : ''}`} onClick={() => scrollToParticipant(participantId)} title={playerName(participant)} aria-current={activeParticipantId === participantId ? 'true' : undefined}>
-            <GameIcon src={participant.championAvatar} alt={participant.championName} size={30} rounded />
-            {railExpanded && <span>{playerName(participant)}</span>}
-          </button>;
-        })}
-      </aside>
+    </div>
+  );
+
+  return (
+    <div className="lol-builds lol-build-lab">
+      <div className="lol-build-roster" role="group" aria-label="选择构建玩家">
+        {renderRosterTeam(bluePlayers, 'blue')}
+        <b>VS</b>
+        {renderRosterTeam(redPlayers, 'red')}
+      </div>
+
+      <div ref={profileRef} className="lol-build-profile">
+        <header className="lol-build-context">
+          <strong className="lol-build-context__name" title={playerName(activeParticipant)}>{playerName(activeParticipant)}</strong>
+          <span className="lol-build-context__meta">{[teamLabel, positionLabel, `${activeParticipant.champLevel} 级`].filter(Boolean).join(' · ')}</span>
+          <dl className="lol-build-context__stats">
+            <div><dt>KDA</dt><dd>{activeParticipant.kills}<i>/</i>{activeParticipant.deaths}<i>/</i>{activeParticipant.assists}</dd></div>
+            <div><dt>金币</dt><dd>{formatInteger(activeParticipant.gold)}</dd></div>
+          </dl>
+        </header>
+
+        <div className="lol-build-blueprint">
+          <section className="lol-build-final" aria-labelledby="build-final-heading">
+            <h3 id="build-final-heading" className="lol-build-section-title">最终装备</h3>
+            {finalItems.length > 0 ? (
+              <div className="lol-build-final__items" role="list" aria-label="最终装备">
+                {inventorySlots.map(({ slot, item }) => (
+                  <span
+                    key={`inventory-${slot}`}
+                    className={[!item ? 'is-empty' : '', slot === 6 ? 'is-trinket' : '', slot > 6 ? 'is-extra' : ''].filter(Boolean).join(' ')}
+                    data-slot={slot}
+                    role="listitem"
+                    tabIndex={item ? 0 : undefined}
+                    aria-label={item?.name || `空装备栏 ${slot + 1}`}
+                    title={item?.name || '空装备栏'}
+                  >
+                    {item ? <img src={item.icon} alt="" /> : <i aria-hidden="true" />}
+                  </span>
+                ))}
+              </div>
+            ) : <p className="lol-build-empty">无装备记录</p>}
+          </section>
+
+          <section className="lol-build-skills" aria-labelledby="build-skills-heading">
+            <h3 id="build-skills-heading" className="lol-build-section-title">技能加点</h3>
+            <BuildSkillMatrix events={normalSkillEvents} spells={buildGuide?.spells ?? []} />
+
+          {evolveEvents.length > 0 && (
+            <div className="lol-build-evolves">
+              {evolveEvents.map((event, index) => {
+                const skill = buildSkillKey(event.skillSlot);
+                const spell = skill !== '?' ? buildGuide?.spells.find((item) => item.key === skill) : undefined;
+                return (
+                  <span key={`${event.timestamp}-evolve-${index}`}>
+                    {spell?.icon ? <img src={spell.icon} alt="" aria-hidden="true" /> : <b>{skill}</b>}
+                    <em>{skill} 进化</em>
+                    <time>{formatBuildTime(event.timestamp)}</time>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          </section>
+        </div>
+
+        <section className="lol-build-shopping" aria-labelledby="build-shopping-heading">
+          <h3 id="build-shopping-heading" className="lol-build-section-title">出装顺序</h3>
+          {purchaseTrips.length > 0 ? (
+            <ol className="lol-build-shopping__track" aria-label="按时间排序的装备购买记录">
+              {purchaseTrips.map((trip, tripIndex) => (
+                <li
+                  key={`${trip.timestamp}-trip-${tripIndex}`}
+                  className="lol-build-trip"
+                  aria-label={`${formatBuildTime(trip.timestamp)} 购买`}
+                >
+                  <time>{formatBuildTime(trip.timestamp)}</time>
+                  <div>
+                    {trip.events.map((event, eventIndex) => (
+                      <span
+                        key={`${event.timestamp}-${event.itemId}-${eventIndex}`}
+                        className={finalItemIds.has(event.itemId ?? 0) ? 'is-final' : ''}
+                        tabIndex={0}
+                        aria-label={`${event.itemName || event.itemId || '未知装备'}，${formatBuildTime(event.timestamp)}`}
+                        title={`${event.itemName || event.itemId || '未知装备'} · ${formatBuildTime(event.timestamp)}`}
+                      >
+                        {event.itemIcon
+                          ? <img src={event.itemIcon} alt={event.itemName || ''} />
+                          : <b>{event.itemId || '?'}</b>}
+                      </span>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="lol-build-empty">无装备购买记录</p>}
+        </section>
+      </div>
     </div>
   );
 }

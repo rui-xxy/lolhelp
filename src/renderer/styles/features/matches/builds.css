@@ -1,0 +1,256 @@
+/* Build workbench: inline context, equipment dock, and a shared QWER point matrix. */
+@layer components {
+  .lol-postgame-content:has(.lol-builds) { overflow: hidden; padding: 0; background: var(--color-app-bg); }
+  .lol-builds {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    background: var(--color-app-bg);
+    container: build / inline-size;
+  }
+  .lol-build-roster {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--color-frost-line);
+    padding: 10px 24px;
+    background: var(--color-frost-fill-faint);
+  }
+  .lol-build-roster > b { color: var(--color-app-muted); font-size: 12px; font-weight: 500; text-align: center; }
+  .lol-build-roster__team { display: flex; min-width: 0; align-items: center; gap: 12px; }
+  .lol-build-roster__team.is-blue { --build-team: var(--color-app-team-mine); }
+  .lol-build-roster__team.is-red { --build-team: var(--color-app-team-enemy); }
+  .lol-build-roster__team > span { flex: 0 0 auto; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
+  .lol-build-roster__team > div { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 4px; }
+  .lol-build-roster__team button {
+    position: relative;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 3px;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+  .lol-build-roster__team button > img { opacity: 0.8; }
+  .lol-build-roster__team button:hover { background: var(--color-frost-fill-hover); }
+  .lol-build-roster__team button:hover > img,
+  .lol-build-roster__team button.is-active > img { opacity: 1; }
+  .lol-build-roster__team button.is-active { border-color: color-mix(in srgb, var(--build-team) 68%, transparent); background: color-mix(in srgb, var(--build-team) 10%, transparent); }
+  .lol-build-roster__team button > small {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    min-width: 20px;
+    border: 1px solid var(--color-frost-line);
+    border-radius: 5px;
+    padding: 0 3px;
+    background: var(--color-app-bg);
+    color: var(--color-app-body);
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 16px;
+    text-align: center;
+  }
+  .lol-build-profile {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px 24px 24px;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+  .lol-build-context {
+    display: flex;
+    min-width: 0;
+    min-height: 38px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 18px;
+    border-bottom: 1px solid var(--color-frost-line);
+    padding: 6px 0 12px;
+    line-height: 20px;
+  }
+  .lol-build-context__name {
+    max-width: min(34ch, 100%);
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lol-build-context__meta { color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
+  .lol-build-context__stats { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; }
+  .lol-build-context__stats > div { display: flex; align-items: baseline; gap: 7px; }
+  .lol-build-context__stats dt { color: var(--color-app-muted); font-size: 12px; }
+  .lol-build-context__stats dd { margin: 0; color: var(--color-app-body); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .lol-build-context__stats i { margin: 0 3px; color: var(--color-app-subtle); font-style: normal; font-weight: 400; }
+
+  .lol-build-blueprint {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 236px minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+    border-bottom: 1px solid var(--color-frost-line);
+    padding: 18px 0 20px;
+  }
+  .lol-build-final,
+  .lol-build-skills { min-width: 0; }
+  .lol-build-final__items {
+    display: grid;
+    width: fit-content;
+    min-width: 0;
+    grid-template-columns: repeat(3, 44px) 50px;
+    grid-template-rows: repeat(2, 44px);
+    gap: 8px;
+    border: 1px solid var(--color-frost-line);
+    border-radius: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--color-app-sidebar) 22%, transparent);
+    box-shadow: inset 0 1px 4px var(--color-frost-shadow-soft);
+  }
+  .lol-build-final__items > span {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-frost-line-strong);
+    border-radius: 6px;
+    background: var(--color-frost-fill-faint);
+  }
+  .lol-build-final__items > [data-slot="0"] { grid-area: 1 / 1; }
+  .lol-build-final__items > [data-slot="1"] { grid-area: 1 / 2; }
+  .lol-build-final__items > [data-slot="2"] { grid-area: 1 / 3; }
+  .lol-build-final__items > [data-slot="3"] { grid-area: 2 / 1; }
+  .lol-build-final__items > [data-slot="4"] { grid-area: 2 / 2; }
+  .lol-build-final__items > [data-slot="5"] { grid-area: 2 / 3; }
+  .lol-build-final__items > .is-trinket { grid-area: 1 / 4 / span 2; align-self: center; justify-self: end; }
+  .lol-build-final__items > .is-empty { border-color: var(--color-frost-line); }
+  .lol-build-final__items img { width: 100%; height: 100%; object-fit: cover; }
+  .lol-build-final__items i { width: 10px; height: 1px; background: var(--color-app-subtle); }
+  .lol-build-final__items > span:not(.is-empty):hover { border-color: var(--color-app-focus); }
+  .lol-build-section-title { margin: 0 0 12px; color: var(--color-app-body); font-size: 14px; font-weight: 550; line-height: 20px; }
+  .lol-build-shopping { padding-top: 18px; }
+
+  .lol-build-matrix { display: grid; min-width: 0; gap: 16px; }
+  .lol-build-matrix__table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+  .lol-build-matrix__label-col { width: 68px; }
+  .lol-build-matrix__table th,
+  .lol-build-matrix__table td { padding: 0; border: 0; text-align: center; }
+  .lol-build-matrix__table thead th { height: 22px; color: var(--color-app-muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; vertical-align: top; }
+  .lol-build-matrix__table thead th:first-child { text-align: left; }
+  .lol-build-matrix__table thead .is-pending { color: var(--color-app-subtle); }
+  .lol-build-matrix__table tbody tr { height: 40px; }
+  .lol-build-matrix__table tbody tr:hover { background: var(--color-frost-fill-faint); }
+  .lol-build-matrix__skill { display: flex; align-items: center; gap: 8px; }
+  .lol-build-matrix__skill > img { flex: 0 0 34px; border-radius: 5px; }
+  .lol-build-matrix__skill > b { color: var(--color-app-body); font-size: 16px; font-weight: 550; }
+  .lol-build-matrix__art-empty { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 5px; background: var(--color-frost-fill-soft); }
+  .lol-build-matrix__cell > span { display: grid; width: min(24px, 100%); height: 26px; margin: auto; place-items: center; border-radius: 5px; }
+  .lol-build-matrix__cell i { width: 2px; height: 2px; border-radius: 50%; background: var(--color-app-muted); opacity: 0.4; }
+  .lol-build-matrix__cell.is-pending i { opacity: 0.18; }
+  .lol-build-matrix__cell.is-active > span {
+    background: color-mix(in srgb, var(--color-app-body) 86%, var(--color-app-bg));
+    color: var(--color-app-primary-foreground);
+    box-shadow: inset 0 1px 0 var(--color-frost-highlight), var(--shadow-ui-neutral-sm);
+  }
+  .lol-build-matrix__cell b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
+  .lol-build-matrix__table .is-ultimate .is-active > span { background: color-mix(in srgb, var(--color-analysis-gold) 84%, var(--color-app-body)); }
+  .lol-build-matrix__cell.is-active:hover > span,
+  .lol-build-matrix__cell.is-active > span:focus-visible { background: var(--color-app-text); }
+  .lol-build-evolves { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .lol-build-evolves > span { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 4px 8px 4px 4px; background: var(--color-frost-fill-soft); }
+  .lol-build-evolves img,
+  .lol-build-evolves b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 5px; }
+  .lol-build-evolves em { color: var(--color-app-body); font-size: 12px; font-style: normal; }
+  .lol-build-evolves time { color: var(--color-app-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .lol-build-shopping__track {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 22px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .lol-build-trip { display: grid; min-width: 68px; max-width: 100%; gap: 8px; }
+  .lol-build-trip > time {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--color-app-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+  }
+  .lol-build-trip > time::before { width: 3px; height: 3px; flex: 0 0 3px; border-radius: 50%; background: var(--color-app-muted); content: ""; }
+  .lol-build-trip > time::after { height: 1px; min-width: 8px; flex: 1; background: var(--color-frost-line-strong); content: ""; }
+  .lol-build-trip > div { display: flex; min-width: 0; flex-wrap: wrap; gap: 6px; }
+  .lol-build-trip > div > span {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-frost-line-strong);
+    border-radius: 6px;
+    background: var(--color-frost-fill-soft);
+  }
+  .lol-build-trip > div > .is-final { border-color: color-mix(in srgb, var(--color-analysis-gold) 50%, transparent); }
+  .lol-build-trip img { width: 100%; height: 100%; object-fit: cover; }
+  .lol-build-trip b { color: var(--color-app-body); font-size: 11px; }
+  .lol-build-trip:hover > time { color: var(--color-app-text); }
+  .lol-build-empty { margin: 0; color: var(--color-app-muted); font-size: 13px; line-height: 1.5; }
+  .lol-builds :is(button, [tabindex="0"]):focus-visible { outline: 2px solid var(--color-app-focus); outline-offset: 3px; }
+  @container build (max-width: 879px) {
+    .lol-build-blueprint { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .lol-build-final { display: flex; align-items: center; gap: 18px; }
+    .lol-build-final h3 { margin: 0; white-space: nowrap; }
+    .lol-build-final__items { grid-template-columns: repeat(6, 44px) 50px; grid-template-rows: 44px; padding: 8px 10px; }
+    .lol-build-final__items > [data-slot] { grid-area: auto; }
+    .lol-build-final__items > .is-trinket { justify-self: end; }
+  }
+  @container build (max-width: 720px) {
+    .lol-build-roster { gap: 10px; padding-inline: 16px; }
+    .lol-build-roster__team { display: grid; gap: 5px; }
+    .lol-build-profile { padding-inline: 16px; }
+  }
+  @container build (max-width: 560px) {
+    .lol-build-roster { grid-template-columns: 1fr; gap: 8px; }
+    .lol-build-roster > b { display: none; }
+    .lol-build-roster__team { grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 8px; }
+    .lol-build-roster__team > div { justify-content: space-between; }
+    .lol-build-context { column-gap: 12px; }
+    .lol-build-final { display: block; }
+    .lol-build-final h3 { margin-bottom: 12px; }
+    .lol-build-final__items { grid-template-columns: repeat(3, 44px) 50px; grid-template-rows: repeat(2, 44px); padding: 12px; }
+    .lol-build-final__items > [data-slot="0"] { grid-area: 1 / 1; }
+    .lol-build-final__items > [data-slot="1"] { grid-area: 1 / 2; }
+    .lol-build-final__items > [data-slot="2"] { grid-area: 1 / 3; }
+    .lol-build-final__items > [data-slot="3"] { grid-area: 2 / 1; }
+    .lol-build-final__items > [data-slot="4"] { grid-area: 2 / 2; }
+    .lol-build-final__items > [data-slot="5"] { grid-area: 2 / 3; }
+    .lol-build-final__items > .is-trinket { grid-area: 1 / 4 / span 2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lol-build-roster__team button { transition: none; }
+  }
+}

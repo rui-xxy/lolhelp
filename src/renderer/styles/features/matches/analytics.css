@@ -774,15 +774,6 @@
   .lol-timeline-empty strong { color: var(--lol-text); font-size: 13px; }
   .lol-timeline-empty span { font-size: 11px; }
 
-  .lol-events,
-  .lol-builds,
-  .lol-timeline {
-    min-height: 0;
-    height: 100%;
-    overflow: auto;
-    color: var(--lol-text);
-  }
-
   .lol-events { padding: 10px 14px 18px; }
   .lol-events__title { position: sticky; top: 0; z-index: 2; padding: 7px 0 10px; background: var(--lol-panel); font-size: 12px; font-weight: 750; }
   .lol-events__title span { margin-left: 5px; color: var(--lol-muted); font-size: 10px; font-weight: 500; }
@@ -796,24 +787,6 @@
   .lol-event__copy { display: grid; gap: 2px; }
   .lol-event__copy strong { color: var(--lol-text); font-size: 11px; font-weight: 650; }
   .lol-event__copy small { color: var(--lol-muted); font-size: 9.5px; }
-
-  .lol-builds { display: grid; gap: 4px; padding: 8px; }
-  .lol-build { display: grid; grid-template-columns: 180px 205px minmax(240px, 1fr); min-height: 64px; align-items: center; gap: 12px; border: 1px solid rgba(200, 170, 110, 0.12); border-radius: 5px; padding: 7px 9px; background: rgba(255, 255, 255, 0.018); }
-  .lol-build--target { border-color: rgba(213, 180, 105, 0.42); background: rgba(213, 180, 105, 0.045); }
-  .lol-build__player { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .lol-build__player > span { display: grid; min-width: 0; gap: 2px; }
-  .lol-build__player strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-  .lol-build__player small,
-  .lol-build__final > small,
-  .lol-build__path > small { color: var(--lol-muted); font-size: 9px; }
-  .lol-build__final,
-  .lol-build__path { display: grid; gap: 5px; min-width: 0; }
-  .lol-build__final > span,
-  .lol-build__path > span { display: flex; gap: 3px; min-width: 0; overflow: hidden; }
-  .lol-build__purchase { position: relative; display: grid; width: 29px; height: 37px; flex: 0 0 29px; place-items: center; border-radius: 3px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
-  .lol-build__purchase img { width: 25px; height: 25px; object-fit: cover; }
-  .lol-build__purchase b { font-size: 8px; }
-  .lol-build__purchase time { width: 100%; color: var(--lol-muted); font-size: 7px; line-height: 10px; text-align: center; }
 
   .lol-timeline { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(310px, 0.8fr); gap: 10px; padding: 10px; }
   .lol-timeline__chart,
@@ -835,8 +808,6 @@
   @media (max-width: 850px) {
     .lol-postgame-tabs { gap: 8px; }
     .lol-postgame-tab { padding-inline: 7px; font-size: 11px; }
-    .lol-build { grid-template-columns: 150px 1fr; }
-    .lol-build__path { grid-column: 1 / -1; }
     .lol-timeline { grid-template-columns: 1fr; }
   }
 
@@ -1253,70 +1224,9 @@
     opacity: 0.64;
   }
 
-
-  .lol-builds {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    padding: 7px 8px 10px 10px;
-  }
   .lol-postgame { display: flex; height: 100%; min-height: 0; flex-direction: column; }
   .lol-postgame-tabs { flex: 0 0 auto; }
   .lol-postgame-content { min-height: 0; flex: 1 1 auto; }
-  .lol-postgame-content:has(.lol-builds) { overflow: hidden; padding: 0; }
-  .lol-postgame-content:has(.lol-builds) .lol-builds { height: 100%; }
-  .lol-builds__content { width: 100%; height: 100%; min-width: 0; overflow-x: hidden; overflow-y: auto; padding-right: 54px; overscroll-behavior: contain; scroll-behavior: smooth; scrollbar-gutter: stable; }
-  .lol-build {
-    display: block;
-    min-height: 220px;
-    margin-bottom: 9px;
-    border: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 0;
-    padding: 13px 12px 16px;
-    background: rgba(255, 255, 255, 0.012);
-    scroll-margin-top: 4px;
-  }
-  .lol-build--target { border: 1px solid rgba(67, 208, 183, 0.25); border-radius: 5px; background: rgba(67, 208, 183, 0.025); }
-  .lol-build__player { margin-bottom: 14px; gap: 9px; }
-  .lol-build__player strong { color: #f0f2f4; font-size: 13px; line-height: 17px; }
-  .lol-build__player small { font-size: 10px; line-height: 14px; }
-  .lol-build__anvil { margin-left: auto; border-radius: 3px; padding: 3px 7px; color: #dadfe3; background: rgba(255, 255, 255, 0.1); font-size: 10px; font-style: normal; }
-  .lol-build__sequence { display: grid; gap: 7px; margin-top: 11px; }
-  .lol-build__sequence > small { color: #aeb5bc; font-size: 11px; font-weight: 600; }
-  .lol-build__sequence > div { display: flex; min-height: 47px; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 5px; overflow: visible; padding-bottom: 3px; }
-  .lol-build__sequence i { color: #79838c; font-size: 10px; font-style: normal; }
-  .lol-build__skill { position: relative; display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 1px solid rgba(70, 197, 212, 0.52); border-radius: 4px; color: #f2f4f5; background: #064157; }
-  .lol-build__skill--w { background: #07513f; }
-  .lol-build__skill--e { background: #302142; }
-  .lol-build__skill--r { border-color: #b98724; background: #855212; }
-  .lol-build__skill.is-evolve { border-color: #ed5c88; border-radius: 50%; background: rgba(213, 53, 103, 0.55); }
-  .lol-build__skill b { font-size: 12px; }
-  .lol-build__skill em { position: absolute; right: 2px; bottom: -8px; color: #c0c7cd; font-size: 8px; font-style: normal; }
-  .lol-build__purchases { gap: 5px !important; overflow: visible !important; }
-  .lol-build__purchase { position: relative; display: flex; overflow: visible; width: 40px; height: 55px; flex: 0 0 40px; flex-direction: column; align-items: center; gap: 3px; background: transparent; }
-  .lol-build__purchase:not(:last-child)::after,
-  .lol-build__purchase:not(:last-child)::before { display: none; }
-  .lol-build__purchase img { width: 36px; height: 36px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 4px; object-fit: cover; }
-  .lol-build__purchase > b { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 4px; background: rgba(255, 255, 255, 0.08); font-size: 10px; }
-  .lol-build__purchase time { width: auto; color: #c2c8cd; font-size: 10px; font-weight: 600; line-height: 12px; white-space: nowrap; }
-  .lol-build__purchase-spacer { display: grid; width: 31px; height: 40px; flex: 0 0 31px; place-items: center; color: rgba(222, 228, 232, 0.5); font-size: 18px; }
-  .lol-builds__rail { position: absolute; top: 10px; right: 8px; bottom: 10px; z-index: 10; display: flex; width: 46px; flex-direction: column; gap: 5px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 7px; padding: 6px; background: rgba(16, 20, 24, 0.97); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); opacity: 0.68; transition: width 150ms ease, opacity 150ms ease; }
-  .lol-builds__rail:hover,
-  .lol-builds__rail:focus-within { opacity: 1; }
-  .lol-builds__rail.is-expanded { width: 190px; }
-  .lol-builds__rail button { display: grid; width: 32px; min-height: 32px; flex: 0 0 32px; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 17px; opacity: 0.68; transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease; }
-  .lol-builds__rail.is-expanded button:not(.lol-builds__rail-toggle) { width: 174px; padding-right: 9px; border-radius: 6px; text-align: left; }
-  .lol-builds__rail button > span { overflow: hidden; color: #e0e5e8; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-  .lol-builds__rail .lol-builds__rail-toggle { display: grid; width: 26px; height: 24px; min-height: 24px; flex-basis: 24px; grid-template-columns: 1fr; place-items: center; align-self: center; border-radius: 50%; color: #9fa8b0; background: rgba(255, 255, 255, 0.06); }
-  .lol-builds__rail button:hover,
-  .lol-builds__rail button.is-active { opacity: 1; background: rgba(255, 255, 255, 0.085); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
-  .lol-builds__rail button.is-blue { border-color: rgba(45, 146, 220, 0.5); }
-  .lol-builds__rail button.is-red { border-color: rgba(224, 69, 93, 0.52); }
-
   .lol-timeline {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 205px;
