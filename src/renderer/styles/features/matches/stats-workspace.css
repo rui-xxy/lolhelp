@@ -626,7 +626,7 @@
       grid-template-columns: minmax(90px, 1fr) minmax(70px, auto) 14px;
       gap: 8px;
     }
-    .md-stats:not(.is-comparing) .md-stat__visual, .md-stats:not(.is-comparing) .md-stats__column-head > span:nth-child(3) { display: none; }
+    .md-stats:not(.is-comparing) .md-stat__visual, .md-stats:not(.is-comparing) .md-stats__column-head > span:nth-child(4) { display: none; }
     .md-stats.is-comparing .md-stats__column-head, .md-stats.is-comparing .md-stat__row { grid-template-columns: repeat(3, minmax(0, 1fr)) 14px; gap: 10px; }
     .md-stats.is-comparing .md-stat__label { grid-column: 1 / -1; font-size: 12px; }
     .md-stats.is-comparing .md-stats__metric-heading { display: none; }

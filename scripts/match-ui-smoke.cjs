@@ -24,12 +24,18 @@ async function screenshot(name) { const image = await window.webContents.capture
   await tab('详尽表格');
   await check('stats page and all ten player controls render', () => document.querySelectorAll('.md-stats .match-roster__player').length === 10);
   await check('avatar selection uses full border with no underline', () => { const p = document.querySelector('.match-roster__player.is-selected'); const c = getComputedStyle(p); return c.textDecorationLine === 'none' && c.boxShadow === 'none' && c.borderTopWidth === c.borderBottomWidth && getComputedStyle(p, '::after').content === 'none'; });
-  await check('no ranking pills or explanatory slogans reintroduced', () => !/事件轨迹|点击指标展开|相对本局|#\d+\s*\/\s*10/.test(document.querySelector('.md-stats').textContent));
+  await check('summary rankings and distributions use the actual ten participants', () => document.querySelectorAll('.md-performance__distribution i').length === 40 && [...document.querySelectorAll('.md-performance__standing b')].every(node => Number(node.textContent) === 1));
+  await check('no position is invented when match roles are unavailable', () => Boolean(document.querySelector('.md-duel__empty')) && !document.querySelector('.md-duel__players'));
+  await window.setContentSize(1440, 1000); await sleep(500);
+  await evaluate(() => Promise.race([Promise.all([...document.images].map(image => image.decode().catch(() => {}))), new Promise(resolve => setTimeout(resolve, 5000))]));
+  await screenshot('stats-arena-1440');
   await evaluate(() => document.querySelector('.md-stat__row').click());
   await check('metric expansion contains ten values without fake KDA bars', () => document.querySelectorAll('.md-stat__player').length === 10 && document.querySelectorAll('.md-stat.is-expanded .md-stat__visual .md-meter').length === 0);
   await evaluate(() => { document.querySelector('.md-stats__toolbar .md-control').click(); }); await sleep(60);
   await evaluate(() => document.querySelectorAll('.md-stats .match-roster__player')[6].click()); await sleep(70);
   await check('comparison selection and value display work', () => Boolean(document.querySelector('.match-roster__player.is-comparing')) && Boolean(document.querySelector('.md-stat__other')));
+  await check('comparison panel shows computed gold, CS, kill and damage differences', () => [...document.querySelectorAll('.md-duel dd')].map(node => node.textContent).join('|') === '+4,458|+48|+6|+15,738');
+  await screenshot('stats-arena-comparison-1440');
   await check('both comparison bars share the same track width', () => { const row = [...document.querySelectorAll('.md-stat__row')].find((node) => node.querySelectorAll('.md-meter').length === 2); const bars = row.querySelectorAll('.md-meter'); return Math.abs(bars[0].getBoundingClientRect().width - bars[1].getBoundingClientRect().width) < 1; });
   await check('both named value columns and signed differences are visible without expanding', () => document.querySelectorAll('.md-stat__row .md-stat__number > strong').length >= 10 && document.querySelectorAll('.md-player-heading').length === 2 && document.querySelectorAll('.md-stat__delta').length >= 5);
   await check('labels are upright and numbers use restrained weight', () => getComputedStyle(document.querySelector('.md-stat__label')).fontStyle === 'normal' && Number(getComputedStyle(document.querySelector('.md-stat__number strong')).fontWeight) <= 500);
@@ -37,7 +43,7 @@ async function screenshot(name) { const image = await window.webContents.capture
   await evaluate(() => [...document.querySelectorAll('.md-stats__categories > button')].find((node) => node.title === '承受与资源').click());
   for (const width of [1100, 900, 650]) { await window.setContentSize(width, 820); await sleep(250); await check(`comparison preserves both values at ${width}px`, () => [...document.querySelectorAll('.md-stat__number')].every((node) => node.getBoundingClientRect().width > 0) && document.querySelector('.md-stats__content').scrollWidth <= document.querySelector('.md-stats__content').clientWidth + 1); await screenshot(`comparison-${width}`); }
   await window.setContentSize(900, 760); await sleep(120);
-  await evaluate(() => { document.querySelector('.md-stats__content').scrollTop = 280; }); await sleep(120);
+  await evaluate(() => { const content = document.querySelector('.md-stats__content'); const head = document.querySelector('.md-stats__column-head'); content.scrollTop += head.getBoundingClientRect().top - content.getBoundingClientRect().top + 40; }); await sleep(120);
   await check('comparison avatars and both names stay pinned while values scroll', () => { const content = document.querySelector('.md-stats__content'); const head = document.querySelector('.md-stats__column-head'); return content.scrollTop > 100 && getComputedStyle(head).position === 'sticky' && Math.abs(head.getBoundingClientRect().top - content.getBoundingClientRect().top) <= 2 && [...head.querySelectorAll('img')].every(img => img.getBoundingClientRect().height > 0); });
   await screenshot('comparison-sticky-900');
   await evaluate(() => { document.querySelector('.md-stats__content').scrollTop = 0; });

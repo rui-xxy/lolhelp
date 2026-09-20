@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeftRight, ChevronDown, Search, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Crown, Focus, Search, Sparkles, Swords, Trophy, X } from 'lucide-react';
 import type { MatchParticipantSummary } from '../../../shared/api';
 import { GameIcon } from './GameIcon';
 import { MatchRoster } from './MatchRoster';
+import { MatchPerformanceSummary } from './MatchPerformanceSummary';
 import { metricBar, metricHasBar, participantLabel, shortParticipantLabel, type StatsDisplayValue, type StatsGroup, type StatsMetric } from './matchStatsModel';
 
 interface DetailedStatsViewProps {
@@ -22,6 +23,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   '信号与对局状态': '信号与状态',
   '更多原始统计': '其他统计',
 };
+
+const COMBAT_ICONS = { kda: Swords, largestKillingSpree: Crown, largestMultiKill: Sparkles, timeCCingOthers: Focus, firstBlood: Trophy };
 
 export function DetailedStatsView({ participants, targetPuuid, groups, readValue, formatValue, formatDelta, groupIcon }: DetailedStatsViewProps) {
   const [focusPuuid, setFocusPuuid] = useState(targetPuuid);
@@ -48,24 +51,13 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
   useEffect(() => { contentRef.current?.scrollTo({ top: 0 }); }, [category, query]);
 
   if (!focus) return <div className="md-stats__empty">暂无可用的详细统计数据</div>;
-  const teammates = participants.filter((player) => player.teamId === focus.teamId);
-  const teamShare = (key: 'damage' | 'gold') => {
-    const total = teammates.reduce((sum, player) => sum + (player[key] || 0), 0);
-    return total > 0 ? `占全队 ${((focus[key] || 0) / total * 100).toFixed(1)}%` : '暂无队伍占比';
-  };
-  const summaries = [
-    { label: 'K / D / A', value: `${focus.kills} / ${focus.deaths} / ${focus.assists}`, context: `${((focus.kills + focus.assists) / Math.max(1, focus.deaths)).toFixed(2)} KDA`, other: compare ? `${compare.kills} / ${compare.deaths} / ${compare.assists}` : null },
-    { label: '英雄伤害', value: Math.round(focus.damage || 0).toLocaleString('zh-CN'), context: teamShare('damage'), other: compare ? Math.round(compare.damage || 0).toLocaleString('zh-CN') : null },
-    { label: '获得金币', value: Math.round(focus.gold || 0).toLocaleString('zh-CN'), context: teamShare('gold'), other: compare ? Math.round(compare.gold || 0).toLocaleString('zh-CN') : null },
-    { label: '补刀', value: String(focus.cs || 0), context: '小兵与野怪', other: compare ? String(compare.cs || 0) : null },
-  ];
 
   return (
     <div className={`md-stats match-analytics${compare ? ' is-comparing' : ''}`}  onKeyDown={(event) => { if (event.key === 'Escape') setPicking(false); }}>
       <header className="md-stats__header">
         <div className="md-stats__toolbar">
           <div className="md-stats__identity">
-            <GameIcon src={focus.championAvatar} alt="" size={38} rounded />
+            <GameIcon src={focus.championAvatar} alt="" size={52} rounded />
             <div><strong title={participantLabel(focus)}>{participantLabel(focus)}</strong><small>{picking ? '在下方选择一位玩家进行对比' : `${focus.teamId === 100 ? '蓝方' : focus.teamId === 200 ? '红方' : '当前玩家'} · 对局表现`}</small></div>
           </div>
           <button type="button" className={`md-control${picking || compare ? ' is-active' : ''}`} aria-pressed={picking || Boolean(compare)} onClick={() => setPicking((value) => !value)}>
@@ -74,7 +66,7 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
           {compare && <div className="md-stats__comparison"><GameIcon src={compare.championAvatar} alt="" size={24} rounded /><span title={participantLabel(compare)}>{shortParticipantLabel(compare)}</span><button type="button" aria-label="退出双人对比" onClick={() => { setComparePuuid(null); setPicking(false); }}><X /></button></div>}
           <label className="md-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索指标" aria-label="搜索统计指标" />{query && <button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X /></button>}</label>
         </div>
-        <MatchRoster participants={participants} selectedPuuids={[focus.puuid]} comparePuuid={compare?.puuid} label={picking ? '选择对比玩家' : '切换观察玩家'} onPick={(player) => {
+        <MatchRoster showcase participants={participants} selectedPuuids={[focus.puuid]} comparePuuid={compare?.puuid} label={picking ? '选择对比玩家' : '切换观察玩家'} onPick={(player) => {
           if (picking && player.puuid !== focus.puuid) setComparePuuid(player.puuid);
           else if (!picking) { setFocusPuuid(player.puuid); if (player.puuid === comparePuuid) setComparePuuid(null); }
           setPicking(false);
@@ -90,15 +82,15 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
           ))}
         </nav>
         <div className="md-stats__content" ref={contentRef}>
-          <div className="md-stats__summary" aria-label="当前玩家核心数据">
-            {summaries.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong>{item.other !== null ? <span className="md-stats__summary-compare"><small>对比</small>{item.other}</span> : <small className="md-stats__summary-context">{item.context}</small>}</div>)}
-          </div>
+          <div className="md-stats__overview-heading"><div><span>MATCH PERFORMANCE</span><h2>对局表现</h2></div><p>核心数据总览 · 全场表现对比</p></div>
+          <MatchPerformanceSummary participants={participants} focus={focus} compare={compare} onCompare={() => setPicking(true)} />
           {visibleGroups.map((group) => (
             <section className="md-stats__section" key={group.title}>
               <div className="md-stats__section-heading"><h3>{CATEGORY_LABELS[group.title] ?? group.title}</h3><span>{group.metrics.length} 项指标</span></div>
               <div className="md-stats__column-head">
                 <span className="md-stats__metric-heading">指标</span>
                 <span className="md-player-heading"><GameIcon src={focus.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(focus)}>{shortParticipantLabel(focus)}</b><small>当前</small></span></span>
+                {!compare && <span className="md-stat__rank-heading" title="按数值从高到低排列，相同数值并列；不代表表现优劣">数值排序</span>}
                 {compare ? <><span className="md-player-heading is-compare"><GameIcon src={compare.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(compare)}>{shortParticipantLabel(compare)}</b><small>对比</small></span></span><span className="md-stats__delta-heading" title="当前玩家数值减去对比玩家数值">差值</span></> : <span title="以零为起点，与全场最大绝对值比较；包含负值时以中线为零点">全场数值参照</span>}
                 <span />
               </div>
@@ -109,6 +101,8 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
                 const other = compare ? rows.find((row) => row.player.puuid === compare.puuid) : undefined;
                 const expanded = expandedKey === metric.key;
                 const comparable = current.numeric !== null;
+                const rank = current.numeric === null ? null : values.filter((value) => value > (current.numeric as number)).length + 1;
+                const Emblem = COMBAT_ICONS[metric.key as keyof typeof COMBAT_ICONS];
                 const delta = other && current.numeric !== null && other.numeric !== null ? formatDelta(metric, current.numeric - other.numeric) : null;
                 const sorted = comparable ? [...rows].sort((a, b) => (b.numeric ?? -Infinity) - (a.numeric ?? -Infinity)) : rows;
                 const renderBar = (value: number | null, isCompare = false) => {
@@ -118,8 +112,9 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
                 return (
                   <article className={`md-stat${expanded ? ' is-expanded' : ''}`} key={metric.key}>
                     <button type="button" className="md-stat__row" aria-expanded={expanded} aria-label={`${metric.label}，当前 ${formatValue(metric, current.value)}${other ? `，对比 ${formatValue(metric, other.value)}，差值 ${delta ?? '不适用'}` : ''}，${expanded ? '收起' : '展开'}全场对比`} onClick={() => setExpandedKey(expanded ? null : metric.key)}>
-                      <span className="md-stat__label" title={metric.description ?? metric.label}>{metric.label}</span>
+                      <span className="md-stat__label" title={metric.description ?? metric.label}><span className="md-stat__emblem" aria-hidden="true">{Emblem ? <Emblem /> : groupIcon(group.title)}</span><span>{metric.label}</span></span>
                       <span className="md-stat__number is-current"><strong>{formatValue(metric, current.value)}</strong>{compare && comparable && renderBar(current.numeric)}</span>
+                      {!compare && <span className="md-stat__rank">{rank !== null ? <><b>{rank}</b><small>/ {values.length}</small></> : '—'}</span>}
                       {other ? <>
                         <span className="md-stat__number md-stat__other"><strong>{formatValue(metric, other.value)}</strong>{other.numeric !== null && renderBar(other.numeric, true)}</span>
                         <span className="md-stat__delta" title="当前玩家减去对比玩家">{delta ?? '—'}</span>

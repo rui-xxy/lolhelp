@@ -9,16 +9,17 @@ interface MatchRosterProps {
   comparePuuid?: string;
   onPick: (player: MatchParticipantSummary) => void;
   compact?: boolean;
+  showcase?: boolean;
   label: string;
 }
 
-export function MatchRoster({ participants, selectedPuuids, comparePuuid, onPick, compact = false, label }: MatchRosterProps) {
+export function MatchRoster({ participants, selectedPuuids, comparePuuid, onPick, compact = false, showcase = false, label }: MatchRosterProps) {
   const teamIds = Array.from(new Set(participants.map((player) => player.teamId)));
   return (
-    <div className={`match-roster${compact ? ' match-roster--compact' : ''}`} role="group" aria-label={label}>
+    <div className={`match-roster${compact ? ' match-roster--compact' : ''}${showcase ? ' match-roster--showcase' : ''}`} role="group" aria-label={label}>
       {teamIds.map((teamId) => (
         <div key={teamId} className={`match-roster__team ${teamId === 100 ? 'is-blue' : 'is-red'}`}>
-          <span className="match-roster__team-name">{teamId === 100 ? '蓝方' : teamId === 200 ? '红方' : `队伍 ${teamId}`}</span>
+          <span className="match-roster__team-name">{teamId === 100 ? '蓝方' : teamId === 200 ? '红方' : `队伍 ${teamId}`}{showcase && <small>{participants.find((player) => player.teamId === teamId)?.win ? '胜利' : '落败'}</small>}</span>
           <div className="match-roster__players">
             {participants.filter((player) => player.teamId === teamId).map((player) => {
               const selected = selectedPuuids.includes(player.puuid);
@@ -35,16 +36,19 @@ export function MatchRoster({ participants, selectedPuuids, comparePuuid, onPick
                   onClick={() => onPick(player)}
                 >
                   <span className="match-roster__portrait">
-                    <GameIcon src={player.championAvatar} alt="" size={compact ? 30 : 34} rounded />
+                    <GameIcon src={player.championAvatar} alt="" size={compact ? 30 : showcase ? 44 : 34} rounded />
+                    {showcase && player.champLevel > 0 && <small className="match-roster__level">{player.champLevel}</small>}
                     {(selected || comparing) && <span className="match-roster__check" aria-hidden="true"><Check /></span>}
                   </span>
                   <span className="match-roster__name">{shortParticipantLabel(player)}</span>
+                  {showcase && <small className="match-roster__status">{comparing ? '对比玩家' : selected ? '当前玩家' : `等级 ${player.champLevel || '—'}`}</small>}
                 </button>
               );
             })}
           </div>
         </div>
       ))}
+      {showcase && teamIds.length === 2 && <span className="match-roster__versus" aria-hidden="true">VS</span>}
     </div>
   );
 }
