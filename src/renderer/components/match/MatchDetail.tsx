@@ -1779,7 +1779,10 @@ function DetailedTableTab({
       ].filter(Boolean).join(' ')}
       onScroll={(event) => {
         const scrollTop = event.currentTarget.scrollTop;
-        setHeaderCompact((current) => (current ? scrollTop > 52 : scrollTop > 96));
+        // The compact state removes roughly one player-strip height. A wide
+        // hysteresis prevents the resulting scrollTop adjustment from toggling
+        // the sticky header back and forth near the collapse threshold.
+        setHeaderCompact((current) => (current ? scrollTop > 12 : scrollTop > 104));
       }}
     >
       <div className="lol-stats-explorer__sticky">
@@ -1927,7 +1930,6 @@ function DetailedTableTab({
         <div className="lol-stats-highlights" aria-label="本局特征">
           <div className="lol-stats-highlights__lead">
             <span>本局特征</span>
-            <small>相对本局 10 人最显著的统计位置</small>
           </div>
           <div className="lol-stats-highlights__items">
             {highlights.map((highlight) => (
@@ -1946,7 +1948,6 @@ function DetailedTableTab({
                   <small>{highlight.metric.label}</small>
                   <strong>{formatMetricValue(highlight.metric, highlight.value)}</strong>
                 </span>
-                <em>#{String(highlight.rank).padStart(2, '0')} / {highlight.total}</em>
               </button>
             ))}
           </div>
@@ -1966,7 +1967,6 @@ function DetailedTableTab({
                 <i aria-hidden="true"><StatsGroupIcon title={group.title} /></i>
                 <span>{group.title}</span>
               </div>
-              <small>{group.metrics.length} 项 · 点击指标展开 10 人对比</small>
             </div>
 
             <div className="lol-stats-focus-list">
@@ -1985,9 +1985,6 @@ function DetailedTableTab({
                 const numericValues = numericRows.map((row) => row.numericValue as number);
                 const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
                 const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
-                const focusRank = focusNumeric === null
-                  ? null
-                  : sortedNumericRows.findIndex((row) => row.player.puuid === focusPlayer.puuid) + 1;
                 const compareRow = comparePlayer
                   ? rows.find((row) => row.player.puuid === comparePlayer.puuid)
                   : undefined;
@@ -2031,16 +2028,6 @@ function DetailedTableTab({
                         className="lol-stats-focus-item__reading lol-stats-value-swap"
                       >
                         <strong>{formatMetricValue(metric, focusRow?.value ?? 0)}</strong>
-                        <span className="lol-stats-focus-item__rank">
-                          {focusRank && numericRows.length > 0 ? (
-                            <>
-                              <b>#{String(focusRank).padStart(2, '0')}</b>
-                              <em>/ {numericRows.length}</em>
-                            </>
-                          ) : (
-                            <em>{metric.kind === 'boolean' ? '状态指标' : '文本指标'}</em>
-                          )}
-                        </span>
                         {compareRow && (
                           <span className="lol-stats-focus-item__compare-reading">
                             <ArrowLeftRight aria-hidden="true" />
@@ -2058,7 +2045,7 @@ function DetailedTableTab({
                         {compareNumeric !== null && (
                           <i className="is-compare" style={{ width: `${compareRatio}%` }} />
                         )}
-                        {focusRank && numericRows.length > 0 && compareNumeric === null && (
+                        {focusNumeric !== null && numericRows.length > 0 && compareNumeric === null && (
                           <b style={{ left: `${focusRatio}%` }} />
                         )}
                       </div>
@@ -2073,9 +2060,6 @@ function DetailedTableTab({
                       <div className="lol-stats-compare-inline">
                         <div className="lol-stats-compare-inline__head">
                           <span>全场对比</span>
-                          <small>
-                            {numericRows.length > 0 ? '按数值从高到低排列' : '按双方阵容顺序排列'}
-                          </small>
                         </div>
                         <div className="lol-stats-compare-inline__grid">
                           {comparisonRows.map((row, index) => {
@@ -2921,11 +2905,7 @@ function EventsTab({
     <div className="lol-event-analyzer">
       <header className="lol-event-analyzer__overview">
         <div className="lol-event-analyzer__overview-copy">
-          <span>事件轨迹</span>
           <strong>事件 <b>{filteredEntries.length}</b><small> / {entries.length}</small></strong>
-          <small>
-            {primaryCounts.kill} 击杀 · {primaryCounts.objective} 史诗目标 · {primaryCounts.building} 建筑
-          </small>
         </div>
 
         <div className="lol-event-density" aria-label="整局事件密度">
