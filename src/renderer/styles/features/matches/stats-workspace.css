@@ -330,11 +330,14 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
-    padding: 18px 22px 28px;
+    padding: 0 22px 28px;
     scrollbar-gutter: stable;
+    scroll-padding-top: 60px;
+    overflow-anchor: none;
   }
   .md-stats__summary {
     display: grid;
+    margin-top: 18px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin-bottom: 22px;
     padding: 14px 16px;
@@ -378,6 +381,11 @@
     gap: 16px;
   }
   .md-stats__column-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--analysis-bg);
+    box-shadow: 0 1px 0 var(--analysis-line);
     min-height: 56px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--analysis-line);
@@ -480,7 +488,7 @@
   .md-stat__number > strong { line-height: 1.3; white-space: nowrap; }
   .md-stat__number.md-stat__other > strong { color: var(--analysis-blue); }
   .md-stat__delta { font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; color: var(--color-app-muted); white-space: nowrap; }
-  .md-stats.is-comparing .md-stat__row { min-height: 76px; }
+  .md-stats.is-comparing .md-stat__row { min-height: 64px; }
   .md-stat__expanded {
     padding: 4px 12px 12px;
   }
@@ -539,7 +547,7 @@
       grid-template-columns: 145px minmax(0, 1fr);
     }
     .md-stats__content {
-      padding: 16px 14px 24px;
+      padding: 0 14px 24px;
     }
     .md-stats.is-comparing .md-stats__column-head, .md-stats.is-comparing .md-stat__row { gap: 12px; }
     .md-stats__column-head, .md-stat__row {
@@ -595,9 +603,10 @@
     .md-stats.is-comparing .md-stats__column-head, .md-stats.is-comparing .md-stat__row { grid-template-columns: repeat(3, minmax(0, 1fr)) 14px; gap: 10px; }
     .md-stats.is-comparing .md-stat__label { grid-column: 1 / -1; font-size: 12px; }
     .md-stats.is-comparing .md-stats__metric-heading { display: none; }
-    .md-stats.is-comparing .md-stat__row { padding-block: 14px; }
+    .md-stats.is-comparing .md-stat__row { padding-block: 10px; }
     .md-stats.is-comparing .md-stat__number > strong { font-size: 15px; }
-    .md-player-heading > img { display: none; }
+    .md-player-heading { gap: 5px; }
+    .md-player-heading > img { display: block; }
     .md-stat__delta { font-size: 12px; }
 
   }

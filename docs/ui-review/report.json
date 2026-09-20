@@ -43,6 +43,11 @@
       "value": true
     },
     {
+      "label": "stats names use player identities instead of champion aliases",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "comparison preserves both values at 1100px",
       "passed": true,
       "value": true
@@ -58,11 +63,16 @@
       "value": true
     },
     {
+      "label": "comparison avatars and both names stay pinned while values scroll",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "header stays fixed across former collapse threshold",
       "passed": true,
       "value": {
-        "before": 223,
-        "after": 223
+        "before": 149,
+        "after": 149
       }
     },
     {
@@ -91,6 +101,16 @@
       "value": true
     },
     {
+      "label": "events and roster show player IDs with no champion alias headings",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "separate special-kill notifications populate multi-kill counts without duplicate kills",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "headline counts and confetti chart are replaced by three navigable lanes",
       "passed": true,
       "value": true
@@ -101,7 +121,12 @@
       "value": true
     },
     {
-      "label": "hover previews a concrete event",
+      "label": "hover previews a concrete event with portraits instead of a sentence",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "cursor follows exact pixels between events and coalesces pointer bursts",
       "passed": true,
       "value": true
     },
@@ -145,7 +170,17 @@
       "value": true
     },
     {
+      "label": "multi-kill filter shows matching awards with victim and damage context",
+      "passed": true,
+      "value": true
+    },
+    {
       "label": "building filter excludes champion kills",
+      "passed": true,
+      "value": true
+    },
+    {
+      "label": "building previews combine actor portrait, target icon and lane text",
       "passed": true,
       "value": true
     },

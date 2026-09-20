@@ -61,7 +61,7 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
         <div className="md-stats__toolbar">
           <div className="md-stats__identity">
             <GameIcon src={focus.championAvatar} alt="" size={38} rounded />
-            <div><strong title={participantLabel(focus)}>{participantLabel(focus)}</strong><small>{focus.championName}</small></div>
+            <div><strong title={participantLabel(focus)}>{participantLabel(focus)}</strong></div>
           </div>
           <button type="button" className={`md-control${picking || compare ? ' is-active' : ''}`} aria-pressed={picking || Boolean(compare)} onClick={() => setPicking((value) => !value)}>
             <ArrowLeftRight aria-hidden="true" />{picking ? '取消选择' : compare ? '更换对比' : '对比玩家'}
@@ -93,8 +93,8 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
               <h3>{CATEGORY_LABELS[group.title] ?? group.title}</h3>
               <div className="md-stats__column-head">
                 <span className="md-stats__metric-heading">指标</span>
-                <span className="md-player-heading"><GameIcon src={focus.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(focus)}>{shortParticipantLabel(focus)}</b><small>当前 · {focus.championName}</small></span></span>
-                {compare ? <><span className="md-player-heading is-compare"><GameIcon src={compare.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(compare)}>{shortParticipantLabel(compare)}</b><small>对比 · {compare.championName}</small></span></span><span className="md-stats__delta-heading" title="当前玩家数值减去对比玩家数值">差值</span></> : <span>全场分布</span>}
+                <span className="md-player-heading"><GameIcon src={focus.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(focus)}>{shortParticipantLabel(focus)}</b><small>当前</small></span></span>
+                {compare ? <><span className="md-player-heading is-compare"><GameIcon src={compare.championAvatar} alt="" size={24} rounded /><span><b title={participantLabel(compare)}>{shortParticipantLabel(compare)}</b><small>对比</small></span></span><span className="md-stats__delta-heading" title="当前玩家数值减去对比玩家数值">差值</span></> : <span>全场分布</span>}
                 <span />
               </div>
               {group.metrics.map((metric) => {
@@ -126,7 +126,7 @@ export function DetailedStatsView({ participants, targetPuuid, groups, readValue
                       <div className="md-stat__players">
                         {sorted.map((row) => <div className={`md-stat__player${row.player.puuid === focus.puuid ? ' is-focus' : ''}${row.player.puuid === compare?.puuid ? ' is-compare' : ''}`} key={row.player.puuid}>
                           <GameIcon src={row.player.championAvatar} alt="" size={26} rounded />
-                          <span title={`${participantLabel(row.player)} · ${row.player.championName}`}>{shortParticipantLabel(row.player)}</span>
+                          <span title={participantLabel(row.player)}>{shortParticipantLabel(row.player)}</span>
                           {row.numeric !== null ? renderBar(row.numeric, row.player.puuid === compare?.puuid) : <span />}
                           <strong>{formatValue(metric, row.value)}</strong>
                         </div>)}

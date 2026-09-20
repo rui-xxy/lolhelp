@@ -8,9 +8,9 @@ const champions = [
   [51, 'Caitlyn', '凯特琳'], [111, 'Nautilus', '诺提勒斯'], [234, 'Viego', '佛耶戈'], [134, 'Syndra', '辛德拉'], [895, 'Nilah', '尼菈'],
 ] as const;
 const nicknames = ['星河入梦', '雾起时见你', '九尾的信笺', '峡谷回声', '北境不退', '皮城第七码头', '深海守望者', '破败王座', '暗星回廊', '长夜与微光'];
-const participants = champions.map(([id, alias, name], index) => ({
+const participants = champions.map(([id, alias], index) => ({
   puuid: `ui-fixture-${index}`, participantId: index + 1, teamId: index < 5 ? 100 : 200,
-  championId: id, championName: name,
+  championId: id, championName: alias,
   championAvatar: `https://ddragon.leagueoflegends.com/cdn/16.17.1/img/champion/${alias}.png`,
   riotId: `${nicknames[index]}#${1000 + index}`, summonerName: nicknames[index], teamPosition: '',
   kills: 16 - index, deaths: 5 + index, assists: 27 - index, damage: 42670 - index * 2623,
@@ -31,11 +31,16 @@ const events = Array.from({ length: 48 }, (_, index) => ({
   timestamp: 90000 + index * 23000 + (index % 3 === 1 ? -21000 : 0),
   type: index % 12 === 10 ? 'ELITE_MONSTER_KILL' : index % 12 === 11 ? 'BUILDING_KILL' : 'CHAMPION_KILL',
   killerId: index % 5 + 1, victimId: index % 5 + 6, assistingParticipantIds: [2, 3],
-  multiKillLength: index % 3 === 1 ? 2 : 1, shutdownBounty: index === 2 ? 350 : 0,
+  shutdownBounty: index === 2 ? 350 : 0,
   monsterType: 'BARON_NASHOR', buildingType: 'TOWER_BUILDING', laneType: 'MID_LANE',
   position: { x: 7400, y: 9200 }, victimDamageReceived: index === 3 ? [] : damage,
 }));
-const timeline = { frames: [{ timestamp: 0, events: [] }, { timestamp: 1200000, events }], frameInterval: 60000 } as unknown as MatchTimeline;
+// Match-v5-like notifications are separate from CHAMPION_KILL. Keep the
+// fixture faithful so the UI cannot pass while silently discarding all awards.
+const rawEvents = events.flatMap((event, index) => event.type === 'CHAMPION_KILL' && index % 3 === 1
+  ? [event, { type: 'CHAMPION_SPECIAL_KILL', killType: 'KILL_MULTI', multiKillLength: 2, killerId: event.killerId, timestamp: event.timestamp }]
+  : [event]);
+const timeline = { frames: [{ timestamp: 0, events: [] }, { timestamp: 1200000, events: rawEvents }], frameInterval: 60000 } as unknown as MatchTimeline;
 window.lolHelper = {
   match: { getReplayAvailability: async () => ({ available: false }), getTimeline: async () => ({ available: true, timeline }) },
   assist: { getChampionGuide: async (id: number) => ({ championId: id, spells: [{ key: 'Q', name: '技能示例', icon: participants[0].championAvatar }, { key: 'E', name: '技能示例', icon: participants[1].championAvatar }] }) },

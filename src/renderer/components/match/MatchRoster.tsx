@@ -29,16 +29,16 @@ export function MatchRoster({ participants, selectedPuuids, comparePuuid, onPick
                   key={player.puuid}
                   type="button"
                   className={`match-roster__player${selected ? ' is-selected' : ''}${comparing ? ' is-comparing' : ''}`}
-                  aria-label={`${name} · ${player.championName}${comparing ? ' · 对比玩家' : ''}`}
+                  aria-label={`${name}${comparing ? ' · 对比玩家' : ''}`}
                   aria-pressed={selected || comparing}
-                  title={`${name} · ${player.championName}${comparing ? ' · 对比玩家' : ''}`}
+                  title={`${name}${comparing ? ' · 对比玩家' : ''}`}
                   onClick={() => onPick(player)}
                 >
                   <span className="match-roster__portrait">
                     <GameIcon src={player.championAvatar} alt="" size={compact ? 30 : 34} rounded />
                     {(selected || comparing) && <span className="match-roster__check" aria-hidden="true"><Check /></span>}
                   </span>
-                  <span className="match-roster__name">{compact ? player.championName : shortParticipantLabel(player)}</span>
+                  <span className="match-roster__name">{shortParticipantLabel(player)}</span>
                 </button>
               );
             })}

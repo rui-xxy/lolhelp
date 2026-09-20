@@ -13,7 +13,7 @@ export interface StatsMetric {
 export interface StatsGroup { title: string; metrics: StatsMetric[] }
 
 export function participantLabel(player: MatchParticipantSummary): string {
-  return player.riotId || player.summonerName || player.championName || '未知玩家';
+  return player.riotId || player.summonerName || '未知玩家';
 }
 export function shortParticipantLabel(player: MatchParticipantSummary): string {
   return participantLabel(player).split('#')[0];

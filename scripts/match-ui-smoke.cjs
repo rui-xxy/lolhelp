@@ -33,8 +33,14 @@ async function screenshot(name) { const image = await window.webContents.capture
   await check('both comparison bars share the same track width', () => { const row = [...document.querySelectorAll('.md-stat__row')].find((node) => node.querySelectorAll('.md-meter').length === 2); const bars = row.querySelectorAll('.md-meter'); return Math.abs(bars[0].getBoundingClientRect().width - bars[1].getBoundingClientRect().width) < 1; });
   await check('both named value columns and signed differences are visible without expanding', () => document.querySelectorAll('.md-stat__row .md-stat__number > strong').length >= 10 && document.querySelectorAll('.md-player-heading').length === 2 && document.querySelectorAll('.md-stat__delta').length >= 5);
   await check('labels are upright and numbers use restrained weight', () => getComputedStyle(document.querySelector('.md-stat__label')).fontStyle === 'normal' && Number(getComputedStyle(document.querySelector('.md-stat__number strong')).fontWeight) <= 500);
+  await check('stats names use player identities instead of champion aliases', () => !/Jinx|Thresh|Nautilus|Caitlyn/.test(document.querySelector('.md-stats').textContent));
   await evaluate(() => [...document.querySelectorAll('.md-stats__categories > button')].find((node) => node.title === '承受与资源').click());
   for (const width of [1100, 900, 650]) { await window.setContentSize(width, 820); await sleep(250); await check(`comparison preserves both values at ${width}px`, () => [...document.querySelectorAll('.md-stat__number')].every((node) => node.getBoundingClientRect().width > 0) && document.querySelector('.md-stats__content').scrollWidth <= document.querySelector('.md-stats__content').clientWidth + 1); await screenshot(`comparison-${width}`); }
+  await window.setContentSize(900, 760); await sleep(120);
+  await evaluate(() => { document.querySelector('.md-stats__content').scrollTop = 280; }); await sleep(120);
+  await check('comparison avatars and both names stay pinned while values scroll', () => { const content = document.querySelector('.md-stats__content'); const head = document.querySelector('.md-stats__column-head'); return content.scrollTop > 100 && getComputedStyle(head).position === 'sticky' && Math.abs(head.getBoundingClientRect().top - content.getBoundingClientRect().top) <= 2 && [...head.querySelectorAll('img')].every(img => img.getBoundingClientRect().height > 0); });
+  await screenshot('comparison-sticky-900');
+  await evaluate(() => { document.querySelector('.md-stats__content').scrollTop = 0; });
   await evaluate(() => document.querySelector('[aria-label="退出双人对比"]').click());
   await evaluate(() => document.querySelector('.md-stats__categories > button').click()); await sleep(100);
   const before = await evaluate(() => document.querySelector('.md-stats__header').getBoundingClientRect().height);
@@ -51,12 +57,21 @@ async function screenshot(name) { const image = await window.webContents.capture
   }
   window.setContentSize(980, 760); await tab('事件'); await sleep(1200);
   await check('event stream and persistent filters render', () => document.querySelectorAll('.lol-event-control-types button').length === 5 && document.querySelectorAll('.lol-event-analyzer__event').length > 20);
+  await check('events and roster show player IDs with no champion alias headings', () => !/Jinx|Thresh|Ahri|LeeSin|Garen|Caitlyn|Nautilus|Viego|Syndra|Nilah/.test(document.querySelector('.lol-event-analyzer').textContent) && [...document.querySelectorAll('.md-event-identity b')].every(node => node.textContent.includes('#')));
+  await check('separate special-kill notifications populate multi-kill counts without duplicate kills', () => { const counts = [...document.querySelectorAll('.lol-event-control-types small')].map(node=>Number(node.textContent)); return counts[0] === 48 && counts[1] === 40 && counts[2] === 12; });
   await screenshot('events-980');
   await check('headline counts and confetti chart are replaced by three navigable lanes', () => !document.querySelector('.lol-event-analyzer__overview-copy') && !document.querySelector('.lol-event-density') && document.querySelectorAll('.md-timeline__lane').length === 3 && document.querySelector('.md-timeline__plot').getAttribute('role') === 'slider');
   await check('time axis has intermediate ticks and group headers are distinct', () => document.querySelectorAll('.md-timeline__axis > span').length >= 4 && getComputedStyle(document.querySelector('.lol-fight-window')).borderTopWidth === '1px' && getComputedStyle(document.querySelector('.lol-fight-window__head')).backgroundColor !== getComputedStyle(document.querySelector('.lol-fight-window')).backgroundColor);
   const plot = await evaluate(() => { const r = document.querySelector('.md-timeline__plot').getBoundingClientRect(); return { x: r.x + r.width * .45, y: r.y + 15 }; });
   await window.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...plot }); await sleep(100);
-  await check('hover previews a concrete event', () => Boolean(document.querySelector('.md-timeline__cursor')) && document.querySelector('.md-timeline__preview').textContent.includes('击杀'));
+  await check('hover previews a concrete event with portraits instead of a sentence', () => document.querySelectorAll('.md-timeline__preview .md-event-visual img').length >= 3 && document.querySelector('.md-timeline__preview .md-event-visual').getAttribute('aria-label').includes('击杀'));
+  await check('cursor follows exact pixels between events and coalesces pointer bursts', async () => {
+    const plot = document.querySelector('.md-timeline__plot'); const r = plot.getBoundingClientRect(); const cursor = plot.querySelector('.md-timeline__cursor');
+    const xs = [r.width * .452, r.width * .452 + 1, r.width * .452 + 2, r.width * .452 + 6];
+    const errors = [];
+    for (const x of xs) { for (let n = 0; n < 10; n++) plot.dispatchEvent(new PointerEvent('pointermove', {clientX:r.left+x, clientY:r.top+12, pointerId:1, bubbles:true})); await new Promise(requestAnimationFrame); errors.push(Math.abs(cursor.getBoundingClientRect().left - r.left - x)); }
+    return errors.every(error => error < 1) && getComputedStyle(cursor).transitionDuration === '0s';
+  });
   await screenshot('timeline-hover-980');
   await window.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...plot });
   await window.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...plot }); await sleep(250);
@@ -83,8 +98,14 @@ async function screenshot(name) { const image = await window.webContents.capture
   await evaluate(() => document.querySelector('.lol-event-analyzer').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await check('Escape closes details', () => !document.querySelector('.lol-event-inspector__selected'));
   await evaluate(() => document.querySelector('[aria-label="重置筛选"]').click());
+  await evaluate(() => document.querySelectorAll('.lol-event-control-types button')[2].click()); await sleep(100);
+  await check('multi-kill filter shows matching awards with victim and damage context', () => document.querySelectorAll('.lol-event-analyzer__event').length === 12 && [...document.querySelectorAll('.lol-event-analyzer__event')].every(node => node.textContent.includes('双杀')));
+  await screenshot('multikills-980');
+  await evaluate(() => document.querySelector('[aria-label="重置筛选"]').click());
   await evaluate(() => document.querySelectorAll('.lol-event-control-types button')[4].click()); await sleep(100);
   await check('building filter excludes champion kills', () => !document.querySelector('.lol-event-analyzer__kill-flow') && document.querySelectorAll('.lol-event-analyzer__event').length === 4);
+  await check('building previews combine actor portrait, target icon and lane text', () => { const v=document.querySelector('.md-timeline__preview .md-event-visual'); return v && v.querySelectorAll('img').length === 3 && v.textContent.includes('中路') && !v.textContent.includes('防御塔'); });
+  await screenshot('building-preview-980');
   await evaluate(() => document.querySelector('[aria-label="重置筛选"]').click());
   await evaluate(() => document.querySelectorAll('.lol-event-inspector .match-roster__player')[9].click()); await sleep(100);
   await check('type counts reflect the selected participant scope', () => { const counts = [...document.querySelectorAll('.lol-event-control-types small')].map((node) => Number(node.textContent)); return counts[0] < 48 && counts[0] === counts[1] + counts[3] + counts[4]; });

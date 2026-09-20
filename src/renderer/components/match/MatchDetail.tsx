@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CirclePlay, Download, Flame, Layers3, Loader
 import { GameIcon } from './GameIcon';
 import { DetailedStatsView } from './DetailedStatsView';
 import { EventTimeline } from './EventTimeline';
+import { hasMultiKillSummary, isMultiKillEvent, isSpecialMultiKill, multiKillLabel, prepareEventTimeline } from './matchEventModel';
 import type { TimelinePoint } from './eventTimelineModel';
 import { MatchRoster } from './MatchRoster';
 import { LeagueArtImage, leagueArtUrl } from './LeagueArtImage';
@@ -1645,9 +1646,8 @@ function eventParticipantIds(event: MatchTimelineEvent): number[] {
 }
 
 function eventFilterKey(event: MatchTimelineEvent): EventFilterKey | null {
-  if (event.type === 'CHAMPION_KILL') {
-    return (event.multiKillLength ?? 0) >= 2 ? 'multi' : 'kill';
-  }
+  if (isMultiKillEvent(event)) return 'multi';
+  if (event.type === 'CHAMPION_KILL') return 'kill';
   if (event.type === 'ELITE_MONSTER_KILL') return 'objective';
   if (event.type === 'BUILDING_KILL' || event.type === 'TURRET_PLATE_DESTROYED') return 'building';
   return null;
@@ -1686,7 +1686,7 @@ function EventFilterArt({ filter }: { filter: EventPrimaryFilter }) {
 function eventMatchesPrimaryFilter(event: MatchTimelineEvent, filter: EventPrimaryFilter): boolean {
   if (filter === 'all') return eventFilterKey(event) !== null;
   if (filter === 'kill') return event.type === 'CHAMPION_KILL';
-  if (filter === 'multi') return event.type === 'CHAMPION_KILL' && (event.multiKillLength ?? 0) >= 2;
+  if (filter === 'multi') return isMultiKillEvent(event);
   if (filter === 'objective') return event.type === 'ELITE_MONSTER_KILL';
   return event.type === 'BUILDING_KILL' || event.type === 'TURRET_PLATE_DESTROYED';
 }
@@ -1807,6 +1807,8 @@ function eventCopy(event: MatchTimelineEvent, names: Map<number, MatchParticipan
         detail: `${event.assistingParticipantIds?.length ?? 0} 次助攻${event.shutdownBounty ? ` · 终结赏金 ${event.shutdownBounty}` : ''}`,
         tone: actor?.teamId === 200 ? 'red' : 'blue',
       };
+    case 'CHAMPION_SPECIAL_KILL':
+      return { title: `${actorName} · ${multiKillLabel(event)}`, detail: '', tone: actor?.teamId === 200 ? 'red' : 'blue' };
     case 'ELITE_MONSTER_KILL':
       return { title: `${actorName} · ${eventMonsterName(event)}`, detail: '团队地图资源', tone: 'gold' };
     case 'BUILDING_KILL':
@@ -1818,6 +1820,26 @@ function eventCopy(event: MatchTimelineEvent, names: Map<number, MatchParticipan
     default:
       return { title: event.type.replaceAll('_', ' ').toLowerCase(), detail: actorName, tone: 'muted' };
   }
+}
+
+function EventPictogram({ event, names, showActorName = false }: { event: MatchTimelineEvent; names: Map<number, MatchParticipantSummary>; showActorName?: boolean }) {
+  const actor = names.get(event.killerId ?? event.participantId ?? 0);
+  const victim = names.get(event.victimId ?? 0);
+  const combat = event.type === 'CHAMPION_KILL';
+  const special = isSpecialMultiKill(event);
+  const building = event.type === 'BUILDING_KILL' || event.type === 'TURRET_PLATE_DESTROYED';
+  const label = combat ? `${actor ? playerName(actor) : '地图单位'} 击杀 ${victim ? playerName(victim) : '未知玩家'}` : eventCopy(event, names).title;
+  const targetLabel = building ? eventBuildingName(event) : eventMonsterName(event);
+  const targetTeam = building ? event.teamId : actor?.teamId;
+  return <span className="md-event-visual" role="img" aria-label={label} title={label}>
+    {actor ? <GameIcon key={`actor-${actor.puuid}`} src={actor.championAvatar} alt="" title={playerName(actor)} size={28} rounded /> : <span className="md-event-visual__unknown">地图</span>}
+    {showActorName && actor && <b className="md-event-visual__actor">{playerName(actor)}</b>}
+    <span className="md-event-visual__action" aria-hidden="true"><LeagueArtImage name={combat || special ? 'kills.png' : 'arrow.png'} /></span>
+    {combat ? (victim ? <GameIcon key={`victim-${victim.puuid}`} src={victim.championAvatar} alt="" title={playerName(victim)} size={28} rounded /> : <span>未知玩家</span>)
+      : special ? <span className="md-multikill-label">{multiKillLabel(event)}</span>
+      : <><span className="md-event-visual__target" title={targetLabel}><LeagueArtImage name={eventArtAsset(event, targetTeam)} fallback={targetLabel} /></span><span>{building ? eventLaneName(event.laneType) : ''}{event.type === 'TURRET_PLATE_DESTROYED' ? ' · 镀层' : ''}</span></>}
+    {combat && isMultiKillEvent(event) && <span className="md-multikill-label">{multiKillLabel(event)}</span>}
+  </span>;
 }
 
 interface EventEntry {
@@ -2119,7 +2141,7 @@ function EventsTab({
   gameDuration: number;
 }) {
   const names = useMemo(() => participantIndex(participants), [participants]);
-  const allEvents = useMemo(() => timelineEvents(timeline), [timeline]);
+  const allEvents = useMemo(() => prepareEventTimeline(timelineEvents(timeline)), [timeline]);
   const eventRefs = useRef(new Map<string, HTMLElement>());
   const [typeFilter, setTypeFilter] = useState<EventPrimaryFilter>('all');
   const [championFilters, setChampionFilters] = useState<Set<number> | null>(null);
@@ -2140,14 +2162,14 @@ function EventsTab({
   const primaryCounts = useMemo<Record<EventPrimaryFilter, number>>(() => ({
     all: scopedEntries.length,
     kill: scopedEntries.filter((entry) => entry.event.type === 'CHAMPION_KILL').length,
-    multi: scopedEntries.filter((entry) => (
-      entry.event.type === 'CHAMPION_KILL' && (entry.event.multiKillLength ?? 0) >= 2
-    )).length,
+    multi: scopedEntries.filter((entry) => isMultiKillEvent(entry.event)).length,
     objective: scopedEntries.filter((entry) => entry.event.type === 'ELITE_MONSTER_KILL').length,
     building: scopedEntries.filter((entry) => (
       entry.event.type === 'BUILDING_KILL' || entry.event.type === 'TURRET_PLATE_DESTROYED'
     )).length,
   }), [scopedEntries]);
+
+  const multiTimelineMissing = !entries.some(entry => isMultiKillEvent(entry.event)) && hasMultiKillSummary(participants);
 
   const filteredEntries = useMemo(() => entries.filter((entry) => {
     if (!eventMatchesPrimaryFilter(entry.event, typeFilter)) return false;
@@ -2226,9 +2248,9 @@ function EventsTab({
     const victim = names.get(entry.event.victimId ?? 0);
     return {
       ...entry,
-      lane: entry.event.type === 'CHAMPION_KILL' ? (actor?.teamId === 200 ? 'red' : 'blue') : 'objective',
+      lane: entry.event.type === 'CHAMPION_KILL' || isSpecialMultiKill(entry.event) ? (actor?.teamId === 200 ? 'red' : 'blue') : 'objective',
       label: entry.event.type === 'CHAMPION_KILL'
-        ? (actor?.championName ?? '地图单位') + ' 击杀 ' + (victim?.championName ?? '未知英雄')
+        ? (actor ? playerName(actor) : '地图单位') + ' 击杀 ' + (victim ? playerName(victim) : '未知玩家')
         : eventCopy(entry.event, names).title,
     };
   }), [filteredEntries, names]);
@@ -2354,8 +2376,7 @@ function EventsTab({
                               <i className="lol-event-damage-group__unknown"><Flame aria-hidden="true" /></i>
                             )}
                             <span>
-                              <strong>{dealer ? dealer.championName : '其他来源'}</strong>
-                              <small>{dealer ? playerName(dealer) : '环境伤害'}</small>
+                              <strong title={dealer ? playerName(dealer) : '环境伤害'}>{dealer ? playerName(dealer) : '其他来源'}</strong>
                             </span>
                             <div aria-hidden="true">
                               <i style={{ width: `${totalShare}%` }} />
@@ -2470,7 +2491,7 @@ function EventsTab({
             <>
               {((event.multiKillLength ?? 0) >= 2 || Boolean(event.shutdownBounty)) && <div className="lol-event-analyzer__kill-meta">
                 <span className={`lol-event-analyzer__kind lol-event-analyzer__kind--${filter ?? 'kill'}`}>
-                  {filter === 'multi' ? `${event.multiKillLength} 杀` : '击杀'}
+                  {filter === 'multi' ? multiKillLabel(event) : '击杀'}
                 </span>
                 {event.shutdownBounty ? <em>终结赏金 {event.shutdownBounty}</em> : null}
               </div>}
@@ -2482,7 +2503,7 @@ function EventsTab({
                   ) : (
                     <i className="lol-event-analyzer__unknown-avatar"><Swords aria-hidden="true" /></i>
                   )}
-                  <span className="md-event-identity"><b>{killer?.championName ?? '未知来源'}</b><small title={killer ? playerName(killer) : ''}>{killer ? playerName(killer) : '地图单位'}</small></span>
+                  <span className="md-event-identity"><b title={killer ? playerName(killer) : '地图单位'}>{killer ? playerName(killer) : '地图单位'}</b></span>
                 </span>
                 <span className="md-event-action"><LeagueArtImage name="kills.png" /><small>击杀</small></span>
                 <span className="lol-event-analyzer__combatant lol-event-analyzer__combatant--victim">
@@ -2491,7 +2512,7 @@ function EventsTab({
                   ) : (
                     <i className="lol-event-analyzer__unknown-avatar"><Skull aria-hidden="true" /></i>
                   )}
-                  <span className="md-event-identity"><b>{victim?.championName ?? '未知英雄'}</b><small title={victim ? playerName(victim) : ''}>{victim ? playerName(victim) : ''}</small></span>
+                  <span className="md-event-identity"><b title={victim ? playerName(victim) : ''}>{victim ? playerName(victim) : '未知玩家'}</b></span>
                 </span>
               </div>
 
@@ -2521,10 +2542,7 @@ function EventsTab({
                 </span>
               </div>
               <div className="lol-event-analyzer__objective-copy">
-                {killer && <GameIcon src={killer.championAvatar} alt={killer.championName} size={30} rounded />}
-                <div>
-                  <strong>{copy.title}</strong>
-                </div>
+                <EventPictogram event={event} names={names} showActorName />
               </div>
             </>
           )}
@@ -2547,6 +2565,7 @@ function EventsTab({
     <div className="lol-event-analyzer match-analytics" onKeyDown={(event) => { if (event.key === 'Escape' && selectedEventKey) { eventRefs.current.get(selectedEventKey)?.focus(); setSelectedEventKey(null); } }}>
       <header className="lol-event-analyzer__overview">
         <EventTimeline points={timelinePoints} duration={durationMs} selectedKey={selectedEventKey}
+          renderPreview={(point) => <EventPictogram event={point.event} names={names} />}
           onSelect={(key) => { const entry = filteredEntries.find((item) => item.key === key); if (entry) scrollToEvent(entry); }} />
       </header>
 
@@ -2561,7 +2580,7 @@ function EventsTab({
           {streamNodes.length === 0 && (
             <div className="lol-event-analyzer__empty">
               <Layers3 aria-hidden="true" />
-              <strong>无匹配事件</strong>
+              <strong>{typeFilter === 'multi' && multiTimelineMissing ? '此对局未提供多杀时间点' : '无匹配事件'}</strong>
             </div>
           )}
 
@@ -2634,7 +2653,7 @@ function EventsTab({
                   >
                     <EventFilterArt filter={filter} />
                     <span>{eventPrimaryFilterLabel(filter)}</span>
-                    <small>{primaryCounts[filter]}</small>
+                    <small title={filter === 'multi' && multiTimelineMissing ? '赛后统计存在多杀，但时间线未提供对应记录' : undefined}>{filter === 'multi' && multiTimelineMissing ? '—' : primaryCounts[filter]}</small>
                   </button>
                 ))}
               </nav>
