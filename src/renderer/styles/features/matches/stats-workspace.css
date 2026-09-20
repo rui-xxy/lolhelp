@@ -1,9 +1,9 @@
 @layer components {
   /* Shared match controls: full-surface selection, no avatar underlines. */
   .match-analytics {
-    --analysis-bg: var(--color-analysis-bg);
-    --analysis-panel: var(--color-analysis-panel);
-    --analysis-surface: var(--color-analysis-surface);
+    --analysis-bg: var(--color-app-bg);
+    --analysis-panel: color-mix(in srgb, var(--color-app-surface) 44%, var(--color-app-bg));
+    --analysis-surface: color-mix(in srgb, var(--color-app-surface) 76%, var(--color-app-bg));
     --analysis-line: var(--color-frost-line);
     --analysis-focus: var(--color-analysis-accent);
     --analysis-blue: var(--color-app-team-mine);
@@ -220,6 +220,7 @@
   .lol-postgame-content:has(.md-stats) {
     overflow: hidden;
     padding: 0;
+    background: var(--color-app-bg);
   }
   .md-stats {
     display: grid;

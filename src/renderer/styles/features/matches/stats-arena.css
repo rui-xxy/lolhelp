@@ -2,15 +2,11 @@
   /* Match-only art direction. Data, filters and player controls stay native. */
   .md-stats {
     --arena-gold: var(--color-analysis-gold);
-    background: linear-gradient(var(--analysis-bg), color-mix(in srgb, var(--analysis-bg) 96%, transparent)), url('../../../assets/match-atmosphere/wind-swordsman.png') right bottom / cover;
+    background: var(--analysis-bg);
   }
   .lol-postgame:has(.md-stats) .lol-postgame-tabs {
-    background: var(--color-analysis-bg);
-    border-bottom-color: color-mix(in srgb, var(--color-analysis-accent) 22%, transparent);
-  }
-  .lol-postgame:has(.md-stats) .lol-postgame-tab {
-    min-height: 48px;
-    border-radius: 0;
+    background: transparent;
+    border-bottom-color: transparent;
   }
   .lol-postgame:has(.md-stats) .lol-postgame-tab--active {
     background: linear-gradient(0deg, color-mix(in srgb, var(--color-analysis-accent) 15%, transparent), transparent);
@@ -19,7 +15,7 @@
   .md-stats__header {
     position: relative;
     padding: 20px 24px 18px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-bg) 96%, transparent), color-mix(in srgb, var(--analysis-bg) 35%, transparent) 70%, color-mix(in srgb, var(--analysis-bg) 80%, transparent)), url('../../../assets/match-atmosphere/wind-swordsman.png') center 38% / cover;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-bg) 98%, transparent) 0%, color-mix(in srgb, var(--analysis-bg) 92%, transparent) 52%, color-mix(in srgb, var(--analysis-bg) 78%, transparent) 100%), url('../../../assets/match-atmosphere/wind-swordsman.png') center 38% / cover;
     border-bottom: 1px solid color-mix(in srgb, var(--arena-gold) 24%, transparent);
   }
   .md-stats__toolbar { min-height: 60px; margin-bottom: 18px; }
@@ -50,7 +46,7 @@
   .match-roster--showcase .is-selected .match-roster__status { color: var(--arena-gold); }
   .match-roster__versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--color-app-muted); font-size: 19px; font-family: Georgia, serif; font-style: italic; letter-spacing: .05em; }
   .md-stats__workspace { grid-template-columns: 88px minmax(0, 1fr); }
-  .md-stats__categories { padding: 16px 8px; gap: 4px; background: color-mix(in srgb, var(--analysis-bg) 84%, transparent); }
+  .md-stats__categories { padding: 16px 8px; gap: 4px; background: color-mix(in srgb, var(--analysis-panel) 72%, transparent); }
   .md-stats__categories > button { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 61px; gap: 5px; padding: 7px 2px; border-radius: 5px; font-size: 10px; }
   .md-stats__categories > button .lol-riot-art-icon { width: 22px; height: 22px; filter: grayscale(1); opacity: .65; }
   .md-stats__categories > button.is-active { background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 18%, transparent), color-mix(in srgb, var(--analysis-focus) 3%, transparent)); border: 1px solid color-mix(in srgb, var(--analysis-focus) 32%, transparent); color: var(--color-app-text); }
@@ -61,7 +57,7 @@
   .md-stats__overview-heading h2 { margin: 3px 0 0; color: var(--color-app-text); font-size: 22px; font-weight: 600; line-height: 1.2; }
   .md-stats__overview-heading p { margin: 0 0 2px; font-size: 12px; color: var(--color-app-muted); }
   .md-performance { display: grid; grid-template-columns: minmax(0, 1fr) 218px; gap: 14px; margin-bottom: 26px; }
-  .md-stats__summary { margin: 0; padding: 20px 0; align-items: center; border: 1px solid color-mix(in srgb, var(--arena-gold) 20%, var(--analysis-line)); border-radius: 10px 3px; background: linear-gradient(130deg, var(--analysis-panel), color-mix(in srgb, var(--analysis-surface) 48%, var(--analysis-bg))); }
+  .md-stats__summary { margin: 0; padding: 20px 0; align-items: center; border: 1px solid color-mix(in srgb, var(--arena-gold) 14%, var(--analysis-line)); border-radius: 10px 3px; background: linear-gradient(130deg, var(--analysis-panel), color-mix(in srgb, var(--analysis-surface) 36%, var(--analysis-bg))); }
   .md-stats__summary > div { padding-inline: 18px; gap: 12px; }
   .md-stats__summary strong { font-size: clamp(21px, 2.2cqi, 34px); font-weight: 600; letter-spacing: -.04em; }
   .md-stats__summary > div:first-child strong { color: var(--color-app-text); }
@@ -74,7 +70,7 @@
   .md-performance__distribution { display: flex; flex: 0 1 65px; align-items: flex-end; gap: 3px; height: 22px; }
   .md-performance__distribution > i { flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--analysis-focus) 23%, transparent); }
   .md-performance__distribution > i.is-focus { background: var(--analysis-focus); }
-  .md-duel { min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--analysis-focus) 22%, transparent); border-radius: 3px 10px; background: linear-gradient(145deg, var(--analysis-surface), var(--analysis-bg)); }
+  .md-duel { min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--analysis-focus) 16%, transparent); border-radius: 3px 10px; background: color-mix(in srgb, var(--analysis-panel) 78%, var(--analysis-bg)); }
   .md-duel__heading { display: flex; justify-content: space-between; align-items: center; }
   .md-duel__heading strong { font-size: 12px; font-weight: 600; }
   .md-duel__heading button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; color: var(--color-app-muted); }
@@ -96,8 +92,8 @@
   .md-duel__empty p span { font-size: 10px; color: var(--color-app-muted); }
   .md-stats__section-heading { border-left: 2px solid var(--arena-gold); padding-left: 10px; margin-bottom: 14px; }
   .md-stats__section h3 { font-size: 17px; font-weight: 600; }
-  .md-stats__column-head { border-radius: 6px 6px 0 0; min-height: 48px; background: var(--analysis-surface); }
-  .md-stat { margin-top: 4px; border: 1px solid var(--analysis-line); border-radius: 6px; background: linear-gradient(100deg, color-mix(in srgb, var(--analysis-panel) 86%, transparent), color-mix(in srgb, var(--analysis-bg) 65%, transparent)); }
+  .md-stats__column-head { border-radius: 6px 6px 0 0; min-height: 48px; background: color-mix(in srgb, var(--analysis-surface) 72%, var(--analysis-bg)); }
+  .md-stat { margin-top: 4px; border: 1px solid var(--analysis-line); border-radius: 6px; background: color-mix(in srgb, var(--analysis-panel) 64%, transparent); }
   .md-stat__row { min-height: 62px; border-left: 2px solid transparent; }
   .md-stat__row:hover, .md-stat.is-expanded > .md-stat__row { border-left-color: var(--analysis-focus); background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 10%, transparent), transparent); }
   .md-stat__label { display: flex; min-width: 0; align-items: center; gap: 12px; }
