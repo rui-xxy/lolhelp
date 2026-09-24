@@ -32,3 +32,14 @@ cmd //c 'mklink /J node_modules "C:\Users\Administrator\Desktop\个人项目\lol
 - 若 junction 失败（极少见），退回 `npm install --prefer-offline`
 - `npm run check`（lint+typecheck+styles+test 全链）是收尾自检的标准命令
 
+## 成果落地方式（免审核直写，禁止提交）
+
+用户已明确授权：**任务完成并通过检查链后，直接把最终改动同步（写回）到真实桌面项目** `C:\Users\Administrator\Desktop\个人项目\lolhelp` 的文件里。不要把工作停留在"待审核补丁"状态等用户 accept——用户不会去控制台点审核。
+
+**严格禁止 git commit / git push**（用户 2026-09-23 明确要求：提交时机由用户自己决定，AI 只写文件不碰版本历史）。
+
+- 写回前比对目标文件 SHA，写回后逐文件校验哈希一致
+- 只同步本任务涉及的文件，不动其他部分
+- 完成后在回复里告诉用户"改动已写入哪些文件"，由用户自行决定是否提交
+
+
