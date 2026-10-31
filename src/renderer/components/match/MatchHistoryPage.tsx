@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
-import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Ellipsis, History as HistoryIcon, LoaderCircle, MailPlus, MousePointerClick, PanelRightOpen, Trash2, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, CircleAlert, Ellipsis, History as HistoryIcon, LoaderCircle, MousePointerClick, PanelRightOpen, Trash2, UserPlus, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import { MonthActivityNavigator, getHistoryDayKey } from './MatchActivityNavigator';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
+import { QUEUE_FILTERS, QueueFilterMenu, TierGem, WinRateAvatar, formatRankTier, pickHeaderRank } from './MatchPlayerHeader';
 import { RankEmblem } from '../RankEmblem';
 import { EmptyState } from '../ui/kit';
 import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesStore';
@@ -44,97 +45,6 @@ interface MatchTab {
 
 interface OpenSearchTabOptions {
   forceRefresh?: boolean;
-}
-
-// 模式筛选选项（tag → 中文名，tag 是 SGP 的 q_{queueId} 格式）
-const QUEUE_FILTERS = [
-  { key: '', tag: '', name: '全部' },
-  { key: '420', tag: 'q_420', name: '单双排' },
-  { key: '440', tag: 'q_440', name: '灵活组排' },
-  { key: '450', tag: 'q_450', name: '大乱斗' },
-  { key: '2400', tag: 'q_2400', name: '海克斯大乱斗' },
-  { key: '490', tag: 'q_490', name: '快速模式' },
-  { key: '1700', tag: 'q_1700', name: '竞技场' },
-];
-
-function QueueFilterMenu({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (queueKey: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const activeFilter = QUEUE_FILTERS.find((filter) => filter.key === value) ?? QUEUE_FILTERS[0];
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={menuRef} className="relative shrink-0">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className={`group flex h-8 min-w-[88px] items-center justify-between gap-1.5 rounded-sm border px-2 text-xs outline-none transition-[background-color,border-color,color] ${
-          open
-            ? 'border-app-border bg-app-nav-hover text-app-text'
-            : 'border-transparent bg-transparent text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover'
-        }`}
-      >
-        <span className="truncate font-medium">{activeFilter.name}</span>
-        <ChevronDown className={`size-3.5 text-app-subtle transition-transform duration-150 group-hover:text-app-muted ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute top-9 right-0 z-30 w-40 rounded-md border border-app-border-strong bg-app-surface p-1 shadow-[var(--shadow-ui-popover)]"
-        >
-          {QUEUE_FILTERS.map((filter) => {
-            const selected = filter.key === activeFilter.key;
-            return (
-              <button
-                key={filter.key}
-                type="button"
-                role="menuitemradio"
-                aria-checked={selected}
-                onClick={() => {
-                  setOpen(false);
-                  if (!selected) onChange(filter.key);
-                }}
-                className={`flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-xs outline-none transition-colors ${
-                  selected
-                    ? 'bg-app-nav-hover font-medium text-app-text'
-                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover'
-                }`}
-              >
-                <Check className={`size-3.5 ${selected ? 'opacity-100' : 'opacity-0'}`} />
-                <span>{filter.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function createEmptyResult(error: string): PlayerLookupResult {
@@ -724,6 +634,18 @@ export function MatchHistoryPage({
   }, [activeTab, targetPuuid]);
   const isProfilePanelOpen = activeTab ? profilePanelTabId === activeTab.id : false;
   const isSaveMode = activeTab ? saveModeTabId === activeTab.id : false;
+  const headerMatches = activeTab?.matches ?? [];
+  const headerWins = headerMatches.filter((match) => match.win).length;
+  const headerLosses = headerMatches.length - headerWins;
+  const headerWinRate = headerMatches.length > 0 ? Math.round((headerWins / headerMatches.length) * 100) : null;
+  const headerRanks = activeTab?.result?.profile
+    ? activeTab.result.profile.ranks?.length
+      ? activeTab.result.profile.ranks
+      : activeTab.result.profile.rank
+        ? [activeTab.result.profile.rank]
+        : []
+    : [];
+  const headerRank = pickHeaderRank(headerRanks, activeTab?.filterQueue ?? '');
   const selectedSaveIds = new Set(activeTab ? saveSelections[activeTab.id] ?? [] : []);
   const selectedSaveCount = selectedSaveIds.size;
 
@@ -1418,8 +1340,8 @@ export function MatchHistoryPage({
       <div className="flex min-h-0 flex-1 bg-app-bg-soft">
         <div className="flex w-[320px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft">
           {activeTab && (
-            <div className="relative shrink-0 border-b border-app-border bg-app-bg-soft px-3 py-2.5">
-              <div className="flex items-center gap-2">
+            <div className="relative shrink-0 border-b border-app-border bg-app-bg-soft px-3 pt-3.5 pb-3">
+              <div className="flex items-center gap-3">
                 {activeTab.result?.profile ? (
                   <button
                     type="button"
@@ -1427,106 +1349,139 @@ export function MatchHistoryPage({
                     onClick={() =>
                       setProfilePanelTabId((current) => (current === activeTab.id ? null : activeTab.id))
                     }
-                    className={`group flex h-8 min-w-0 flex-1 items-center gap-2.5 text-left outline-none transition-colors disabled:cursor-default disabled:opacity-50 ${
-                      isProfilePanelOpen ? 'text-app-text' : 'text-app-body hover:text-app-text'
-                    }`}
-                    title={activeTab.result.profile.riotId}
+                    className="group -my-1 -ml-1 flex min-w-0 flex-1 items-center gap-3 rounded-sm py-1 pl-1 text-left outline-none transition-colors focus-visible:bg-app-nav-hover disabled:cursor-default"
+                    title={
+                      headerWinRate === null
+                        ? activeTab.result.profile.riotId
+                        : `${activeTab.result.profile.riotId}\n近 ${headerMatches.length} 场胜率 ${headerWinRate}%`
+                    }
                   >
-                    <ProfileIcon
+                    <WinRateAvatar
+                      wins={headerWins}
+                      losses={headerLosses}
                       iconId={activeTab.result.profile.profileIconId}
-                      src={activeTab.result.profile.profileIconUrl}
-                      alt={getDisplayName(activeTab.result.profile.riotId)}
-                      size={26}
-                      className="ring-1 ring-app-border transition-[box-shadow] group-hover:ring-app-border-strong"
+                      iconUrl={activeTab.result.profile.profileIconUrl}
+                      name={getDisplayName(activeTab.result.profile.riotId)}
+                      level={activeTab.result.profile.level}
                     />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
-                      {getDisplayName(activeTab.result.profile.riotId)}
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="min-w-0 truncate text-list font-semibold tracking-[-0.01em] text-app-text">
+                          {getDisplayName(activeTab.result.profile.riotId)}
+                        </span>
+                        <PanelRightOpen
+                          className={`size-3.5 shrink-0 text-app-subtle transition-opacity ${
+                            isProfilePanelOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+                          }`}
+                        />
+                      </span>
+                      {headerRank ? (
+                        <span
+                          className="flex min-w-0 items-center gap-1.5 text-meta text-app-body"
+                          title={headerRank.displayText}
+                        >
+                          <TierGem tier={headerRank.tier} />
+                          <span className="truncate">{formatRankTier(headerRank)}</span>
+                          <span className="num shrink-0 text-app-muted">· {headerRank.leaguePoints} LP</span>
+                        </span>
+                      ) : (
+                        <span className="text-meta text-app-subtle">未定级</span>
+                      )}
                     </span>
-                    <PanelRightOpen
-                      className={`size-3.5 shrink-0 text-app-subtle transition-[color,opacity] ${
-                        isProfilePanelOpen ? 'opacity-100 text-app-muted' : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                    />
                   </button>
                 ) : (
-                  <div className="flex h-8 min-w-0 flex-1 items-center text-xs text-app-subtle">
+                  <div className="flex h-[46px] min-w-0 flex-1 items-center text-meta text-app-subtle">
                     {activeTab.loading ? '正在读取玩家...' : '暂无玩家信息'}
                   </div>
                 )}
-                <QueueFilterMenu value={activeTab.filterQueue} onChange={handleFilterChange} />
-              </div>
 
-              <div className="mt-1.5 flex h-6 items-center justify-between gap-2 text-[11px] text-app-muted">
-                <div className="min-w-0 truncate tabular-nums">
-                  {activeTab.loading ? (
-                    <span className="text-app-subtle">加载战绩中...</span>
-                  ) : activeTab.matches.length > 0 ? (
-                    <>
-                      <span className="font-medium text-ally">
-                        {activeTab.matches.filter((match) => match.win).length} 胜
-                      </span>
-                      <span className="mx-1.5 text-app-border-strong">·</span>
-                      <span className="font-medium text-enemy">
-                        {activeTab.matches.filter((match) => !match.win).length} 负
-                      </span>
-                      <span className="mx-1.5 text-app-border-strong">·</span>
-                      <span className="text-app-subtle">{activeTab.matches.length} 场</span>
-                      {activeTab.pageLoading && <span className="ml-1.5 text-app-body">读取中</span>}
-                    </>
-                  ) : (
-                    <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  {!isSaveMode && activeTab.result?.profile.riotId && (
-                    <button
-                      type="button"
-                      aria-label={addingFriendTabId === activeTab.id ? '正在发送好友请求' : '添加好友'}
-                      disabled={addingFriendTabId === activeTab.id}
-                      onClick={() => void handleAddCurrentPlayerFriend()}
-                      className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover focus-visible:text-app-body disabled:opacity-40"
-                      title={addingFriendTabId === activeTab.id ? '发送中' : '添加好友'}
-                    >
-                      <MailPlus className="size-3.5" />
-                    </button>
-                  )}
+                <div className="flex shrink-0 items-center gap-0.5 self-start">
                   {isSaveMode ? (
                     <>
                       <button
                         type="button"
                         disabled={selectedSaveCount === 0}
                         onClick={() => void handleSaveSelectedMatches()}
-                        className="h-6 rounded-sm bg-app-primary px-2 text-[11px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
+                        className="h-6 rounded-sm bg-app-primary px-2 text-meta font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
                       >
-                        保存{selectedSaveCount > 0 ? selectedSaveCount : ''}
+                        保存{selectedSaveCount > 0 ? ` ${selectedSaveCount} 场` : ''}
                       </button>
                       <button
                         type="button"
                         onClick={stopSaveMode}
-                        className="h-6 rounded-sm px-2 text-[11px] text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+                        className="h-6 rounded-sm px-2 text-meta text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
                       >
                         取消
                       </button>
                     </>
-                  ) : activeTab.source === 'saved' ? (
-                    <span className="h-6 px-1.5 leading-6 text-[11px] font-medium text-app-subtle">
-                      已保存
-                    </span>
                   ) : (
-                    <button
-                      type="button"
-                      aria-label="保存战绩"
-                      title="保存战绩"
-                      onClick={() => {
-                        setProfilePanelTabId(null);
-                        setSaveModeTabId(activeTab.id);
-                      }}
-                      className="flex size-6 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-body focus-visible:bg-app-nav-hover focus-visible:text-app-body"
-                    >
-                      <BookmarkPlus className="size-3.5" />
-                    </button>
+                    <>
+                      {activeTab.result?.profile.riotId && (
+                        <button
+                          type="button"
+                          aria-label={addingFriendTabId === activeTab.id ? '正在发送好友请求' : '加为好友'}
+                          disabled={addingFriendTabId === activeTab.id}
+                          onClick={() => void handleAddCurrentPlayerFriend()}
+                          className="flex size-7 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-text focus-visible:bg-app-nav-hover focus-visible:text-app-text disabled:opacity-40"
+                          title={addingFriendTabId === activeTab.id ? '发送中' : '加为好友'}
+                        >
+                          {addingFriendTabId === activeTab.id ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : (
+                            <UserPlus className="size-4" />
+                          )}
+                        </button>
+                      )}
+                      {activeTab.source === 'saved' ? (
+                        <span
+                          className="flex size-7 items-center justify-center text-gold"
+                          title="已保存的战绩"
+                          aria-label="已保存的战绩"
+                        >
+                          <BookmarkCheck className="size-4" />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label="挑选对局保存"
+                          title="挑选对局保存"
+                          onClick={() => {
+                            setProfilePanelTabId(null);
+                            setSaveModeTabId(activeTab.id);
+                          }}
+                          className="flex size-7 items-center justify-center rounded-sm text-app-subtle outline-none transition-colors hover:bg-app-nav-hover hover:text-app-text focus-visible:bg-app-nav-hover focus-visible:text-app-text"
+                        >
+                          <Bookmark className="size-4" />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
+              </div>
+
+              <div className="mt-3 flex h-7 items-center gap-2.5">
+                <div className="flex min-w-0 flex-1 items-baseline gap-2 truncate text-meta text-app-muted">
+                  {activeTab.loading ? (
+                    <span className="text-app-subtle">加载战绩中...</span>
+                  ) : headerWinRate !== null ? (
+                    <>
+                      <span className="num text-title leading-none font-bold tracking-[-0.01em] text-app-text">
+                        {headerWinRate}
+                        <span className="ml-px text-meta font-semibold text-app-muted">%</span>
+                      </span>
+                      <span className="num">
+                        <b className="font-semibold text-ally">{headerWins}</b> 胜{' '}
+                        <b className="font-semibold text-enemy">{headerLosses}</b> 负
+                      </span>
+                      <span className="num truncate text-app-subtle">
+                        {activeTab.pageLoading ? '读取中…' : `近 ${headerMatches.length} 场`}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-app-subtle">{activeTab.result?.error ?? '暂无战绩'}</span>
+                  )}
+                </div>
+                <QueueFilterMenu value={activeTab.filterQueue} onChange={handleFilterChange} ranks={headerRanks} />
               </div>
               {friendNotice?.tabId === activeTab.id && (
                 <div
