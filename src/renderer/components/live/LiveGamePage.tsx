@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { CircleDashed, DatabaseZap, LoaderCircle, MoreVertical, RefreshCw, Swords } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { CircleDashed, DatabaseZap, LoaderCircle, RefreshCw, Swords } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { LiveBattlePlayer, PlayerMatchDetail, PlayerRankSummary } from '../../../shared/api';
+import { buildChampionSplashByAlias, buildProfileIconCandidates } from '../../../shared/gameAssets';
 import { getRankEmblemUrl } from '../RankEmblem';
-import { ProfileIcon } from '../ProfileIcon';
 import { MatchDetail } from '../match/MatchDetail';
 import { LargeDialog } from '../ui/large-dialog';
 import { LIVE_PARTY_COLORS } from '../../styles/palette';
+import { LaneIcon } from '../LaneIcon';
 import { LIVE_PREVIEW_ENEMY_TEAM, LIVE_PREVIEW_MY_TEAM } from './livePreviewData';
 
-const HISTORY_CARD_ROWS = 7;
-const RECENT_CHAMPION_COUNT = 10;
 const MAX_BOARD_CARDS = 10;
 const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -125,6 +124,18 @@ function currentPartyKey(player: LiveBattlePlayer) {
   return player.premadeId ? `${player.teamId}:${player.premadeId}` : '';
 }
 
+interface PartyInfo {
+  color: string;
+  label: string;
+  size: number;
+}
+
+const PARTY_SIZE_LABELS: Record<number, string> = { 2: '双排', 3: '三黑', 4: '四黑', 5: '五黑' };
+
+function partySizeLabel(size: number): string {
+  return PARTY_SIZE_LABELS[size] ?? `${size} 黑`;
+}
+
 function buildParties(players: LiveBattlePlayer[]) {
   const byParty = new Map<string, LiveBattlePlayer[]>();
   players.forEach((player) => {
@@ -133,7 +144,7 @@ function buildParties(players: LiveBattlePlayer[]) {
     byParty.set(key, [...(byParty.get(key) ?? []), player]);
   });
 
-  const info = new Map<string, { color: string; label: string }>();
+  const info = new Map<string, PartyInfo>();
   let colorIndex = 0;
   let labelIndex = 0;
   byParty.forEach((partyPlayers) => {
@@ -142,7 +153,7 @@ function buildParties(players: LiveBattlePlayer[]) {
     const label = PARTY_LABELS[labelIndex % PARTY_LABELS.length];
     colorIndex += 1;
     labelIndex += 1;
-    partyPlayers.forEach((player) => info.set(playerIdentity(player), { color, label }));
+    partyPlayers.forEach((player) => info.set(playerIdentity(player), { color, label, size: partyPlayers.length }));
   });
 
   return info;
@@ -258,229 +269,6 @@ function splitRiotId(player: LiveBattlePlayer): { name: string; tag: string } {
     return { name: player.riotId.slice(0, separator), tag: `#${player.riotId.slice(separator + 1)}` };
   }
   return { name: player.gameName, tag: '' };
-}
-
-function recentChampions(player: LiveBattlePlayer) {
-  const stats = new Map<string, {
-    alias: string;
-    name: string;
-    games: number;
-    wins: number;
-    kills: number;
-    deaths: number;
-    assists: number;
-    matches: LiveBattlePlayer['history'];
-  }>();
-
-  player.history.forEach((match) => {
-    if (!match.championAlias) return;
-    const current = stats.get(match.championAlias)
-      ?? {
-        alias: match.championAlias,
-        name: match.championName,
-        games: 0,
-        wins: 0,
-        kills: 0,
-        deaths: 0,
-        assists: 0,
-        matches: [],
-      };
-    current.games += 1;
-    if (match.win) current.wins += 1;
-    current.kills += match.kills;
-    current.deaths += match.deaths;
-    current.assists += match.assists;
-    current.matches.push(match);
-    stats.set(match.championAlias, current);
-  });
-
-  return Array.from(stats.values()).slice(0, RECENT_CHAMPION_COUNT);
-}
-
-type RecentChampionStats = ReturnType<typeof recentChampions>[number];
-
-function championAverage(
-  champion: RecentChampionStats,
-  getter: (performance: NonNullable<LiveBattlePlayer['history'][number]['performance']>) => number,
-): number {
-  const values = champion.matches.map((match) => match.performance).filter(Boolean) as Array<NonNullable<LiveBattlePlayer['history'][number]['performance']>>;
-  return values.length > 0 ? values.reduce((sum, value) => sum + getter(value), 0) / values.length : 0;
-}
-
-function championKdaVariation(champion: RecentChampionStats): number {
-  if (champion.matches.length < 2) return 0;
-  const values = champion.matches.map((match) => (match.kills + match.assists) / Math.max(1, match.deaths));
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  if (average <= 0) return 0;
-  const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length;
-  return Math.sqrt(variance) / average;
-}
-
-function championAnalysisScore(champion: RecentChampionStats): number {
-  const winRate = champion.wins / Math.max(1, champion.games);
-  const kda = (champion.kills + champion.assists) / Math.max(1, champion.deaths);
-  const participation = championAverage(champion, (performance) => performance.killParticipation);
-  return Math.max(0, Math.min(10, 1.2 + winRate * 2.8 + Math.min(5, kda) * 0.38 + participation * 1.4));
-}
-
-function percent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-function compactMetric(value: number): string {
-  if (!value) return '0';
-  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString();
-  return value.toFixed(value < 10 ? 1 : 0);
-}
-
-function ChampionAnalysisTooltip({
-  champion,
-  style,
-  onMouseEnter,
-  onMouseLeave,
-  onCollect,
-}: {
-  champion: RecentChampionStats;
-  style?: CSSProperties;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
-  onCollect?: () => void;
-}) {
-  const hasPerformance = champion.matches.some((match) => Boolean(match.performance));
-  const averageKills = champion.kills / Math.max(1, champion.games);
-  const averageDeaths = champion.deaths / Math.max(1, champion.games);
-  const averageAssists = champion.assists / Math.max(1, champion.games);
-  const metric = (getter: (performance: NonNullable<LiveBattlePlayer['history'][number]['performance']>) => number) => championAverage(champion, getter);
-  const value = (content: string) => hasPerformance ? content : '—';
-  const columns = [
-    {
-      title: '核心表现',
-      rows: [
-        ['Akari Score', championAnalysisScore(champion).toFixed(2)],
-        ['胜率', `${Math.round((champion.wins / champion.games) * 100)}%`],
-        ['平均 KDA', `${averageKills.toFixed(1)} / ${averageDeaths.toFixed(1)} / ${averageAssists.toFixed(1)}`],
-        ['参团率', value(percent(metric((performance) => performance.killParticipation)))],
-        ['KDA 波动', championKdaVariation(champion).toFixed(2)],
-        ['场均拆塔伤害', value(compactMetric(metric((performance) => performance.turretDamage)))],
-        ['视野占比', value(percent(metric((performance) => performance.teamVisionPercentage)))],
-        ['场均视野得分', value(metric((performance) => performance.visionScore).toFixed(1))],
-        ['场均敌人消失信号', value(metric((performance) => performance.enemyMissingPings).toFixed(1))],
-      ],
-    },
-    {
-      title: '输出与承伤',
-      rows: [
-        ['英雄伤害 / 分', value(compactMetric(metric((performance) => performance.championDamage / Math.max(1, performance.duration / 60))))],
-        ['团队伤害占比', value(percent(metric((performance) => performance.teamDamagePercentage)))],
-        ['相对队内最高伤害', value(percent(metric((performance) => performance.relativeTeamDamage)))],
-        ['相对全场最高伤害', value(percent(metric((performance) => performance.relativeGlobalDamage)))],
-        ['团队承伤占比', value(percent(metric((performance) => performance.teamDamageTakenPercentage)))],
-        ['相对队内最高承伤', value(percent(metric((performance) => performance.relativeTeamDamageTaken)))],
-        ['相对全场最高承伤', value(percent(metric((performance) => performance.relativeGlobalDamageTaken)))],
-        ['伤害经济转化率', value(`${Math.round(metric((performance) => performance.damageGoldEfficiency) * 100)}%`)],
-        ['场均单杀', value(metric((performance) => performance.soloKills).toFixed(1))],
-      ],
-    },
-    {
-      title: '经济与资源',
-      rows: [
-        ['团队经济占比', value(percent(metric((performance) => performance.teamGoldPercentage)))],
-        ['相对队内最高经济', value(percent(metric((performance) => performance.relativeTeamGold)))],
-        ['相对全场最高经济', value(percent(metric((performance) => performance.relativeGlobalGold)))],
-        ['补刀 / 分', value(metric((performance) => performance.csPerMinute).toFixed(1))],
-        ['团队补刀占比', value(percent(metric((performance) => performance.teamCsPercentage)))],
-        ['相对队内最高补刀', value(percent(metric((performance) => performance.relativeTeamCs)))],
-        ['相对全场最高补刀', value(percent(metric((performance) => performance.relativeGlobalCs)))],
-        ['团队推塔伤害占比', value(percent(metric((performance) => performance.teamTurretDamagePercentage)))],
-        ['相对队内最高推塔', value(percent(metric((performance) => performance.relativeTeamTurretDamage)))],
-        ['相对全场最高推塔', value(percent(metric((performance) => performance.relativeGlobalTurretDamage)))],
-      ],
-    },
-  ];
-
-  return (
-    <span
-      className="live-champion-tooltip is-floating"
-      role="tooltip"
-      style={style}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onFocus={onMouseEnter}
-      onBlur={onMouseLeave}
-    >
-      <span className="live-champion-tooltip__head">
-        <img src={championIcon(champion.alias)} alt="" />
-        <span>
-          <strong>{champion.name}</strong>
-          <small>{champion.games} 场对局 · {champion.wins} 胜 {champion.games - champion.wins} 负 · {champion.wins >= 2 ? `${champion.wins} 连胜` : '近期数据'}</small>
-        </span>
-        <button
-          type="button"
-          className="live-champion-tooltip__collect"
-          title={`打开玩家战绩并收集更多 ${champion.name} 对局样本`}
-          onClick={onCollect}
-          disabled={!onCollect}
-        >
-          收集
-        </button>
-      </span>
-      <span className="live-champion-tooltip__tabs"><b>综合</b><span>熟练度</span></span>
-      <span className="live-champion-tooltip__columns">
-        {columns.map((column) => <span className="live-champion-tooltip__column" key={column.title}>
-          <strong>{column.title}</strong>
-          {column.rows.map(([label, metricValue]) => <span className="live-champion-tooltip__metric" key={label}>
-            <small>{label}</small><b>{metricValue}</b>
-          </span>)}
-        </span>)}
-      </span>
-      {!hasPerformance && <span className="live-champion-tooltip__notice">当前仅有基础战绩；详细占比会在 SGP 数据恢复后自动补齐。</span>}
-    </span>
-  );
-}
-
-function ChampionHover({ champion, onCollect }: { champion: RecentChampionStats; onCollect?: () => void }) {
-  const anchorRef = useRef<HTMLSpanElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
-  const [open, setOpen] = useState(false);
-  const style = useFloatingPosition(anchorRef, open, 660, 340);
-  const keepOpen = useCallback(() => {
-    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-    setOpen(true);
-  }, []);
-  const closeLater = useCallback(() => {
-    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null;
-      setOpen(false);
-    }, 180);
-  }, []);
-  useEffect(() => () => {
-    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-  }, []);
-  return (
-    <span
-      ref={anchorRef}
-      className={`live-champ ${champion.wins * 2 >= champion.games ? 'live-champ--win' : 'live-champ--loss'}`}
-      tabIndex={0}
-      onMouseEnter={keepOpen}
-      onMouseLeave={closeLater}
-      onFocus={keepOpen}
-      onBlur={closeLater}
-    >
-      <img src={championIcon(champion.alias)} alt={champion.name} loading="lazy" />
-      {open && createPortal(
-        <ChampionAnalysisTooltip
-          champion={champion}
-          style={style}
-          onMouseEnter={keepOpen}
-          onMouseLeave={closeLater}
-          onCollect={onCollect}
-        />,
-        document.body,
-      )}
-    </span>
-  );
 }
 
 function rankQueueLabel(queueType: string, queueName: string) {
@@ -606,7 +394,10 @@ function RankDetailsPopover({ rank, ranks }: { rank: PlayerRankSummary; ranks?: 
   );
 }
 
-function summarizeTeam(players: LiveBattlePlayer[]) {
+function summarizeTeam(
+  players: LiveBattlePlayer[],
+  parties: Map<string, PartyInfo>,
+) {
   const playersWithMatches = players.filter((player) => player.matchCount > 0);
   const averageWinRate = playersWithMatches.length > 0
     ? Math.round(playersWithMatches.reduce((total, player) => total + player.winRate, 0) / playersWithMatches.length)
@@ -615,51 +406,58 @@ function summarizeTeam(players: LiveBattlePlayer[]) {
     ? Math.round((playersWithMatches.reduce((total, player) => total + player.kda, 0) / playersWithMatches.length) * 100) / 100
     : 0;
 
-  const partyCounts = new Map<string, number>();
+  const partyGroups = new Map<string, PartyInfo>();
   players.forEach((player) => {
-    const key = currentPartyKey(player);
-    if (key) partyCounts.set(key, (partyCounts.get(key) ?? 0) + 1);
+    const party = parties.get(playerIdentity(player));
+    if (party) partyGroups.set(party.label, party);
   });
-  const premadeGroups = Array.from(partyCounts.values())
-    .filter((count) => count > 1)
-    .sort((a, b) => b - a);
 
-  return { averageWinRate, averageKda, premadeGroups };
+  return {
+    averageWinRate,
+    averageKda,
+    partyGroups: Array.from(partyGroups.values()).sort((a, b) => b.size - a.size),
+  };
 }
 
 function LiveTeamSummaryBar({
   teamId,
   label,
   summary,
-  pageBar = false,
+  align = 'start',
 }: {
   teamId: number;
   label: string;
   summary: ReturnType<typeof summarizeTeam>;
-  pageBar?: boolean;
+  align?: 'start' | 'end';
 }) {
   return (
-    <div className={`live-team-bar ${pageBar ? 'live-team-bar--page' : ''}`}>
-      <span className={`live-team-dot live-team-dot--${teamId === 100 ? 'blue' : 'red'}`} />
+    <div className={`live-team-bar live-team-bar--${align}`}>
+      <span className={`live-team-dot live-team-dot--${teamId === 200 ? 'red' : 'blue'}`} />
       <span className="live-team-name">{label}</span>
       <span className="live-team-metrics">
         <span className={`live-team-metric ${
-          summary.averageWinRate >= 50
-            ? 'live-team-metric--win'
-            : 'live-team-metric--loss'
+          !summary.averageWinRate
+            ? ''
+            : summary.averageWinRate >= 50
+              ? 'live-team-metric--win'
+              : 'live-team-metric--loss'
         }`}>
-          {summary.averageWinRate || '—'}
-          {summary.averageWinRate ? '%' : ''}
+          <em>胜率</em>
+          <b>{summary.averageWinRate ? `${summary.averageWinRate}%` : '—'}</b>
         </span>
-        <span className="live-team-sep" />
-        <span className="live-team-metric">{summary.averageKda || '—'}</span>
-        {summary.premadeGroups.length > 0 && <span className="live-team-sep" />}
-        {summary.premadeGroups.map((groupSize, groupIndex) => (
+        <span className="live-team-metric">
+          <em>KDA</em>
+          <b>{summary.averageKda || '—'}</b>
+        </span>
+        {summary.partyGroups.map((group) => (
           <span
-            key={`${teamId}-party-${groupIndex}`}
-            className="live-chip live-chip--party"
+            key={`${teamId}-party-${group.label}`}
+            className="live-team-party"
+            style={{ '--live-party-color': group.color } as CSSProperties}
+            title={`${group.size} 人一起排`}
           >
-            {groupSize} 黑
+            <i aria-hidden="true" />
+            {partySizeLabel(group.size)} {group.label}
           </span>
         ))}
       </span>
@@ -667,8 +465,310 @@ function LiveTeamSummaryBar({
   );
 }
 
-function AkariCard({
+// ---------------------------------------------------------------------------
+// 对位镜像：一行一组对位，左蓝右红，中间一道光缝。
+// ---------------------------------------------------------------------------
+
+type DuelSide = 'blue' | 'red';
+
+interface DuelRow {
+  key: string;
+  lane: string;
+  blue?: LiveBattlePlayer;
+  red?: LiveBattlePlayer;
+}
+
+interface PartyThread {
+  side: DuelSide;
+  label: string;
+  color: string;
+  lane: number;
+  rows: number[];
+}
+
+const LANE_ORDER = ['top', 'jungle', 'middle', 'bottom', 'utility'];
+const LANE_INDEX: Record<string, number> = {
+  top: 0,
+  jungle: 1,
+  middle: 2,
+  mid: 2,
+  bottom: 3,
+  bot: 3,
+  adc: 3,
+  utility: 4,
+  support: 4,
+};
+const TIER_ORDER = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+const DIVISION_ORDER = ['IV', 'III', 'II', 'I'];
+const FORM_CELLS = 20;
+const GTIMG_SKIN_BASE = 'https://game.gtimg.cn/images/lol/act/img/skin/big';
+
+function laneIndex(player: LiveBattlePlayer): number {
+  return LANE_INDEX[String(player.position ?? '').toLowerCase()] ?? -1;
+}
+
+function hasDistinctLanes(team: LiveBattlePlayer[]): boolean {
+  const lanes = team.map(laneIndex);
+  return lanes.every((lane) => lane >= 0) && new Set(lanes).size === lanes.length;
+}
+
+// 段位越高越靠前；同段位比胜率。没有分路的模式（大乱斗等）用它来排对位。
+function strengthScore(player: LiveBattlePlayer): number {
+  const ranks = player.ranks ?? (player.rank ? [player.rank] : []);
+  const playable = (queueType: string) => ranks.find(
+    (rank) => rank.queueType === queueType && rank.tier && rank.tier !== 'NA',
+  );
+  const rank = playable('RANKED_SOLO_5x5') ?? playable('RANKED_FLEX_SR');
+  const tier = rank ? TIER_ORDER.indexOf(rank.tier.toUpperCase()) : -1;
+  const division = rank ? Math.max(0, DIVISION_ORDER.indexOf(rank.division)) : 0;
+  const rankScore = tier >= 0 ? tier * 10_000 + division * 1_000 + Math.min(999, rank?.leaguePoints ?? 0) : -1;
+  return rankScore * 100 + (player.matchCount > 0 ? player.winRate : 0);
+}
+
+function buildDuelRows(
+  blue: LiveBattlePlayer[],
+  red: LiveBattlePlayer[],
+  keepOrder: boolean,
+): DuelRow[] {
+  const everyone = [...blue, ...red];
+  if (!keepOrder && everyone.length > 0 && hasDistinctLanes(blue) && hasDistinctLanes(red)) {
+    return LANE_ORDER
+      .map((lane, index) => ({
+        key: lane,
+        lane,
+        blue: blue.find((player) => laneIndex(player) === index),
+        red: red.find((player) => laneIndex(player) === index),
+      }))
+      .filter((row) => row.blue || row.red);
+  }
+
+  const arrange = (team: LiveBattlePlayer[]) => (
+    keepOrder ? team : [...team].sort((a, b) => strengthScore(b) - strengthScore(a))
+  );
+  const blueRows = arrange(blue);
+  const redRows = arrange(red);
+  return Array.from({ length: Math.max(blueRows.length, redRows.length) }, (_, index) => ({
+    key: `slot-${index}`,
+    lane: '',
+    blue: blueRows[index],
+    red: redRows[index],
+  }));
+}
+
+// 同一队里一起排的人，在外侧用一根细线串起来。
+function buildPartyThreads(
+  rows: DuelRow[],
+  parties: Map<string, PartyInfo>,
+): PartyThread[] {
+  const threads: PartyThread[] = [];
+  (['blue', 'red'] as const).forEach((side) => {
+    const groups = new Map<string, PartyThread>();
+    rows.forEach((row, rowIndex) => {
+      const player = row[side];
+      const party = player ? parties.get(playerIdentity(player)) : undefined;
+      if (!party) return;
+      const group = groups.get(party.label) ?? { side, label: party.label, color: party.color, lane: 0, rows: [] };
+      group.rows.push(rowIndex);
+      groups.set(party.label, group);
+    });
+    let lane = 0;
+    groups.forEach((group) => {
+      if (group.rows.length < 2) return;
+      threads.push({ ...group, lane });
+      lane += 1;
+    });
+  });
+  return threads;
+}
+
+function championSplashCandidates(championId: number, alias: string): string[] {
+  const urls: string[] = [];
+  if (championId > 0) urls.push(`${GTIMG_SKIN_BASE}${championId}000.jpg`);
+  if (alias) urls.push(buildChampionSplashByAlias(alias, championId, 0));
+  return urls.filter(Boolean);
+}
+
+function compactNumber(value: number): string {
+  if (value >= 10_000) return `${(value / 1000).toFixed(1)}k`;
+  return Math.round(value).toLocaleString();
+}
+
+function agoLabel(timeStr: string): string {
+  return /[分时天]$/.test(timeStr) ? `${timeStr}前` : timeStr;
+}
+
+// 外沿透进来的英雄原画；没有英雄（房间阶段）时退回到召唤师头像，虚化成一团底色。
+function DuelArt({ player }: { player: LiveBattlePlayer }) {
+  const splashSources = useMemo(
+    () => championSplashCandidates(player.championId, player.championAlias),
+    [player.championAlias, player.championId],
+  );
+  const sources = useMemo(
+    () => [...splashSources, ...buildProfileIconCandidates(player.profileIconId)],
+    [player.profileIconId, splashSources],
+  );
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const src = sources[sourceIndex];
+  if (!src) return <span className="live-duel-art live-duel-art--empty" aria-hidden="true" />;
+  return (
+    <span
+      className={`live-duel-art ${sourceIndex >= splashSources.length ? 'live-duel-art--icon' : ''}`}
+      aria-hidden="true"
+    >
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setSourceIndex((current) => current + 1)}
+      />
+    </span>
+  );
+}
+
+// 近 20 场胜负：一排小格，最新一局在最外侧（贴着原画那一边）。
+function FormStrip({ history, loading }: { history: LiveBattlePlayer['history']; loading: boolean }) {
+  const recent = history.slice(0, FORM_CELLS);
+  const wins = recent.filter((match) => match.win).length;
+  return (
+    <div
+      className="live-duel-form"
+      aria-label={recent.length > 0 ? `近 ${recent.length} 场 ${wins} 胜 ${recent.length - wins} 负` : '暂无近期战绩'}
+    >
+      <span className="live-duel-form__cells">
+        {Array.from({ length: FORM_CELLS }, (_, cellIndex) => {
+          const match = recent[cellIndex];
+          return (
+            <i
+              key={cellIndex}
+              data-result={match ? (match.win ? 'win' : 'loss') : undefined}
+              data-loading={!match && loading ? 'true' : undefined}
+            />
+          );
+        })}
+      </span>
+      <span className="live-duel-form__cap">
+        {recent.length > 0 ? (
+          <>
+            <b data-result="win">{wins}</b>胜<b data-result="loss">{recent.length - wins}</b>负
+          </>
+        ) : loading ? '读取中' : '暂无战绩'}
+      </span>
+    </div>
+  );
+}
+
+// 悬浮在卡片上时，卡片向下（或向上）展开出的战绩列表。
+type SheetAlign = 'top' | 'bottom' | 'mid';
+
+function DuelHistorySheet({
   player,
+  side,
+  top,
+  height,
+  align,
+  onMatchOpen,
+}: {
+  player: LiveBattlePlayer;
+  side: DuelSide;
+  top: number;
+  height: number;
+  align: SheetAlign;
+  onMatchOpen: (gameId: number, puuid: string, playerName: string) => void;
+}) {
+  const searchableRiotId = player.riotId || player.gameName;
+  const { name, tag } = splitRiotId(player);
+  const games = player.history;
+  const wins = games.filter((match) => match.win).length;
+  const average = (pick: (match: LiveBattlePlayer['history'][number]) => number) => (
+    games.length > 0 ? games.reduce((total, match) => total + pick(match), 0) / games.length : 0
+  );
+  return (
+    <motion.div
+      className={`live-duel-sheet live-duel-sheet--${side}`}
+      data-align={align}
+      style={{ top, height }}
+      initial={{ opacity: 0, clipPath: side === 'blue' ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)' }}
+      animate={{ opacity: 1, clipPath: 'inset(0 0% 0 0%)' }}
+      exit={{ opacity: 0, transition: { duration: 0.1 } }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="live-duel-sheet__summary">
+        <strong>
+          {name || '未知玩家'}
+          {tag && <small>{tag}</small>}
+        </strong>
+        <span>
+          近 {games.length} 场 <b data-result="win">{wins}</b> 胜 <b data-result="loss">{games.length - wins}</b> 负
+        </span>
+        <span>
+          场均 {average((match) => match.kills).toFixed(1)} / {average((match) => match.deaths).toFixed(1)} / {average((match) => match.assists).toFixed(1)}
+        </span>
+        <em>点一局看整场</em>
+      </div>
+      <div className="live-duel-sheet__head" aria-hidden="true">
+        <span />
+        <span>结果</span>
+        <span>模式</span>
+        <span>K / D / A</span>
+        <span>KDA</span>
+        <span>伤害</span>
+        <span>补刀</span>
+        <span>时间</span>
+      </div>
+      <div className="live-duel-sheet__list">
+        {games.map((match, matchIndex) => {
+          const canOpen = Boolean(match.gameId && player.puuid);
+          const ratio = (match.kills + match.assists) / Math.max(1, match.deaths);
+          const performance = match.performance;
+          return (
+            <button
+              type="button"
+              key={`${match.gameId ?? matchIndex}-${match.championAlias}-${matchIndex}`}
+              className="live-sheet-row"
+              data-result={match.win ? 'win' : 'loss'}
+              aria-disabled={!canOpen}
+              onClick={() => {
+                if (match.gameId && player.puuid) onMatchOpen(match.gameId, player.puuid, searchableRiotId);
+              }}
+            >
+              <img
+                src={championIcon(match.championAlias)}
+                alt={match.championName}
+                loading="lazy"
+                onError={(event) => {
+                  (event.currentTarget as HTMLImageElement).style.opacity = '0';
+                }}
+              />
+              <span className="live-sheet-row__result">{match.win ? '胜' : '负'}</span>
+              <span className="live-sheet-row__mode">{match.queueName || match.championName}</span>
+              <span className="live-sheet-row__kda">
+                <b>{match.kills}</b>
+                <i>/</i>
+                <b className="live-sheet-row__deaths">{match.deaths}</b>
+                <i>/</i>
+                <b>{match.assists}</b>
+              </span>
+              <span className={`live-sheet-row__ratio ${ratio >= 4 ? 'is-gold' : ''}`}>{ratio.toFixed(2)}</span>
+              <span className="live-sheet-row__num">{performance ? compactNumber(performance.championDamage) : '—'}</span>
+              <span className="live-sheet-row__num">{performance ? performance.cs : '—'}</span>
+              <span className="live-sheet-row__time">{agoLabel(match.timeStr)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+const HOVER_OPEN_DELAY = 160;
+const HOVER_CLOSE_DELAY = 220;
+// 展开的战绩表固定这么高（约 9 局），多的滚轮往下翻。
+const SHEET_HEIGHT = 348;
+
+function DuelPanel({
+  player,
+  side,
   isLoaded,
   index,
   party,
@@ -677,325 +777,218 @@ function AkariCard({
   onMatchOpen,
 }: {
   player: LiveBattlePlayer;
+  side: DuelSide;
   isLoaded: boolean;
   index: number;
-  party?: { color: string; label: string };
+  party?: PartyInfo;
   isSelf?: boolean;
   onPlayerSearch?: (riotId: string) => void;
   onMatchOpen: (gameId: number, puuid: string, playerName: string) => void;
 }) {
-  const historyRef = useRef<HTMLDivElement>(null);
-  const scrollDragRef = useRef<{
-    pointerId: number;
-    startY: number;
-    startScrollTop: number;
-  } | null>(null);
-  const [scrollThumb, setScrollThumb] = useState({ top: 0, height: 0, visible: false });
-  const champIcon = championIcon(player.championAlias);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const hoverTimerRef = useRef<number | null>(null);
+  const [sheet, setSheet] = useState<{ top: number; height: number; align: SheetAlign } | null>(null);
   const searchableRiotId = player.riotId || player.gameName;
   const { name, tag } = splitRiotId(player);
   const ranks = useMemo(() => rankLine(player.ranks), [player.ranks]);
-  const visibleHistory = player.history;
-  const recentWins = visibleHistory.filter((history) => history.win).length;
-  const recentLosses = visibleHistory.length - recentWins;
-  const currentPosition = positionLabel(player.position);
   const streak = currentStreak(player);
-  const soloKillMatches = visibleHistory.filter((history) => history.performance);
-  const averageSoloKills = soloKillMatches.length > 0
-    ? soloKillMatches.reduce(
-      (total, history) => total + (history.performance?.soloKills ?? 0),
-      0,
-    ) / soloKillMatches.length
-    : 0;
   const hasHighWinRate = player.matchCount >= 16 && player.winRate >= 85;
   const careerHidden = player.privacy?.toUpperCase() === 'PRIVATE';
-  const champions = useMemo(() => recentChampions(player), [player.history]);
   const historyLoading = player.matchCount === 0 && player.loadState?.history === 'loading';
   const rankLoading = ranks.length === 0 && player.loadState?.rank === 'loading';
-  const cardStyle = party
-    ? ({ '--live-party-color': party.color } as React.CSSProperties)
-    : undefined;
   const winRateTone = player.matchCount === 0
     ? ''
     : player.winRate >= 53
-      ? 'live-card-stat--win'
+      ? 'is-win'
       : player.winRate <= 47
-        ? 'live-card-stat--loss'
+        ? 'is-loss'
         : '';
-  const kdaTone = player.matchCount === 0
-    ? ''
-    : player.kda >= 4
-      ? 'live-card-stat--win'
-      : player.kda < 2
-        ? 'live-card-stat--loss'
-        : '';
+  const kdaTone = player.matchCount > 0 && player.kda >= 4 ? 'is-gold' : '';
 
-  const updateScrollThumb = useCallback(() => {
-    const historyElement = historyRef.current;
-    if (!historyElement) return;
-    const { clientHeight, scrollHeight, scrollTop } = historyElement;
-    const visible = scrollHeight > clientHeight + 1;
-    const height = visible
-      ? Math.max(28, Math.round((clientHeight * clientHeight) / scrollHeight))
-      : 0;
-    const travel = Math.max(0, clientHeight - height);
-    const top = visible && scrollHeight > clientHeight
-      ? Math.round((scrollTop / (scrollHeight - clientHeight)) * travel)
-      : 0;
-    setScrollThumb((current) => (
-      current.top === top && current.height === height && current.visible === visible
-        ? current
-        : { top, height, visible }
-    ));
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = null;
   }, []);
 
+  // 战绩表像抽屉一样从卡片朝中缝的那条边拉出来（蓝方往右、红方往左），紧贴着卡片，高度固定；
+  // 顶边尽量和这张卡对齐，靠下的卡就往上挪，始终留在对阵区里，不会撑出滚动条。
+  const openSheet = useCallback(() => {
+    clearHoverTimer();
+    if (player.history.length === 0) return;
+    hoverTimerRef.current = window.setTimeout(() => {
+      const slot = slotRef.current;
+      const rows = slot?.closest('.live-duel-rows');
+      const body = slot?.closest('.live-page-body') ?? rows;
+      if (!slot || !rows || !body) return;
+      const slotRect = slot.getBoundingClientRect();
+      const rowsRect = rows.getBoundingClientRect();
+      const boundTop = rowsRect.top;
+      const boundBottom = Math.max(
+        rowsRect.bottom,
+        Math.min(body.getBoundingClientRect().bottom, window.innerHeight) - 8,
+      );
+      const height = Math.min(SHEET_HEIGHT, Math.round(boundBottom - boundTop));
+      const top = Math.round(Math.min(Math.max(slotRect.top, boundTop), boundBottom - height) - slotRect.top);
+      const align: SheetAlign = Math.abs(top) <= 1
+        ? 'top'
+        : Math.abs(top + height - slotRect.height) <= 1
+          ? 'bottom'
+          : 'mid';
+      setSheet({ top, height, align });
+    }, HOVER_OPEN_DELAY);
+  }, [clearHoverTimer, player.history.length]);
+
+  const closeSheet = useCallback(() => {
+    clearHoverTimer();
+    hoverTimerRef.current = window.setTimeout(() => setSheet(null), HOVER_CLOSE_DELAY);
+  }, [clearHoverTimer]);
+
+  useEffect(() => clearHoverTimer, [clearHoverTimer]);
+
+  // 展开后，鼠标停在这张卡或战绩表的任何地方滚轮，都滚动战绩列表，不用先把鼠标挪进列表。
+  const sheetOpen = Boolean(sheet);
   useEffect(() => {
-    const historyElement = historyRef.current;
-    if (!historyElement) return undefined;
-    updateScrollThumb();
-    const resizeObserver = new ResizeObserver(updateScrollThumb);
-    resizeObserver.observe(historyElement);
-    const frame = window.requestAnimationFrame(updateScrollThumb);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      resizeObserver.disconnect();
+    const slot = slotRef.current;
+    if (!slot || !sheetOpen) return undefined;
+    const handleWheel = (event: WheelEvent) => {
+      const list = slot.querySelector<HTMLElement>('.live-duel-sheet__list');
+      if (!list || (event.target instanceof Node && list.contains(event.target))) return;
+      event.preventDefault();
+      list.scrollTop += event.deltaY;
     };
-  }, [historyLoading, updateScrollThumb, visibleHistory.length]);
+    slot.addEventListener('wheel', handleWheel, { passive: false });
+    return () => slot.removeEventListener('wheel', handleWheel);
+  }, [sheetOpen]);
 
-  const startScrollDrag = useCallback((event: React.PointerEvent<HTMLSpanElement>) => {
-    const historyElement = historyRef.current;
-    if (!historyElement || !scrollThumb.visible) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    scrollDragRef.current = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startScrollTop: historyElement.scrollTop,
-    };
-  }, [scrollThumb.visible]);
-
-  const moveScrollDrag = useCallback((event: React.PointerEvent<HTMLSpanElement>) => {
-    const historyElement = historyRef.current;
-    const drag = scrollDragRef.current;
-    if (!historyElement || !drag || drag.pointerId !== event.pointerId) return;
-    const scrollRange = historyElement.scrollHeight - historyElement.clientHeight;
-    const thumbRange = historyElement.clientHeight - scrollThumb.height;
-    if (scrollRange <= 0 || thumbRange <= 0) return;
-    historyElement.scrollTop = drag.startScrollTop
-      + ((event.clientY - drag.startY) / thumbRange) * scrollRange;
-  }, [scrollThumb.height]);
-
-  const endScrollDrag = useCallback((event: React.PointerEvent<HTMLSpanElement>) => {
-    if (scrollDragRef.current?.pointerId !== event.pointerId) return;
-    scrollDragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+  const partyStyle = party ? ({ '--live-party-color': party.color } as CSSProperties) : undefined;
 
   return (
     <div
-      className={`live-card ${party ? 'live-card--party' : ''} ${isSelf ? 'live-card--self' : ''}`}
-      style={cardStyle}
+      ref={slotRef}
+      className={`live-duel-slot live-duel-slot--${side} ${party ? 'is-party' : ''} ${sheet ? `is-open is-align-${sheet.align}` : ''}`}
+      style={partyStyle}
+      onMouseEnter={openSheet}
+      onMouseLeave={closeSheet}
     >
-      <motion.div
-        className="live-card-inner"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isLoaded ? 1 : 0 }}
-        transition={{ duration: 0.18, delay: index * 0.01, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <div className="live-card-head">
-          <div
-            className="live-card-avatar"
-            title={`${player.championId > 0 ? player.championName : name}${
-              player.summonerLevel ? ` · Lv.${player.summonerLevel}` : ''
-            }`}
-          >
-            {champIcon ? (
-              <img
-                src={champIcon}
-                alt={player.championName}
-                loading="lazy"
-                onError={(event) => {
-                  (event.currentTarget as HTMLImageElement).style.opacity = '0';
-                }}
-              />
-            ) : player.profileIconId ? (
-              <ProfileIcon
-                iconId={player.profileIconId}
-                alt={name || '召唤师头像'}
-                size={36}
-                className="live-card-profile-icon"
-              />
-            ) : (
-              <span className="live-card-avatar-fallback">{player.championName.slice(0, 1)}</span>
+      <div className={`live-duel-panel live-duel-panel--${side} ${party ? 'is-party' : ''} ${isSelf ? 'is-self' : ''}`}>
+        <span className="live-duel-window">
+          <DuelArt key={`${player.championId}-${player.championAlias}-${player.profileIconId ?? 0}`} player={player} />
+          <span className="live-duel-window__tabs">
+            {party && (
+              <span className="live-duel-tab live-duel-tab--party" title={`和外侧同色连线的人一起排（${partySizeLabel(party.size)}）`}>
+                {partySizeLabel(party.size)} {party.label}
+              </span>
             )}
-            {player.summonerLevel ? (
-              <span className="live-card-level">{player.summonerLevel}</span>
-            ) : null}
-          </div>
-          <div className="live-card-identity">
-            <div className="live-card-name-row">
+            {isSelf && <span className="live-duel-tab live-duel-tab--self">自己</span>}
+          </span>
+          {player.summonerLevel ? <span className="live-duel-window__level">Lv {player.summonerLevel}</span> : null}
+        </span>
+        <motion.div
+          className="live-duel-panel__inner"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isLoaded ? 1 : 0 }}
+          transition={{ duration: 0.2, delay: index * 0.012, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="live-duel-id">
+            <div className="live-duel-name">
               <button
                 type="button"
-                className="live-card-name"
+                className="live-duel-name__btn"
                 title={`查看 ${searchableRiotId} 的战绩`}
                 onClick={() => onPlayerSearch?.(searchableRiotId)}
                 disabled={!searchableRiotId || !onPlayerSearch}
               >
-                {name || currentPosition || '未知玩家'}
+                {name || positionLabel(player.position) || '未知玩家'}
               </button>
-              {tag && <span className="live-card-tag">{tag}</span>}
+              {tag && <span className="live-duel-tag">{tag}</span>}
             </div>
-            <button
-              type="button"
-              className="live-card-more"
-              title={`查看 ${searchableRiotId} 的战绩`}
-              onClick={() => onPlayerSearch?.(searchableRiotId)}
-              disabled={!searchableRiotId || !onPlayerSearch}
-            >
-              <MoreVertical size={13} />
-            </button>
-          </div>
-        </div>
-
-        <div className="live-card-ranks">
-          {ranks.length > 0 ? (
-            ranks.map((rank) => <RankDetailsPopover key={rank.queueType || rank.displayText} rank={rank} ranks={player.ranks} />)
-          ) : (
-            <span className="live-rank-item live-rank-item--empty">
-              {rankLoading ? '段位读取中' : '无段位'}
-            </span>
-          )}
-        </div>
-
-        <div className="live-card-stats">
-          <span className={`live-card-stat ${winRateTone}`}>
-            <b>{player.matchCount > 0 ? `${player.winRate}%` : '— %'}</b>
-            {player.matchCount > 0 && <small>({player.matchCount})</small>}
-          </span>
-          <span className={`live-card-stat live-card-stat--kda ${kdaTone}`}>
-            <b>{player.matchCount > 0 ? player.kda.toFixed(2) : '—'}</b>
-          </span>
-        </div>
-
-        <div className="live-card-tags">
-          {isSelf && <span className="live-chip live-chip--self" title="当前登录账号">自己</span>}
-          {party && <span className="live-chip live-chip--party" title="预组队成员">小队 {party.label}</span>}
-          {hasHighWinRate && (
-            <span className="live-chip live-chip--high-win" title={`近 ${player.matchCount} 场胜率 ${player.winRate}%`}>
-              高胜率
-            </span>
-          )}
-          {careerHidden && (
-            <span className="live-chip live-chip--privacy" title="该玩家已隐藏生涯战绩">
-              生涯隐藏
-            </span>
-          )}
-          {streak.count >= 3 && (
-            <span className={`live-chip ${streak.win ? 'live-chip--win' : 'live-chip--loss'}`}>
-              {streak.count}{streak.win ? ' 连胜' : ' 连败'}
-            </span>
-          )}
-          {averageSoloKills > 0 && (
-            <span
-              className="live-chip live-chip--solo"
-              title={`近 ${soloKillMatches.length} 场平均每场 ${averageSoloKills.toFixed(2)} 次单杀`}
-            >
-              {averageSoloKills.toFixed(1)} 单杀
-            </span>
-          )}
-          {currentPosition && <span className="live-chip live-chip--position">{currentPosition}</span>}
-        </div>
-
-        <div className="live-card-champs">
-          {champions.map((champion) => (
-            <ChampionHover
-              key={champion.alias}
-              champion={champion}
-              onCollect={searchableRiotId && onPlayerSearch
-                ? () => onPlayerSearch(searchableRiotId)
-                : undefined}
-            />
-          ))}
-        </div>
-
-        <div className="live-card-history-shell">
-          <div
-            ref={historyRef}
-            className="live-card-history"
-            onScroll={updateScrollThumb}
-          >
-            {visibleHistory.length > 0 ? (
-              <>
-                {visibleHistory.map((history, historyIndex) => (
-                <button
-                  type="button"
-                  key={`${history.gameId ?? historyIndex}-${history.championAlias}-${historyIndex}`}
-                  className={`live-match ${history.win ? 'live-match--win' : 'live-match--loss'}`}
-                  disabled={!history.gameId || !player.puuid}
-                  title={history.gameId ? '点击查看本场完整战绩' : undefined}
-                  onClick={() => {
-                    if (history.gameId && player.puuid) {
-                      onMatchOpen(history.gameId, player.puuid, searchableRiotId);
-                    }
-                  }}
-                >
-                  <span className="live-match-icon">
-                    <img
-                      src={championIcon(history.championAlias)}
-                      alt={history.championName}
-                      loading="lazy"
-                      onError={(event) => {
-                        (event.currentTarget as HTMLImageElement).style.opacity = '0';
-                      }}
-                    />
-                  </span>
-                  <span className="live-match-info">
-                    <span className="live-match-mode">{history.queueName}</span>
-                    <span className="live-match-meta">
-                      <span className="live-match-time">{history.timeStr}</span>
-                      <span className={`live-match-result ${history.win ? 'live-match-result--win' : 'live-match-result--loss'}`}>
-                        {history.win ? '胜' : '负'}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="live-match-kda">
-                    {history.kills} / {history.deaths} / {history.assists}
-                  </span>
-                </button>
-                ))}
-                <span className="live-card-history-summary">
-                  近{visibleHistory.length}场 <b>{recentWins}</b>胜<i>{recentLosses}</i>负
+            <div className="live-duel-meta">
+              {ranks.length > 0 ? (
+                ranks.map((rank) => (
+                  <RankDetailsPopover key={rank.queueType || rank.displayText} rank={rank} ranks={player.ranks} />
+                ))
+              ) : (
+                <span className="live-rank-item live-rank-item--empty">
+                  {rankLoading ? '段位读取中' : '无段位'}
                 </span>
-              </>
-            ) : historyLoading ? (
-              <span className="live-card-history-placeholder" aria-hidden="true">
-                {Array.from({ length: HISTORY_CARD_ROWS }, (_, i) => (
-                  <span key={i} className="live-match live-match--placeholder" />
-                ))}
-              </span>
-            ) : (
-              <span className="live-card-empty">
-                {player.loadState?.history === 'failed' ? '战绩读取失败' : '暂无近期战绩'}
-              </span>
-            )}
+              )}
+              {streak.count >= 3 && (
+                <span className={`live-chip ${streak.win ? 'live-chip--win' : 'live-chip--loss'}`}>
+                  {streak.count}{streak.win ? ' 连胜' : ' 连败'}
+                </span>
+              )}
+              {hasHighWinRate && <span className="live-chip live-chip--high-win">高胜率</span>}
+              {careerHidden && <span className="live-chip live-chip--privacy">生涯隐藏</span>}
+            </div>
           </div>
-          {scrollThumb.visible && (
-            <span className="live-card-scrollbar" aria-hidden="true">
-              <span
-                className="live-card-scrollbar-thumb"
-                style={{ height: scrollThumb.height, transform: `translateY(${scrollThumb.top}px)` }}
-                onPointerDown={startScrollDrag}
-                onPointerMove={moveScrollDrag}
-                onPointerUp={endScrollDrag}
-                onPointerCancel={endScrollDrag}
-              />
+          <div className={`live-duel-stat ${winRateTone}`}>
+            <b>
+              {player.matchCount > 0 ? player.winRate : '—'}
+              {player.matchCount > 0 && <small>%</small>}
+            </b>
+            <span>
+              KDA <em className={kdaTone}>{player.matchCount > 0 ? player.kda.toFixed(2) : '—'}</em>
+              {player.matchCount > 0 && <> · {player.matchCount} 场</>}
             </span>
-          )}
-        </div>
-      </motion.div>
+          </div>
+          <FormStrip history={player.history} loading={historyLoading} />
+        </motion.div>
+      </div>
+      <AnimatePresence>
+        {sheet && (
+          <DuelHistorySheet
+            key="sheet"
+            player={player}
+            side={side}
+            top={sheet.top}
+            height={sheet.height}
+            align={sheet.align}
+            onMatchOpen={onMatchOpen}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function GhostPanel({ side, label }: { side: DuelSide; label?: string }) {
+  return (
+    <div className={`live-duel-panel live-duel-panel--${side} live-duel-panel--ghost`}>
+      {label && <span>{label}</span>}
+    </div>
+  );
+}
+
+function DuelSpine({ row, index }: { row: DuelRow; index: number }) {
+  const { blue, red } = row;
+  const comparable = Boolean(blue && red && blue.matchCount > 0 && red.matchCount > 0);
+  const diff = comparable && blue && red ? blue.winRate - red.winRate : 0;
+  const lead = Math.abs(diff) < 1 ? 'even' : diff > 0 ? 'blue' : 'red';
+  const amount = Math.round(Math.abs(diff));
+  return (
+    <div className="live-duel-spine">
+      {row.lane ? (
+        <span className="live-duel-lane" aria-label={POSITION_NAMES[row.lane]}>
+          <LaneIcon lane={row.lane} />
+        </span>
+      ) : (
+        <span className="live-duel-lane live-duel-lane--index">{String(index + 1).padStart(2, '0')}</span>
+      )}
+      {comparable && (
+        <>
+          <span
+            className="live-duel-meter"
+            data-lead={lead}
+            style={{ '--reach': Math.min(1, Math.abs(diff) / 12) } as CSSProperties}
+            aria-label={lead === 'even' ? '胜率持平' : `${lead === 'blue' ? '蓝方' : '红方'}胜率高 ${amount}%`}
+          >
+            <i />
+          </span>
+          <span className="live-duel-adv" data-lead={lead}>
+            {lead === 'even' ? '持平' : lead === 'blue' ? `◂ ${amount}%` : `${amount}% ▸`}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -1039,6 +1032,9 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
   const displayedIdentifiedPlayerCountRef = useRef(0);
   const loadedCardCountRef = useRef(0);
   const previewModeRef = useRef(false);
+  // 主进程的对局会话编号。每开一局新的就加一；收到更新的编号说明手里的名单是上一局的，
+  // 要整盘换掉，不能和新数据拼在一起。页面切走期间（Activity 隐藏）漏掉的 reset 也靠它补上。
+  const sessionRef = useRef<number | null>(null);
 
   const clearCardTimers = useCallback(() => {
     cardTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -1058,6 +1054,16 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
       // A real-game request may finish just after the user enters preview mode.
       // Never let that late response replace the isolated ten-player preview.
       if (!isCurrentRequest() || previewModeRef.current) return;
+      // 请求发出后又收到了更新会话的推送：这份结果已经过时，丢掉。
+      if (
+        info.session !== undefined
+        && sessionRef.current !== null
+        && info.session < sessionRef.current
+      ) {
+        return;
+      }
+      const sessionChanged = info.session !== undefined && info.session !== sessionRef.current;
+      if (info.session !== undefined) sessionRef.current = info.session;
       setPhase(info.phase);
       setQueueName(info.queueName ?? '');
       setMapName(info.mapName ?? '');
@@ -1071,7 +1077,8 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
         const nextRosterKey = battleRosterKey(nextMyTeam, nextEnemyTeam);
         const total = nextMyTeam.length + nextEnemyTeam.length;
         const identifiedTotal = identifiedPlayerCount([...nextMyTeam, ...nextEnemyTeam]);
-        const previousRosterKey = battleRosterKeyRef.current;
+        // 换了会话：上一局的名单作废，不参与「人数变少就先不换」的防抖判断。
+        const previousRosterKey = sessionChanged ? '' : battleRosterKeyRef.current;
         const hadDisplayedRoster = Boolean(previousRosterKey);
 
         if (
@@ -1147,6 +1154,25 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
   useEffect(() => {
     return window.lolHelper.live.onBattleUpdate((event) => {
       if (previewModeRef.current) return;
+
+      const eventSession = event.session;
+      // 上一局迟到的推送：直接丢掉。
+      if (eventSession !== undefined && sessionRef.current !== null && eventSession < sessionRef.current) {
+        return;
+      }
+      const isNewSession = eventSession !== undefined && eventSession !== sessionRef.current;
+      if (eventSession !== undefined) sessionRef.current = eventSession;
+
+      if (event.type === 'reset' || isNewSession) {
+        // 新的一局（或离开对局）：先把旧名单整盘清掉
+        setMyTeam([]);
+        setEnemyTeam([]);
+        setLoadedCards(new Set());
+        battleRosterKeyRef.current = '';
+        displayedPlayerCountRef.current = 0;
+        displayedIdentifiedPlayerCountRef.current = 0;
+        loadedCardCountRef.current = 0;
+      }
 
       if (event.type === 'reset') {
         setMyTeam([]);
@@ -1256,8 +1282,8 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
     [displayedEnemyTeam, displayedMyTeam],
   );
   const parties = useMemo(() => buildParties(allPlayers), [allPlayers]);
-  const myTeamSummary = useMemo(() => summarizeTeam(displayedMyTeam), [displayedMyTeam]);
-  const enemyTeamSummary = useMemo(() => summarizeTeam(displayedEnemyTeam), [displayedEnemyTeam]);
+  const myTeamSummary = useMemo(() => summarizeTeam(displayedMyTeam, parties), [displayedMyTeam, parties]);
+  const enemyTeamSummary = useMemo(() => summarizeTeam(displayedEnemyTeam, parties), [displayedEnemyTeam, parties]);
   const hasBattle = previewMode || (inGame && allPlayers.length > 0);
   const isLobbyPhase = !previewMode
     && ['Lobby', 'Matchmaking', 'ReadyCheck'].includes(displayedPhase);
@@ -1293,12 +1319,24 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
     ? phaseLabel(displayedPhase)
     : sections.find((section) => section.isMine)?.teamId === 200 ? '红队' : '蓝队';
   const blueTeamSize = sections[0].players.length;
+  // 没分路的模式按段位排对位；段位还在读的时候先保持原顺序，读完再排一次，避免卡片来回跳。
+  const ranksSettled = allPlayers.every((player) => player.loadState?.rank !== 'loading');
+  const duelRows = useMemo(
+    () => buildDuelRows(
+      sections[0]?.players ?? [],
+      isLobbyPhase ? [] : (sections[1]?.players ?? []),
+      isLobbyPhase || !ranksSettled,
+    ),
+    [isLobbyPhase, ranksSettled, sections],
+  );
+  const partyThreads = useMemo(() => buildPartyThreads(duelRows, parties), [duelRows, parties]);
   const headerParts = isLobbyPhase
     ? [queueName, mySideLabel, `${displayedMyTeam.length} 人`].filter(Boolean)
     : [queueName, mapName, mySideLabel].filter(Boolean);
+  // 没有对局时不拼阵营，避免标题栏出现「红队」这类残留标题。
   const headerTitle = previewMode
     ? '海克斯大乱斗 · 随机地图 · 红队'
-    : headerParts.join(' · ');
+    : hasBattle ? headerParts.join(' · ') : '';
 
   const statusText = previewMode
     ? '演示对局'
@@ -1311,16 +1349,7 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
   return (
     <div className="live-page">
       <div className="live-page-bar">
-        {hasBattle ? (
-          <LiveTeamSummaryBar
-            teamId={sections[0].teamId}
-            label={isLobbyPhase ? '房间' : teamName(sections[0].teamId)}
-            summary={sections[0].summary}
-            pageBar
-          />
-        ) : (
-          <span className="live-page-title">{statusText}</span>
-        )}
+        <span className="live-page-title">{statusText}</span>
         <div className="live-page-actions">
           <button
             type="button"
@@ -1356,42 +1385,81 @@ export function LiveGamePage({ onTitleChange, onPlayerSearch }: LiveGamePageProp
             <span className="live-page-empty-text">未进入对局</span>
           </div>
         ) : (
-          <div className={`live-board ${isLobbyPhase ? 'live-board--lobby' : ''}`}>
-            {sections.map((section, sectionIndex) => (
-              <section className="live-team" key={section.teamId}>
-                {!isLobbyPhase && sectionIndex > 0 && (
-                  <LiveTeamSummaryBar
-                    teamId={section.teamId}
-                    label={teamName(section.teamId)}
-                    summary={section.summary}
-                  />
-                )}
-                <div
-                  className="live-team-cards"
-                  style={isLobbyPhase ? {
-                    width: '100%',
-                    maxWidth: `${Math.max(1, Math.min(5, section.players.length)) * 240 + Math.max(0, Math.min(5, section.players.length) - 1) * 4}px`,
-                    gridTemplateColumns: `repeat(${Math.max(1, Math.min(5, section.players.length))}, minmax(0, 1fr))`,
-                  } : undefined}
+          <div className={`live-duel ${isLobbyPhase ? 'live-duel--lobby' : ''}`}>
+            <div className="live-duel-head">
+              <LiveTeamSummaryBar
+                teamId={sections[0].teamId}
+                label={isLobbyPhase ? '房间' : teamName(sections[0].teamId)}
+                summary={sections[0].summary}
+              />
+              <span className="live-duel-vs">{isLobbyPhase ? '' : 'VS'}</span>
+              {sections[1] ? (
+                <LiveTeamSummaryBar
+                  teamId={sections[1].teamId}
+                  label={teamName(sections[1].teamId)}
+                  summary={sections[1].summary}
+                  align="end"
+                />
+              ) : <span />}
+            </div>
+            <div className="live-duel-rows">
+              {partyThreads.map((thread) => (
+                <span
+                  key={`${thread.side}-${thread.label}`}
+                  className={`live-duel-thread live-duel-thread--${thread.side}`}
+                  style={{
+                    '--from': thread.rows[0],
+                    '--to': thread.rows[thread.rows.length - 1],
+                    '--lane': thread.lane,
+                    '--live-party-color': thread.color,
+                  } as CSSProperties}
+                  aria-hidden="true"
                 >
-                  {section.players.map((player, idx) => {
-                    const cardIndex = sectionIndex === 0 ? idx : idx + blueTeamSize;
-                    return (
-                      <AkariCard
-                        key={`${player.puuid}-${idx}`}
-                        player={player}
-                        isLoaded={loadedCards.has(cardIndex)}
-                        index={cardIndex}
-                        party={parties.get(playerIdentity(player))}
-                        isSelf={Boolean(displayedMyPuuid) && player.puuid === displayedMyPuuid}
-                        onPlayerSearch={onPlayerSearch}
-                        onMatchOpen={openMatchDetail}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+                  <b>{thread.label}</b>
+                  {thread.rows.map((rowIndex) => (
+                    <i key={rowIndex} style={{ '--at': rowIndex - thread.rows[0] } as CSSProperties} />
+                  ))}
+                </span>
+              ))}
+              {duelRows.map((row, rowIndex) => {
+                const renderSide = (side: DuelSide) => {
+                  const player = row[side];
+                  if (!player) {
+                    const ghostLabel = rowIndex > 0
+                      ? undefined
+                      : isLobbyPhase
+                        ? '匹配成功后显示对手'
+                        : side === 'red' || sections[0].players.length === 0
+                          ? '对手未知'
+                          : undefined;
+                    return <GhostPanel side={side} label={ghostLabel} />;
+                  }
+                  const cardIndex = side === 'blue'
+                    ? sections[0].players.indexOf(player)
+                    : blueTeamSize + Math.max(0, sections[1]?.players.indexOf(player) ?? 0);
+                  return (
+                    <DuelPanel
+                      key={`${side}-${playerIdentity(player)}`}
+                      player={player}
+                      side={side}
+                      isLoaded={loadedCards.has(cardIndex)}
+                      index={cardIndex}
+                      party={parties.get(playerIdentity(player))}
+                      isSelf={Boolean(displayedMyPuuid) && player.puuid === displayedMyPuuid}
+                      onPlayerSearch={onPlayerSearch}
+                      onMatchOpen={openMatchDetail}
+                    />
+                  );
+                };
+                return (
+                  <div className="live-duel-row" key={row.key}>
+                    {renderSide('blue')}
+                    <DuelSpine row={row} index={rowIndex} />
+                    {renderSide('red')}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

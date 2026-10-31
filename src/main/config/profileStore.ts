@@ -71,6 +71,7 @@ export function summarizeProfile(profile: ConfigProfile): LolConfigProfileSummar
     updatedAt: profile.updatedAt,
     sourceRootPath: profile.sourceRootPath,
     gameResolution: profile.gameResolution,
+    sourceAccount: profile.sourceAccount,
   };
 }
 

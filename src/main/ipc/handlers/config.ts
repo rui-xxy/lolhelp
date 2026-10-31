@@ -4,6 +4,7 @@ import type {
   LolConfigApplyProfileRequest,
   LolConfigApplyResult,
   LolConfigApplyValuesRequest,
+  LolConfigProfileDetail,
   LolConfigProfileSummary,
   LolConfigSaveProfileRequest,
   LolConfigState,
@@ -16,6 +17,7 @@ import {
   applyLeagueConfigProfile,
   applyLeagueConfigValues,
   deleteLeagueConfigProfile,
+  getLeagueConfigProfile,
   readLeagueConfig,
   saveLeagueConfigProfile,
 } from '../../config/lolConfig';
@@ -72,7 +74,14 @@ export function registerConfigHandlers(): void {
     IPC_CHANNELS.CONFIG_APPLY_PROFILE,
     async (_event, req: LolConfigApplyProfileRequest): Promise<LolConfigApplyResult> => {
       const validated = validateApplyProfileRequest(req);
-      return applyLeagueConfigProfile(validated.profileId, validated.rootPath);
+      return applyLeagueConfigProfile(validated.profileId, validated.rootPath, validated.parts);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONFIG_GET_PROFILE,
+    async (_event, profileId: string): Promise<LolConfigProfileDetail | null> => {
+      return getLeagueConfigProfile(validateProfileId(profileId));
     },
   );
 

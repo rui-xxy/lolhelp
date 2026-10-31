@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
-import { fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
+import { fetchMatchBriefsByPuuid, fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
 import { downloadReplay, getReplayAvailability, watchReplay } from '../../match/replayService';
 import { getMatchTimeline } from '../../match/timelineService';
@@ -21,9 +21,10 @@ import type {
   ChampionSummary,
   PlayerLookupRequest,
   PlayerLookupResult,
+  PlayerMatchBriefResult,
   PlayerRankSummary,
 } from '../../../shared/api';
-import { validatePlayerLookupRequest } from '../validation';
+import { validateMatchBriefRequest, validatePlayerLookupRequest } from '../validation';
 
 // 注册 match 域 IPC 处理器。
 // - search：按召唤师名查战绩（列表 + 每场详情 + 汇总）。
@@ -33,6 +34,15 @@ export function registerMatchHandlers(): void {
     IPC_CHANNELS.MATCH_SEARCH,
     async (_event, req: PlayerLookupRequest): Promise<PlayerLookupResult> => {
       return searchPlayer(validatePlayerLookupRequest(req));
+    },
+  );
+
+  // 战绩速览：只拉一页列表、只回传列表字段（高手雷达点卡片时用）
+  ipcMain.handle(
+    IPC_CHANNELS.MATCH_GET_BRIEFS,
+    async (_event, req: unknown): Promise<PlayerMatchBriefResult> => {
+      const request = validateMatchBriefRequest(req);
+      return fetchMatchBriefsByPuuid(request.puuid, request.count, request.region);
     },
   );
 

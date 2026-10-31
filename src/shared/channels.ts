@@ -24,6 +24,7 @@ export const IPC_CHANNELS = {
   ASSIST_APPLY_RECOMMENDATION: 'assist:apply-recommendation',
   ASSIST_GET_CHAMPION_GUIDE: 'assist:get-champion-guide',
   ASSIST_GET_PROFILE_ICONS: 'assist:get-profile-icons',
+  ASSIST_GET_CHAMPION_SKINS: 'assist:get-champion-skins',
   ASSIST_LOCK_CURRENT_CHAMPION: 'assist:lock-current-champion',
   ASSIST_APPLY_ACCOUNT_SETTINGS: 'assist:apply-account-settings',
   ASSIST_GET_LOOT: 'assist:get-loot',
@@ -41,8 +42,10 @@ export const IPC_CHANNELS = {
   CONFIG_SAVE_PROFILE: 'config:save-profile',
   CONFIG_APPLY_PROFILE: 'config:apply-profile',
   CONFIG_DELETE_PROFILE: 'config:delete-profile',
+  CONFIG_GET_PROFILE: 'config:get-profile',
   // match 域：战绩查询（按名查战绩列表+详情）
   MATCH_SEARCH: 'match:search',
+  MATCH_GET_BRIEFS: 'match:get-briefs',
   MATCH_GET_PLAYER_RANKS: 'match:get-player-ranks',
   MATCH_GET_SAVED_MATCHES_SUMMARY: 'match:get-saved-matches-summary',
   MATCH_GET_SAVED_MATCHES_CATALOG: 'match:get-saved-matches-catalog',
@@ -61,6 +64,7 @@ export const IPC_CHANNELS = {
   MATCH_GET_TIMELINE: 'match:get-timeline',
   // window 域：窗口控制
   WINDOW_SET_WIDTH: 'window:set-width',
+  WINDOW_SET_CHROME: 'window:set-chrome', // 外观切换后同步窗口底色与系统按钮颜色
   // live 域：实时对局
   LIVE_GET_BATTLE: 'live:get-battle',
   LIVE_GET_MATCH_DETAIL: 'live:get-match-detail',

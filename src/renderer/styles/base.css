@@ -78,4 +78,22 @@
   *::-webkit-scrollbar-corner {
     background: transparent;
   }
+
+  /* 键盘焦点的兜底样式：组件自己写了 focus-visible 的会覆盖它（utilities / components 层优先级更高） */
+  :where(button, a[href], summary, [role="button"], [role="tab"], [tabindex]:not([tabindex="-1"]):not(input):not(textarea)):focus-visible {
+    outline: 2px solid var(--color-text-3);
+    outline-offset: 2px;
+  }
+
+  /* 系统开启「减少动态效果」时：动画和过渡一律压到瞬时（canvas / three.js 动画各自另有判断） */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto;
+    }
+  }
 }

@@ -97,3 +97,4 @@ out-*/
 
 # Windows 保留设备名误生成的垃圾文件（cmd 误重定向 > nul 产物）
 nul
+Claude outputs/

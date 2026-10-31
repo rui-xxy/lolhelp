@@ -1,9 +1,9 @@
 import { Activity, memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { MotionConfig } from 'framer-motion';
 import { AppShell, type ScoutSidebarStatus, type View } from './components/AppShell';
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
-import { MatchRegionPicker, type MatchRegionOption } from './components/match/MatchRegionPicker';
+import { type MatchRegionOption } from './components/match/MatchRegionPicker';
 import { FollowAccountsDialog, type FollowAccountRequest } from './components/match/FollowAccountsDialog';
 import { SavedMatchPickerDialog } from './components/match/SavedMatchPickerDialog';
 import {
@@ -13,16 +13,14 @@ import {
 } from './components/match/savedMatchesStore';
 import { LiveGamePage } from './components/live/LiveGamePage';
 import { ScoutPage } from './components/scout/ScoutPage';
-import {
-  ChampionRankingPage,
-  RankingChapterSwitch,
-  type RankingChapter,
-} from './components/ranking/ChampionRankingPage';
+import { ChampionRankingPage, type RankingChapter } from './components/ranking/ChampionRankingPage';
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { AssistPage } from './components/assist/AssistPage';
 import { ChatSessionDialog } from './components/chat/ChatSessionDialog';
 import { FriendManagerDialog } from './components/friends/FriendManagerDialog';
+import { GlobalSearch, type GlobalSearchHandle } from './components/shell/GlobalSearch';
+import { Segmented } from './components/ui/kit';
 import {
   createAcceptedAlerts,
   loadFriendAcceptedAlerts,
@@ -30,22 +28,18 @@ import {
   mergeAcceptedAlerts,
   saveFriendAcceptedAlerts,
   saveTrackedOutgoingRequests,
-  type FriendAcceptedAlert,
 } from './components/friends/friendRequestTracking';
 import { APP_LAYOUT, LOL_REGIONS } from '../shared/constants';
 
 const PAGE_TITLES: Record<View, string> = {
-  home: '主页',
-  matches: '', // 战绩页标题栏放搜索框，标题留空
-  live: '',
+  home: '首页',
+  matches: '战绩',
+  live: '对局',
   scout: '高手雷达',
-  ranking: '',
-  assist: '辅助功能',
+  ranking: '数据',
+  assist: '助手',
+  settings: '设置',
 };
-
-const EXPANDED_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
-const HIDDEN_APP_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
-const FRIEND_PANEL_ANIMATION_MS = 200;
 
 const StableHomePage = memo(HomePage);
 const StableMatchHistoryPage = memo(MatchHistoryPage);
@@ -57,7 +51,8 @@ const StableFriendPanel = memo(FriendPanel);
 const FRIEND_REQUEST_CHECK_INTERVAL_MS = 10_000;
 const FOLLOW_ALERTS_READ_STORAGE_KEY = 'lolhelp:follow-alerts-read:v1';
 const APP_SESSION_STORAGE_KEY = 'lolhelp:ui-session:v1';
-const APP_VIEWS: View[] = ['home', 'matches', 'live', 'scout', 'ranking', 'assist'];
+const FRIEND_DRAWER_STORAGE_KEY = 'lolhelp:friend-drawer-open:v1';
+const APP_VIEWS: View[] = ['home', 'matches', 'live', 'scout', 'ranking', 'assist', 'settings'];
 const RANKING_CHAPTERS: RankingChapter[] = ['mayhem', 'ranking'];
 
 const NATIVE_SELECTABLE_SELECTOR =
@@ -96,6 +91,25 @@ function loadAppSessionState(): AppSessionState {
   }
 }
 
+function loadFriendDrawerOpen(): boolean {
+  try {
+    const stored = window.localStorage.getItem(FRIEND_DRAWER_STORAGE_KEY);
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+  } catch {
+    // 读不到偏好时按窗口宽度决定。
+  }
+  return window.innerWidth >= APP_LAYOUT.friendDrawerDockMinWidth;
+}
+
+function saveFriendDrawerOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(FRIEND_DRAWER_STORAGE_KEY, open ? '1' : '0');
+  } catch {
+    // 偏好只影响下次启动。
+  }
+}
+
 function loadReadFollowAlertIds(): Set<string> {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(FOLLOW_ALERTS_READ_STORAGE_KEY) ?? '[]');
@@ -114,7 +128,7 @@ function saveReadFollowAlertIds(ids: Set<string>): void {
   }
 }
 
-async function showFriendAcceptedNotification(alerts: FriendAcceptedAlert[]): Promise<void> {
+async function showFriendAcceptedNotification(alerts: Array<{ riotId: string }>): Promise<void> {
   if (alerts.length === 0 || !('Notification' in window)) return;
   try {
     let permission = Notification.permission;
@@ -137,13 +151,13 @@ export function App() {
   const [matchSearchTrigger, setMatchSearchTrigger] = useState(
     initialSession.activeView === 'matches' && initialSession.matchSearchName ? 1 : 0,
   ); // 自增触发搜索
-  const matchSearchInputRef = useRef<HTMLInputElement>(null);
-  const [livePageTitle, setLivePageTitle] = useState('未进入对局');
+  const searchRef = useRef<GlobalSearchHandle>(null);
+  const [livePageTitle, setLivePageTitle] = useState('');
   const [currentRegionKey, setCurrentRegionKey] = useState('');
   const [currentRegionName, setCurrentRegionName] = useState('读取大区...');
+  const [clientConnected, setClientConnected] = useState(false);
   const [clientSessionId, setClientSessionId] = useState('');
-  const [friendPanelHidden, setFriendPanelHidden] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [friendDrawerOpen, setFriendDrawerOpen] = useState(loadFriendDrawerOpen);
   const [chatSessionsOpen, setChatSessionsOpen] = useState(false);
   const [savedPickerOpen, setSavedPickerOpen] = useState(false);
   const [followAccountsOpen, setFollowAccountsOpen] = useState(false);
@@ -160,7 +174,6 @@ export function App() {
   const [rankingChapter, setRankingChapter] = useState<RankingChapter>(
     initialSession.rankingChapter ?? 'mayhem',
   );
-  const friendPanelTimerRef = useRef<number | null>(null);
   const trackedOutgoingRequestsRef = useRef(loadTrackedOutgoingRequests());
   const friendRequestCheckInFlightRef = useRef(false);
 
@@ -243,10 +256,14 @@ export function App() {
         if (region.name && !region.error) {
           setCurrentRegionKey(region.key ?? '');
           setCurrentRegionName(region.name);
+          setClientConnected(true);
           if (region.sessionId) setClientSessionId(region.sessionId);
+        } else {
+          setClientConnected(false);
         }
       } catch {
         // 保留上一次成功读取到的区域，下一轮继续检查。
+        if (!cancelled) setClientConnected(false);
       } finally {
         refreshInFlight = false;
       }
@@ -334,55 +351,25 @@ export function App() {
 
   const regions: MatchRegionOption[] = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
 
-  const matchSearchBar = activeView === 'matches' ? (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        setMatchSearchName(matchSearchInputRef.current?.value ?? matchSearchName);
-        setMatchSearchTrigger((n) => n + 1);
-      }}
-      className="app-shell-header-search relative z-40 flex h-8 items-stretch rounded-md border border-app-border-strong bg-app-surface transition-[background-color,border-color,box-shadow] duration-200 focus-within:border-app-border-strong focus-within:bg-app-surface-soft focus-within:shadow-ui-focus-compact"
-    >
-      <MatchRegionPicker value={matchRegion} options={regions} onChange={setMatchRegion} />
-      <div className="relative flex items-center">
-        <Search className="pointer-events-none absolute left-2.5 size-3.5 text-app-muted" />
-        <input
-          ref={matchSearchInputRef}
-          type="text"
-          defaultValue={matchSearchName}
-          onBlur={(event) => setMatchSearchName(event.currentTarget.value)}
-          placeholder="名字#编号"
-          autoComplete="off"
-          spellCheck={false}
-          className="h-full w-48 bg-transparent pr-3 pl-8 text-xs text-app-text placeholder:text-app-subtle outline-none"
-        />
-      </div>
-      <button
-        type="submit"
-        className="shrink-0 rounded-r-md bg-app-primary px-4 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover"
-      >
-        查询
-      </button>
-    </form>
-  ) : null;
-
-  // 点击好友查战绩：切到战绩页 + 填入 Riot ID + 触发搜索
-  const handleFriendClick = useCallback((riotId: string) => {
-    setActiveView('matches');
-    setMatchSearchName(riotId);
-    if (matchSearchInputRef.current) matchSearchInputRef.current.value = riotId;
-    setMatchRegion(''); // 好友默认使用已读取到的大区
-    // 延迟触发搜索（等视图切换完成）
-    setTimeout(() => setMatchSearchTrigger((n) => n + 1), 100);
+  const closeDialogs = useCallback(() => {
+    setSavedPickerOpen(false);
+    setChatSessionsOpen(false);
+    setFollowAccountsOpen(false);
+    setFriendManagerOpen(false);
   }, []);
 
+  // 查人：所有入口（顶栏、好友、对局、雷达、首页）都走这里，结果在战绩页打开。
   const handlePlayerSearch = useCallback((name: string, region?: string) => {
     setMatchSearchName(name);
-    if (matchSearchInputRef.current) matchSearchInputRef.current.value = name;
+    searchRef.current?.setValue(name);
     setMatchRegion(region ?? '');
     setActiveView('matches');
     setMatchSearchTrigger((n) => n + 1);
   }, []);
+
+  const handleFriendClick = useCallback((riotId: string) => {
+    handlePlayerSearch(riotId, ''); // 好友默认使用已读取到的大区
+  }, [handlePlayerSearch]);
 
   const handleLivePlayerSearch = useCallback((riotId: string) => {
     handlePlayerSearch(riotId, currentRegionKey);
@@ -392,14 +379,15 @@ export function App() {
     setScoutPanelMinimized(true);
   }, []);
 
+  const handleScoutPanelRestore = useCallback(() => {
+    setScoutPanelMinimized(false);
+  }, []);
+
   const handleFollowAccount = useCallback((riotId: string, region?: string) => {
-    setSavedPickerOpen(false);
-    setChatSessionsOpen(false);
-    setSettingsOpen(false);
-    setFriendManagerOpen(false);
+    closeDialogs();
     setFollowAccountsOpen(true);
     setFollowAccountRequest({ riotId, region, nonce: Date.now() });
-  }, []);
+  }, [closeDialogs]);
 
   const markCurrentFollowAlertsRead = useCallback(async () => {
     try {
@@ -449,117 +437,120 @@ export function App() {
     if (followAccountsOpen) void markCurrentFollowAlertsRead();
   }, [followAccountsOpen, markCurrentFollowAlertsRead]);
 
-  const setWindowWidth = useCallback((width: number) => {
-    void window.lolHelper.window.setWidth(width).catch((err) => {
-      console.error('[friend] 设置好友栏窗口宽度失败:', err);
+  const toggleFriendDrawer = useCallback(() => {
+    setFriendDrawerOpen((open) => {
+      saveFriendDrawerOpen(!open);
+      return !open;
     });
   }, []);
 
-  useEffect(() => {
-    setWindowWidth(EXPANDED_APP_WIDTH);
-    return () => {
-      if (friendPanelTimerRef.current !== null) {
-        window.clearTimeout(friendPanelTimerRef.current);
-      }
-    };
-  }, [setWindowWidth]);
+  const closeFriendDrawer = useCallback(() => {
+    setFriendDrawerOpen(false);
+    saveFriendDrawerOpen(false);
+  }, []);
 
-  const toggleFriendPanelHidden = useCallback(() => {
-    if (friendPanelTimerRef.current !== null) {
-      window.clearTimeout(friendPanelTimerRef.current);
-      friendPanelTimerRef.current = null;
-    }
+  const openSavedMatches = useCallback(() => {
+    closeDialogs();
+    setSavedPickerOpen(true);
+  }, [closeDialogs]);
 
-    if (friendPanelHidden) {
-      setWindowWidth(EXPANDED_APP_WIDTH);
-      friendPanelTimerRef.current = window.setTimeout(() => {
-        setFriendPanelHidden(false);
-        friendPanelTimerRef.current = null;
-      }, 40);
-      return;
-    }
+  const openFollowAccounts = useCallback(() => {
+    closeDialogs();
+    setFollowAccountsOpen(true);
+    void markCurrentFollowAlertsRead();
+  }, [closeDialogs, markCurrentFollowAlertsRead]);
 
-    setFriendPanelHidden(true);
-    friendPanelTimerRef.current = window.setTimeout(() => {
-      setWindowWidth(HIDDEN_APP_WIDTH);
-      friendPanelTimerRef.current = null;
-    }, FRIEND_PANEL_ANIMATION_MS);
-  }, [friendPanelHidden, setWindowWidth]);
+  const openFriendManager = useCallback(() => {
+    closeDialogs();
+    setFriendManagerOpen(true);
+    markFriendAcceptedAlertsRead();
+  }, [closeDialogs, markFriendAcceptedAlertsRead]);
 
   const scoutPanelActuallyMinimized = scoutPanelMinimized && scoutSidebarStatus !== null;
-  const headerExtra = matchSearchBar ?? (activeView === 'ranking' ? (
-    <RankingChapterSwitch value={rankingChapter} onChange={setRankingChapter} />
-  ) : null);
+  const unreadFriendAccepted = friendAcceptedAlerts.filter((alert) => !alert.read).length;
+
+  // 页面自己的切换控件放在顶栏标题旁边。
+  const headerExtra = activeView === 'ranking' ? (
+    <Segmented<RankingChapter>
+      size="sm"
+      ariaLabel="数据分类"
+      value={rankingChapter}
+      onChange={setRankingChapter}
+      options={[
+        { value: 'mayhem', label: '海克斯大乱斗' },
+        { value: 'ranking', label: '英雄排行' },
+      ]}
+    />
+  ) : null;
+
+  const title = activeView === 'live' && livePageTitle ? `对局 · ${livePageTitle}` : PAGE_TITLES[activeView];
 
   return (
+    // reducedMotion="user"：系统开了「减少动态效果」时，framer-motion 的位移/缩放动画自动关闭。
+    <MotionConfig reducedMotion="user">
     <AppShell
-      title={activeView === 'live' ? livePageTitle : PAGE_TITLES[activeView]}
+      title={title}
       activeView={activeView}
       onNavigate={setActiveView}
-      fullBleed={activeView === 'matches' || activeView === 'live' || activeView === 'scout' || activeView === 'ranking' || activeView === 'assist'}
       headerExtra={headerExtra}
-      friendPanelHidden={friendPanelHidden}
-      onToggleFriendPanel={toggleFriendPanelHidden}
-      chatSessionsOpen={chatSessionsOpen}
-      savedMatchesOpen={savedPickerOpen}
-      followAccountsOpen={followAccountsOpen}
-      friendManagerOpen={friendManagerOpen}
-      friendRequestAlertCount={friendAcceptedAlerts.filter((alert) => !alert.read).length}
-      followAlertCount={followAlertCount}
+      search={(
+        <GlobalSearch
+          ref={searchRef}
+          defaultValue={matchSearchName}
+          region={matchRegion}
+          regions={regions}
+          onRegionChange={setMatchRegion}
+          onValueCommit={setMatchSearchName}
+          onSubmit={(name) => handlePlayerSearch(name, matchRegion)}
+        />
+      )}
+      connection={{
+        connected: clientConnected,
+        label: clientConnected ? currentRegionName : '未连接客户端',
+      }}
+      actions={{
+        savedOpen: savedPickerOpen,
+        onOpenSaved: openSavedMatches,
+        followOpen: followAccountsOpen,
+        followCount: followAlertCount,
+        onOpenFollow: openFollowAccounts,
+        friendRequestsOpen: friendManagerOpen,
+        friendRequestCount: unreadFriendAccepted,
+        onOpenFriendRequests: openFriendManager,
+      }}
+      chatOpen={chatSessionsOpen}
+      onOpenChat={() => {
+        closeDialogs();
+        setChatSessionsOpen(true);
+      }}
+      friendDrawerOpen={friendDrawerOpen}
+      onToggleFriendDrawer={toggleFriendDrawer}
+      onCloseFriendDrawer={closeFriendDrawer}
       scoutStatus={scoutPanelActuallyMinimized ? scoutSidebarStatus : null}
-      onScoutPlayerSearch={handlePlayerSearch}
       onScoutStatusClick={() => {
         setActiveView('scout');
         setScoutPanelMinimized(false);
       }}
-      onOpenSavedMatches={() => {
-        setChatSessionsOpen(false);
-        setSettingsOpen(false);
-        setFollowAccountsOpen(false);
-        setFriendManagerOpen(false);
-        setSavedPickerOpen(true);
-      }}
-      onOpenFollowAccounts={() => {
-        setSavedPickerOpen(false);
-        setChatSessionsOpen(false);
-        setSettingsOpen(false);
-        setFriendManagerOpen(false);
-        setFollowAccountsOpen(true);
-        void markCurrentFollowAlertsRead();
-      }}
-      onOpenChatSessions={() => {
-        setSavedPickerOpen(false);
-        setFollowAccountsOpen(false);
-        setSettingsOpen(false);
-        setFriendManagerOpen(false);
-        setChatSessionsOpen(true);
-      }}
-      onOpenFriendManager={() => {
-        setSavedPickerOpen(false);
-        setChatSessionsOpen(false);
-        setFollowAccountsOpen(false);
-        setSettingsOpen(false);
-        setFriendManagerOpen(true);
-        markFriendAcceptedAlertsRead();
-      }}
-      onOpenSettings={() => {
-        setSavedPickerOpen(false);
-        setChatSessionsOpen(false);
-        setFollowAccountsOpen(false);
-        setFriendManagerOpen(false);
-        setSettingsOpen(true);
-      }}
-      settingsOpen={settingsOpen}
       friendPanel={
-         <StableFriendPanel
-           onFriendClick={handleFriendClick}
-           onFriendFollow={handleFollowAccount}
-           active={!friendPanelHidden}
-         />
+        <StableFriendPanel
+          onFriendClick={handleFriendClick}
+          onFriendFollow={handleFollowAccount}
+          onOpenFriendRequests={openFriendManager}
+          active={friendDrawerOpen}
+        />
       }
     >
       <Activity name="home" mode={activeView === 'home' ? 'visible' : 'hidden'}>
-        <div><StableHomePage /></div>
+        <div className="h-full">
+          <StableHomePage
+            active={activeView === 'home'}
+            connected={clientConnected}
+            regionName={currentRegionName}
+            onNavigate={setActiveView}
+            onPlayerSearch={handlePlayerSearch}
+            onOpenFollow={openFollowAccounts}
+          />
+        </div>
       </Activity>
       <Activity name="matches" mode={activeView === 'matches' ? 'visible' : 'hidden'}>
         <div className="h-full">
@@ -594,6 +585,7 @@ export function App() {
             onStatusChange={setScoutSidebarStatus}
             configPanelMinimized={scoutPanelActuallyMinimized}
             onConfigPanelMinimize={handleScoutPanelMinimize}
+            onConfigPanelRestore={handleScoutPanelRestore}
           />
         </div>
       </Activity>
@@ -602,6 +594,9 @@ export function App() {
       </Activity>
       <Activity name="assist" mode={activeView === 'assist' ? 'visible' : 'hidden'}>
         <div className="h-full"><StableAssistPage onPlayerSearch={handlePlayerSearch} /></div>
+      </Activity>
+      <Activity name="settings" mode={activeView === 'settings' ? 'visible' : 'hidden'}>
+        <div className="h-full"><SettingsDialog open embedded onClose={() => setActiveView('home')} /></div>
       </Activity>
       {chatSessionsOpen && (
         <ChatSessionDialog open onClose={() => setChatSessionsOpen(false)} />
@@ -632,7 +627,7 @@ export function App() {
           acceptedAlerts={friendAcceptedAlerts}
         />
       )}
-      {settingsOpen && <SettingsDialog open onClose={() => setSettingsOpen(false)} />}
     </AppShell>
+    </MotionConfig>
   );
 }

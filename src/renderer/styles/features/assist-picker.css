@@ -1,0 +1,692 @@
+@layer components {
+  /* ===========================================================================
+     助手页的两个弹窗：英雄选择器（cp-）和生涯背景皮肤选择器（sp-）。
+     助手页本身的样式在 assist.css。
+     =========================================================================== */
+
+  /* ---------- 英雄选择器：上面搜索 + 按定位筛；中间头像墙；多选时右边是「已选」清单，顺序就是优先级 ---------- */
+  .cp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: var(--color-scrim);
+    animation: cp-fade 160ms ease-out;
+    -webkit-app-region: no-drag;
+  }
+
+  .cp-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 61;
+    display: flex;
+    width: min(940px, calc(100vw - 48px));
+    height: min(640px, calc(100vh - 72px));
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    color: var(--color-text-2);
+    background: var(--color-app-surface);
+    box-shadow: var(--shadow-ui-popover), inset 0 0 0 1px var(--color-line-1);
+    transform: translate(-50%, -50%);
+    animation: cp-rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    -webkit-app-region: no-drag;
+  }
+
+  .cp-dialog[data-single='true'] {
+    width: min(780px, calc(100vw - 48px));
+  }
+
+  .cp-dialog:focus {
+    outline: none;
+  }
+
+  .cp-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 16px 12px 22px;
+  }
+
+  .cp-title {
+    margin: 0;
+    color: var(--color-text-1);
+    font-size: 16px;
+    font-weight: 650;
+  }
+
+  .cp-subtitle {
+    margin: 3px 0 0;
+    color: var(--color-text-4);
+    font-size: 12px;
+  }
+
+  .cp-close {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-3);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .cp-close:hover {
+    color: var(--color-text-1);
+    background: color-mix(in srgb, var(--color-text-1) 7%, transparent);
+  }
+
+  .cp-close svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .cp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 0 22px 12px;
+  }
+
+  .cp-search {
+    position: relative;
+    display: flex;
+    min-width: 200px;
+    height: 34px;
+    flex: 1 1 240px;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    background: var(--color-app-bg);
+    box-shadow: inset 0 0 0 1px var(--color-line-2);
+    transition: box-shadow 140ms ease;
+  }
+
+  .cp-search:focus-within {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 60%, transparent);
+  }
+
+  .cp-search svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    color: var(--color-text-4);
+  }
+
+  .cp-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    color: var(--color-text-1);
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  .cp-search input::placeholder {
+    color: var(--color-text-4);
+  }
+
+  .cp-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .cp-role {
+    display: inline-flex;
+    height: 30px;
+    align-items: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 11px;
+    color: var(--color-text-3);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .cp-role:hover {
+    color: var(--color-text-1);
+  }
+
+  .cp-role[aria-checked='true'] {
+    color: var(--color-text-1);
+    background: color-mix(in srgb, var(--color-text-1) 9%, transparent);
+    font-weight: 600;
+  }
+
+  .cp-role svg {
+    width: 12px;
+    height: 12px;
+    color: var(--color-gold);
+  }
+
+  .cp-body {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) 248px;
+    border-top: 1px solid var(--color-line-1);
+  }
+
+  .cp-dialog[data-single='true'] .cp-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cp-grid {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+    align-content: start;
+    gap: 4px 6px;
+    overflow-y: auto;
+    padding: 14px 16px 20px 18px;
+  }
+
+  .cp-empty {
+    grid-column: 1 / -1;
+    padding: 56px 0;
+    color: var(--color-text-4);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .cp-champ {
+    display: grid;
+    min-width: 0;
+    justify-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 8px 2px 6px;
+    color: var(--color-text-3);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 120ms ease;
+  }
+
+  .cp-champ:hover {
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
+  }
+
+  .cp-champ:focus-visible {
+    outline: 1px solid color-mix(in srgb, var(--color-glow) 60%, transparent);
+    outline-offset: -1px;
+  }
+
+  .cp-champ__face {
+    position: relative;
+    display: grid;
+    width: 54px;
+    height: 54px;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    background: var(--color-app-surface-soft);
+  }
+
+  .cp-champ__face > img,
+  .cp-champ__face > .cp-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+    transition: transform 160ms ease, box-shadow 140ms ease, filter 140ms ease;
+  }
+
+  .cp-champ:hover .cp-champ__face > img {
+    transform: scale(1.04);
+  }
+
+  .cp-champ[aria-selected='true'] .cp-champ__face > img,
+  .cp-champ[aria-selected='true'] .cp-champ__face > .cp-avatar-fallback {
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      0 0 0 4px var(--color-app-primary);
+  }
+
+  .cp-dialog[data-mode='ban'] .cp-champ[aria-selected='true'] .cp-champ__face > img {
+    filter: grayscale(0.5);
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      0 0 0 4px var(--color-enemy);
+  }
+
+  .cp-champ__badge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    display: grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    border-radius: 999px;
+    padding: 0 5px;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    box-shadow: 0 0 0 2px var(--color-app-surface);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .cp-dialog[data-mode='ban'] .cp-champ__badge {
+    color: var(--color-app-on-danger);
+    background: var(--color-enemy);
+    font-family: inherit;
+  }
+
+  .cp-champ__name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cp-champ[aria-selected='true'] .cp-champ__name {
+    color: var(--color-text-1);
+    font-weight: 600;
+  }
+
+  .cp-avatar-fallback {
+    display: grid;
+    place-items: center;
+    color: var(--color-text-3);
+    background: var(--color-app-surface-soft);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .cp-side {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    border-left: 1px solid var(--color-line-1);
+    background: var(--color-app-bg-soft);
+  }
+
+  .cp-side__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 16px 10px;
+  }
+
+  .cp-side__head b {
+    color: var(--color-text-1);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .cp-side__head span {
+    color: var(--color-text-4);
+    font-size: 11px;
+  }
+
+  .cp-side__empty {
+    padding: 4px 16px;
+    color: var(--color-text-4);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .cp-side__list {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0 8px 12px;
+    list-style: none;
+  }
+
+  .cp-side__list li {
+    display: grid;
+    height: 40px;
+    grid-template-columns: 16px 30px minmax(0, 1fr) repeat(3, 24px);
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--radius-sm);
+    padding: 0 4px 0 6px;
+  }
+
+  .cp-side__list li:hover {
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
+  }
+
+  .cp-side__list i {
+    color: var(--color-text-4);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-style: normal;
+    text-align: right;
+  }
+
+  .cp-side__list li:first-child i {
+    color: var(--color-text-1);
+    font-weight: 700;
+  }
+
+  .cp-side__face {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
+  }
+
+  .cp-side__list span {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cp-side__list button {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-xs);
+    color: var(--color-text-4);
+    background: transparent;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+  }
+
+  .cp-side__list li:hover button,
+  .cp-side__list button:focus-visible {
+    opacity: 1;
+  }
+
+  .cp-side__list button:hover {
+    color: var(--color-text-1);
+    background: color-mix(in srgb, var(--color-text-1) 8%, transparent);
+  }
+
+  .cp-side__list button:disabled {
+    opacity: 0;
+    cursor: default;
+  }
+
+  .cp-side__list li:hover button:disabled {
+    opacity: 0.25;
+  }
+
+  .cp-side__list button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .cp-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--color-line-1);
+    padding: 12px 16px 12px 22px;
+  }
+
+  .cp-foot p {
+    min-width: 0;
+    flex: 1;
+    margin: 0;
+    color: var(--color-text-4);
+    font-size: 12px;
+  }
+
+  /* ---------- 生涯背景：左边英雄，右边皮肤原画 ---------- */
+  .sp-dialog {
+    --sp-on-art: var(--color-app-on-danger);
+    width: min(1060px, calc(100vw - 48px));
+    height: min(700px, calc(100vh - 64px));
+  }
+
+  .sp-body {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: 216px minmax(0, 1fr);
+    border-top: 1px solid var(--color-line-1);
+  }
+
+  .sp-champs {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+    border-right: 1px solid var(--color-line-1);
+    padding: 12px 8px 0 10px;
+    background: var(--color-app-bg-soft);
+  }
+
+  .sp-champs .cp-search {
+    min-width: 0;
+    flex: 0 0 34px;
+  }
+
+  .sp-champ-list {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 10px;
+  }
+
+  .sp-champ {
+    display: flex;
+    width: 100%;
+    height: 38px;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0 8px 0 5px;
+    color: var(--color-text-2);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .sp-champ:hover {
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
+  }
+
+  .sp-champ[aria-selected='true'] {
+    color: var(--color-text-1);
+    background: color-mix(in srgb, var(--color-text-1) 9%, transparent);
+    font-weight: 600;
+  }
+
+  .sp-champ > img,
+  .sp-champ > .cp-avatar-fallback {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
+  }
+
+  .sp-champ > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sp-champ i {
+    margin-left: auto;
+    border-radius: 999px;
+    padding: 1px 7px;
+    color: var(--color-text-2);
+    background: color-mix(in srgb, var(--color-glow) 16%, transparent);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .sp-skins {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .sp-skins__head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 14px 22px 12px;
+  }
+
+  .sp-skins__head b {
+    color: var(--color-text-1);
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .sp-skins__head span {
+    color: var(--color-text-4);
+    font-size: 12px;
+  }
+
+  .sp-skins .as-empty {
+    flex: 1;
+  }
+
+  .sp-grid {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    align-content: start;
+    gap: 12px;
+    overflow-y: auto;
+    padding: 0 22px 22px;
+  }
+
+  .sp-skin {
+    position: relative;
+    display: block;
+    aspect-ratio: 1215 / 717;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    background: var(--color-app-surface-soft);
+    box-shadow: inset 0 0 0 1px var(--color-line-1);
+    cursor: pointer;
+    isolation: isolate;
+  }
+
+  .sp-skin img {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sp-skin::after {
+    position: absolute;
+    inset: 45% 0 0;
+    z-index: 0;
+    content: "";
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in srgb, var(--color-shadow) 72%, transparent)
+    );
+    pointer-events: none;
+  }
+
+  .sp-skin:hover img {
+    transform: scale(1.05);
+  }
+
+  .sp-skin:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-glow) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  .sp-skin[aria-pressed='true'] {
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      0 0 0 4px var(--color-app-primary);
+  }
+
+  .sp-skin__name {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    left: 11px;
+    z-index: 1;
+    overflow: hidden;
+    color: var(--sp-on-art);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 6px color-mix(in srgb, var(--color-shadow) 70%, transparent);
+    white-space: nowrap;
+  }
+
+  .sp-skin__check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-shadow) 40%, transparent);
+  }
+
+  .sp-skin__check svg {
+    width: 13px;
+    height: 13px;
+    stroke-width: 3;
+  }
+
+  .sp-skin__missing {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--color-text-4);
+    font-size: 12px;
+  }
+
+  @keyframes cp-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes cp-rise {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 8px)) scale(0.985);
+    }
+  }
+}

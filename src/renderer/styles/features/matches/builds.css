@@ -37,7 +37,7 @@
     flex: 0 0 48px;
     place-items: center;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 3px;
     background: transparent;
     cursor: pointer;
@@ -54,7 +54,7 @@
     bottom: -1px;
     min-width: 20px;
     border: 1px solid var(--color-frost-line);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     padding: 0 3px;
     background: var(--color-app-bg);
     color: var(--color-app-body);
@@ -118,7 +118,7 @@
     grid-template-rows: repeat(2, 44px);
     gap: 8px;
     border: 1px solid var(--color-frost-line);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 12px;
     background: color-mix(in srgb, var(--color-app-sidebar) 22%, transparent);
     box-shadow: inset 0 1px 4px var(--color-frost-shadow-soft);
@@ -130,7 +130,7 @@
     place-items: center;
     overflow: hidden;
     border: 1px solid var(--color-frost-line-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-frost-fill-faint);
   }
   .lol-build-final__items > [data-slot="0"] { grid-area: 1 / 1; }
@@ -158,10 +158,10 @@
   .lol-build-matrix__table tbody tr { height: 40px; }
   .lol-build-matrix__table tbody tr:hover { background: var(--color-frost-fill-faint); }
   .lol-build-matrix__skill { display: flex; align-items: center; gap: 8px; }
-  .lol-build-matrix__skill > img { flex: 0 0 34px; border-radius: 5px; }
+  .lol-build-matrix__skill > img { flex: 0 0 34px; border-radius: var(--radius-xs); }
   .lol-build-matrix__skill > b { color: var(--color-app-body); font-size: 16px; font-weight: 550; }
-  .lol-build-matrix__art-empty { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 5px; background: var(--color-frost-fill-soft); }
-  .lol-build-matrix__cell > span { display: grid; width: min(24px, 100%); height: 26px; margin: auto; place-items: center; border-radius: 5px; }
+  .lol-build-matrix__art-empty { width: 34px; height: 34px; flex: 0 0 34px; border-radius: var(--radius-xs); background: var(--color-frost-fill-soft); }
+  .lol-build-matrix__cell > span { display: grid; width: min(24px, 100%); height: 26px; margin: auto; place-items: center; border-radius: var(--radius-xs); }
   .lol-build-matrix__cell i { width: 2px; height: 2px; border-radius: 50%; background: var(--color-app-muted); opacity: 0.4; }
   .lol-build-matrix__cell.is-pending i { opacity: 0.18; }
   .lol-build-matrix__cell.is-active > span {
@@ -174,9 +174,9 @@
   .lol-build-matrix__cell.is-active:hover > span,
   .lol-build-matrix__cell.is-active > span:focus-visible { background: var(--color-app-text); }
   .lol-build-evolves { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .lol-build-evolves > span { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 4px 8px 4px 4px; background: var(--color-frost-fill-soft); }
+  .lol-build-evolves > span { display: flex; align-items: center; gap: 8px; border-radius: var(--radius-sm); padding: 4px 8px 4px 4px; background: var(--color-frost-fill-soft); }
   .lol-build-evolves img,
-  .lol-build-evolves b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 5px; }
+  .lol-build-evolves b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: var(--radius-xs); }
   .lol-build-evolves em { color: var(--color-app-body); font-size: 12px; font-style: normal; }
   .lol-build-evolves time { color: var(--color-app-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .lol-build-shopping__track {
@@ -211,7 +211,7 @@
     place-items: center;
     overflow: hidden;
     border: 1px solid var(--color-frost-line-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-frost-fill-soft);
   }
   .lol-build-trip > div > .is-final { border-color: color-mix(in srgb, var(--color-analysis-gold) 50%, transparent); }

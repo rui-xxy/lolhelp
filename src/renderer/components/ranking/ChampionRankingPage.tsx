@@ -205,7 +205,7 @@ function FilterMenu<T extends string>({
                   <span className="min-w-0 flex-1 text-left">
                     <span className="block truncate text-xs font-semibold">{option.label}</span>
                     {option.description && (
-                      <span className="mt-0.5 block truncate text-[10px] text-app-subtle">{option.description}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-app-subtle">{option.description}</span>
                     )}
                   </span>
                   {active && <Check className="size-3.5 shrink-0 text-app-primary" />}

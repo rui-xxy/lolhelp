@@ -2,9 +2,11 @@ import type {
   AppSettings,
   LolConfigApplyProfileRequest,
   LolConfigApplyValuesRequest,
+  LolConfigPart,
   LolConfigSaveProfileRequest,
   LolConfigValues,
   PlayerLookupRequest,
+  PlayerMatchBriefRequest,
   ScoutConfig,
 } from '../../shared/api';
 
@@ -107,11 +109,22 @@ export function validateSaveProfileRequest(value: unknown): LolConfigSaveProfile
   };
 }
 
+const CONFIG_PART_KEYS = new Set<LolConfigPart>(['video', 'controls', 'interface', 'combat', 'audio', 'hotkeys', 'client']);
+
 export function validateApplyProfileRequest(value: unknown): LolConfigApplyProfileRequest {
   const request = record(value, '应用方案请求');
+  let parts: LolConfigPart[] | undefined;
+  if (request.parts !== undefined) {
+    if (!Array.isArray(request.parts)) throw new Error('要应用的部分格式不正确');
+    parts = Array.from(new Set(request.parts.filter((part): part is LolConfigPart => (
+      typeof part === 'string' && CONFIG_PART_KEYS.has(part as LolConfigPart)
+    ))));
+    if (parts.length === 0) throw new Error('至少要选一项要应用的设置');
+  }
   return {
     profileId: stringValue(request.profileId, '方案 ID', { maxLength: 100 }) ?? '',
     rootPath: validateRootPath(request.rootPath),
+    parts,
   };
 }
 
@@ -129,6 +142,17 @@ export function validatePlayerLookupRequest(value: unknown): PlayerLookupRequest
     pageSize: finiteNumber(request.pageSize, '每页场次', 1, 100, true),
     region: optionalRegion(request.region),
     tag: stringValue(request.tag, '模式标签', { optional: true, maxLength: 32 }),
+  };
+}
+
+export function validateMatchBriefRequest(value: unknown): PlayerMatchBriefRequest {
+  const request = record(value, '战绩速览请求');
+  const puuid = stringValue(request.puuid, '玩家标识', { maxLength: 128 }) ?? '';
+  if (!puuid.trim()) throw new Error('玩家标识不能为空');
+  return {
+    puuid: puuid.trim(),
+    region: optionalRegion(request.region),
+    count: finiteNumber(request.count, '速览场次', 1, 40, true),
   };
 }
 

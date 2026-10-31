@@ -1,28 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Gift, PackageOpen, RefreshCw } from 'lucide-react';
 import type {
   AssistChampionShard,
   AssistClaimRewardRequest,
   AssistLootSummary,
   AssistRewardGrant,
 } from '../../../shared/api';
-import {
-  ActionButton,
-  SettingCard,
-} from './AssistControls';
 import { ConfirmDialog } from '../ui/confirm-dialog';
+import {
+  Btn,
+  Empty,
+  Panel,
+  PanelBody,
+} from './AssistControls';
+import { localizeAssistMessage, rewardStatusLabel } from './assistText';
 
 function resultMessage(results: { success: boolean; message: string }[]): string {
-  if (results.length === 0) return '没有需要执行的项目';
+  if (results.length === 0) return '没有需要处理的项目';
   const successCount = results.filter((result) => result.success).length;
-  return `${successCount}/${results.length} 成功：${results
-    .map((result) => `${result.success ? '✓' : '×'} ${result.message}`)
+  const failed = results.filter((result) => !result.success);
+  if (failed.length === 0) return `全部完成（${successCount} 项）`;
+  return `完成 ${successCount}/${results.length} 项。没成功的：${failed
+    .map((result) => localizeAssistMessage(result.message))
     .join('；')}`;
-}
-
-function rewardStatusLabel(status: string): string {
-  if (status === 'PENDING_SELECTION') return '待领取';
-  if (status === 'FULFILLED') return '已领取';
-  return status || '未知';
 }
 
 function rewardRequest(reward: AssistRewardGrant): AssistClaimRewardRequest {
@@ -33,6 +33,10 @@ function rewardRequest(reward: AssistRewardGrant): AssistClaimRewardRequest {
   };
 }
 
+function formatNumber(value: number): string {
+  return Math.round(value).toLocaleString('zh-CN');
+}
+
 export function LootDisenchantSection({
   setOperationState,
 }: {
@@ -41,13 +45,17 @@ export function LootDisenchantSection({
   const [loot, setLoot] = useState<AssistLootSummary>({ championEssence: 0, shards: [] });
   const [selectedLootIds, setSelectedLootIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [busyLootId, setBusyLootId] = useState('');
+  const [loaded, setLoaded] = useState(false);
   const [disenchantConfirmation, setDisenchantConfirmation] = useState<AssistChampionShard[] | null>(null);
 
   const selectedShards = useMemo(
     () => loot.shards.filter((shard) => selectedLootIds.has(shard.lootId)),
     [loot.shards, selectedLootIds],
   );
+  const shardTotal = loot.shards.reduce((sum, shard) => sum + shard.count, 0);
+  const allValue = loot.shards.reduce((sum, shard) => sum + shard.count * shard.disenchantValue, 0);
+  const selectedCount = selectedShards.reduce((sum, shard) => sum + shard.count, 0);
+  const selectedValue = selectedShards.reduce((sum, shard) => sum + shard.count * shard.disenchantValue, 0);
 
   const refresh = async () => {
     setLoading(true);
@@ -59,9 +67,10 @@ export function LootDisenchantSection({
         return new Set([...current].filter((id) => validIds.has(id)));
       });
     } catch (error) {
-      setOperationState(`碎片数据加载失败：${String(error)}`);
+      setOperationState(`读取英雄碎片失败：${localizeAssistMessage(String(error))}`);
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
   };
 
@@ -69,24 +78,21 @@ export function LootDisenchantSection({
     void refresh();
   }, []);
 
-  const toggleShard = (lootId: string, checked: boolean) => {
+  const toggleShard = (lootId: string) => {
     setSelectedLootIds((current) => {
       const next = new Set(current);
-      if (checked) next.add(lootId);
-      else next.delete(lootId);
+      if (next.has(lootId)) next.delete(lootId);
+      else next.add(lootId);
       return next;
     });
   };
 
-  const toggleAll = (checked: boolean) => {
-    setSelectedLootIds(checked ? new Set(loot.shards.map((shard) => shard.lootId)) : new Set());
-  };
+  const allSelected = loot.shards.length > 0 && selectedLootIds.size === loot.shards.length;
 
   const performDisenchant = async () => {
     const shards = disenchantConfirmation ?? [];
     if (shards.length === 0) return;
-    if (shards.length === 1) setBusyLootId(shards[0].lootId);
-    else setLoading(true);
+    setLoading(true);
     try {
       const results = [];
       for (const shard of shards) {
@@ -100,118 +106,108 @@ export function LootDisenchantSection({
       setDisenchantConfirmation(null);
       await refresh();
     } finally {
-      setBusyLootId('');
       setLoading(false);
     }
   };
 
-  const disenchantShard = (shard: AssistChampionShard) => {
-    setDisenchantConfirmation([shard]);
-  };
-
-  const disenchantSelected = async () => {
-    if (selectedShards.length === 0) {
-      setOperationState('请先选择要分解的英雄碎片');
-      return;
-    }
-    setDisenchantConfirmation(selectedShards);
-  };
-
   return (
     <>
-    <SettingCard
-      title="碎片分解"
-      description="读取战利品里的英雄碎片，可单个分解，也可以勾选后批量分解。分解会直接消耗碎片，请确认后再操作。"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="mr-auto text-sm text-app-body">
-          当前精粹：<span className="font-semibold text-green-600">{loot.championEssence}</span>
+      <div className="as-stats">
+        <div className="as-stat" data-tone="ok">
+          <em>现有英雄精粹</em>
+          <b>{formatNumber(loot.championEssence)}</b>
         </div>
-        <ActionButton onClick={() => void refresh()} disabled={loading}>
-          {loading ? '刷新中...' : '刷新数据'}
-        </ActionButton>
-        <button
-          type="button"
-          onClick={() => void disenchantSelected()}
-          disabled={selectedShards.length === 0 || loading}
-          className="rounded-sm border border-app-danger px-4 py-2 text-xs font-semibold text-app-danger hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          分解选中
-        </button>
+        <div className="as-stat">
+          <em>英雄碎片</em>
+          <b>
+            {loot.shards.length}
+            <small>种 · 共 {shardTotal} 个</small>
+          </b>
+        </div>
+        <div className="as-stat" data-tone="glow">
+          <em>全部分解能拿到</em>
+          <b>
+            {formatNumber(allValue)}
+            <small>精粹</small>
+          </b>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-sm border border-app-border">
-        <div className="grid grid-cols-[36px_minmax(170px,1fr)_90px_110px_110px_92px] border-b border-app-border bg-app-bg-soft px-3 py-2 text-xs font-semibold text-app-muted">
-          <input
-            type="checkbox"
-            checked={loot.shards.length > 0 && selectedLootIds.size === loot.shards.length}
-            onChange={(event) => toggleAll(event.target.checked)}
-            aria-label="选择全部英雄碎片"
-          />
-          <span>英雄碎片</span>
-          <span className="text-center">碎片数量</span>
-          <span className="text-center">碎片价值</span>
-          <span className="text-center">分解价值</span>
-          <span className="text-center">操作</span>
-        </div>
-        <div className="max-h-[520px] overflow-y-auto">
-          {loot.shards.length === 0 ? (
-            <div className="px-3 py-8 text-center text-xs text-app-muted">
-              {loading ? '正在加载碎片...' : '没有可分解的英雄碎片'}
+      <Panel
+        title="英雄碎片"
+        count={loot.shards.length}
+        description="点卡片选中，选好后在底部一起分解。头像角上的数字是这种碎片有几个。"
+        extra={(
+          <>
+            {loot.shards.length > 0 && (
+              <Btn size="sm" tone="ghost" onClick={() => setSelectedLootIds(allSelected ? new Set() : new Set(loot.shards.map((shard) => shard.lootId)))}>
+                {allSelected ? '取消全选' : '全选'}
+              </Btn>
+            )}
+            <Btn size="sm" onClick={() => void refresh()} busy={loading}>
+              {!loading && <RefreshCw />}
+              刷新
+            </Btn>
+          </>
+        )}
+      >
+        {loot.shards.length === 0 ? (
+          <Empty icon={<PackageOpen />} title={loading || !loaded ? '正在读取战利品…' : '没有可以分解的英雄碎片'}>
+            {loading || !loaded ? null : '打开海克斯宝箱得到的英雄碎片会出现在这里。'}
+          </Empty>
+        ) : (
+          <PanelBody>
+            <div className="as-shards">
+              {loot.shards.map((shard) => {
+                const selected = selectedLootIds.has(shard.lootId);
+                return (
+                  <button
+                    key={shard.lootId}
+                    type="button"
+                    className="as-shard"
+                    aria-pressed={selected}
+                    onClick={() => toggleShard(shard.lootId)}
+                  >
+                    {shard.icon ? <img src={shard.icon} alt="" loading="lazy" /> : <span className="as-pick__ph" />}
+                    {shard.count > 1 && <span className="as-shard__count">×{shard.count}</span>}
+                    <div style={{ minWidth: 0 }}>
+                      <b>{shard.name}</b>
+                      <span>分解得 {formatNumber(shard.disenchantValue * shard.count)}</span>
+                    </div>
+                    <span className="as-check" data-checked={selected ? 'true' : undefined} aria-hidden="true" />
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            loot.shards.map((shard) => (
-              <div
-                key={shard.lootId}
-                className="grid grid-cols-[36px_minmax(170px,1fr)_90px_110px_110px_92px] items-center border-b border-app-border/70 px-3 py-2 text-sm last:border-b-0"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedLootIds.has(shard.lootId)}
-                  onChange={(event) => toggleShard(shard.lootId, event.target.checked)}
-                  aria-label={`选择 ${shard.name}`}
-                />
-                <div className="flex min-w-0 items-center gap-2">
-                  {shard.icon && (
-                    <img
-                      src={shard.icon}
-                      alt={shard.name}
-                      className="size-8 rounded-sm border border-app-border object-cover"
-                    />
-                  )}
-                  <span className="truncate text-app-text">{shard.name}</span>
-                </div>
-                <span className="text-center tabular-nums">{shard.count}</span>
-                <span className="text-center tabular-nums">{shard.value}</span>
-                <span className="text-center tabular-nums">{shard.disenchantValue}</span>
-                <button
-                  type="button"
-                  onClick={() => void disenchantShard(shard)}
-                  disabled={loading || busyLootId === shard.lootId}
-                  className="justify-self-center rounded-xs border border-app-danger px-3 py-1 text-xs font-semibold text-app-danger hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busyLootId === shard.lootId ? '分解中' : '分解'}
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </SettingCard>
-    <ConfirmDialog
-      open={Boolean(disenchantConfirmation)}
-      title="确认分解英雄碎片"
-      description={disenchantConfirmation
-        ? `将分解 ${disenchantConfirmation.length} 种、共 ${disenchantConfirmation.reduce((sum, shard) => sum + shard.count, 0)} 个英雄碎片。分解后无法恢复。`
-        : ''}
-      confirmLabel="确认分解"
-      destructive
-      busy={loading || Boolean(busyLootId)}
-      onOpenChange={(open) => {
-        if (!open) setDisenchantConfirmation(null);
-      }}
-      onConfirm={() => void performDisenchant()}
-    />
+          </PanelBody>
+        )}
+        {selectedShards.length > 0 && (
+          <div className="as-selection">
+            <p>
+              已选<b>{selectedShards.length}</b>种、<b>{selectedCount}</b>个碎片，分解后得到<b>{formatNumber(selectedValue)}</b>精粹
+            </p>
+            <Btn tone="ghost" onClick={() => setSelectedLootIds(new Set())}>取消选择</Btn>
+            <Btn tone="danger" onClick={() => setDisenchantConfirmation(selectedShards)} disabled={loading}>
+              分解这些碎片
+            </Btn>
+          </div>
+        )}
+      </Panel>
+
+      <ConfirmDialog
+        open={Boolean(disenchantConfirmation)}
+        title="确认分解"
+        description={disenchantConfirmation
+          ? `将分解 ${disenchantConfirmation.length} 种、共 ${disenchantConfirmation.reduce((sum, shard) => sum + shard.count, 0)} 个英雄碎片，换成 ${formatNumber(disenchantConfirmation.reduce((sum, shard) => sum + shard.count * shard.disenchantValue, 0))} 精粹。分解后碎片就没了，不能撤回。`
+          : ''}
+        confirmLabel="确认分解"
+        destructive
+        busy={loading}
+        onOpenChange={(open) => {
+          if (!open) setDisenchantConfirmation(null);
+        }}
+        onConfirm={() => void performDisenchant()}
+      />
     </>
   );
 }
@@ -222,30 +218,22 @@ export function RewardsClaimSection({
   setOperationState: (message: string) => void;
 }) {
   const [rewards, setRewards] = useState<AssistRewardGrant[]>([]);
-  const [selectedRewardIds, setSelectedRewardIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [busyRewardId, setBusyRewardId] = useState('');
 
   const claimableRewards = rewards.filter((reward) => reward.status === 'PENDING_SELECTION');
-  const selectedRewards = rewards.filter((reward) => selectedRewardIds.has(reward.id));
+  const otherRewards = rewards.filter((reward) => reward.status !== 'PENDING_SELECTION');
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const next = await window.lolHelper.assist.getRewards();
-      setRewards(next);
-      setSelectedRewardIds((current) => {
-        const claimableIds = new Set(
-          next
-            .filter((reward) => reward.status === 'PENDING_SELECTION')
-            .map((reward) => reward.id),
-        );
-        return new Set([...current].filter((id) => claimableIds.has(id)));
-      });
+      setRewards(await window.lolHelper.assist.getRewards());
     } catch (error) {
-      setOperationState(`奖励数据加载失败：${String(error)}`);
+      setOperationState(`读取奖励失败：${localizeAssistMessage(String(error))}`);
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
   };
 
@@ -253,135 +241,88 @@ export function RewardsClaimSection({
     void refresh();
   }, []);
 
-  const toggleReward = (reward: AssistRewardGrant, checked: boolean) => {
-    if (reward.status !== 'PENDING_SELECTION') return;
-    setSelectedRewardIds((current) => {
-      const next = new Set(current);
-      if (checked) next.add(reward.id);
-      else next.delete(reward.id);
-      return next;
-    });
-  };
-
-  const toggleAll = (checked: boolean) => {
-    setSelectedRewardIds(checked ? new Set(claimableRewards.map((reward) => reward.id)) : new Set());
-  };
-
   const claimReward = async (reward: AssistRewardGrant) => {
-    if (reward.status !== 'PENDING_SELECTION') {
-      setOperationState('这个奖励已经领取过了');
-      return;
-    }
     setBusyRewardId(reward.id);
     try {
       const result = await window.lolHelper.assist.claimReward(rewardRequest(reward));
-      setOperationState(result.message);
+      setOperationState(result.success ? `「${reward.title}」已领取` : localizeAssistMessage(result.message));
       await refresh();
     } finally {
       setBusyRewardId('');
     }
   };
 
-  const claimSelected = async () => {
-    const requests = selectedRewards
-      .filter((reward) => reward.status === 'PENDING_SELECTION')
-      .map(rewardRequest);
-    if (requests.length === 0) {
-      setOperationState('请先选择待领取奖励');
-      return;
-    }
+  const claimAll = async () => {
+    if (claimableRewards.length === 0) return;
     setLoading(true);
     try {
-      const results = await window.lolHelper.assist.claimRewards(requests);
+      const results = await window.lolHelper.assist.claimRewards(claimableRewards.map(rewardRequest));
       setOperationState(resultMessage(results));
-      setSelectedRewardIds(new Set());
       await refresh();
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <SettingCard
-      title="奖励获取"
-      description="读取客户端待领取奖励，可单个领取，也可以勾选后批量领取。"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="mr-auto text-sm text-app-body">
-          待领取：<span className="font-semibold text-app-primary">{claimableRewards.length}</span>
+  const renderReward = (reward: AssistRewardGrant) => {
+    const claimable = reward.status === 'PENDING_SELECTION';
+    return (
+      <div key={reward.id} className="as-list-row" data-dim={claimable ? undefined : 'true'}>
+        <span className="as-gift" aria-hidden="true"><Gift /></span>
+        <div style={{ minWidth: 0 }}>
+          <div className="as-list-row__title">{reward.title}</div>
+          <div className="as-list-row__sub">
+            {reward.rewards.length > 1
+              ? `包含 ${reward.rewards.length} 样：${reward.rewards.map((item) => item.title).join('、')}`
+              : rewardStatusLabel(reward.status)}
+          </div>
         </div>
-        <ActionButton onClick={() => void refresh()} disabled={loading}>
-          {loading ? '刷新中...' : '刷新数据'}
-        </ActionButton>
-        <button
-          type="button"
-          onClick={() => void claimSelected()}
-          disabled={selectedRewards.length === 0 || loading}
-          className="rounded-sm border border-green-500 px-4 py-2 text-xs font-semibold text-green-600 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          领取选中
-        </button>
+        {claimable ? (
+          <Btn
+            size="sm"
+            tone="primary"
+            busy={busyRewardId === reward.id}
+            disabled={loading}
+            onClick={() => void claimReward(reward)}
+          >
+            领取
+          </Btn>
+        ) : (
+          <span className="as-status">{rewardStatusLabel(reward.status)}</span>
+        )}
       </div>
+    );
+  };
 
-      <div className="overflow-hidden rounded-sm border border-app-border">
-        <div className="grid grid-cols-[36px_minmax(240px,1fr)_120px_92px] border-b border-app-border bg-app-bg-soft px-3 py-2 text-xs font-semibold text-app-muted">
-          <input
-            type="checkbox"
-            checked={claimableRewards.length > 0 && selectedRewardIds.size === claimableRewards.length}
-            onChange={(event) => toggleAll(event.target.checked)}
-            aria-label="选择全部待领取奖励"
-          />
-          <span>可获取奖励</span>
-          <span className="text-center">奖励状态</span>
-          <span className="text-center">操作</span>
-        </div>
-        <div className="max-h-[520px] overflow-y-auto">
-          {rewards.length === 0 ? (
-            <div className="px-3 py-8 text-center text-xs text-app-muted">
-              {loading ? '正在加载奖励...' : '没有待展示的奖励'}
-            </div>
-          ) : (
-            rewards.map((reward) => {
-              const claimable = reward.status === 'PENDING_SELECTION';
-              return (
-                <div
-                  key={reward.id}
-                  className={`grid grid-cols-[36px_minmax(240px,1fr)_120px_92px] items-center border-b border-app-border/70 px-3 py-2 text-sm last:border-b-0 ${
-                    claimable ? '' : 'opacity-60'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedRewardIds.has(reward.id)}
-                    disabled={!claimable}
-                    onChange={(event) => toggleReward(reward, event.target.checked)}
-                    aria-label={`选择 ${reward.title}`}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-app-text">{reward.title}</div>
-                    {reward.rewards.length > 1 && (
-                      <div className="mt-0.5 truncate text-[11px] text-app-muted">
-                        {reward.rewards.map((item) => item.title).join('、')}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-center text-xs text-app-muted">
-                    {rewardStatusLabel(reward.status)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void claimReward(reward)}
-                    disabled={!claimable || loading || busyRewardId === reward.id}
-                    className="justify-self-center rounded-xs border border-app-primary px-3 py-1 text-xs font-semibold text-app-primary hover:bg-app-primary-soft disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {busyRewardId === reward.id ? '领取中' : '领取'}
-                  </button>
-                </div>
-              );
-            })
+  return (
+    <Panel
+      title="可以领取的奖励"
+      count={claimableRewards.length}
+      description="活动、通行证、等级奖励等，客户端里待领取的东西都在这里，一键领完。"
+      extra={(
+        <>
+          <Btn size="sm" onClick={() => void refresh()} busy={loading && !busyRewardId}>
+            {!(loading && !busyRewardId) && <RefreshCw />}
+            刷新
+          </Btn>
+          {claimableRewards.length > 0 && (
+            <Btn size="sm" tone="primary" onClick={() => void claimAll()} disabled={loading}>
+              全部领取
+            </Btn>
           )}
+        </>
+      )}
+    >
+      {rewards.length === 0 ? (
+        <Empty icon={<Gift />} title={loading || !loaded ? '正在读取奖励…' : '现在没有可以领取的奖励'}>
+          {loading || !loaded ? null : '有新奖励时点一下右上角的刷新就能看到。'}
+        </Empty>
+      ) : (
+        <div className="as-list">
+          {claimableRewards.map(renderReward)}
+          {otherRewards.map(renderReward)}
         </div>
-      </div>
-    </SettingCard>
+      )}
+    </Panel>
   );
 }

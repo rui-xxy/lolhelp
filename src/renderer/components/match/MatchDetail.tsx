@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { CirclePlay, Download, Flame, Layers3, LoaderCircle, RotateCcw, Skull, Swords, Users, X } from 'lucide-react';
 import { GameIcon } from './GameIcon';
 import { BuildSkillMatrix } from './BuildSkillMatrix';
@@ -342,6 +342,35 @@ function formatCompact(value: number): string {
   if (!Number.isFinite(value)) return '0';
   if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(Math.round(value));
+}
+
+// 记分板 KDA 下面的比值：0 死记为「完美」，按高低分档上色
+function kdaRatioLabel(participant: MatchParticipantSummary): { text: string; tier: 'great' | 'good' | 'fair' | 'poor' } {
+  const { kills, deaths, assists } = participant;
+  if (deaths <= 0) return { text: kills + assists > 0 ? '完美' : '0.0 KDA', tier: kills + assists > 0 ? 'great' : 'poor' };
+  const ratio = (kills + assists) / deaths;
+  const tier = ratio >= 5 ? 'great' : ratio >= 3 ? 'good' : ratio >= 1.5 ? 'fair' : 'poor';
+  return { text: `${ratio.toFixed(1)} KDA`, tier };
+}
+
+function KdaRatio({ participant }: { participant: MatchParticipantSummary }) {
+  const { text, tier } = kdaRatioLabel(participant);
+  return <small className="lol-kda-ratio" data-tier={tier}>{text}</small>;
+}
+
+// 记分板伤害：数字 + 一条细条（相对全场最高伤害），全场最高的数字标金
+function DamageCell({ className, damage, damageShare, win }: { className: string; damage: number; damageShare: number; win: boolean }) {
+  return (
+    <span
+      className={`${className} lol-damage-cell lol-damage-cell--${win ? 'win' : 'loss'}`}
+      data-top={damageShare >= 99.95 ? 'true' : undefined}
+      style={{ '--damage-share': `${Math.max(4, damageShare).toFixed(1)}%` } as CSSProperties}
+      title={damageShare >= 99.95 ? '全场最高伤害' : `约为全场最高伤害的 ${Math.round(damageShare)}%`}
+    >
+      <b>{formatCompact(damage)}</b>
+      <i aria-hidden="true" />
+    </span>
+  );
 }
 
 function teamTone(teamId: number): string {
@@ -1102,8 +1131,9 @@ function RiftScoreboardRow({
           <i className="lol-kda-separator">/</i>
           <span className="lol-kda-value">{participant.assists}</span>
         </strong>
+        <KdaRatio participant={participant} />
       </div>
-      <span className="lol-rift-damage">{formatCompact(participant.damage)}</span>
+      <DamageCell className="lol-rift-damage" damage={participant.damage} damageShare={damageShare} win={participant.win} />
     </div>
   );
 }
@@ -1302,8 +1332,9 @@ function ScoreboardRow({
           <i className="lol-kda-separator">/</i>
           <span className="lol-kda-value">{participant.assists}</span>
         </strong>
+        <KdaRatio participant={participant} />
       </div>
-      <span className="lol-score-number">{formatCompact(participant.damage)}</span>
+      <DamageCell className="lol-score-number" damage={participant.damage} damageShare={damageShare} win={participant.win} />
     </div>
   );
 }

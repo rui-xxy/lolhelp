@@ -26,6 +26,7 @@ import type {
 } from '../../../shared/api';
 import { MayhemAugmentRanking } from './MayhemAugmentRanking';
 import { MayhemComboRanking } from './MayhemComboRanking';
+import { formatUpdatedAt } from '../../lib/utils';
 
 type RoleFilter = 'all' | MayhemChampionRole;
 
@@ -486,7 +487,7 @@ export function MayhemGuidePage() {
                 <strong>{visibleEntries.length}</strong>
                 <small>位英雄</small>
                 <p>按强化符文环境下的综合强度分层</p>
-                {result?.meta.updatedAt && <time>{result.meta.updatedAt} 更新</time>}
+                {result?.meta.updatedAt && <time>{formatUpdatedAt(result.meta.updatedAt)} 更新</time>}
               </div>
               <div className="mayhem-toolbar-controls">
                 <RoleFilters value={role} onChange={setRole} />

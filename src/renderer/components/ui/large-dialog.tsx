@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from './button';
@@ -35,9 +36,10 @@ export function LargeDialog({
 
   if (!open) return null;
 
-  return (
+  // 挂到 body 上：避免被页面内部较高 z-index 的元素（如战绩页签栏）压住
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 backdrop-blur-[1px] [-webkit-app-region:no-drag]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-6 backdrop-blur-[1px] [-webkit-app-region:no-drag]"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -74,6 +76,7 @@ export function LargeDialog({
         </header>
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

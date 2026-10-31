@@ -39,7 +39,7 @@ export function MatchRegionPicker({ value, options, onChange }: MatchRegionPicke
   return (
     <div
       ref={rootRef}
-      className="relative flex w-[136px] shrink-0 items-center border-r border-app-border bg-app-shell/45"
+      className="relative flex w-[132px] shrink-0 items-center rounded-l-[5px] border-r border-line-2"
     >
       <button
         type="button"
@@ -87,7 +87,7 @@ export function MatchRegionPicker({ value, options, onChange }: MatchRegionPicke
                     <Check className={isSelected ? 'size-3.5 opacity-100' : 'size-3.5 opacity-0'} />
                   </span>
                   <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                  {option.key === '' && <span className="text-[9px] text-app-subtle">当前</span>}
+                  {option.key === '' && <span className="text-[11px] text-app-subtle">当前</span>}
                 </button>
               );
             })}

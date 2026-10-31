@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   Bot,
@@ -6,6 +8,7 @@ import {
   Gift,
   LoaderCircle,
   PackageOpen,
+  Search,
   ShieldAlert,
   Sparkles,
   UserRoundCog,
@@ -24,8 +27,8 @@ import type {
   FriendInfo,
 } from '../../../shared/api';
 import { DEFAULT_ASSIST_SETTINGS } from '../../../shared/assist';
-import { ChampionPickerDialog } from '../scout/ChampionPickerDialog';
-import { Button } from '../ui/button';
+import { broadcastSettingsChanged, SETTINGS_CHANGED_EVENT } from '../../lib/events';
+import { ProfileIcon } from '../ProfileIcon';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import {
   AccountSection,
@@ -38,7 +41,10 @@ import {
   BuildsSection,
   ChampionsSection,
 } from './AssistChampionSections';
-import { TextInput } from './AssistControls';
+import { AssistChampionPicker, type ChampionPickerRequest } from './AssistChampionPicker';
+import { AssistSkinPicker } from './AssistSkinPicker';
+import { Btn } from './AssistControls';
+import { localizeAssistMessage } from './assistText';
 import {
   FriendsSection,
 } from './AssistSocialSections';
@@ -57,21 +63,31 @@ type SectionKey =
   | 'account'
   | 'blacklist';
 
+// 侧栏按用途分组：先是对局里自动发生的事，再是选人出装，最后是账号和社交。
+// description 是右侧标题下那句话：用大白话说清楚这一页能替你做什么。
 const sections: Array<{
   key: SectionKey;
   label: string;
   description: string;
+  group: string;
   icon: typeof Sparkles;
 }> = [
-  { key: 'automation', label: '自动操作', description: '对局接受、结算返回与队友点赞', icon: Bot },
-  { key: 'champions', label: '英雄禁选', description: '按模式和位置管理选用与禁用', icon: WandSparkles },
-  { key: 'builds', label: '符文装备', description: '自动应用装备方案与符文配置', icon: Sparkles },
-  { key: 'friends', label: '好友管理', description: '在线展示、签名与好友批量操作', icon: Users },
-  { key: 'loot', label: '碎片分解', description: '查看英雄碎片并进行批量分解', icon: PackageOpen },
-  { key: 'rewards', label: '奖励获取', description: '集中查看并领取可用奖励', icon: Gift },
-  { key: 'account', label: '账号展示', description: '段位、头像、生涯背景与装饰', icon: UserRoundCog },
-  { key: 'blacklist', label: '黑名单', description: '记录玩家标签并快速查询战绩', icon: ShieldAlert },
+  { key: 'automation', group: '对局', label: '自动操作', description: '排队、结算这些重复的点击，交给助手来点', icon: Bot },
+  { key: 'champions', group: '选人', label: '自动选禁', description: '轮到你时，自动选好想玩的英雄、禁掉讨厌的英雄', icon: WandSparkles },
+  { key: 'builds', group: '选人', label: '符文出装', description: '锁定英雄后，自动配好符文页和推荐出装', icon: Sparkles },
+  { key: 'account', group: '账号', label: '账号展示', description: '换头像、生涯背景，以及好友看到的段位', icon: UserRoundCog },
+  { key: 'rewards', group: '账号', label: '领取奖励', description: '客户端里没领的奖励，在这里一次领完', icon: Gift },
+  { key: 'loot', group: '账号', label: '碎片分解', description: '把用不上的英雄碎片分解成精粹', icon: PackageOpen },
+  { key: 'friends', group: '社交', label: '好友', description: '设置自己的在线状态，整理好友列表', icon: Users },
+  { key: 'blacklist', group: '社交', label: '黑名单', description: '记下坑过你的玩家，随时翻出来查他的战绩', icon: ShieldAlert },
 ];
+
+const sectionGroups = sections.reduce<Array<{ group: string; items: typeof sections }>>((groups, section) => {
+  const last = groups[groups.length - 1];
+  if (last && last.group === section.group) last.items.push(section);
+  else groups.push({ group: section.group, items: [section] });
+  return groups;
+}, []);
 
 const emptySettings: AppSettings = {
   favoriteChampions: [],
@@ -105,13 +121,9 @@ export function AssistPage({
     tags: '常见',
     description: '',
   });
-  const [picker, setPicker] = useState<{
-    open: boolean;
-    title: string;
-    ids: number[];
-    max: number;
-    apply: (ids: number[]) => void;
-  } | null>(null);
+  // 每次打开都带一个新的 key，让选择器从这次的已选英雄重新开始。
+  const [picker, setPicker] = useState<(ChampionPickerRequest & { key: number }) | null>(null);
+  const [skinPickerOpen, setSkinPickerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +140,7 @@ export function AssistPage({
         setSaveState('设置已同步');
       })
       .catch((error) => {
-        if (!cancelled) setSaveState(`读取失败：${String(error)}`);
+        if (!cancelled) setSaveState(`读取失败：${localizeAssistMessage(String(error))}`);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -139,8 +151,19 @@ export function AssistPage({
   }, []);
 
   useEffect(() => {
+    // 首页的快捷开关改了设置后，这里重新读取，避免旧状态把新值覆盖回去。
+    const onSettingsChanged = (event: Event) => {
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source;
+      if (source === 'assist') return;
+      void window.lolHelper.db.getSettings().then((loaded) => setSettings(loaded)).catch(() => undefined);
+    };
+    window.addEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged);
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged);
+  }, []);
+
+  useEffect(() => {
     if (!operationState || operationState === '正在执行…') return undefined;
-    const needsMoreReadingTime = /失败|错误|×|请先|请输入/.test(operationState);
+    const needsMoreReadingTime = /失败|错误|没成功|请先|请输入/.test(operationState);
     const timer = window.setTimeout(
       () => setOperationState(''),
       needsMoreReadingTime ? 8000 : 3500,
@@ -166,8 +189,9 @@ export function AssistPage({
         blacklist: saved.blacklist,
       }));
       setSaveState('已自动保存');
+      broadcastSettingsChanged('assist');
     }).catch((error) => {
-      setSaveState(`保存失败：${String(error)}`);
+      setSaveState(`保存失败：${localizeAssistMessage(String(error))}`);
     });
   };
 
@@ -179,20 +203,8 @@ export function AssistPage({
     updateAssist((assist) => ({ ...assist, [key]: value }));
   };
 
-  const openPicker = (
-    title: string,
-    ids: number[],
-    max: number,
-    apply: (ids: number[]) => void,
-  ) => {
-    setPicker({ open: true, title, ids, max, apply });
-  };
-
-  const championSummary = (ids: number[]) => {
-    if (ids.length === 0) return '未设置';
-    return ids
-      .map((id) => championMap.get(id)?.title || championMap.get(id)?.name || id)
-      .join('、');
+  const openPicker = (request: ChampionPickerRequest) => {
+    setPicker({ ...request, key: Date.now() });
   };
 
   const setChampionArray = (
@@ -225,22 +237,23 @@ export function AssistPage({
     setOperationState('正在执行…');
     try {
       const results = await operation();
-      setOperationState(
-        results.length
-          ? results
-            .map((result) => `${result.success ? '✓' : '×'} ${result.message}`)
-            .join('；')
-          : '当前没有需要执行的项目',
-      );
+      if (results.length === 0) {
+        setOperationState('没有需要改动的地方');
+        return;
+      }
+      const failed = results.filter((result) => !result.success);
+      setOperationState(failed.length === 0
+        ? results.map((result) => result.message).join('\n')
+        : `有 ${failed.length} 项没成功：\n${failed.map((result) => localizeAssistMessage(result.message)).join('\n')}`);
     } catch (error) {
-      setOperationState(`执行失败：${String(error)}`);
+      setOperationState(`执行失败：${localizeAssistMessage(String(error))}`);
     }
   };
 
   const addBlacklistEntry = () => {
     const riotId = blacklistDraft.riotId.trim();
     if (!riotId) {
-      setOperationState('请输入玩家 Riot ID');
+      setOperationState('请先填写玩家，格式是「游戏名#编号」');
       return;
     }
     const now = Date.now();
@@ -271,7 +284,7 @@ export function AssistPage({
     try {
       setFriends(await window.lolHelper.lcu.getFriends());
     } catch (error) {
-      setOperationState(`好友列表刷新失败：${String(error)}`);
+      setOperationState(`好友列表刷新失败：${localizeAssistMessage(String(error))}`);
     }
   };
 
@@ -290,12 +303,14 @@ export function AssistPage({
         [...selectedFriendIds].map((id) => window.lolHelper.lcu.deleteFriend(id)),
       );
       const successCount = results.filter((result) => result.success).length;
-      setOperationState(`已删除 ${successCount}/${results.length} 位好友`);
+      setOperationState(successCount === results.length
+        ? `已删除 ${successCount} 位好友`
+        : `删除了 ${successCount}/${results.length} 位好友，其余的没成功`);
       setSelectedFriendIds(new Set());
       setFriendDeleteConfirmOpen(false);
       await refreshFriends();
     } catch (error) {
-      setOperationState(`删除好友失败：${String(error)}`);
+      setOperationState(`删除好友失败：${localizeAssistMessage(String(error))}`);
     } finally {
       setDeletingFriends(false);
     }
@@ -307,259 +322,268 @@ export function AssistPage({
     try {
       setProfileIcons(await window.lolHelper.assist.getProfileIcons());
     } catch (error) {
-      setOperationState(`头像列表加载失败：${String(error)}`);
+      setOperationState(`头像列表加载失败：${localizeAssistMessage(String(error))}`);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-app-muted">
-        辅助功能加载中…
-      </div>
-    );
+    return <div className="as-loading">助手设置读取中…</div>;
   }
 
   const assist = settings.assist;
   const activeSectionMeta = sections.find((section) => section.key === activeSection) ?? sections[0];
+  const ActiveIcon = activeSectionMeta.icon;
   const saveFailed = saveState.includes('失败');
   const savePending = saveState.includes('中') || saveState.includes('正在');
-  const operationFailed = /失败|错误|×|请先|请输入/.test(operationState);
+  const operationBusy = operationState === '正在执行…';
+  const operationFailed = /失败|错误|没成功|请先|请输入/.test(operationState);
+
+  // 目录里每一项右边那句状态：开了几项、有几个人，不用点进去也知道。
+  const automationOn = [assist.autoAccept, assist.autoPlayAgain || assist.autoReturnLobby, assist.autoHonorTeammates]
+    .filter(Boolean).length;
+  const buildsOn = [
+    assist.autoWinRateRunes || assist.autoPickRateRunes,
+    assist.autoWinRateItems || assist.autoPickRateItems,
+  ].filter(Boolean).length;
+  const navHints: Partial<Record<SectionKey, { text: string; tone?: 'on' | 'count' }>> = {
+    automation: automationOn > 0 ? { text: `开 ${automationOn} 项`, tone: 'on' } : { text: '未开启' },
+    champions: assist.autoChampionEnabled ? { text: '已开启', tone: 'on' } : { text: '未开启' },
+    builds: buildsOn > 0 ? { text: `开 ${buildsOn} 项`, tone: 'on' } : { text: '未开启' },
+    account: assist.spoofRankEnabled ? { text: '展示段位', tone: 'on' } : undefined,
+    friends: friends.length > 0 ? { text: String(friends.length), tone: 'count' } : undefined,
+    blacklist: settings.blacklist.length > 0 ? { text: String(settings.blacklist.length), tone: 'count' } : undefined,
+  };
+
+  const iconQuery = profileIconSearch.trim().toLowerCase();
+  const visibleIcons = profileIcons
+    .filter((icon) => !iconQuery
+      || String(icon.id).includes(iconQuery)
+      || icon.title.toLowerCase().includes(iconQuery))
+    .slice(0, 800);
 
   return (
-    <div className="grid h-full grid-cols-[208px_minmax(0,1fr)] overflow-hidden bg-app-surface">
-      <aside className="flex min-h-0 flex-col border-r border-app-border bg-app-bg-soft/80 px-3 py-4">
-        <div className="mb-3 px-2 text-[11px] font-medium text-app-subtle">功能分类</div>
-        <nav className="space-y-1">
-          {sections.map((section) => {
-            const Icon = section.icon;
-            return (
-              <button
-                key={section.key}
-                type="button"
-                onClick={() => setActiveSection(section.key)}
-                className={`group relative flex h-9 w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm transition-[background-color,color,box-shadow] ${
-                  activeSection === section.key
-                    ? 'bg-app-surface text-app-text shadow-sm ring-1 ring-app-border/70'
-                    : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-                }`}
-              >
-                <Icon className={`size-4 ${activeSection === section.key ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-muted'}`} />
-                <span className="truncate">{section.label}</span>
-              </button>
-            );
-          })}
+    <div className="as-page">
+      <aside className="as-nav">
+        <nav aria-label="助手功能">
+          {sectionGroups.map(({ group, items }) => (
+            <div key={group} className="as-nav__group">
+              <div className="as-nav__group-title">{group}</div>
+              {items.map((section) => {
+                const Icon = section.icon;
+                const active = activeSection === section.key;
+                const hint = navHints[section.key];
+                return (
+                  <button
+                    key={section.key}
+                    type="button"
+                    className="as-nav__item"
+                    onClick={() => setActiveSection(section.key)}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <Icon />
+                    <span>{section.label}</span>
+                    {hint && <span className="as-nav__hint" data-tone={hint.tone}>{hint.text}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
-        <div className="mt-auto border-t border-app-border/70 px-2 pt-3 text-[10px] leading-4 text-app-subtle">
-          设置变更会自动保存
-        </div>
+        <div className="as-nav__foot">所有改动都会自动保存，不需要手动点保存。</div>
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-col">
-        <header className="flex h-[58px] shrink-0 items-center gap-4 border-b border-app-border px-6">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-app-text">{activeSectionMeta.label}</h2>
-            <p className="mt-0.5 truncate text-[11px] text-app-muted">{activeSectionMeta.description}</p>
-          </div>
-          <div className={`flex shrink-0 items-center gap-2 text-[11px] ${saveFailed ? 'text-app-danger' : 'text-app-muted'}`}>
-            {savePending ? (
-              <LoaderCircle className="size-3.5 animate-spin text-app-primary" />
-            ) : (
-              <span className={`size-1.5 rounded-full ${saveFailed ? 'bg-app-danger' : 'bg-app-success'}`} />
-            )}
-            <span>{saveState}</span>
-          </div>
-        </header>
+      <section className="as-main">
+        <main className="as-scroll">
+          <div className="as-content">
+            <header className="as-head">
+              <span className="as-head__icon" aria-hidden="true"><ActiveIcon /></span>
+              <div style={{ minWidth: 0 }}>
+                <h2>{activeSectionMeta.label}</h2>
+                <p>{activeSectionMeta.description}</p>
+              </div>
+              <span
+                className="as-save"
+                data-state={saveFailed ? 'error' : savePending ? 'pending' : undefined}
+                title={saveState}
+              >
+                <i />
+                {saveFailed ? saveState : savePending ? '保存中…' : '已保存'}
+              </span>
+            </header>
 
-        {operationState && (
-          <div
-            role="status"
-            className={`mx-6 mt-4 flex min-h-9 items-center gap-2 rounded-sm border px-3 text-xs ${
-              operationFailed
-                ? 'border-app-danger/20 bg-app-danger/5 text-app-danger'
-                : 'border-app-success/20 bg-app-success/5 text-app-body'
-            }`}
-          >
-            {operationState === '正在执行…' ? (
-              <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-            ) : operationFailed ? (
-              <AlertCircle className="size-3.5 shrink-0" />
-            ) : (
-              <CheckCircle2 className="size-3.5 shrink-0 text-app-success" />
+            {activeSection === 'automation' && (
+              <AutomationSection
+                assist={assist}
+                updateAssist={updateAssist}
+                updateBoolean={updateBoolean}
+              />
             )}
-            <span className="min-w-0 flex-1 truncate">{operationState}</span>
-            {operationState !== '正在执行…' && (
-              <Button variant="ghost" size="icon-xs" onClick={() => setOperationState('')} aria-label="关闭提示">
-                <X className="size-3.5" />
-              </Button>
+            {activeSection === 'champions' && (
+              <ChampionsSection
+                assist={assist}
+                updateAssist={updateAssist}
+                updateBoolean={updateBoolean}
+                openPicker={openPicker}
+                championMap={championMap}
+                setChampionArray={setChampionArray}
+                setRoleChampionArray={setRoleChampionArray}
+                setBan={setBan}
+              />
             )}
-          </div>
-        )}
-
-        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <div className="mx-auto max-w-[896px] space-y-7 pb-8">
-          {activeSection === 'automation' && (
-            <AutomationSection
-              assist={assist}
-              updateAssist={updateAssist}
-              updateBoolean={updateBoolean}
-            />
-          )}
-          {activeSection === 'champions' && (
-            <ChampionsSection
-              assist={assist}
-              updateAssist={updateAssist}
-              updateBoolean={updateBoolean}
-              openPicker={openPicker}
-              championMap={championMap}
-              setChampionArray={setChampionArray}
-              setRoleChampionArray={setRoleChampionArray}
-              setBan={setBan}
-            />
-          )}
-          {activeSection === 'builds' && (
-            <BuildsSection
-              assist={assist}
-              updateAssist={updateAssist}
-              updateBoolean={updateBoolean}
-              runOperation={runOperation}
-            />
-          )}
-          {activeSection === 'friends' && (
-            <FriendsSection
-              assist={assist}
-              updateAssist={updateAssist}
-              runOperation={runOperation}
-              friends={friends}
-              selectedFriendIds={selectedFriendIds}
-              setSelectedFriendIds={setSelectedFriendIds}
-              refreshFriends={refreshFriends}
-              deleteSelectedFriends={requestDeleteSelectedFriends}
-              setOperationState={setOperationState}
-            />
-          )}
-          {activeSection === 'loot' && (
-            <LootDisenchantSection setOperationState={setOperationState} />
-          )}
-          {activeSection === 'rewards' && (
-            <RewardsClaimSection setOperationState={setOperationState} />
-          )}
-          {activeSection === 'account' && (
-            <AccountSection
-              assist={assist}
-              updateAssist={updateAssist}
-              updateBoolean={updateBoolean}
-              openProfileIconPicker={openProfileIconPicker}
-              championSummary={championSummary}
-              openPicker={openPicker}
-              runOperation={runOperation}
-            />
-          )}
-          {activeSection === 'blacklist' && (
-            <BlacklistSection
-              blacklistDraft={blacklistDraft}
-              setBlacklistDraft={setBlacklistDraft}
-              editingBlacklistId={editingBlacklistId}
-              addBlacklistEntry={addBlacklistEntry}
-              settings={settings}
-              persist={persist}
-              setOperationState={setOperationState}
-              onPlayerSearch={onPlayerSearch}
-              setEditingBlacklistId={setEditingBlacklistId}
-            />
-          )}
+            {activeSection === 'builds' && (
+              <BuildsSection
+                assist={assist}
+                updateAssist={updateAssist}
+                updateBoolean={updateBoolean}
+                runOperation={runOperation}
+              />
+            )}
+            {activeSection === 'friends' && (
+              <FriendsSection
+                assist={assist}
+                updateAssist={updateAssist}
+                runOperation={runOperation}
+                friends={friends}
+                selectedFriendIds={selectedFriendIds}
+                setSelectedFriendIds={setSelectedFriendIds}
+                refreshFriends={refreshFriends}
+                deleteSelectedFriends={requestDeleteSelectedFriends}
+                setOperationState={setOperationState}
+              />
+            )}
+            {activeSection === 'loot' && (
+              <LootDisenchantSection setOperationState={setOperationState} />
+            )}
+            {activeSection === 'rewards' && (
+              <RewardsClaimSection setOperationState={setOperationState} />
+            )}
+            {activeSection === 'account' && (
+              <AccountSection
+                assist={assist}
+                updateAssist={updateAssist}
+                updateBoolean={updateBoolean}
+                openProfileIconPicker={openProfileIconPicker}
+                openSkinPicker={() => setSkinPickerOpen(true)}
+                championMap={championMap}
+                runOperation={runOperation}
+              />
+            )}
+            {activeSection === 'blacklist' && (
+              <BlacklistSection
+                blacklistDraft={blacklistDraft}
+                setBlacklistDraft={setBlacklistDraft}
+                editingBlacklistId={editingBlacklistId}
+                addBlacklistEntry={addBlacklistEntry}
+                settings={settings}
+                persist={persist}
+                setOperationState={setOperationState}
+                onPlayerSearch={onPlayerSearch}
+                setEditingBlacklistId={setEditingBlacklistId}
+              />
+            )}
           </div>
         </main>
+
+        {/* 操作结果从右下角浮出来，不把页面往下挤 */}
+        <AnimatePresence>
+          {operationState && (
+            <motion.div
+              key="toast"
+              role="status"
+              className="as-toast"
+              data-tone={operationBusy ? 'busy' : operationFailed ? 'error' : undefined}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+            >
+              {operationBusy ? <LoaderCircle /> : operationFailed ? <AlertCircle /> : <CheckCircle2 />}
+              <p>{operationState}</p>
+              {!operationBusy && (
+                <Btn size="sm" tone="ghost" onClick={() => setOperationState('')} title="关闭">
+                  <X />
+                </Btn>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       {picker && (
-        <ChampionPickerDialog
-          open={picker.open}
-          onOpenChange={(open) => {
-            if (!open) setPicker(null);
-          }}
+        <AssistChampionPicker
+          key={picker.key}
+          request={picker}
           champions={champions}
-          selectedIds={picker.ids}
           favoriteIds={settings.favoriteChampions}
-          championPresets={settings.championPresets}
-          onChange={(ids) => {
-            const limited = picker.max === 1
-              ? ids.slice(-1)
-              : ids.slice(0, picker.max);
-            picker.apply(limited);
-            setPicker((current) => current ? { ...current, ids: limited } : current);
-          }}
+          onClose={() => setPicker(null)}
         />
       )}
 
-      {profileIconPickerOpen && (
+      {skinPickerOpen && (
+        <AssistSkinPicker
+          champions={champions}
+          value={assist.profileBackgroundChampionId}
+          onSelect={(skinId) => updateAssist((next) => ({ ...next, profileBackgroundChampionId: skinId }))}
+          onClose={() => setSkinPickerOpen(false)}
+        />
+      )}
+
+      {profileIconPickerOpen && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-8 backdrop-blur-[1px]"
+          className="as-modal"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setProfileIconPickerOpen(false);
-            }
+            if (event.target === event.currentTarget) setProfileIconPickerOpen(false);
           }}
         >
-          <div className="flex max-h-[78vh] w-[760px] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
-            <div className="flex h-14 items-center gap-3 border-b border-app-border px-5">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-app-text">选择玩家头像</div>
-                <div className="mt-0.5 text-[10px] text-app-muted">点击头像后立即应用</div>
+          <div className="as-modal__box" role="dialog" aria-label="选择召唤师头像">
+            <div className="as-modal__head">
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <b>选择召唤师头像</b>
+                <span>点一下就选中，记得回去点「应用到客户端」</span>
               </div>
-              <div className="ml-auto w-56">
-                <TextInput
+              <div className="as-search">
+                <Search />
+                <input
+                  className="as-input"
                   value={profileIconSearch}
-                  placeholder="搜索头像 ID 或名称"
-                  onChange={setProfileIconSearch}
+                  placeholder="按编号或名称搜索"
+                  onChange={(event) => setProfileIconSearch(event.target.value)}
                 />
               </div>
-              <Button variant="ghost" size="icon-sm" onClick={() => setProfileIconPickerOpen(false)} aria-label="关闭">
-                <X className="size-4" />
-              </Button>
+              <Btn size="sm" tone="ghost" onClick={() => setProfileIconPickerOpen(false)} title="关闭">
+                <X />
+              </Btn>
             </div>
-            <div className="grid min-h-0 flex-1 grid-cols-9 gap-2 overflow-y-auto bg-app-bg-soft/45 p-4">
-              {profileIcons
-                .filter((icon) => {
-                  const query = profileIconSearch.trim().toLowerCase();
-                  return !query
-                    || String(icon.id).includes(query)
-                    || icon.title.toLowerCase().includes(query);
-                })
-                .slice(0, 800)
-                .map((icon) => (
+            {profileIcons.length === 0 ? (
+              <div className="as-empty"><LoaderCircle className="as-spin" /><b>正在读取你拥有的头像…</b></div>
+            ) : (
+              <div className="as-icon-grid">
+                {visibleIcons.map((icon) => (
                   <button
                     key={icon.id}
                     type="button"
-                    title={`${icon.title} (${icon.id})`}
+                    title={icon.title}
+                    aria-pressed={assist.profileIconId === icon.id}
                     onClick={() => {
                       updateAssist((next) => ({ ...next, profileIconId: icon.id }));
                       setProfileIconPickerOpen(false);
                     }}
-                    className={`rounded-sm border bg-app-surface p-1 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-app-primary/50 hover:shadow-sm ${
-                      assist.profileIconId === icon.id
-                        ? 'border-app-primary bg-app-primary-soft'
-                        : 'border-app-border'
-                    }`}
                   >
-                    <img
-                      src={icon.icon}
-                      alt={icon.title}
-                      className="aspect-square w-full rounded-sm"
-                    />
-                    <div className="mt-1 truncate text-[9px] text-app-muted">
-                      {icon.id}
-                    </div>
+                    <ProfileIcon iconId={icon.id} srcs={icon.icon ? [icon.icon] : []} alt={icon.title} size={56} />
+                    {icon.id}
                   </button>
                 ))}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <ConfirmDialog
         open={friendDeleteConfirmOpen}
         title="删除选中的好友"
-        description={`将从客户端好友列表中删除选中的 ${selectedFriendIds.size} 位好友。此操作无法直接撤销。`}
+        description={`会从客户端好友列表里删掉 ${selectedFriendIds.size} 位好友，删了需要重新加好友才能恢复。`}
         confirmLabel="删除好友"
         destructive
         busy={deletingFriends}

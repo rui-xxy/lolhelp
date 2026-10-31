@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { PlayerMatchDetail } from '../../../shared/api';
 
 export function getHistoryDayKey(timestamp: number): string {
@@ -22,6 +22,8 @@ export function getHistoryDayLabel(dayKey: string): string {
   if (date.getFullYear() === today.getFullYear()) return `${month}月${day}日`;
   return `${year}/${month}/${day}`;
 }
+
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 interface MonthActivityNavigatorProps {
   matches: PlayerMatchDetail[];
@@ -83,6 +85,61 @@ function buildMonthDays(
   });
 }
 
+// 月历波形的坐标：每天占 10 个单位宽，基线在 y=30，最高的一天顶到 y=6
+const WAVE_DAY = 10;
+const WAVE_BASE = 30;
+const WAVE_PEAK = 24;
+
+interface WavePoint {
+  x: number;
+  y: number;
+}
+
+// 单调三次插值（Fritsch–Carlson）：曲线平滑，但不会在两点之间冲过头、跑到基线下面
+function buildSmoothPath(points: WavePoint[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M${points[0].x},${points[0].y}`;
+  const n = points.length;
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = points[i + 1].x - points[i].x;
+    slope[i] = (points[i + 1].y - points[i].y) / dx[i];
+  }
+  const tangent: number[] = new Array(n);
+  tangent[0] = slope[0];
+  tangent[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    tangent[i] = slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2;
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) {
+      tangent[i] = 0;
+      tangent[i + 1] = 0;
+      continue;
+    }
+    const a = tangent[i] / slope[i];
+    const b = tangent[i + 1] / slope[i];
+    const h = a * a + b * b;
+    if (h > 9) {
+      const t = 3 / Math.sqrt(h);
+      tangent[i] = t * a * slope[i];
+      tangent[i + 1] = t * b * slope[i];
+    }
+  }
+  let path = `M${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const c1x = p0.x + dx[i] / 3;
+    const c1y = p0.y + (tangent[i] * dx[i]) / 3;
+    const c2x = p1.x - dx[i] / 3;
+    const c2y = p1.y - (tangent[i + 1] * dx[i]) / 3;
+    path += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p1.x.toFixed(2)},${p1.y.toFixed(2)}`;
+  }
+  return path;
+}
+
 export function MonthActivityNavigator({
   matches,
   activeDayKey,
@@ -98,6 +155,7 @@ export function MonthActivityNavigator({
   const lastPreviewKeyRef = useRef<string | null>(null);
   const [dragPreviewKey, setDragPreviewKey] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const waveId = useId().replace(/:/g, '');
   if (matches.length === 0) return null;
 
   const fallbackDayKey = getHistoryDayKey(matches[0].gameCreation);
@@ -115,17 +173,41 @@ export function MonthActivityNavigator({
   const visualDayKey =
     dragPreviewKey && getMonthKey(dragPreviewKey) === monthKey ? dragPreviewKey : resolvedDayKey;
   const activeIndex = Math.max(0, monthDays.findIndex((day) => day.key === visualDayKey));
-  const latestLoadedIndex = loadedIndexes.length > 0
-    ? Math.max(...loadedIndexes)
-    : activeIndex;
-  const rangeStart = Math.min(activeIndex, latestLoadedIndex);
-  const rangeEnd = Math.max(activeIndex, latestLoadedIndex);
   const dayCount = monthDays.length;
   const activeDay = monthDays[activeIndex]?.day ?? 1;
-  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][
-    new Date(year, month - 1, activeDay).getDay()
-  ];
+  const weekday = WEEKDAYS[new Date(year, month - 1, activeDay).getDay()];
   const tickDays = new Set([1, 8, 15, 22, dayCount]);
+  const visualDay = monthDays[activeIndex];
+  const monthWins = monthMatches.filter((match) => match.win).length;
+  const monthWinRate = monthTotal > 0 ? Math.round((monthWins / monthTotal) * 100) : 0;
+
+  // 波形只画「已知」的日子：从最早加载到的那天（或月初）到今天（或月末）
+  const knownIndexes = monthDays
+    .map((day, index) => (!day.unknown && !day.future ? index : -1))
+    .filter((index) => index >= 0);
+  const firstKnown = knownIndexes.length > 0 ? knownIndexes[0] : -1;
+  const lastKnown = knownIndexes.length > 0 ? knownIndexes[knownIndexes.length - 1] : -1;
+  const wavePoints: WavePoint[] = firstKnown < 0
+    ? []
+    : monthDays.slice(firstKnown, lastKnown + 1).map((day, offset) => ({
+        x: (firstKnown + offset) * WAVE_DAY + WAVE_DAY / 2,
+        y: WAVE_BASE - (day.count / maxCount) * WAVE_PEAK,
+      }));
+  const wavePath = buildSmoothPath(wavePoints);
+  const waveArea = wavePoints.length > 1
+    ? `${wavePath} L${wavePoints[wavePoints.length - 1].x},${WAVE_BASE} L${wavePoints[0].x},${WAVE_BASE} Z`
+    : '';
+  const waveWidth = dayCount * WAVE_DAY;
+  // 颜色沿着日期走：那天赢得多偏蓝、输得多偏红；没打的日子回到中性的淡灰，曲线贴着基线时几乎看不见
+  const colorStops = firstKnown < 0
+    ? []
+    : monthDays.slice(firstKnown, lastKnown + 1).map((day, offset) => ({
+        offset: (((firstKnown + offset) * WAVE_DAY + WAVE_DAY / 2) / waveWidth) * 100,
+        color: day.count > 0
+          ? `color-mix(in srgb, var(--color-ally) ${Math.round((day.wins / day.count) * 100)}%, var(--color-enemy))`
+          : 'color-mix(in srgb, var(--color-text-1) 18%, transparent)',
+      }));
+  const cursorX = activeIndex * WAVE_DAY + WAVE_DAY / 2;
 
   const resolveNearestLoadedDay = (clientX: number): DayActivity | null => {
     const stage = stageRef.current;
@@ -194,22 +276,41 @@ export function MonthActivityNavigator({
   };
 
   return (
-    <div className="match-calendar-scrubber">
+    <div className="match-calendar-scrubber" data-dragging={isDragging ? 'true' : undefined}>
       <div className="match-calendar-head">
-        <span className="match-calendar-month">
-          <strong>{String(month).padStart(2, '0')}</strong>
-          <em>{year}</em>
-        </span>
-
-        <span className="match-calendar-current">
-          <strong>{String(activeDay).padStart(2, '0')}</strong>
+        {/* 左：列表正在看的那一天（日期、星期、当天胜负）；右：这个月的总览 */}
+        <span className="match-calendar-current" key={visualDayKey}>
+          <strong>{activeDay}<small>日</small></strong>
           <em>{weekday}</em>
+          {visualDay && visualDay.count > 0 && (
+            <span className="match-calendar-current__record">
+              <b data-result="win" data-zero={visualDay.wins === 0 ? 'true' : undefined}>{visualDay.wins}胜</b>
+              <b data-result="loss" data-zero={visualDay.losses === 0 ? 'true' : undefined}>{visualDay.losses}负</b>
+            </span>
+          )}
         </span>
 
-        <span className="match-calendar-meta">
-          <strong>{monthTotal}</strong>
-          <em>局</em>
-          <i>{loading ? '同步' : `${Math.round(progress * 100)}%`}</i>
+        <span className="match-calendar-meta" title={`已浏览已加载战绩的 ${Math.round(progress * 100)}%`}>
+          <span className="match-calendar-month">
+            {year !== new Date().getFullYear() && <em>{year}</em>}
+            <strong>{month}<small>月</small></strong>
+          </span>
+          {loading ? (
+            <i className="match-calendar-meta__sync">同步中</i>
+          ) : (
+            <>
+              <i aria-hidden="true" />
+              <strong>{monthTotal}</strong>
+              <em>局</em>
+              {monthTotal > 0 && (
+                <>
+                  <i aria-hidden="true" />
+                  <strong>{monthWinRate}%</strong>
+                  <em>胜</em>
+                </>
+              )}
+            </>
+          )}
         </span>
       </div>
 
@@ -223,47 +324,90 @@ export function MonthActivityNavigator({
         onPointerUp={(event) => finishStageDrag(event, true)}
         onPointerCancel={(event) => finishStageDrag(event, false)}
       >
-        <span
-          className="match-calendar-depth"
-          style={{ width: `${progress * 100}%` }}
+        {/* 一条平滑的活动曲线：高低 = 当天局数，颜色 = 当天胜负；正在看的那天有一道竖向的光 */}
+        <svg
+          className="match-calendar-wave"
+          viewBox={`0 0 ${waveWidth} ${WAVE_BASE + 2}`}
+          preserveAspectRatio="none"
           aria-hidden="true"
-        />
-        <span
-          className="match-calendar-range"
-          style={{
-            left: `${(rangeStart / dayCount) * 100}%`,
-            width: `${((rangeEnd - rangeStart + 1) / dayCount) * 100}%`,
-          }}
-          aria-hidden="true"
-        />
-        <span
-          className="match-calendar-cursor"
-          style={{
-            left: `${(activeIndex / dayCount) * 100}%`,
-            width: `${100 / dayCount}%`,
-          }}
-          aria-hidden="true"
-        />
+        >
+          <defs>
+            <linearGradient id={`${waveId}-hue`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={waveWidth} y2="0">
+              {colorStops.length === 0 ? (
+                <stop offset="0%" style={{ stopColor: 'var(--color-text-3)' }} />
+              ) : (
+                colorStops.map((stop) => (
+                  <stop key={stop.offset} offset={`${stop.offset}%`} style={{ stopColor: stop.color }} />
+                ))
+              )}
+            </linearGradient>
+            <linearGradient id={`${waveId}-fade`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="white" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="white" stopOpacity="0" />
+            </linearGradient>
+            <mask id={`${waveId}-mask`} maskUnits="userSpaceOnUse" x="0" y="0" width={waveWidth} height={WAVE_BASE + 2}>
+              <rect x="0" y="0" width={waveWidth} height={WAVE_BASE} fill={`url(#${waveId}-fade)`} />
+            </mask>
+            <linearGradient id={`${waveId}-beam`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={WAVE_BASE}>
+              <stop offset="0%" style={{ stopColor: 'var(--color-glow)', stopOpacity: 0 }} />
+              <stop offset="100%" style={{ stopColor: 'var(--color-glow)', stopOpacity: 0.9 }} />
+            </linearGradient>
+            <clipPath id={`${waveId}-focus`}>
+              <rect x={cursorX - WAVE_DAY * 1.5} y="0" width={WAVE_DAY * 3} height={WAVE_BASE + 2} />
+            </clipPath>
+          </defs>
+
+          <line className="match-calendar-wave__base" x1="0" y1={WAVE_BASE} x2={waveWidth} y2={WAVE_BASE} vectorEffect="non-scaling-stroke" />
+          {lastKnown >= 0 && (
+            <line
+              className="match-calendar-wave__known"
+              x1={firstKnown * WAVE_DAY}
+              y1={WAVE_BASE}
+              x2={(lastKnown + 1) * WAVE_DAY}
+              y2={WAVE_BASE}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+
+          {waveArea && (
+            <path d={waveArea} fill={`url(#${waveId}-hue)`} mask={`url(#${waveId}-mask)`} className="match-calendar-wave__area" />
+          )}
+          {wavePath && (
+            <path d={wavePath} stroke={`url(#${waveId}-hue)`} className="match-calendar-wave__line" vectorEffect="non-scaling-stroke" />
+          )}
+          {wavePath && (
+            <path
+              d={wavePath}
+              stroke={`url(#${waveId}-hue)`}
+              clipPath={`url(#${waveId}-focus)`}
+              className="match-calendar-wave__line match-calendar-wave__line--focus"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {/* 正在看的那天：一根从基线往上淡出的细光 */}
+          <line
+            className="match-calendar-wave__cursor"
+            x1={cursorX}
+            y1="0"
+            x2={cursorX}
+            y2={WAVE_BASE}
+            stroke={`url(#${waveId}-beam)`}
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
 
         <div className="match-calendar-days">
           {monthDays.map((day) => {
-            const ratio = day.count / maxCount;
-            const fillHeight = day.count > 0 ? 6 + Math.round(ratio * 19) : 2;
             const isActive = day.key === visualDayKey;
-            const opacity = isActive
-              ? 1
-              : day.count > 0
-                ? 0.32 + ratio * 0.68
-                : day.unknown
-                  ? 0.12
-                  : 0.16;
             const canJump = day.count > 0;
+            const state = day.future ? 'future' : day.count > 0 ? 'played' : day.unknown ? 'unknown' : 'empty';
 
             return (
               <button
                 key={day.key}
                 type="button"
                 role="listitem"
+                data-state={state}
                 aria-label={
                   day.unknown
                     ? `${month}月${day.day}日，尚未加载`
@@ -277,32 +421,21 @@ export function MonthActivityNavigator({
                   }
                   if (canJump) onDaySelect(day.key);
                 }}
-                className={`match-calendar-day ${
-                  isActive ? 'match-calendar-day--active' : ''
-                } ${day.unknown ? 'match-calendar-day--unknown' : ''} ${
-                  day.future ? 'match-calendar-day--future' : ''
-                }`}
+                className={`match-calendar-day ${isActive ? 'match-calendar-day--active' : ''}`}
               >
-                <span className="match-calendar-day__well">
-                  <span
-                    className="match-calendar-day__fill"
-                    style={{
-                      height: fillHeight,
-                      opacity,
-                    } as CSSProperties}
-                  />
-                </span>
-                {tickDays.has(day.day) && (
+                {(isActive || (tickDays.has(day.day) && Math.abs(day.day - activeDay) > 2)) && (
                   <span className="match-calendar-day__index">{String(day.day).padStart(2, '0')}</span>
                 )}
                 <span className="match-calendar-day__tooltip" aria-hidden="true">
-                  <strong>{month}月{day.day}日</strong>
+                  <strong>{month}月{day.day}日 {WEEKDAYS[new Date(year, month - 1, day.day).getDay()]}</strong>
                   <em>
                     {day.unknown
                       ? '尚未加载'
-                      : day.count > 0
-                        ? `${day.count} 局 · ${day.wins}胜 ${day.losses}负`
-                        : '0 局'}
+                      : day.future
+                        ? '还没到'
+                        : day.count > 0
+                          ? `${day.count} 局 · ${day.wins}胜 ${day.losses}负`
+                          : '没有对局'}
                   </em>
                 </span>
               </button>

@@ -10,10 +10,12 @@ import { APP_LAYOUT } from '../shared/constants';
 import { startAssistEngine, stopAssistEngine } from './assist/engine';
 import { startLiveWatcher, stopLiveWatcher } from './live/liveWatcher';
 import { startSavedMatchFollowWatcher, stopSavedMatchFollowWatcher } from './match/savedMatchFollowWatcher';
+import { loadWindowState, trackWindowState } from './windowState';
+import { loadWindowChrome } from './windowChrome';
 
 const APP_WINDOW_TITLE = 'LOL助手';
-const DEFAULT_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.friendPanelWidth;
-const MIN_WINDOW_WIDTH = APP_LAYOUT.workspaceWidth + APP_LAYOUT.hiddenFriendPanelWidth;
+// 旧版独立好友窗口的最大宽度（288px 面板 + 边距），仅用于启动时关闭遗留窗口。
+const LEGACY_FRIEND_WINDOW_MAX_WIDTH = 368;
 
 function writeRendererExitLog(
   details: { reason: string; exitCode: number },
@@ -53,7 +55,7 @@ function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
     const { width } = win.getBounds();
     const isLegacyDevFriendWindow =
       Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL) &&
-      width <= APP_LAYOUT.friendPanelWidth + 80 &&
+      width <= LEGACY_FRIEND_WINDOW_MAX_WIDTH &&
       url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL);
     const isLegacyFriendWindow =
       win.getTitle() === '好友' ||
@@ -67,18 +69,28 @@ function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
 }
 
 const createWindow = () => {
+  const windowState = loadWindowState({
+    width: APP_LAYOUT.defaultWindowWidth,
+    height: APP_LAYOUT.defaultWindowHeight,
+    minWidth: APP_LAYOUT.minWindowWidth,
+    minHeight: APP_LAYOUT.minWindowHeight,
+  });
+  // 窗口底色与系统按钮区要和顶栏同色；颜色随外观设置变化，见 windowChrome.ts。
+  const chrome = loadWindowChrome();
   const mainWindow = new BrowserWindow({
     title: APP_WINDOW_TITLE,
-    width: DEFAULT_WINDOW_WIDTH,
-    height: APP_LAYOUT.windowHeight,
-    minWidth: MIN_WINDOW_WIDTH,
+    x: windowState.x,
+    y: windowState.y,
+    width: windowState.width,
+    height: windowState.height,
+    minWidth: APP_LAYOUT.minWindowWidth,
     minHeight: APP_LAYOUT.minWindowHeight,
-    backgroundColor: '#0b0f14',
+    backgroundColor: chrome.color,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#0d1219',
-      symbolColor: '#c4ced9',
-      height: 44,
+      color: chrome.color,
+      symbolColor: chrome.symbolColor,
+      height: APP_LAYOUT.topbarHeight,
     },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -90,6 +102,9 @@ const createWindow = () => {
       webSecurity: true,
     },
   });
+
+  if (windowState.maximized) mainWindow.maximize();
+  trackWindowState(mainWindow);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -108,7 +123,7 @@ const createWindow = () => {
       void mainWindow.webContents.executeJavaScript(`
         for (const type of ['focusin', 'focusout', 'keydown', 'beforeinput', 'input', 'selectionchange']) {
           document.addEventListener(type, (event) => {
-            console.log('[input-probe]' + JSON.stringify({type, target:event.target?.tagName, active:document.activeElement?.tagName, length:document.querySelector('.app-shell-header-search input')?.value.length, selection:window.getSelection()?.anchorNode?.nodeName}));
+            console.log('[input-probe]' + JSON.stringify({type, target:event.target?.tagName, active:document.activeElement?.tagName, length:document.querySelector('.shell-search input')?.value.length, selection:window.getSelection()?.anchorNode?.nodeName}));
           }, true);
         }
       `);

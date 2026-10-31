@@ -390,7 +390,7 @@ export function SavedMatchPickerDialog({ open, onClose, onSelect }: SavedMatchPi
                         <h3 className="truncate text-lg font-semibold text-app-text">
                           {getFullRiotId(activeAccount.profile.riotId)}
                         </h3>
-                        <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-1 text-[10px] font-medium text-app-primary">
+                        <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-1 text-[11px] font-medium text-app-primary">
                           {getRegionName(activeAccount)}
                         </span>
                       </div>
@@ -529,11 +529,11 @@ function AccountListItem({
           </span>
           {account.follow?.enabled && <Bell className="size-3 shrink-0 fill-app-primary text-app-primary" />}
         </div>
-        <div className="mt-0.5 truncate text-[10px] text-app-subtle">
+        <div className="mt-0.5 truncate text-[11px] text-app-subtle">
           {getRegionName(account)} · {getAccountSummary(account.matches)}
         </div>
       </div>
-      <span className="shrink-0 text-[10px] text-app-subtle">{formatSavedAt(getSavedAt(account))}</span>
+      <span className="shrink-0 text-[11px] text-app-subtle">{formatSavedAt(getSavedAt(account))}</span>
     </button>
   );
 }
@@ -558,7 +558,7 @@ function RankSummary({ ranks }: { ranks: PlayerRankSummary[] }) {
           title={getRankText(rank)}
         >
           <RankEmblem rank={rank} size={44} />
-          <div className="mt-0.5 w-full truncate text-[10px] text-app-muted">{getRankQueueLabel(rank)}</div>
+          <div className="mt-0.5 w-full truncate text-[11px] text-app-muted">{getRankQueueLabel(rank)}</div>
           <div className="w-full truncate text-xs font-semibold text-app-text">{getRankDetailText(rank)}</div>
         </div>
       ))}
@@ -579,19 +579,19 @@ function AccountInfoPanel({ account }: { account: SavedMatchAccountCatalogEntry 
         <h4 className="mb-2 text-xs font-semibold text-app-text">保存概览</h4>
         <div className="grid grid-cols-3 overflow-hidden rounded-sm border border-app-border bg-app-surface divide-x divide-app-border">
           <div className="px-4 py-3">
-            <div className="text-[10px] text-app-muted">保存对局</div>
+            <div className="text-[11px] text-app-muted">保存对局</div>
             <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">{account.matches.length}</div>
           </div>
           <div className="px-4 py-3">
-            <div className="text-[10px] text-app-muted">胜负</div>
+            <div className="text-[11px] text-app-muted">胜负</div>
             <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">
-              <span className="text-app-success">{wins}</span>
+              <span className="text-ally">{wins}</span>
               <span className="mx-1 text-app-subtle">/</span>
               <span className="text-app-danger">{losses}</span>
             </div>
           </div>
           <div className="px-4 py-3">
-            <div className="text-[10px] text-app-muted">胜率</div>
+            <div className="text-[11px] text-app-muted">胜率</div>
             <div className="mt-1 text-lg font-semibold tabular-nums text-app-text">{winRate}%</div>
           </div>
         </div>
@@ -633,7 +633,7 @@ function SavedMatchesPanel({
           key={match.gameId}
           className={`saved-match-row grid grid-cols-[minmax(0,1fr)_90px_80px_80px] items-center gap-3 border-l-2 px-3 py-2.5 ${
             match.win
-              ? 'border-l-app-success bg-app-win-bg/20'
+              ? 'border-l-ally bg-app-win-bg/20'
               : 'border-l-app-danger bg-app-loss-bg/20'
           }`}
         >
@@ -650,15 +650,15 @@ function SavedMatchesPanel({
           </div>
           <div className="text-right text-xs font-semibold tabular-nums text-app-text">
             {match.kills} / {match.deaths} / {match.assists}
-            <div className="text-[10px] font-normal text-app-muted">{match.kda.toFixed(2)} KDA</div>
+            <div className="text-[11px] font-normal text-app-muted">{match.kda.toFixed(2)} KDA</div>
           </div>
           <div className="text-right text-xs font-semibold tabular-nums text-app-text">
             {formatNumber(match.damage)}
-            <div className="text-[10px] font-normal text-app-muted">伤害</div>
+            <div className="text-[11px] font-normal text-app-muted">伤害</div>
           </div>
           <div className="text-right text-xs font-semibold tabular-nums text-app-text">
             {match.cs}
-            <div className="text-[10px] font-normal text-app-muted">补刀</div>
+            <div className="text-[11px] font-normal text-app-muted">补刀</div>
           </div>
         </div>
       ))}
@@ -718,7 +718,7 @@ function GroupButton({
       >
         <span className="shrink-0">{icon}</span>
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <span className="shrink-0 text-[10px] text-app-subtle">{count}</span>
+        <span className="shrink-0 text-[11px] text-app-subtle">{count}</span>
       </button>
       {onDelete && (
         <button

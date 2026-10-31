@@ -72,18 +72,18 @@
   .match-result-card--win::after {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.68) 0%,
-      rgba(247, 248, 248, 0.05) 46%,
-      rgba(255, 255, 255, 0.74) 100%
+      color-mix(in srgb, var(--color-text-1) 68%, transparent) 0%,
+      color-mix(in srgb, var(--color-text-1) 5%, transparent) 46%,
+      color-mix(in srgb, var(--color-text-1) 74%, transparent) 100%
     );
   }
 
   .match-result-card--loss::after {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.68) 0%,
-      rgba(247, 248, 248, 0.05) 46%,
-      rgba(255, 255, 255, 0.74) 100%
+      color-mix(in srgb, var(--color-text-1) 68%, transparent) 0%,
+      color-mix(in srgb, var(--color-text-1) 5%, transparent) 46%,
+      color-mix(in srgb, var(--color-text-1) 74%, transparent) 100%
     );
   }
 
@@ -123,9 +123,9 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--color-app-border);
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     background: var(--color-app-surface-soft);
-    box-shadow: rgba(0, 0, 0, 0.04) 0 1px 3px;
+    box-shadow: color-mix(in srgb, var(--color-shadow) 4%, transparent) 0 1px 3px;
   }
 
   .match-result-card--checked .match-result-check {
@@ -143,7 +143,7 @@
   .match-result-avatar {
     position: relative;
     z-index: 10;
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    border: 1px solid color-mix(in srgb, var(--color-shadow) 6%, transparent);
   }
 
   .match-result-avatar--win {
@@ -175,7 +175,7 @@
     align-items: center;
     border-radius: 2px;
     padding: 0 4px;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 800;
     letter-spacing: 0;
     line-height: 14px;
@@ -223,7 +223,7 @@
     border-bottom: 1px solid var(--color-app-border);
     padding: 0 10px 8px;
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
   }
 
@@ -275,7 +275,7 @@
 
   .team-detail-result {
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 800;
     letter-spacing: 0;
   }
@@ -318,9 +318,9 @@
     content: "";
     background: linear-gradient(
       90deg,
-      rgba(247, 248, 248, 0.1) 0%,
+      color-mix(in srgb, var(--color-text-1) 10%, transparent) 0%,
       rgba(213, 180, 105, 0.3) 50%,
-      rgba(247, 248, 248, 0.12) 100%
+      color-mix(in srgb, var(--color-text-1) 12%, transparent) 100%
     );
     opacity: 0;
     pointer-events: none;
@@ -333,7 +333,7 @@
   }
 
   .player-detail-row:hover {
-    background-color: rgba(247, 248, 248, 0.05);
+    background-color: color-mix(in srgb, var(--color-text-1) 5%, transparent);
   }
 
   .player-detail-row--has-skin:hover::before {
@@ -348,13 +348,13 @@
   .player-detail-row--target {
     background:
       linear-gradient(90deg, rgba(213, 180, 105, 0.13), transparent 46%),
-      rgba(247, 248, 248, 0.05);
+      color-mix(in srgb, var(--color-text-1) 5%, transparent);
     box-shadow: rgba(213, 180, 105, 0.3) 0 0 0 1px inset;
   }
 
   .player-detail-avatar {
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: rgba(0, 0, 0, 0.05) 0 0 0 1px;
+    border: 1px solid color-mix(in srgb, var(--color-shadow) 6%, transparent);
+    box-shadow: color-mix(in srgb, var(--color-shadow) 5%, transparent) 0 0 0 1px;
   }
 
   .player-detail-runes {
@@ -377,7 +377,7 @@
     border: 1px solid var(--color-app-border-strong);
     border-radius: 999px;
     background:
-      linear-gradient(135deg, rgba(247, 248, 248, 0.06), rgba(247, 248, 248, 0.03)),
+      linear-gradient(135deg, color-mix(in srgb, var(--color-text-1) 6%, transparent), color-mix(in srgb, var(--color-text-1) 3%, transparent)),
       rgba(221, 221, 221, 0.34);
   }
 

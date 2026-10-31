@@ -45,6 +45,52 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
     const particles: Firefly[] = [];
     const spark = win ? { r: 226, g: 241, b: 235 } : { r: 245, g: 224, b: 230 };
     const sparkColor = `rgb(${spark.r} ${spark.g} ${spark.b})`;
+
+    // 深色模式：浅色光点 + 叠加发光（lighter）。
+    // 浅色模式：浅色光点在浅底上看不见，改成深一些的队伍色（胜蓝负红）正常叠加，
+    // 光晕更小、更实，拖尾更明显。切换深浅色 / 配色时即时更新。
+    interface SparkLook {
+      color: string;
+      composite: GlobalCompositeOperation;
+      trail: number;
+      halo: number;
+      haloScale: number;
+      core: number;
+      coreSwing: number;
+      radiusScale: number;
+    }
+    const readLook = (): SparkLook => {
+      const root = document.documentElement;
+      if (root.dataset.mode === 'light') {
+        const token = getComputedStyle(root).getPropertyValue(win ? '--color-ally' : '--color-enemy').trim();
+        return {
+          color: token || (win ? '#2E6FD1' : '#C8474C'),
+          composite: 'source-over',
+          trail: 0.34,
+          halo: 0.16,
+          haloScale: 3,
+          core: 0.62,
+          coreSwing: 0.33,
+          radiusScale: 1.25,
+        };
+      }
+      return {
+        color: sparkColor,
+        composite: 'lighter',
+        trail: 0.09,
+        halo: 0.055,
+        haloScale: 4,
+        core: 0.28,
+        coreSwing: 0.3,
+        radiusScale: 1,
+      };
+    };
+    let look = readLook();
+    const themeObserver = new MutationObserver(() => {
+      look = readLook();
+      if (reducedMotion) draw(0);
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode', 'data-theme'] });
     let width = 1;
     let height = 1;
     let animationFrame = 0;
@@ -148,23 +194,24 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
         for (let index = 1; index < particle.history.length; index++) {
           context.lineTo(particle.history[index].x, particle.history[index].y);
         }
-        context.globalAlpha = 0.09 * pulse;
-        context.strokeStyle = sparkColor;
-        context.lineWidth = 0.55;
+        context.globalAlpha = look.trail * pulse;
+        context.strokeStyle = look.color;
+        context.lineWidth = 0.55 * look.radiusScale;
         context.stroke();
       }
 
-      context.globalAlpha = 0.055 * pulse;
-      context.fillStyle = sparkColor;
+      const radius = particle.radius * look.radiusScale;
+      context.globalAlpha = look.halo * pulse;
+      context.fillStyle = look.color;
       context.beginPath();
-      context.arc(particle.x, particle.y, particle.radius * 4, 0, Math.PI * 2);
+      context.arc(particle.x, particle.y, radius * look.haloScale, 0, Math.PI * 2);
       context.fill();
 
-      context.globalAlpha = 0.28 + 0.3 * pulse;
-      context.shadowColor = sparkColor;
-      context.shadowBlur = 3 + particle.radius * 1.5;
+      context.globalAlpha = look.core + look.coreSwing * pulse;
+      context.shadowColor = look.color;
+      context.shadowBlur = 3 + radius * 1.5;
       context.beginPath();
-      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      context.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
       context.fill();
       context.shadowBlur = 0;
       context.globalAlpha = 1;
@@ -172,7 +219,7 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
 
     const draw = (time: number) => {
       context.clearRect(0, 0, width, height);
-      context.globalCompositeOperation = 'lighter';
+      context.globalCompositeOperation = look.composite;
       particles.forEach((particle) => drawParticle(particle, time));
       context.globalCompositeOperation = 'source-over';
     };
@@ -222,6 +269,7 @@ export function DamageEnergyBar({ damageShare, win }: DamageEnergyBarProps) {
 
     return () => {
       stopAnimation();
+      themeObserver.disconnect();
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
-import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, Ellipsis, MailPlus, PanelRightOpen, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Ellipsis, History as HistoryIcon, LoaderCircle, MailPlus, MousePointerClick, PanelRightOpen, Trash2, X } from 'lucide-react';
 import { MatchList, type RecurringMate } from './MatchList';
 import { MatchDetail } from './MatchDetail';
 import { MonthActivityNavigator, getHistoryDayKey } from './MatchActivityNavigator';
 import type { PlayerLookupResult, PlayerMatchDetail } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 import { RankEmblem } from '../RankEmblem';
+import { EmptyState } from '../ui/kit';
 import { saveMatchesForProfile, type SavedMatchAccount } from './savedMatchesStore';
 import { LOL_REGIONS } from '../../../shared/constants';
 
@@ -269,7 +270,7 @@ function RankSummaryCard({
       {rank ? (
         <RankEmblem rank={rank} size={44} variant="mini" />
       ) : (
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-surface-soft text-[10px] text-app-subtle">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-surface-soft text-[11px] text-app-subtle">
           未定
         </div>
       )}
@@ -864,8 +865,17 @@ export function MatchHistoryPage({
     const fadeZone = Math.max(78, Math.min(126, containerRect.height * 0.23));
     const handoffZone = Math.max(104, Math.min(132, containerRect.height * 0.22));
     const handoffHalf = handoffZone / 2;
+    // 聚焦线：平时在视口 36% 的高度；刚打开、还在最顶上时贴近顶部，
+    // 这样最新的那一天是亮的，往下滚时聚焦线再平滑地移到原位。
+    const restingFocusOffset = Math.max(116, Math.min(190, containerRect.height * 0.36));
     const focusY =
-      containerRect.top + Math.max(116, Math.min(190, containerRect.height * 0.36));
+      containerRect.top + Math.min(restingFocusOffset, 28 + container.scrollTop);
+    // 只有那一侧还能继续滚动时才做边缘淡出（在最顶上时，最上面几行不该是淡的）
+    const topFadeStrength = Math.max(0, Math.min(1, container.scrollTop / fadeZone));
+    const bottomFadeStrength = Math.max(
+      0,
+      Math.min(1, (container.scrollHeight - container.clientHeight - container.scrollTop) / fadeZone),
+    );
     const entries = Array.from(
       container.querySelectorAll<HTMLElement>('.match-history-entry[data-history-day-key]'),
     );
@@ -964,11 +974,12 @@ export function MatchHistoryPage({
     entries.forEach((entry) => {
       const rect = entry.getBoundingClientRect();
       const rowCenter = rect.top + rect.height / 2;
-      const edgeDistance = Math.min(
-        rowCenter - containerRect.top,
-        containerRect.bottom - rowCenter,
+      const topRatio = Math.max(0, Math.min(1, (rowCenter - containerRect.top) / fadeZone));
+      const bottomRatio = Math.max(0, Math.min(1, (containerRect.bottom - rowCenter) / fadeZone));
+      const edgeRatio = Math.min(
+        1 - topFadeStrength * (1 - topRatio),
+        1 - bottomFadeStrength * (1 - bottomRatio),
       );
-      const edgeRatio = Math.max(0, Math.min(1, edgeDistance / fadeZone));
       const easedEdge = edgeRatio * edgeRatio * (3 - 2 * edgeRatio);
       const centerDistance = Math.abs(rowCenter - viewportCenter);
       const centerRatio = Math.max(
@@ -1445,17 +1456,17 @@ export function MatchHistoryPage({
                 <QueueFilterMenu value={activeTab.filterQueue} onChange={handleFilterChange} />
               </div>
 
-              <div className="mt-1.5 flex h-6 items-center justify-between gap-2 text-[10px] text-app-muted">
+              <div className="mt-1.5 flex h-6 items-center justify-between gap-2 text-[11px] text-app-muted">
                 <div className="min-w-0 truncate tabular-nums">
                   {activeTab.loading ? (
                     <span className="text-app-subtle">加载战绩中...</span>
                   ) : activeTab.matches.length > 0 ? (
                     <>
-                      <span className="font-medium text-app-success">
+                      <span className="font-medium text-ally">
                         {activeTab.matches.filter((match) => match.win).length} 胜
                       </span>
                       <span className="mx-1.5 text-app-border-strong">·</span>
-                      <span className="font-medium text-app-danger">
+                      <span className="font-medium text-enemy">
                         {activeTab.matches.filter((match) => !match.win).length} 负
                       </span>
                       <span className="mx-1.5 text-app-border-strong">·</span>
@@ -1485,20 +1496,20 @@ export function MatchHistoryPage({
                         type="button"
                         disabled={selectedSaveCount === 0}
                         onClick={() => void handleSaveSelectedMatches()}
-                        className="h-6 rounded-sm bg-app-primary px-2 text-[10px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
+                        className="h-6 rounded-sm bg-app-primary px-2 text-[11px] font-medium text-app-primary-foreground transition-colors enabled:hover:bg-app-primary-hover disabled:cursor-default disabled:opacity-40"
                       >
                         保存{selectedSaveCount > 0 ? selectedSaveCount : ''}
                       </button>
                       <button
                         type="button"
                         onClick={stopSaveMode}
-                        className="h-6 rounded-sm px-2 text-[10px] text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
+                        className="h-6 rounded-sm px-2 text-[11px] text-app-muted transition-colors hover:bg-app-nav-hover hover:text-app-text"
                       >
                         取消
                       </button>
                     </>
                   ) : activeTab.source === 'saved' ? (
-                    <span className="h-6 px-1.5 leading-6 text-[10px] font-medium text-app-subtle">
+                    <span className="h-6 px-1.5 leading-6 text-[11px] font-medium text-app-subtle">
                       已保存
                     </span>
                   ) : (
@@ -1537,7 +1548,10 @@ export function MatchHistoryPage({
             className="match-history-focus-viewport scrollbar-none relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-1.5 pb-2"
           >
             {activeTab?.loading ? (
-              <div className="flex h-full items-center justify-center text-xs text-app-subtle">加载中...</div>
+              <div className="flex h-full items-center justify-center gap-2 text-meta text-text-3" aria-live="polite">
+                <LoaderCircle className="size-3.5 animate-spin" />
+                正在读取战绩…
+              </div>
             ) : displayedMatches.length > 0 ? (
               <MatchList
                 matches={displayedMatches}
@@ -1560,13 +1574,19 @@ export function MatchHistoryPage({
                 viewportRange={historyViewportRange}
               />
             ) : activeTab?.result?.error ? (
-              <div className="flex h-full items-center justify-center p-4 text-center text-xs text-app-danger">
-                {activeTab.result.error}
-              </div>
+              <EmptyState
+                className="h-full"
+                icon={<CircleAlert />}
+                title="没查到战绩"
+                description={activeTab.result.error}
+              />
             ) : (
-              <div className="flex h-full items-center justify-center p-4 text-center text-xs text-app-subtle">
-                查询战绩
-              </div>
+              <EmptyState
+                className="h-full"
+                icon={<HistoryIcon />}
+                title={activeTab ? '这个筛选下没有对局' : '还没有查询'}
+                description={activeTab ? '换一个模式筛选试试。' : '在顶部搜索框输入「名字#编号」，或按 Ctrl K。'}
+              />
             )}
             {activeTab?.pageLoading && (
               <div className="match-history-loading" aria-live="polite">
@@ -1603,9 +1623,12 @@ export function MatchHistoryPage({
               onPlayerSearch={handlePlayerSearch}
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-xs text-app-subtle">
-              选择左侧的一场对局查看详情
-            </div>
+            <EmptyState
+              className="h-full"
+              icon={<MousePointerClick />}
+              title="选择一场对局"
+              description="点左侧列表里的任意一场，这里会显示计分板、伤害和时间线。"
+            />
           )}
         </div>
       </div>

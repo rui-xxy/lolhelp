@@ -150,7 +150,7 @@ function MessageBubble({
     return (
       <div className="flex flex-col items-center gap-1 py-1">
         {message.timestamp && (
-          <span className="text-[10px] text-app-subtle">
+          <span className="text-[11px] text-app-subtle">
             {formatMessageTime(message.timestamp)}
           </span>
         )}
@@ -172,7 +172,7 @@ function MessageBubble({
         className="mt-4 border border-app-border"
       />
       <div className={`max-w-[68%] ${message.fromSelf ? 'items-end' : 'items-start'} flex flex-col`}>
-        <div className="mb-1 flex items-center gap-2 text-[10px] text-app-subtle">
+        <div className="mb-1 flex items-center gap-2 text-[11px] text-app-subtle">
           {!message.fromSelf && (
             <span className="max-w-48 truncate">
               {message.senderRiotId || conversation.riotId}
@@ -511,7 +511,7 @@ export function ChatSessionDialog({
                           <span className="block truncate text-xs font-semibold">
                             {account.riotId}
                           </span>
-                          <span className="block text-[10px] text-app-muted">
+                          <span className="block text-[11px] text-app-muted">
                             {account.current ? '当前登录账号' : '本地保存账号'}
                             {' · '}
                             {account.conversationCount} 个会话
@@ -555,7 +555,7 @@ export function ChatSessionDialog({
                 正在读取聊天记录…
               </div>
             ) : error ? (
-              <div className="m-4 rounded-sm border border-app-danger/20 bg-red-50 p-3 text-xs leading-5 text-app-danger">
+              <div className="m-4 rounded-sm border border-app-danger/20 bg-enemy-soft p-3 text-xs leading-5 text-app-danger">
                 {error.includes('未连接')
                   ? '未连接英雄联盟客户端，启动客户端并登录后再试。'
                   : `会话读取失败：${error}`}
@@ -597,7 +597,7 @@ export function ChatSessionDialog({
                         className="border border-app-border"
                       />
                       {conversation.unreadMessageCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[9px] font-semibold leading-4 text-app-primary-foreground">
+                        <span className="absolute -top-1.5 -right-1.5 flex min-w-4 items-center justify-center rounded-full bg-app-primary px-1 text-[11px] font-semibold leading-4 text-app-primary-foreground">
                           {conversation.unreadMessageCount > 99
                             ? '99+'
                             : conversation.unreadMessageCount}
@@ -609,13 +609,13 @@ export function ChatSessionDialog({
                         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
                           {conversation.riotId}
                         </span>
-                        <span className="shrink-0 text-[10px] text-app-subtle">
+                        <span className="shrink-0 text-[11px] text-app-subtle">
                           {formatConversationTime(conversation.lastMessageAt)}
                         </span>
                       </div>
                       <div className="mt-1 flex min-w-0 items-center gap-1.5">
                         {statusText && (
-                          <span className="shrink-0 rounded-sm bg-app-primary-soft px-1.5 py-0.5 text-[9px] font-medium text-app-primary">
+                          <span className="shrink-0 rounded-sm bg-app-primary-soft px-1.5 py-0.5 text-[11px] font-medium text-app-primary">
                             {statusText}
                           </span>
                         )}
@@ -649,7 +649,7 @@ export function ChatSessionDialog({
                       {selectedConversation.riotId}
                     </div>
                     {conversationStatusText(selectedConversation) && (
-                      <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-0.5 text-[10px] font-medium text-app-primary">
+                      <span className="shrink-0 rounded-sm bg-app-primary-soft px-2 py-0.5 text-[11px] font-medium text-app-primary">
                         {conversationStatusText(selectedConversation)}
                       </span>
                     )}
@@ -762,7 +762,7 @@ export function ChatSessionDialog({
                                     key={page.label}
                                     type="button"
                                     onClick={() => setEmojiPageIndex(index)}
-                                    className={`h-6 rounded-xs px-2 text-[10px] font-medium transition-colors ${
+                                    className={`h-6 rounded-xs px-2 text-[11px] font-medium transition-colors ${
                                       emojiPageIndex === index
                                         ? 'bg-app-surface text-app-primary shadow-sm'
                                         : 'text-app-muted hover:text-app-text'
@@ -776,7 +776,7 @@ export function ChatSessionDialog({
                             <div className="max-h-[304px] space-y-3 overflow-y-auto pr-1">
                               {activeEmojiPage.groups.map((group) => (
                                 <div key={group.title}>
-                                  <div className="mb-1 px-1 text-[10px] font-medium text-app-subtle">
+                                  <div className="mb-1 px-1 text-[11px] font-medium text-app-subtle">
                                     {group.title}
                                   </div>
                                   <div className="grid grid-cols-9 gap-1">
@@ -799,10 +799,10 @@ export function ChatSessionDialog({
                           </div>
                         )}
                       </div>
-                      <span className="text-[10px] text-app-subtle">
+                      <span className="text-[11px] text-app-subtle">
                         Enter 发送 · Shift+Enter 换行
                       </span>
-                      <span className="ml-auto text-[10px] text-app-subtle">
+                      <span className="ml-auto text-[11px] text-app-subtle">
                         {draft.length}/1000
                       </span>
                       <button

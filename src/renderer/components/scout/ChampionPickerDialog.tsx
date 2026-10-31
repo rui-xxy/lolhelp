@@ -32,7 +32,7 @@ export function ChampionPickerDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
           onPointerDownOutside={() => onOpenChange(false)}
           className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-app-border bg-app-surface shadow-airbnb"

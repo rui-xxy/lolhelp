@@ -37,7 +37,7 @@
     justify-content: center;
     gap: 7px;
     border: 1px solid var(--analysis-line);
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     padding: 5px 11px;
     background: transparent;
     color: var(--color-app-body);
@@ -58,7 +58,7 @@
     align-items: center;
     gap: 8px;
     border: 1px solid var(--analysis-line);
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     padding: 0 10px;
     background: var(--analysis-panel);
     color: var(--color-app-muted);
@@ -81,7 +81,7 @@
   }
   .md-search button {
     padding: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
   }
   .lol-riot-art-icon {
     display: block;
@@ -101,7 +101,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--roster-team) 4%, var(--analysis-bg));
   }
   .match-roster__team-name {
@@ -142,7 +142,7 @@
     justify-content: center;
     gap: 5px;
     border: 1px solid transparent;
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     padding: 6px 3px 5px;
     color: var(--color-app-muted);
     background: transparent;
@@ -287,7 +287,7 @@
     white-space: nowrap;
   }
   .md-stats__comparison button {
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     padding: 3px;
   }
   .md-stats__comparison svg {
@@ -318,7 +318,7 @@
     gap: 8px;
     padding: 7px 9px;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--color-app-muted);
     font-size: 12px;
@@ -354,7 +354,7 @@
     margin-bottom: 26px;
     padding: 18px 0;
     border: 1px solid var(--analysis-line);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: var(--analysis-panel);
     gap: 0;
   }
@@ -383,7 +383,7 @@
     letter-spacing: -0.025em;
   }
   .md-stats__summary-compare { display: flex; align-items: baseline; gap: 8px; color: var(--analysis-blue); font-size: 13px; font-variant-numeric: tabular-nums; }
-  .md-stats__summary-compare small { color: var(--color-app-muted); font-size: 10px; }
+  .md-stats__summary-compare small { color: var(--color-app-muted); font-size: 11px; }
   .md-stats__section {
     margin-bottom: 26px;
   }
@@ -420,7 +420,7 @@
   .md-player-heading > img { flex-shrink: 0; }
   .md-player-heading > span { display: grid; min-width: 0; gap: 2px; }
   .md-player-heading b { font-size: 12px; font-weight: 500; color: var(--color-app-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .md-player-heading small { display: block; font-size: 10px; color: var(--color-app-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .md-player-heading small { display: block; font-size: 11px; color: var(--color-app-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .md-player-heading.is-compare b { color: var(--analysis-blue); }
   .md-stats__delta-heading { text-align: right; }
   .md-stat {
@@ -430,7 +430,7 @@
     width: 100%;
     min-height: 56px;
     padding: 10px 12px;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     color: var(--color-app-body);
     background: transparent;
     text-align: left;
@@ -441,7 +441,7 @@
   .md-stat.is-expanded {
     margin: 4px 0 8px;
     border: 1px solid var(--color-app-border);
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     background: var(--analysis-panel);
   }
   .md-stat__label {
@@ -470,7 +470,7 @@
     gap: 7px;
     min-width: 0;
   }
-  .md-stat__reference { color: var(--color-app-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .md-stat__reference { color: var(--color-app-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .md-stat__text-values {
     color: var(--color-app-muted);
     font-size: 12px;
@@ -482,7 +482,7 @@
     min-width: 0;
     width: 100%;
     overflow: hidden;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     background: var(--color-frost-fill-active);
   }
   .md-meter > i {
@@ -534,7 +534,7 @@
     min-height: 39px;
     padding: 5px 7px;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
   }
   .md-stat__player > span:not(.md-meter) {
     overflow: hidden;

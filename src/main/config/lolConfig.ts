@@ -4,10 +4,14 @@ import path from 'node:path';
 import type {
   LolBlockedPlayer,
   LolConfigApplyResult,
+  LolConfigClientState,
   LolConfigFileStatus,
+  LolConfigPart,
+  LolConfigProfileDetail,
   LolConfigProfileSummary,
   LolConfigValues,
 } from '../../shared/api';
+import { ALL_CONFIG_PARTS, mergeConfigParts } from '../../shared/configParts';
 import { LcuClient } from '../lcu/client';
 import { readCredentialsForInstallRoot } from '../lcu/lockfile';
 import {
@@ -52,6 +56,7 @@ import {
   gameResolution,
   listProfileSummaries,
   readProfileStore,
+  summarizeProfile,
   writeProfileStore,
   type ConfigProfileSnapshots,
 } from './profileStore';
@@ -701,6 +706,8 @@ async function syncValuesToLcu(rootPath: string, values: LolConfigValues): Promi
     applyHotkeysToLcuInputSettings(inputSettings, values);
     await client.patch('/lol-game-settings/v1/input-settings', inputSettings);
   }
+  // 让客户端马上把游戏设置存进这个账号（会跟着账号走）；旧版本客户端没有这个接口就忽略。
+  await client.post('/lol-game-settings/v1/save', null).catch(() => undefined);
 
   await patchLcuSetting(client, 'local', 'lol-audio', (data) => {
     data.masterSoundEnabled = values.client.clientAudioEnabled;
@@ -736,7 +743,9 @@ async function syncValuesToLcu(rootPath: string, values: LolConfigValues): Promi
   }
 
   if (values.client.voiceInputDeviceHandle) {
-    await client.put<void>('/lol-premade-voice/v1/capturedevices', values.client.voiceInputDeviceHandle);
+    // 方案可能来自另一台电脑，麦克风不一定存在；切不过去就保持现在的设备。
+    await client.put<void>('/lol-premade-voice/v1/capturedevices', values.client.voiceInputDeviceHandle)
+      .catch(() => undefined);
   }
 
   await client.put<void>(
@@ -897,6 +906,28 @@ function buildSnapshots(rootPath: string, values: LolConfigValues): ConfigProfil
   };
 }
 
+// 当前登录的是哪个号、处在什么阶段。方案页用它告诉用户「会应用到哪个号」。
+async function readClientState(rootPath: string): Promise<LolConfigClientState> {
+  const client = getLcuClientForRoot(rootPath);
+  if (!client) return { connected: false, summonerName: '', phase: '' };
+  try {
+    const [summoner, phase] = await Promise.all([
+      client.get<{ gameName?: string; tagLine?: string; displayName?: string; name?: string }>(
+        '/lol-summoner/v1/current-summoner',
+      ),
+      client.get<string>('/lol-gameflow/v1/gameflow-phase').catch(() => ''),
+    ]);
+    const name = summoner.gameName || summoner.displayName || summoner.name || '';
+    return {
+      connected: true,
+      summonerName: name && summoner.tagLine ? `${name}#${summoner.tagLine}` : name,
+      phase: String(phase).replace(/"/g, ''),
+    };
+  } catch {
+    return { connected: false, summonerName: '', phase: '' };
+  }
+}
+
 export async function readLeagueConfig(rootPath?: string): Promise<{
   rootPath: string;
   found: boolean;
@@ -904,6 +935,7 @@ export async function readLeagueConfig(rootPath?: string): Promise<{
   files: LolConfigFileStatus[];
   profiles: LolConfigProfileSummary[];
   warnings: string[];
+  client: LolConfigClientState;
 }> {
   const resolvedRootPath = resolveRootPath(rootPath);
   const found = rootLooksValid(resolvedRootPath);
@@ -934,6 +966,7 @@ export async function readLeagueConfig(rootPath?: string): Promise<{
     files,
     profiles: listProfileSummaries(normalizeValues),
     warnings,
+    client: await readClientState(resolvedRootPath),
   };
 }
 
@@ -955,12 +988,13 @@ export async function applyLeagueConfigValues(
   return result;
 }
 
-export function saveLeagueConfigProfile(
+export async function saveLeagueConfigProfile(
   name: string,
   rootPath: string | undefined,
   values: LolConfigValues,
-): LolConfigProfileSummary[] {
+): Promise<LolConfigProfileSummary[]> {
   const resolvedRootPath = resolveRootPath(rootPath);
+  const sourceAccount = (await readClientState(resolvedRootPath)).summonerName || undefined;
   const store = readProfileStore(normalizeValues);
   const trimmedName = name.trim() || '我的配置';
   const now = Date.now();
@@ -973,6 +1007,7 @@ export function saveLeagueConfigProfile(
     existing.values = normalizedValues;
     existing.snapshots = buildSnapshots(resolvedRootPath, normalizedValues);
     existing.gameResolution = gameResolution(normalizedValues);
+    existing.sourceAccount = sourceAccount ?? existing.sourceAccount;
   } else {
     store.profiles.push({
       id: crypto.randomUUID(),
@@ -981,6 +1016,7 @@ export function saveLeagueConfigProfile(
       updatedAt: now,
       sourceRootPath: resolvedRootPath,
       gameResolution: gameResolution(normalizedValues),
+      sourceAccount,
       values: normalizedValues,
       snapshots: buildSnapshots(resolvedRootPath, normalizedValues),
     });
@@ -993,17 +1029,36 @@ export function saveLeagueConfigProfile(
 export async function applyLeagueConfigProfile(
   profileId: string,
   rootPath?: string,
+  parts?: LolConfigPart[],
 ): Promise<LolConfigApplyResult> {
   const store = readProfileStore(normalizeValues);
   const profile = store.profiles.find((item) => item.id === profileId);
   if (!profile) {
     throw new Error('未找到要应用的配置方案');
   }
+  if (parts && parts.length === 0) {
+    throw new Error('至少要选一项要应用的设置');
+  }
 
   const resolvedRootPath = resolveRootPath(rootPath);
   await assertConfigWriteAllowed(resolvedRootPath);
-  const normalizedValues = normalizeValues(profile.values);
-  const result = applyValuesToDisk(resolvedRootPath, normalizedValues, profile.snapshots);
+
+  // 全部应用时连同方案里的原始配置文件一起写回；只应用一部分时，以现在的设置为底，只替换选中的几块。
+  const applyAll = !parts || ALL_CONFIG_PARTS.every((part) => parts.includes(part));
+  let normalizedValues: LolConfigValues;
+  let snapshots: ConfigProfileSnapshots = {};
+  if (applyAll) {
+    normalizedValues = normalizeValues(profile.values);
+    snapshots = profile.snapshots;
+  } else {
+    if (!rootLooksValid(resolvedRootPath)) {
+      throw new Error(`未找到英雄联盟配置目录：${resolvedRootPath}`);
+    }
+    const current = readValues(resolvedRootPath);
+    await mergeLiveClientSettings(resolvedRootPath, current).catch(() => false);
+    normalizedValues = normalizeValues(mergeConfigParts(current, normalizeValues(profile.values), parts));
+  }
+  const result = applyValuesToDisk(resolvedRootPath, normalizedValues, snapshots);
 
   let lcuSynced = false;
   let lcuError: string | undefined;
@@ -1021,6 +1076,12 @@ export async function applyLeagueConfigProfile(
     lcuSynced,
     lcuError,
   };
+}
+
+export function getLeagueConfigProfile(profileId: string): LolConfigProfileDetail | null {
+  const profile = readProfileStore(normalizeValues).profiles.find((item) => item.id === profileId);
+  if (!profile) return null;
+  return { ...summarizeProfile(profile), values: profile.values };
 }
 
 export function deleteLeagueConfigProfile(profileId: string): LolConfigProfileSummary[] {

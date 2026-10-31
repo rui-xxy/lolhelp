@@ -211,11 +211,12 @@ export function normalizeAssistSettings(value: unknown): AssistSettings {
     spoofRankTier: stringValue(source.spoofRankTier, 'GOLD', 30),
     spoofRankDivision: stringValue(source.spoofRankDivision, 'IV', 10),
     profileIconId: finiteNumber(source.profileIconId, 0, 0, 100_000),
+    // 小于 1000 是英雄编号（用这个英雄的默认皮肤），否则是具体的皮肤编号（英雄编号 × 1000 + 序号）。
     profileBackgroundChampionId: finiteNumber(
       source.profileBackgroundChampionId,
       0,
       0,
-      100_000,
+      10_000_000,
     ),
     removeTokens: boolValue(source.removeTokens, false),
     removePrestigeCrest: boolValue(source.removePrestigeCrest, false),

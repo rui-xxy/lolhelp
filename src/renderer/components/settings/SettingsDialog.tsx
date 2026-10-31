@@ -4,126 +4,131 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+  AlertCircle,
   Check,
+  CheckCircle2,
   ChevronDown,
   FolderOpen,
   FolderSearch,
   Gamepad2,
+  Info,
   Keyboard,
   Library,
+  LoaderCircle,
   MonitorCog,
+  Palette,
   RefreshCw,
-  Search,
-  Settings,
+  RotateCcw,
   Upload,
   X,
 } from 'lucide-react';
-import { Button } from '../ui/button';
-import { ConfirmDialog } from '../ui/confirm-dialog';
 import type {
   LolClientConfigValues,
+  LolConfigPart,
   LolConfigState,
   LolConfigValues,
   LolGameConfigValues,
-  LolHotkeyValues,
 } from '../../../shared/api';
 import { DEFAULT_LOL_ROOT_PATH } from '../../../shared/constants';
-import {
-  SectionDot,
-  SwitchControl,
-  useSettingsScrollSpy,
-} from './SettingsControls';
+import { AboutSettings } from './AboutSettings';
+import { AppearanceSettings } from './AppearanceSettings';
 import { ClientSettings } from './ClientSettings';
+import { CLIENT_PHASE_LABELS, CONFIG_BLOCKED_PHASES, countConfigChanges } from './configFields';
 import { GameSettings } from './GameSettings';
+import { HotkeySettings } from './HotkeySettings';
 import { ProfileSettings } from './ProfileSettings';
-import {
-  HERO_HOTKEY_GROUPS,
-  buildHotkeyCategories,
-  displayHotkeyValue,
-  flattenHotkeys,
-  hotkeyFromKeyboardEvent,
-  hotkeyFromMouseEvent,
-  hotkeyLabel,
-  hotkeyRefKey,
-  isSwitchHotkey,
-  quickbindKeyFor,
-  type HotkeyBinding,
-  type HotkeyCaptureTarget,
-  type HotkeyCategory,
-  type HotkeySectionKey,
-} from './hotkeyModel';
 
 interface SettingsDialogProps {
   open: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  /** 作为「设置」页面嵌入外壳。现在只有这一种用法。 */
+  embedded?: boolean;
 }
 
-type TabKey = 'client' | 'game' | 'hotkeys' | 'profiles';
+type TabKey = 'appearance' | 'client' | 'game' | 'hotkeys' | 'profiles' | 'about';
 type Notice = { type: 'success' | 'error'; text: string } | null;
 
-export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
+const CONFIG_TABS = new Set<TabKey>(['client', 'game', 'hotkeys', 'profiles']);
+
+const TAB_META: Record<TabKey, { label: string; icon: typeof Palette; group: '应用' | '游戏设置' }> = {
+  appearance: { label: '外观', icon: Palette, group: '应用' },
+  about: { label: '关于与游戏目录', icon: Info, group: '应用' },
+  client: { label: '客户端', icon: MonitorCog, group: '游戏设置' },
+  game: { label: '游戏内', icon: Gamepad2, group: '游戏设置' },
+  hotkeys: { label: '热键', icon: Keyboard, group: '游戏设置' },
+  profiles: { label: '方案', icon: Library, group: '游戏设置' },
+};
+
+const NAV_GROUPS: Array<{ title: string; tabs: TabKey[] }> = [
+  { title: '游戏设置', tabs: ['client', 'game', 'hotkeys', 'profiles'] },
+  { title: '应用', tabs: ['appearance', 'about'] },
+];
+
+function errorText(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export function SettingsDialog({ open }: SettingsDialogProps) {
   const [tab, setTab] = useState<TabKey>('client');
-  const [rootPath, setRootPath] = useState(DEFAULT_LOL_ROOT_PATH);
   const [state, setState] = useState<LolConfigState | null>(null);
   const [draft, setDraft] = useState<LolConfigValues | null>(null);
-  const [profileName, setProfileName] = useState('我的配置');
-  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
-  const [deleteProfileConfirmOpen, setDeleteProfileConfirmOpen] = useState(false);
+  const rootPathRef = useRef(DEFAULT_LOL_ROOT_PATH);
+  const latest = useRef<{ state: LolConfigState | null; draft: LolConfigValues | null }>({ state: null, draft: null });
+  latest.current = { state, draft };
 
-  const profiles = state?.profiles ?? [];
-  const selectedProfile = useMemo(
-    () => profiles.find((profile) => profile.id === selectedProfileId) ?? null,
-    [profiles, selectedProfileId],
+  const pendingChanges = useMemo(
+    () => (state && draft ? countConfigChanges(draft, state.values) : 0),
+    [draft, state],
   );
 
-  const refresh = useCallback(async (pathOverride?: string): Promise<LolConfigState | null> => {
-    setBusy('read');
-    setNotice(null);
+  // keepDraft：面板里有没应用的改动时只更新状态（登录的号、方案列表），不把改动冲掉。
+  const refresh = useCallback(async (
+    pathOverride?: string,
+    options: { keepDraft?: boolean; quiet?: boolean } = {},
+  ): Promise<LolConfigState | null> => {
+    if (!options.quiet) setBusy('read');
     try {
-      const next = await window.lolHelper.config.read(pathOverride ?? rootPath);
+      const next = await window.lolHelper.config.read(pathOverride ?? rootPathRef.current);
+      const previous = latest.current;
+      const keep = options.keepDraft
+        && previous.draft
+        && previous.state
+        && countConfigChanges(previous.draft, previous.state.values) > 0;
+      rootPathRef.current = next.rootPath;
       setState(next);
-      setRootPath(next.rootPath);
-      setDraft(next.values);
-      if (next.profiles.length > 0) {
-        setSelectedProfileId((current) =>
-          next.profiles.some((profile) => profile.id === current)
-            ? current
-            : next.profiles[0].id,
-        );
-      } else {
-        setSelectedProfileId('');
-      }
-      setNotice(next.found ? null : { type: 'error', text: '没有找到可用的英雄联盟配置目录' });
+      if (!keep) setDraft(next.values);
+      if (!next.found) setNotice({ type: 'error', text: '没有找到英雄联盟的配置目录，去「关于与游戏目录」里选一下' });
       return next;
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '读取配置失败' });
+      setNotice({ type: 'error', text: errorText(err, '读取游戏设置失败') });
       return null;
     } finally {
-      setBusy(null);
+      if (!options.quiet) setBusy(null);
     }
-  }, [rootPath]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     void refresh(DEFAULT_LOL_ROOT_PATH);
-  }, [open]);
+  }, [open, refresh]);
 
   useEffect(() => {
-    if (!open || notice?.type !== 'success') return undefined;
-    const timer = window.setTimeout(() => setNotice(null), 3_500);
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), notice.type === 'success' ? 3_500 : 8_000);
     return () => window.clearTimeout(timer);
-  }, [notice, open]);
+  }, [notice]);
 
   useEffect(() => {
     document.querySelector<HTMLElement>('[data-settings-scroll]')?.scrollTo({ top: 0 });
-  }, [tab]);
+    // 切到「方案」时顺手看一眼现在登录的是哪个号。
+    if (tab === 'profiles') void refresh(undefined, { keepDraft: true, quiet: true });
+  }, [refresh, tab]);
 
   const updateClient = useCallback(<K extends keyof LolClientConfigValues>(
     key: K,
@@ -178,28 +183,21 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const detectRoots = useCallback(async () => {
     setBusy('detect-root');
-    setNotice(null);
     try {
       const roots = await window.lolHelper.config.detectRoots();
       if (roots.length === 0) {
-        setNotice({
-          type: 'error',
-          text: '没有自动检测到英雄联盟目录，可以点“选择文件夹”手动指定。',
-        });
+        setNotice({ type: 'error', text: '没有自动找到英雄联盟目录，点「选择文件夹」手动指定一下。' });
         return;
       }
-
       const next = await refresh(roots[0]);
       if (next?.found) {
         setNotice({
           type: 'success',
-          text: roots.length > 1
-            ? `检测到 ${roots.length} 个可用目录，已使用第一个：${roots[0]}`
-            : `已检测到英雄联盟目录：${roots[0]}`,
+          text: roots.length > 1 ? `找到 ${roots.length} 个目录，先用第一个：${roots[0]}` : `找到了：${roots[0]}`,
         });
       }
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '自动检测失败' });
+      setNotice({ type: 'error', text: errorText(err, '自动查找失败') });
     } finally {
       setBusy(null);
     }
@@ -207,17 +205,13 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const chooseRoot = useCallback(async () => {
     setBusy('select-root');
-    setNotice(null);
     try {
       const selected = await window.lolHelper.config.selectRoot();
       if (!selected) return;
-
       const next = await refresh(selected);
-      if (next?.found) {
-        setNotice({ type: 'success', text: `已切换到：${next.rootPath}` });
-      }
+      if (next?.found) setNotice({ type: 'success', text: `已切换到：${next.rootPath}` });
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '选择文件夹失败' });
+      setNotice({ type: 'error', text: errorText(err, '选择文件夹失败') });
     } finally {
       setBusy(null);
     }
@@ -226,678 +220,321 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const applyDraft = useCallback(async () => {
     if (!draft) return;
     setBusy('apply');
-    setNotice(null);
     try {
-      const result = await window.lolHelper.config.applyValues({ rootPath, values: draft });
-      await refresh(result.rootPath);
+      const result = await window.lolHelper.config.applyValues({ rootPath: rootPathRef.current, values: draft });
+      await refresh(result.rootPath, { quiet: true });
       setNotice({
         type: result.lcuSynced ? 'success' : 'error',
         text: result.lcuSynced
-          ? `已写入 ${result.filesWritten.length} 个配置文件，并同步到客户端`
-          : `已写入 ${result.filesWritten.length} 个配置文件，但没有同步到正在运行的客户端${result.lcuError ? `：${result.lcuError}` : ''}`,
+          ? '已应用到游戏，并同步给了当前登录的号'
+          : `已写进游戏文件，但没同步到客户端${result.lcuError ? `：${result.lcuError}` : '（客户端没登录）'}`,
       });
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '写入配置失败' });
+      setNotice({ type: 'error', text: errorText(err, '应用失败') });
     } finally {
       setBusy(null);
     }
-  }, [draft, refresh, rootPath]);
+  }, [draft, refresh]);
 
-  const saveProfile = useCallback(async () => {
-    if (!draft) return;
+  const saveProfile = useCallback(async (name: string): Promise<string | null> => {
+    if (!draft) return null;
     setBusy('save-profile');
-    setNotice(null);
     try {
-      const nextProfiles = await window.lolHelper.config.saveProfile({
-        name: profileName,
-        rootPath,
-        values: draft,
-      });
+      const trimmed = name.trim();
+      const nextProfiles = await window.lolHelper.config.saveProfile({ name: trimmed, rootPath: rootPathRef.current, values: draft });
       setState((current) => (current ? { ...current, profiles: nextProfiles } : current));
-      const saved = nextProfiles.find((profile) => profile.name === profileName.trim());
-      if (saved) setSelectedProfileId(saved.id);
-      setNotice({ type: 'success', text: '方案已保存' });
+      setNotice({ type: 'success', text: `方案「${trimmed}」已保存` });
+      return nextProfiles.find((profile) => profile.name === trimmed)?.id ?? null;
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '保存方案失败' });
+      setNotice({ type: 'error', text: errorText(err, '保存方案失败') });
+      return null;
     } finally {
       setBusy(null);
     }
-  }, [draft, profileName, rootPath]);
+  }, [draft]);
 
-  const applyProfile = useCallback(async () => {
-    if (!selectedProfileId) return;
+  const applyProfile = useCallback(async (profileId: string, parts: LolConfigPart[]) => {
     setBusy('apply-profile');
-    setNotice(null);
     try {
-      const result = await window.lolHelper.config.applyProfile({ profileId: selectedProfileId, rootPath });
-      await refresh(result.rootPath);
+      const result = await window.lolHelper.config.applyProfile({ profileId, rootPath: rootPathRef.current, parts });
+      const next = await refresh(result.rootPath, { quiet: true });
+      const account = next?.client?.summonerName?.split('#')[0];
       setNotice({
         type: result.lcuSynced ? 'success' : 'error',
         text: result.lcuSynced
-          ? `方案已应用，写入 ${result.filesWritten.length} 个文件，并同步到客户端`
-          : `方案已写入 ${result.filesWritten.length} 个文件，但没有同步到正在运行的客户端${result.lcuError ? `：${result.lcuError}` : ''}`,
+          ? `方案已应用${account ? `到「${account}」` : ''}，下次进游戏就是这套设置`
+          : `方案已写进游戏文件，但没同步给账号${result.lcuError ? `：${result.lcuError}` : '（客户端没登录）'}`,
       });
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '应用方案失败' });
+      setNotice({ type: 'error', text: errorText(err, '应用方案失败') });
     } finally {
       setBusy(null);
     }
-  }, [refresh, rootPath, selectedProfileId]);
+  }, [refresh]);
 
-  const deleteProfile = useCallback(async () => {
-    if (!selectedProfileId || !selectedProfile) return;
+  const deleteProfile = useCallback(async (profileId: string) => {
     setBusy('delete-profile');
-    setNotice(null);
     try {
-      const nextProfiles = await window.lolHelper.config.deleteProfile(selectedProfileId);
+      const nextProfiles = await window.lolHelper.config.deleteProfile(profileId);
       setState((current) => (current ? { ...current, profiles: nextProfiles } : current));
-      setSelectedProfileId(nextProfiles[0]?.id ?? '');
-      setDeleteProfileConfirmOpen(false);
       setNotice({ type: 'success', text: '方案已删除' });
     } catch (err) {
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : '删除方案失败' });
+      setNotice({ type: 'error', text: errorText(err, '删除方案失败') });
     } finally {
       setBusy(null);
     }
-  }, [selectedProfile, selectedProfileId]);
+  }, []);
 
   if (!open) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 backdrop-blur-[1px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section className="flex h-[680px] max-h-[90vh] w-[1060px] max-w-[94vw] flex-col overflow-hidden rounded-md border border-app-border bg-app-surface shadow-airbnb">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-app-border px-5">
-          <div className="flex size-8 items-center justify-center rounded-sm bg-app-primary-soft text-app-primary">
-            <Settings className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-app-text">设置</h2>
-            <p className="mt-0.5 truncate text-[11px] text-app-muted">同步英雄联盟客户端与游戏内配置</p>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-app-muted">
-            <span className={`size-1.5 rounded-full ${state?.found ? 'bg-app-success' : 'bg-app-danger'}`} />
-            {state?.found ? '已读取配置' : '等待配置目录'}
-          </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="关闭设置">
-            <X className="size-4" />
-          </Button>
-        </header>
+  const isConfigTab = CONFIG_TABS.has(tab);
+  const client = state?.client;
+  const navHints: Partial<Record<TabKey, { text: string; tone?: 'on' | 'count' }>> = {
+    profiles: state?.profiles.length ? { text: String(state.profiles.length), tone: 'count' } : undefined,
+    about: client?.connected ? { text: '已连接', tone: 'on' } : state ? { text: '未连接' } : undefined,
+  };
 
-        <div className="flex min-h-0 flex-1">
-          <aside className="flex w-[188px] shrink-0 flex-col border-r border-app-border bg-app-bg-soft/80 p-3">
-            <div className="mb-2 px-2 text-[10px] font-medium text-app-subtle">设置分类</div>
-            <nav className="space-y-1">
-              <TabButton icon={<MonitorCog className="size-4" />} description="客户端外观与行为" active={tab === 'client'} onClick={() => setTab('client')}>客户端</TabButton>
-              <TabButton icon={<Gamepad2 className="size-4" />} description="画面、声音与界面" active={tab === 'game'} onClick={() => setTab('game')}>游戏内</TabButton>
-              <TabButton icon={<Keyboard className="size-4" />} description="按键与快捷施法" active={tab === 'hotkeys'} onClick={() => setTab('hotkeys')}>热键</TabButton>
-              <TabButton icon={<Library className="size-4" />} description="保存和切换配置" active={tab === 'profiles'} onClick={() => setTab('profiles')}>方案</TabButton>
-            </nav>
-            <div className="mt-auto border-t border-app-border/70 px-2 pt-3 text-[10px] leading-4 text-app-subtle">
-              更改会先保存在当前面板，点击“应用设置”后写入游戏。
-            </div>
-          </aside>
-
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-app-border bg-app-surface px-5 py-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-app-border bg-app-bg-soft/60 px-3 transition-colors focus-within:border-app-primary/45 focus-within:ring-2 focus-within:ring-app-primary/10">
-                  <FolderSearch className="size-3.5 shrink-0 text-app-muted" />
-                  <input
-                    value={rootPath}
-                    onChange={(e) => setRootPath(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-xs text-app-text outline-none"
-                    aria-label="英雄联盟配置目录"
-                  />
-                </div>
-                <Button variant="outline" size="icon-sm" onClick={detectRoots} disabled={Boolean(busy)} title="自动检测目录">
-                  <Search className={`size-3.5 ${busy === 'detect-root' ? 'animate-pulse' : ''}`} />
-                </Button>
-                <Button variant="outline" size="icon-sm" onClick={chooseRoot} disabled={Boolean(busy)} title="选择文件夹">
-                  <FolderOpen className="size-3.5" />
-                </Button>
-                <Button variant="outline" size="icon-sm" onClick={() => refresh(rootPath)} disabled={Boolean(busy)} title="重新读取">
-                  <RefreshCw className={`size-3.5 ${busy === 'read' ? 'animate-spin' : ''}`} />
-                </Button>
-                <Button size="sm" onClick={applyDraft} disabled={!draft || Boolean(busy)}>
-                  <Upload className="size-3.5" />
-                  应用设置
-                </Button>
-              </div>
-              {notice && (
-                <div className={`mt-2 flex min-h-7 items-center gap-2 rounded-sm px-2 text-[11px] ${notice.type === 'success' ? 'bg-app-success/5 text-app-success' : 'bg-app-danger/5 text-app-danger'}`}>
-                  {notice.type === 'success' ? <Check className="size-3.5" /> : <X className="size-3.5" />}
-                  <span className="truncate">{notice.text}</span>
-                </div>
-              )}
-            </div>
-
-        <main data-settings-scroll className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
-          {!draft ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-app-muted">
-              <span>{busy === 'read' ? '正在读取配置...' : '配置读取失败'}</span>
-              {notice?.type === 'error' && (
-                <span className="max-w-xl text-center text-xs text-app-danger">{notice.text}</span>
-              )}
-            </div>
-          ) : (
-            <>
-              {tab === 'client' && (
-                <ClientSettings values={draft.client} onChange={updateClient} />
-              )}
-              {tab === 'game' && (
-                <GameSettings values={draft.game} onChange={updateGame} />
-              )}
-              {tab === 'hotkeys' && (
-                <HotkeySettings values={draft.hotkeys} onChange={updateHotkey} />
-              )}
-              {tab === 'profiles' && (
-                <ProfileSettings
-                  state={state}
-                  profileName={profileName}
-                  setProfileName={setProfileName}
-                  profiles={profiles}
-                  selectedProfileId={selectedProfileId}
-                  setSelectedProfileId={setSelectedProfileId}
-                  onSaveProfile={saveProfile}
-                  onApplyProfile={applyProfile}
-                  onDeleteProfile={() => setDeleteProfileConfirmOpen(true)}
-                  busy={busy}
-                />
-              )}
-            </>
-          )}
-        </main>
-          </div>
-        </div>
-      </section>
-      <ConfirmDialog
-        open={deleteProfileConfirmOpen}
-        title="删除配置方案"
-        description={`将删除“${selectedProfile?.name ?? ''}”。此操作不会修改当前游戏设置，但无法撤销。`}
-        confirmLabel="删除方案"
-        destructive
-        busy={busy === 'delete-profile'}
-        onOpenChange={setDeleteProfileConfirmOpen}
-        onConfirm={() => void deleteProfile()}
+  let content: ReactNode;
+  if (tab === 'appearance') {
+    content = <AppearanceSettings />;
+  } else if (tab === 'about') {
+    content = (
+      <AboutSettings
+        state={state}
+        busy={busy}
+        onDetect={() => void detectRoots()}
+        onChoose={() => void chooseRoot()}
+        onReload={() => void refresh()}
       />
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  description,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: ReactNode;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group flex min-h-[48px] w-full items-center gap-2.5 rounded-sm px-3 py-2 text-left transition-[background-color,color,box-shadow] ${
-        active
-          ? 'bg-app-surface text-app-text shadow-sm ring-1 ring-app-border/70'
-          : 'text-app-muted hover:bg-app-nav-hover hover:text-app-text'
-      }`}
-    >
-      <span className={active ? 'text-app-primary' : 'text-app-subtle group-hover:text-app-muted'}>{icon}</span>
-      <span className="min-w-0">
-        <span className="block text-xs font-medium">{children}</span>
-        <span className="mt-0.5 block truncate text-[9px] font-normal text-app-subtle">{description}</span>
-      </span>
-    </button>
-  );
-}
-
-function HotkeySettings({
-  values,
-  onChange,
-}: {
-  values: LolHotkeyValues;
-  onChange: (section: string, key: string, value: string) => void;
-}) {
-  const [activeSection, setActiveSection] = useState<HotkeySectionKey>('hero');
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ hero: true });
-  const [captureTarget, setCaptureTarget] = useState<HotkeyCaptureTarget | null>(null);
-  const allBindings = useMemo(() => flattenHotkeys(values), [values]);
-  const categories = useMemo(() => buildHotkeyCategories(allBindings), [allBindings]);
-
-  const navSections = useMemo(
-    () => categories.map((item) => ({ key: item.key, label: item.label })),
-    [categories],
-  );
-  useSettingsScrollSpy<HotkeySectionKey>('hotkeys', navSections, setActiveSection);
-
-  const goToSection = useCallback((section: HotkeySectionKey) => {
-    setActiveSection(section);
-    setOpenSections((current) => ({ ...current, [section]: true }));
-    document.getElementById(`hotkeys-section-${section}`)?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth',
-    });
-  }, []);
-
-  const toggleSection = useCallback((section: HotkeySectionKey) => {
-    setOpenSections((current) => ({ ...current, [section]: !(current[section] ?? false) }));
-  }, []);
-
-  const openCapture = useCallback((binding: HotkeyBinding) => {
-    setCaptureTarget({ ...binding, label: hotkeyLabel(binding.key) });
-  }, []);
-
-  if (allBindings.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center text-sm text-app-muted">
-        未读取到 input.ini 热键配置
+    );
+  } else if (!draft || !state) {
+    content = (
+      <div className="as-empty st-empty--page">
+        {busy === 'read' ? <LoaderCircle className="as-spin" /> : <AlertCircle />}
+        <b>{busy === 'read' ? '正在读取游戏设置…' : '游戏设置读不出来'}</b>
+        {busy !== 'read' && <span>去「关于与游戏目录」确认一下英雄联盟装在哪。</span>}
       </div>
+    );
+  } else if (tab === 'client') {
+    content = <ClientSettings values={draft.client} onChange={updateClient} />;
+  } else if (tab === 'game') {
+    content = <GameSettings values={draft.game} onChange={updateGame} />;
+  } else if (tab === 'hotkeys') {
+    content = <HotkeySettings values={draft.hotkeys} onChange={updateHotkey} />;
+  } else {
+    content = (
+      <ProfileSettings
+        profiles={state.profiles}
+        client={client}
+        current={state.values}
+        pendingChanges={pendingChanges}
+        busy={busy}
+        onSave={saveProfile}
+        onApply={applyProfile}
+        onDelete={deleteProfile}
+      />
     );
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
-      <div className="min-w-0 space-y-8">
-        {categories.map((category) => (
-          <HotkeyCategoryPanel
-            key={category.key}
-            category={category}
-            open={openSections[category.key] ?? Boolean(category.defaultOpen)}
-            onToggle={() => toggleSection(category.key)}
-          >
-            {category.key === 'hero' ? (
-              <HeroHotkeyOverview
-                bindings={category.bindings}
-                values={values}
-                onChange={onChange}
-                onCapture={openCapture}
-              />
-            ) : (
-              <HotkeyRows bindings={category.bindings} onChange={onChange} onCapture={openCapture} />
-            )}
-          </HotkeyCategoryPanel>
-        ))}
-      </div>
-
-      <aside className="sticky top-4 flex h-[360px] flex-col items-center justify-center gap-3">
-        {navSections.map((item) => (
-          <SectionDot
-            key={item.key}
-            active={activeSection === item.key}
-            label={item.label}
-            onClick={() => goToSection(item.key)}
-          />
-        ))}
+    <div className="st-page">
+      <aside className="as-nav">
+        <nav aria-label="设置分类">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.title} className="as-nav__group">
+              <div className="as-nav__group-title">{group.title}</div>
+              {group.tabs.map((key) => {
+                const meta = TAB_META[key];
+                const Icon = meta.icon;
+                const hint = navHints[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className="as-nav__item"
+                    aria-current={tab === key ? 'page' : undefined}
+                    onClick={() => setTab(key)}
+                  >
+                    <Icon />
+                    <span>{meta.label}</span>
+                    {hint && <span className="as-nav__hint" data-tone={hint.tone}>{hint.text}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+        <div className="as-nav__foot">
+          {tab === 'appearance'
+            ? '外观改动立即生效，只影响助手自己。'
+            : '游戏设置改完后，点右上角「应用到游戏」才会写进游戏。'}
+        </div>
       </aside>
-      {captureTarget && (
-        <HotkeyCaptureDialog
-          target={captureTarget}
-          onClose={() => setCaptureTarget(null)}
-          onConfirm={(nextValue) => {
-            onChange(captureTarget.section, captureTarget.key, nextValue);
-            setCaptureTarget(null);
-          }}
-        />
-      )}
+
+      <section className="st-main">
+        {isConfigTab && (
+          <ConfigBar
+            state={state}
+            busy={busy}
+            pendingChanges={pendingChanges}
+            onCheck={() => void refresh(undefined, { keepDraft: true })}
+            onDetect={() => void detectRoots()}
+            onChoose={() => void chooseRoot()}
+            onReload={() => void refresh()}
+            onUndo={() => state && setDraft(state.values)}
+            onApply={() => void applyDraft()}
+          />
+        )}
+        <main data-settings-scroll className="st-scroll">
+          <div className="st-content" data-size={tab === 'profiles' || tab === 'appearance' ? 'wide' : undefined}>
+            {content}
+          </div>
+        </main>
+
+        <AnimatePresence>
+          {notice && (
+            <motion.div
+              key="toast"
+              role="status"
+              className="as-toast"
+              data-tone={notice.type === 'error' ? 'error' : undefined}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+            >
+              {notice.type === 'error' ? <AlertCircle /> : <CheckCircle2 />}
+              <p>{notice.text}</p>
+              <button type="button" className="as-btn as-btn--sm as-btn--ghost" onClick={() => setNotice(null)} aria-label="关闭">
+                <X />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
     </div>
   );
 }
 
-function HotkeyCategoryPanel({
-  category,
-  open,
-  onToggle,
-  children,
+// 游戏设置页顶上那一条：现在登录的号、游戏目录、还有几项没应用。
+function ConfigBar({
+  state,
+  busy,
+  pendingChanges,
+  onCheck,
+  onDetect,
+  onChoose,
+  onReload,
+  onUndo,
+  onApply,
 }: {
-  category: HotkeyCategory;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
+  state: LolConfigState | null;
+  busy: string | null;
+  pendingChanges: number;
+  onCheck: () => void;
+  onDetect: () => void;
+  onChoose: () => void;
+  onReload: () => void;
+  onUndo: () => void;
+  onApply: () => void;
 }) {
-  return (
-    <section id={`hotkeys-section-${category.key}`} className="scroll-mt-4">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 py-2 text-left"
-      >
-        <span className="min-w-0">
-          <span className="block text-base font-semibold text-app-text">{category.label}</span>
-        </span>
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-sm text-app-muted transition-colors group-hover:bg-app-bg-soft">
-          <ChevronDown className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </span>
-      </button>
-      {open && <div className="pt-2">{children}</div>}
-    </section>
-  );
-}
-
-function HeroHotkeyOverview({
-  bindings,
-  values,
-  onChange,
-  onCapture,
-}: {
-  bindings: HotkeyBinding[];
-  values: LolHotkeyValues;
-  onChange: (section: string, key: string, value: string) => void;
-  onCapture: (binding: HotkeyBinding) => void;
-}) {
-  const visibleKeys = new Set(bindings.map(hotkeyRefKey));
-  const groups = HERO_HOTKEY_GROUPS
-    .map((group) => ({
-      ...group,
-      refs: group.refs.filter((ref) => visibleKeys.has(hotkeyRefKey(ref)) && values[ref.section]?.[ref.key] !== undefined),
-    }))
-    .filter((group) => group.refs.length > 0);
-
-  const updateAllQuickbinds = (enabled: boolean) => {
-    for (const group of HERO_HOTKEY_GROUPS) {
-      for (const ref of group.refs) {
-        const quickbindKey = quickbindKeyFor(ref.key);
-        if (quickbindKey && values.Quickbinds?.[quickbindKey] !== undefined) {
-          onChange('Quickbinds', quickbindKey, enabled ? '1' : '0');
-        }
-      }
-    }
-  };
-
-  return (
-    <div className="space-y-5 rounded-sm border border-app-border bg-app-bg-soft/55 px-4 py-4">
-      <div className="mx-auto grid h-9 max-w-[440px] grid-cols-2 rounded-sm border border-app-border bg-app-surface p-0.5">
-        <button type="button" className="rounded-sm bg-app-primary/15 text-sm font-semibold text-app-text">
-          全局
-        </button>
-        <button type="button" className="rounded-sm text-sm font-semibold text-app-muted">
-          当前英雄
-        </button>
-      </div>
-
-      <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-x-5 gap-y-4">
-        <div className="space-y-5">
-          {groups.filter((group) => group.label === '英雄技能' || group.label === '道具').map((group) => (
-            <HeroHotkeyGroup
-              key={group.label}
-              group={group}
-              values={values}
-              onChange={onChange}
-              onCapture={onCapture}
-            />
-          ))}
-        </div>
-        <div className="space-y-5">
-          {groups.filter((group) => group.label !== '英雄技能' && group.label !== '道具').map((group) => (
-            <HeroHotkeyGroup
-              key={group.label}
-              group={group}
-              values={values}
-              onChange={onChange}
-              onCapture={onCapture}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => updateAllQuickbinds(true)}>
-          全部设为快捷施法
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => updateAllQuickbinds(false)}>
-          全部设为常规施法
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function HeroHotkeyGroup({
-  group,
-  values,
-  onChange,
-  onCapture,
-}: {
-  group: { label: string; refs: { section: string; key: string; label: string }[] };
-  values: LolHotkeyValues;
-  onChange: (section: string, key: string, value: string) => void;
-  onCapture: (binding: HotkeyBinding) => void;
-}) {
-  return (
-    <div>
-      <h4 className="mb-2 text-sm font-semibold text-app-muted">{group.label}</h4>
-      <div className="flex flex-wrap gap-2">
-        {group.refs.map((ref) => {
-          const quickbindKey = quickbindKeyFor(ref.key);
-          const smartValue = quickbindKey ? values.Quickbinds?.[quickbindKey] : undefined;
-          const value = values[ref.section]?.[ref.key] ?? '';
-          return (
-            <HeroHotkeyBox
-              key={`${ref.section}-${ref.key}`}
-              label={ref.label}
-              value={value}
-              smart={smartValue === '1'}
-              smartToggleVisible={smartValue !== undefined}
-              onCapture={() => onCapture({ section: ref.section, key: ref.key, value })}
-              onToggleSmart={() => {
-                if (quickbindKey && smartValue !== undefined) {
-                  onChange('Quickbinds', quickbindKey, smartValue === '1' ? '0' : '1');
-                }
-              }}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function HeroHotkeyBox({
-  label,
-  value,
-  smart,
-  smartToggleVisible,
-  onCapture,
-  onToggleSmart,
-}: {
-  label: string;
-  value: string;
-  smart: boolean;
-  smartToggleVisible: boolean;
-  onCapture: () => void;
-  onToggleSmart: () => void;
-}) {
-  const displayValue = displayHotkeyValue(value);
-  const compact = displayValue.length > 6;
-
-  return (
-    <div className="w-[76px]">
-      <button
-        type="button"
-        onClick={onCapture}
-        className="flex h-[58px] w-full flex-col overflow-hidden rounded-sm bg-app-surface text-app-text shadow-sm ring-1 ring-app-border transition hover:ring-app-primary/55 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-primary/25"
-        aria-label={`修改${label}`}
-      >
-        <span className="flex min-h-0 flex-1 items-center justify-center px-1">
-          <span className={`truncate font-mono font-semibold ${compact ? 'text-xs' : 'text-xl'}`}>
-            {displayValue}
-          </span>
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={onToggleSmart}
-        disabled={!smartToggleVisible}
-        className={`mt-1 flex h-6 w-full items-center justify-center rounded-sm text-base transition ${
-          smart
-            ? 'bg-app-primary/15 text-app-primary'
-            : 'bg-app-surface text-app-muted'
-        } ${smartToggleVisible ? 'hover:text-app-primary' : 'opacity-35'}`}
-        aria-label={`${smart ? '关闭' : '开启'}${label}快捷施法`}
-      >
-        ↩
-      </button>
-    </div>
-  );
-}
-
-function HotkeyRows({
-  bindings,
-  onChange,
-  onCapture,
-}: {
-  bindings: HotkeyBinding[];
-  onChange: (section: string, key: string, value: string) => void;
-  onCapture: (binding: HotkeyBinding) => void;
-}) {
-  return (
-    <div className="max-w-[680px] overflow-hidden rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
-      {bindings.map((binding) => (
-        <HotkeyRow
-          key={`${binding.section}-${binding.key}`}
-          section={binding.section}
-          bindingKey={binding.key}
-          value={binding.value}
-          onChange={(nextValue) => onChange(binding.section, binding.key, nextValue)}
-          onCapture={() => onCapture(binding)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function KeyBindingButton({
-  value,
-  onClick,
-}: {
-  value: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="h-8 min-w-0 rounded-sm bg-app-bg-soft px-3 text-left font-mono text-xs font-medium text-app-text outline-none ring-1 ring-app-border transition hover:ring-app-primary/55 focus-visible:ring-2 focus-visible:ring-app-primary/20"
-    >
-      <span className="block truncate">{displayHotkeyValue(value)}</span>
-    </button>
-  );
-}
-
-function HotkeyCaptureDialog({
-  target,
-  onClose,
-  onConfirm,
-}: {
-  target: HotkeyCaptureTarget;
-  onClose: () => void;
-  onConfirm: (value: string) => void;
-}) {
-  const [captured, setCaptured] = useState(target.value);
-  const captureRef = useRef<HTMLDivElement>(null);
+  const [dirOpen, setDirOpen] = useState(false);
+  const dirRef = useRef<HTMLDivElement>(null);
+  const client = state?.client;
+  const blocked = client?.connected ? CONFIG_BLOCKED_PHASES[client.phase] : undefined;
 
   useEffect(() => {
-    captureRef.current?.focus();
-  }, []);
+    if (!dirOpen) return undefined;
+    const close = (event: MouseEvent) => {
+      if (!dirRef.current?.contains(event.target as Node)) setDirOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [dirOpen]);
 
-  const captureKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const nextValue = hotkeyFromKeyboardEvent(event);
-    if (nextValue) setCaptured(nextValue);
-  };
-
-  const captureMouse = (event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const nextValue = hotkeyFromMouseEvent(event);
-    if (nextValue) setCaptured(nextValue);
-  };
+  const folderName = state?.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? '';
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="w-[360px] rounded-md border border-app-border bg-app-surface p-4 shadow-airbnb">
-        <h3 className="text-base font-semibold text-app-text">修改键位</h3>
-        <p className="mt-1 text-sm text-app-muted">{target.label}</p>
-        <div
-          ref={captureRef}
-          tabIndex={0}
-          onKeyDown={captureKeyboard}
-          onMouseDown={captureMouse}
-          onContextMenu={(event) => event.preventDefault()}
-          className="mt-4 flex h-24 cursor-crosshair items-center justify-center rounded-sm bg-app-bg-soft px-4 text-center outline-none ring-1 ring-app-border focus:ring-2 focus:ring-app-primary/25"
+    <div className="st-bar">
+      <button
+        type="button"
+        className="st-account"
+        data-state={!client?.connected ? 'off' : blocked ? 'busy' : 'ok'}
+        onClick={onCheck}
+        title="重新看一下客户端状态"
+      >
+        <i />
+        <b>{client?.connected ? (client.summonerName || '已登录') : '客户端没登录'}</b>
+        <span>
+          {client?.connected
+            ? blocked ? `${blocked} · 能存方案，改设置要等打完` : (CLIENT_PHASE_LABELS[client.phase] ?? '在线')
+            : '只能改这台电脑的文件'}
+        </span>
+      </button>
+
+      <div className="st-dir" ref={dirRef}>
+        <button
+          type="button"
+          className="st-dir__chip"
+          aria-expanded={dirOpen}
+          data-missing={state && !state.found ? 'true' : undefined}
+          onClick={() => setDirOpen((value) => !value)}
+          title={state?.rootPath}
         >
-          <span className="font-mono text-xl font-semibold text-app-text">{displayHotkeyValue(captured)}</span>
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setCaptured('[<Unbound>]')}>
-            清空
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              取消
-            </Button>
-            <Button size="sm" onClick={() => onConfirm(captured)}>
-              确认
-            </Button>
+          <FolderOpen />
+          <span>{folderName || '游戏目录'}</span>
+          <ChevronDown />
+        </button>
+        {dirOpen && (
+          <div className="st-dir__pop" role="dialog" aria-label="游戏目录">
+            <b>游戏目录</b>
+            <p title={state?.rootPath}>{state?.rootPath || '还没有目录'}</p>
+            <span data-missing={state && !state.found ? 'true' : undefined}>
+              {state?.found ? '已找到配置文件' : '这里没有英雄联盟的配置文件'}
+            </span>
+            <div>
+              <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onDetect(); }}>
+                <FolderSearch />
+                自动查找
+              </button>
+              <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onChoose(); }}>
+                <FolderOpen />
+                选择文件夹
+              </button>
+              <button type="button" className="as-btn as-btn--sm as-btn--ghost" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onReload(); }}>
+                <RefreshCw />
+                {pendingChanges > 0 ? '重新读取（放弃改动）' : '重新读取'}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </div>
-  );
-}
 
-function HotkeyRow({
-  section,
-  bindingKey,
-  value,
-  onChange,
-  onCapture,
-}: {
-  section: string;
-  bindingKey: string;
-  value: string;
-  onChange: (value: string) => void;
-  onCapture: () => void;
-}) {
-  const label = hotkeyLabel(bindingKey);
+      <span className="st-bar__spacer" />
 
-  return (
-    <div className="grid min-h-10 grid-cols-[minmax(190px,1fr)_minmax(180px,260px)] items-center gap-4 px-3 py-1.5">
-      <div className="min-w-0">
-        <div className="truncate text-sm text-app-body" title={label}>{label}</div>
-      </div>
-      {isSwitchHotkey(section, value) ? (
-        <div className="flex justify-start">
-          <SwitchControl checked={value === '1'} onChange={(checked) => onChange(checked ? '1' : '0')} />
-        </div>
-      ) : (
-        <div className="flex min-w-0 items-center gap-2">
-          <KeyBindingButton value={value} onClick={onCapture} />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onChange('[<Unbound>]')}
-            aria-label="清空热键"
-            title="清空"
+      {pendingChanges > 0 ? (
+        <>
+          <span className="st-pending"><i />改了 {pendingChanges} 项，还没应用</span>
+          <button type="button" className="as-btn as-btn--sm as-btn--ghost" disabled={Boolean(busy)} onClick={onUndo}>
+            <RotateCcw />
+            撤销
+          </button>
+          <button
+            type="button"
+            className="as-btn as-btn--sm as-btn--primary"
+            disabled={Boolean(busy) || Boolean(blocked)}
+            onClick={onApply}
+            title={blocked ? `${blocked}，打完再应用` : undefined}
           >
-            <X className="size-3.5" />
-          </Button>
-        </div>
+            {busy === 'apply' ? <LoaderCircle className="as-spin" /> : <Upload />}
+            应用到游戏
+          </button>
+        </>
+      ) : (
+        <span className="st-synced">
+          {busy === 'read' ? <LoaderCircle className="as-spin" /> : <Check />}
+          {busy === 'read' ? '正在读取…' : '和游戏里一致'}
+        </span>
       )}
     </div>
   );

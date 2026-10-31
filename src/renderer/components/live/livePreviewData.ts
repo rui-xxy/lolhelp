@@ -1,4 +1,4 @@
-import type { LiveBattlePlayer, PlayerRankSummary } from '../../../shared/api';
+import type { LiveBattlePlayer, LiveMatchPerformanceStats, PlayerRankSummary } from '../../../shared/api';
 
 interface PreviewPlayerSpec {
   gameName: string;
@@ -138,6 +138,51 @@ function createRank(spec: PreviewPlayerSpec, index: number): PlayerRankSummary[]
   return [solo, flex];
 }
 
+// 演示用的单局细节（悬浮战绩卡里展示）。数值只求像样，不追求真实分布。
+function createPerformance(
+  index: number,
+  matchIndex: number,
+  kills: number,
+  assists: number,
+  win: boolean,
+): LiveMatchPerformanceStats {
+  const seed = index * 31 + matchIndex * 17;
+  const duration = 960 + (seed * 37) % 840;
+  const cs = 28 + (seed * 13) % 64;
+  const championDamage = 14_000 + (seed * 2_711) % 26_000;
+  const teamDamagePercentage = 0.15 + ((seed * 7) % 15) / 100;
+  return {
+    duration,
+    championDamage,
+    damageTaken: 16_000 + (seed * 1_933) % 22_000,
+    goldEarned: 9_500 + (seed * 811) % 7_500,
+    cs,
+    turretDamage: 1_200 + (seed * 433) % 5_200,
+    visionScore: 6 + (seed % 14),
+    killParticipation: Math.min(0.92, 0.42 + (kills + assists) / 60 + (win ? 0.06 : 0)),
+    soloKills: seed % 5 === 0 ? 1 + (seed % 3) : 0,
+    enemyMissingPings: seed % 4,
+    teamVisionPercentage: 0.14 + ((seed * 3) % 12) / 100,
+    damageGoldEfficiency: 1.1 + ((seed * 5) % 60) / 100,
+    teamDamagePercentage,
+    relativeTeamDamage: Math.min(1, teamDamagePercentage * 3.6),
+    relativeGlobalDamage: Math.min(1, teamDamagePercentage * 3.1),
+    teamDamageTakenPercentage: 0.14 + ((seed * 11) % 16) / 100,
+    relativeTeamDamageTaken: 0.6 + ((seed * 3) % 40) / 100,
+    relativeGlobalDamageTaken: 0.5 + ((seed * 7) % 45) / 100,
+    teamGoldPercentage: 0.17 + ((seed * 5) % 8) / 100,
+    relativeTeamGold: 0.7 + ((seed * 9) % 30) / 100,
+    relativeGlobalGold: 0.62 + ((seed * 13) % 36) / 100,
+    csPerMinute: cs / (duration / 60),
+    teamCsPercentage: 0.12 + ((seed * 3) % 14) / 100,
+    relativeTeamCs: 0.5 + ((seed * 7) % 50) / 100,
+    relativeGlobalCs: 0.45 + ((seed * 11) % 50) / 100,
+    teamTurretDamagePercentage: 0.1 + ((seed * 5) % 20) / 100,
+    relativeTeamTurretDamage: 0.4 + ((seed * 9) % 60) / 100,
+    relativeGlobalTurretDamage: 0.35 + ((seed * 13) % 60) / 100,
+  };
+}
+
 function createPlayer(spec: PreviewPlayerSpec, index: number): LiveBattlePlayer {
   const teamId = index < 5 ? 100 : 200;
   const ranks = createRank(spec, index);
@@ -165,6 +210,7 @@ function createPlayer(spec: PreviewPlayerSpec, index: number): LiveBattlePlayer 
       assists,
       win,
       timeStr: matchIndex < 2 ? `${18 + matchIndex * 17}分` : matchIndex < 8 ? `${matchIndex}时` : `${Math.ceil(matchIndex / 4)}天`,
+      performance: matchIndex % 7 === 6 ? undefined : createPerformance(index, matchIndex, kills, assists, win),
     };
   });
 

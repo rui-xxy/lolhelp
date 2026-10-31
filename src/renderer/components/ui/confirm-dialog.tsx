@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from './button';
 
@@ -36,9 +37,9 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 p-6 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-scrim p-6 backdrop-blur-[1px] [-webkit-app-region:no-drag]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onOpenChange(false);
       }}
@@ -90,6 +91,7 @@ export function ConfirmDialog({
           </Button>
         </footer>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

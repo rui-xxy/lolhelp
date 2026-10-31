@@ -311,7 +311,7 @@ function FollowAccountCard({
         />
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-app-text">{account.profile.riotId}</div>
-          <div className="mt-0.5 truncate text-[10px] text-app-muted">
+          <div className="mt-0.5 truncate text-[11px] text-app-muted">
             {getRegionName(account.region, account.regionName)}{latestGameText}
           </div>
         </div>
@@ -326,7 +326,7 @@ function FollowAccountCard({
         </button>
       </div>
       {account.follow?.lastError && (
-        <div className="mt-2 truncate text-[10px] text-app-danger">{account.follow.lastError}</div>
+        <div className="mt-2 truncate text-[11px] text-app-danger">{account.follow.lastError}</div>
       )}
     </div>
   );
@@ -344,7 +344,7 @@ function FollowAlertRow({
     <div
       className={`grid grid-cols-[minmax(0,1fr)_94px_88px] items-center gap-3 border-l-2 px-3 py-2.5 ${
         match.win
-          ? 'border-l-app-success bg-app-win-bg/20'
+          ? 'border-l-ally bg-app-win-bg/20'
           : 'border-l-app-danger bg-app-loss-bg/20'
       }`}
     >
@@ -369,11 +369,11 @@ function FollowAlertRow({
       </div>
       <div className="text-right text-xs font-semibold tabular-nums text-app-text">
         {match.kills} / {match.deaths} / {match.assists}
-        <div className="text-[10px] font-normal text-app-muted">{match.kda.toFixed(2)} KDA</div>
+        <div className="text-[11px] font-normal text-app-muted">{match.kda.toFixed(2)} KDA</div>
       </div>
       <div className="text-right text-xs font-semibold tabular-nums text-app-text">
         {formatRecentAge(match.gameCreation)}
-        <div className="text-[10px] font-normal text-app-muted">检测 {formatRecentAge(alert.detectedAt)}</div>
+        <div className="text-[11px] font-normal text-app-muted">检测 {formatRecentAge(alert.detectedAt)}</div>
       </div>
     </div>
   );

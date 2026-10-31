@@ -182,7 +182,7 @@ export function ChampionPicker({
                     <span className="max-w-36 truncate text-[11px] font-medium text-app-text">
                       {preset.name}
                     </span>
-                    <span className="text-[10px] tabular-nums text-app-subtle">
+                    <span className="text-[11px] tabular-nums text-app-subtle">
                       {preset.championIds.length}
                     </span>
                   </button>
@@ -255,7 +255,7 @@ export function ChampionPicker({
                 />
               )}
               <GameIcon src={c.avatar} alt={displayName(c)} size={40} rounded />
-              <span className="mt-0.5 max-w-full truncate text-[10px] text-app-muted">
+              <span className="mt-0.5 max-w-full truncate text-[11px] text-app-muted">
                 {displayName(c)}
               </span>
             </button>

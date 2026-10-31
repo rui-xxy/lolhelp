@@ -36,6 +36,8 @@ import { stabilizeLiveBattle, type StableLiveBattleSnapshot } from './liveBattle
 const PREFETCH_PHASES = ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect'];
 // 真正处于对局中的阶段（实时对局页展示这些阶段的数据）。
 const LIVE_PHASES = ['ChampSelect', 'GameStart', 'InProgress', 'Reconnect'];
+// 已经进入游戏的阶段（不含选人）。
+const IN_GAME_PHASES = ['GameStart', 'InProgress', 'Reconnect'];
 
 const RECENT_MATCH_COUNT = 50;
 const LIVE_BATTLE_STALE_TTL_MS = 30_000;
@@ -53,6 +55,8 @@ let currentPhase = 'None';
 let currentQueueName = '';
 let currentMapName = '';
 let currentMyPuuid = '';
+// 当前名单所属的对局 id（选人 / 对局阶段才有，大厅阶段为 0）。
+let currentGameId = 0;
 let currentRoster: { myTeam: RosterPlayer[]; enemyTeam: RosterPlayer[] } = {
   myTeam: [],
   enemyTeam: [],
@@ -90,10 +94,12 @@ export function subscribeLiveBattleUpdates(
   return () => listeners.delete(listener);
 }
 
+// 每条推送都带上当前会话编号，前端用它丢掉上一局迟到的数据。
 function emitUpdate(event: LiveBattleUpdateEvent): void {
+  const stamped: LiveBattleUpdateEvent = { ...event, session: loadGeneration };
   for (const listener of listeners) {
     try {
-      listener(event);
+      listener(stamped);
     } catch (error) {
       console.warn('[live] update listener failed:', error);
     }
@@ -720,6 +726,7 @@ async function loadRoster(
   queueName: string;
   mapName: string;
   myPuuid: string;
+  gameId: number;
 }> {
   const client = createLcuClient();
   let myPuuid = '';
@@ -739,6 +746,7 @@ async function loadRoster(
   let queueName = '';
   let mapName = '';
   let queueId = 0;
+  let gameId = 0;
 
   if (phase === 'ChampSelect') {
     try {
@@ -749,6 +757,7 @@ async function loadRoster(
       queueId = parsed.queueId;
       queueName = getQueueName(queueId);
       mapName = parsed.mapName;
+      gameId = parsed.gameId;
       if (myTeam.length > 0) {
         captureRosterSnapshot(myTeam, enemyTeam, parsed.gameId, parsed.queueId);
       }
@@ -775,6 +784,7 @@ async function loadRoster(
       queueId = parsed.queueId;
       queueName = getQueueName(queueId);
       mapName = parsed.mapName;
+      gameId = parsed.gameId;
 
       // 对局数据缺 puuid 时，用选人阶段存的快照补齐。
       const snapshot = getRosterSnapshot(parsed.gameId);
@@ -809,7 +819,7 @@ async function loadRoster(
   }
 
   if (!queueName && queueId) queueName = getQueueName(queueId);
-  return { myTeam, enemyTeam, queueName, mapName, myPuuid };
+  return { myTeam, enemyTeam, queueName, mapName, myPuuid, gameId };
 }
 
 // ---------------------------------------------------------------------------
@@ -836,15 +846,23 @@ export async function startLiveLoad(phase: string): Promise<void> {
     while (phaseToLoad) {
       const requestedPhase = phaseToLoad;
       phaseToLoad = null;
-      const generation = loadGeneration;
+      const requestedGeneration = loadGeneration;
       const loadedRoster = await loadRoster(requestedPhase);
 
       // 读取期间又有更新：旧结果不落地，直接处理最新阶段/名单。
-      if (generation !== loadGeneration || pendingPhase) {
+      if (requestedGeneration !== loadGeneration || pendingPhase) {
         phaseToLoad = pendingPhase;
         pendingPhase = null;
         continue;
       }
+
+      // 对局 id 变了却没经过结算阶段（相位事件漏了）：说明已经是新的一局，
+      // 先把上一局的名单和缓存清掉，再落新名单。选人快照属于新的一局，保留。
+      if (loadedRoster.gameId > 0 && currentGameId > 0 && loadedRoster.gameId !== currentGameId) {
+        resetLiveBattle({ keepRosterSnapshot: true });
+      }
+      if (loadedRoster.gameId > 0) currentGameId = loadedRoster.gameId;
+      const generation = loadGeneration;
 
       const previousTotal = currentRoster.myTeam.length + currentRoster.enemyTeam.length;
       const loadedTotal = loadedRoster.myTeam.length + loadedRoster.enemyTeam.length;
@@ -932,6 +950,7 @@ function assembleBattle(): LiveBattleInfo {
     myPuuid: currentMyPuuid,
     myTeam: currentRoster.myTeam.map(toPlayer),
     enemyTeam: currentRoster.enemyTeam.map(toPlayer),
+    session: loadGeneration,
   };
 }
 
@@ -978,7 +997,7 @@ export async function getLiveBattle(): Promise<LiveBattleInfo> {
       const lobby = assembleBattle();
       return { ...lobby, inGame: false, phase };
     }
-    return { inGame: false, phase, queueName: '', myTeam: [], enemyTeam: [] };
+    return { inGame: false, phase, queueName: '', myTeam: [], enemyTeam: [], session: loadGeneration };
   }
 
   // 名单还没建立（首次进入该阶段）→ 触发加载并返回已就绪的部分。
@@ -1000,7 +1019,8 @@ export async function getLiveBattle(): Promise<LiveBattleInfo> {
 }
 
 // 离开对局/大厅时彻底重置：递增 generation 让在途回调失效，清空分片状态。
-export function resetLiveBattle(): void {
+// generation 同时就是推给前端的会话编号。
+export function resetLiveBattle(options: { keepRosterSnapshot?: boolean } = {}): void {
   loadGeneration += 1;
   queue.clear();
   store.clearSession();
@@ -1008,11 +1028,12 @@ export function resetLiveBattle(): void {
   currentQueueName = '';
   currentMapName = '';
   currentMyPuuid = '';
+  currentGameId = 0;
   matchDetailCache.clear();
   stableSnapshot = null;
   pendingPhase = null;
   pendingPlayers.clear();
-  clearRosterSnapshot();
+  if (!options.keepRosterSnapshot) clearRosterSnapshot();
   emitUpdate({ type: 'reset' });
 }
 
@@ -1028,6 +1049,11 @@ export function onPhaseChanged(phase: string): void {
     currentPhase = phase;
     resetLiveBattle();
     return;
+  }
+
+  // 从对局中直接回到大厅 / 匹配（结算阶段的相位事件漏掉了）：上一局已经结束，先清掉。
+  if (IN_GAME_PHASES.includes(currentPhase) && ['Lobby', 'Matchmaking', 'ReadyCheck'].includes(phase)) {
+    resetLiveBattle();
   }
 
   currentPhase = phase;

@@ -1,30 +1,25 @@
 import { useCallback, useState } from 'react';
 import type { LolClientConfigValues } from '../../../shared/api';
+import { CLIENT_FIELDS, VOICE_INPUT_OPTIONS } from './configFields';
 import {
   BlockedPlayersList,
   CheckboxRow,
   ReadonlyRow,
-  SectionDot,
+  SectionTabs,
   SelectRow,
   SettingsGroup,
   SettingsSection,
   SliderRow,
+  scrollToSettingsSection,
   useSettingsScrollSpy,
 } from './SettingsControls';
 
-type ClientSectionKey =
-  | 'general'
-  | 'notifications'
-  | 'chat'
-  | 'sound'
-  | 'voice'
-  | 'blocked';
+type ClientSectionKey = 'general' | 'privacy' | 'social' | 'voice' | 'blocked';
 
 const CLIENT_SECTIONS: { key: ClientSectionKey; label: string }[] = [
   { key: 'general', label: '综合' },
-  { key: 'notifications', label: '通知弹窗' },
-  { key: 'chat', label: '聊天&好友' },
-  { key: 'sound', label: '声音' },
+  { key: 'privacy', label: '隐私与主播模式' },
+  { key: 'social', label: '聊天与邀请' },
   { key: 'voice', label: '语音' },
   { key: 'blocked', label: '聊天黑名单' },
 ];
@@ -44,100 +39,110 @@ export function ClientSettings({
 
   const goToSection = useCallback((section: ClientSectionKey) => {
     setActiveSection(section);
-    document.getElementById(`client-section-${section}`)?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth',
-    });
+    scrollToSettingsSection('client', section);
   }, []);
 
   return (
-    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
-      <div className="min-w-0 space-y-8">
-        <SettingsSection prefix="client" id="general" title="综合">
-          <div className="space-y-7">
-            <SettingsGroup title="界面">
-              <CheckboxRow label="低配机器适应模式" checked={values.lowSpecMode} onChange={(value) => onChange('lowSpecMode', value)} />
-              <CheckboxRow label="禁用互动背景效果" checked={values.disableInteractiveBackground} onChange={(value) => onChange('disableInteractiveBackground', value)} />
-              <CheckboxRow label="游戏期间关闭客户端" checked={values.closeClientDuringGame} onChange={(value) => onChange('closeClientDuringGame', value)} />
-              <CheckboxRow label="禁用英雄技能说明文本" checked={values.disableChampionSkillText} onChange={(value) => onChange('disableChampionSkillText', value)} />
-            </SettingsGroup>
-
-            <SettingsGroup title="系统">
-              <CheckboxRow label="自动发送崩溃报告" checked={values.uploadCrashReports} onChange={(value) => onChange('uploadCrashReports', value)} />
-              <CheckboxRow label="将我的生涯设为不公开" checked={values.careerPrivate} onChange={(value) => onChange('careerPrivate', value)} />
-            </SettingsGroup>
-
-            <SettingsGroup title="主播模式">
-              <CheckboxRow label="隐藏所有名称（仅对我）" checked={values.hideAllPlayerNamesForMe} onChange={(value) => onChange('hideAllPlayerNamesForMe', value)} />
-              <CheckboxRow label="对所有人隐藏我的名称" checked={values.hideMyNameFromOthers} onChange={(value) => onChange('hideMyNameFromOthers', value)} />
-              <CheckboxRow label="对所有人隐藏我的身份信息" checked={values.hideMyIdentityFromOthers} onChange={(value) => onChange('hideMyIdentityFromOthers', value)} />
-            </SettingsGroup>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection prefix="client" id="notifications" title="通知弹窗">
+    <>
+      <SectionTabs sections={CLIENT_SECTIONS} active={activeSection} onSelect={goToSection} />
+      <div className="st-sections">
+        <SettingsSection prefix="client" id="general" title="综合" description="客户端本身的表现：卡不卡、吵不吵。">
           <SettingsGroup>
-            <CheckboxRow label="只接受好友游戏邀请" checked={values.blockNonFriendGameInvites} onChange={(value) => onChange('blockNonFriendGameInvites', value)} />
-            <ReadonlyRow label="关闭比赛通知功能" value="未定位到稳定字段" />
-            <ReadonlyRow label="禁用商品·新获内容的提醒" value="未定位到稳定字段" />
+            <CheckboxRow
+              label={CLIENT_FIELDS.lowSpecMode.label}
+              hint="关掉客户端里大部分动画，老电脑会顺滑很多"
+              checked={values.lowSpecMode}
+              onChange={(value) => onChange('lowSpecMode', value)}
+            />
+            <CheckboxRow label={CLIENT_FIELDS.disableInteractiveBackground.label} checked={values.disableInteractiveBackground} onChange={(value) => onChange('disableInteractiveBackground', value)} />
+            <CheckboxRow
+              label={CLIENT_FIELDS.closeClientDuringGame.label}
+              hint="省一点内存，结算后客户端会重新打开"
+              checked={values.closeClientDuringGame}
+              onChange={(value) => onChange('closeClientDuringGame', value)}
+            />
+            <CheckboxRow label={CLIENT_FIELDS.disableChampionSkillText.label} checked={values.disableChampionSkillText} onChange={(value) => onChange('disableChampionSkillText', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.clientAudioEnabled.label} checked={values.clientAudioEnabled} onChange={(value) => onChange('clientAudioEnabled', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.uploadCrashReports.label} checked={values.uploadCrashReports} onChange={(value) => onChange('uploadCrashReports', value)} />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="chat" title="聊天&好友">
+        <SettingsSection prefix="client" id="privacy" title="隐私与主播模式" description="直播或不想被认出来时用。">
           <SettingsGroup>
-            <CheckboxRow label="当我在聊天框中点击了跳转链接时，请警告我" checked={values.linkClickWarningEnabled} onChange={(value) => onChange('linkClickWarningEnabled', value)} />
-            <CheckboxRow label="显示“更多未读”指示条" checked={values.moreUnreadsEnabled} onChange={(value) => onChange('moreUnreadsEnabled', value)} />
-            <CheckboxRow label="显示新的好友请求浮标" checked={values.friendRequestToastsEnabled} onChange={(value) => onChange('friendRequestToastsEnabled', value)} />
+            <CheckboxRow
+              label={CLIENT_FIELDS.careerPrivate.label}
+              hint="别人点开你的资料看不到战绩"
+              checked={values.careerPrivate}
+              onChange={(value) => onChange('careerPrivate', value)}
+            />
+            <CheckboxRow
+              label={CLIENT_FIELDS.hideAllPlayerNamesForMe.label}
+              hint="你看到的玩家名字都会被隐藏，和游戏内「隐藏玩家名字」是同一个开关"
+              checked={values.hideAllPlayerNamesForMe}
+              onChange={(value) => onChange('hideAllPlayerNamesForMe', value)}
+            />
+            <CheckboxRow label={CLIENT_FIELDS.hideMyNameFromOthers.label} checked={values.hideMyNameFromOthers} onChange={(value) => onChange('hideMyNameFromOthers', value)} />
+            <CheckboxRow
+              label={CLIENT_FIELDS.hideMyIdentityFromOthers.label}
+              hint="名字、头像、段位都会对其他玩家隐藏"
+              checked={values.hideMyIdentityFromOthers}
+              onChange={(value) => onChange('hideMyIdentityFromOthers', value)}
+            />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="sound" title="声音">
+        <SettingsSection prefix="client" id="social" title="聊天与邀请">
           <SettingsGroup>
-            <CheckboxRow label="开启客户端音效" checked={values.clientAudioEnabled} onChange={(value) => onChange('clientAudioEnabled', value)} />
-            <ReadonlyRow label="音效音量" value="客户端未开放稳定字段" />
-            <ReadonlyRow label="音乐音量" value="客户端未开放稳定字段" />
-            <ReadonlyRow label="播放英雄选择音乐" value="客户端未开放稳定字段" />
-            <ReadonlyRow label="播放房间/赛前音乐" value="客户端未开放稳定字段" />
-            <ReadonlyRow label="播放《英雄联盟》首页" value="客户端未开放稳定字段" />
-            <ReadonlyRow label="播放登录音乐" value="客户端未开放稳定字段" />
+            <CheckboxRow
+              label={CLIENT_FIELDS.blockNonFriendGameInvites.label}
+              hint="陌生人拉你进房间的邀请不再弹出来"
+              checked={values.blockNonFriendGameInvites}
+              onChange={(value) => onChange('blockNonFriendGameInvites', value)}
+            />
+            <CheckboxRow label={CLIENT_FIELDS.linkClickWarningEnabled.label} checked={values.linkClickWarningEnabled} onChange={(value) => onChange('linkClickWarningEnabled', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.moreUnreadsEnabled.label} checked={values.moreUnreadsEnabled} onChange={(value) => onChange('moreUnreadsEnabled', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.friendRequestToastsEnabled.label} checked={values.friendRequestToastsEnabled} onChange={(value) => onChange('friendRequestToastsEnabled', value)} />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="voice" title="语音">
+        <SettingsSection prefix="client" id="voice" title="语音" description="组队开黑时的队伍语音。">
           <SettingsGroup>
-            <CheckboxRow label="启用组队语音" checked={values.teamVoiceEnabled} onChange={(value) => onChange('teamVoiceEnabled', value)} />
-            <CheckboxRow label="自动加入队伍语音" checked={values.autoJoinTeamVoice} onChange={(value) => onChange('autoJoinTeamVoice', value)} />
-            <CheckboxRow label="在我连上联盟语音时将我静音" checked={values.muteOnConnect} onChange={(value) => onChange('muteOnConnect', value)} />
-            <ReadonlyRow label="输入设备" value={values.voiceInputDeviceName || values.voiceInputDeviceHandle || '-'} />
-            <SliderRow label="输入音量（增强）" value={values.voiceInputVolume} min={0} max={100} onChange={(value) => onChange('voiceInputVolume', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.teamVoiceEnabled.label} checked={values.teamVoiceEnabled} onChange={(value) => onChange('teamVoiceEnabled', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.autoJoinTeamVoice.label} checked={values.autoJoinTeamVoice} onChange={(value) => onChange('autoJoinTeamVoice', value)} />
+            <CheckboxRow label={CLIENT_FIELDS.muteOnConnect.label} checked={values.muteOnConnect} onChange={(value) => onChange('muteOnConnect', value)} />
             <SelectRow
-              label="输入模式"
+              label={CLIENT_FIELDS.voiceInputMode.label}
               value={values.voiceInputMode}
-              options={[
-                { value: 'voiceActivity', label: '语音活跃度' },
-                { value: 'pushToTalk', label: '按住以发言' },
-              ]}
+              options={VOICE_INPUT_OPTIONS}
+              segmented
               onChange={(value) => onChange('voiceInputMode', value)}
             />
-            <SliderRow label="语音激活阈值" value={values.voiceSensitivity} min={0} max={100} onChange={(value) => onChange('voiceSensitivity', value)} />
+            <ReadonlyRow
+              label={CLIENT_FIELDS.voiceInputDeviceName.label}
+              hint="在客户端里切换，这里只显示"
+              value={values.voiceInputDeviceName || values.voiceInputDeviceHandle || '系统默认'}
+            />
+            <SliderRow label={CLIENT_FIELDS.voiceInputVolume.label} value={values.voiceInputVolume} min={0} max={100} onChange={(value) => onChange('voiceInputVolume', value)} />
+            <SliderRow
+              label={CLIENT_FIELDS.voiceSensitivity.label}
+              hint="「有声音就发」时，声音超过这个大小才会被队友听到"
+              value={values.voiceSensitivity}
+              min={0}
+              max={100}
+              onChange={(value) => onChange('voiceSensitivity', value)}
+            />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="blocked" title="聊天黑名单">
+        <SettingsSection
+          prefix="client"
+          id="blocked"
+          title="聊天黑名单"
+          description="客户端里屏蔽的玩家，只能查看。要解除屏蔽请在客户端好友列表里操作。"
+        >
           <BlockedPlayersList players={values.blockedPlayers} />
         </SettingsSection>
       </div>
-
-      <aside className="sticky top-4 flex h-[360px] flex-col items-center justify-center gap-3">
-        {CLIENT_SECTIONS.map((item) => (
-          <SectionDot
-            key={item.key}
-            active={activeSection === item.key}
-            label={item.label}
-            onClick={() => goToSection(item.key)}
-          />
-        ))}
-      </aside>
-    </div>
+    </>
   );
 }

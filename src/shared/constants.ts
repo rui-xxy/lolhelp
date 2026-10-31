@@ -1,13 +1,16 @@
 export const DEFAULT_LOL_ROOT_PATH = 'D:\\WeGameApps\\英雄联盟';
 
 export const APP_LAYOUT = {
-  workspaceWidth: 1448,
-  windowHeight: 850,
-  minWindowHeight: 760,
-  friendPanelWidth: 288,
-  hiddenFriendPanelWidth: 0,
-  expandedSidebarWidth: 200,
-  collapsedSidebarWidth: 52,
+  // 流式布局：窗口可自由缩放，默认尺寸会按屏幕可用区域收缩，并记住上次尺寸。
+  defaultWindowWidth: 1440,
+  defaultWindowHeight: 880,
+  minWindowWidth: 1200,
+  minWindowHeight: 720,
+  topbarHeight: 48,
+  railWidth: 72,
+  friendDrawerWidth: 300,
+  // 窗口足够宽时好友抽屉停靠在右侧，否则浮在内容上方。
+  friendDrawerDockMinWidth: 1600,
 } as const;
 
 export const LOL_REGIONS = [

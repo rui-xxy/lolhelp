@@ -1,347 +1,439 @@
+/* 外壳：72px 导航轨 + 48px 顶栏 + 页面 + 好友抽屉。全部流式，不写死宽度。 */
 @layer components {
-  .app-shell {
+  .shell {
     position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr);
     height: 100vh;
     overflow: hidden;
+    /* 外壳自成一层：页面里再高的 z-index 也压不住挂在 body 上的弹窗 */
+    isolation: isolate;
     color: var(--color-app-text);
-    background: var(--color-app-shell);
+    background: var(--color-ink-0);
   }
 
-  .app-sidebar {
+  /* ---------- 导航轨 ---------- */
+  .shell-rail {
     position: relative;
-    z-index: 10;
-    display: flex;
-    width: var(--shell-sidebar-width);
-    flex: 0 0 var(--shell-sidebar-width);
-    flex-direction: column;
-    overflow: hidden;
-    border-right: 1px solid var(--color-app-border-subtle);
-    padding-top: var(--shell-titlebar-height);
-    background: var(--color-app-sidebar);
-    transition:
-      width var(--duration-ui-layout) var(--ease-ui),
-      flex-basis var(--duration-ui-layout) var(--ease-ui);
-  }
-
-  .app-sidebar__drag-region {
-    position: absolute;
-    inset: 0 0 auto;
-    height: var(--shell-titlebar-height);
-    -webkit-app-region: drag;
-  }
-
-  .app-sidebar__brand-row {
-    display: flex;
-    height: 48px;
-    flex: 0 0 48px;
-    align-items: center;
-    padding: 0 8px;
-    -webkit-app-region: drag;
-  }
-
-  .app-sidebar__brand {
-    display: flex;
-    width: 100%;
-    height: 36px;
-    min-width: 0;
-    align-items: center;
-    gap: 10px;
-    border-radius: var(--radius-sm);
-    padding: 0 8px;
-    color: var(--color-app-body);
-    text-align: left;
-    transition:
-      color var(--duration-ui-normal) ease,
-      background-color var(--duration-ui-normal) ease;
-    -webkit-app-region: no-drag;
-  }
-
-  .app-sidebar__brand:hover {
-    color: var(--color-app-text);
-    background: var(--color-app-nav-hover);
-  }
-
-  .app-sidebar__brand-mark {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
-    place-items: center;
-    border: 1px solid var(--color-app-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-app-primary);
-    background: var(--color-app-surface);
-    transition: border-color var(--duration-ui-normal) ease;
-  }
-
-  .app-sidebar__brand:hover .app-sidebar__brand-mark {
-    border-color: var(--color-app-border-strong);
-  }
-
-  .app-sidebar__brand-name {
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 18px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .app-sidebar__collapse-icon {
-    width: 14px;
-    height: 14px;
-    flex: 0 0 14px;
-    color: var(--color-app-subtle);
-    opacity: 0;
-    transition:
-      color var(--duration-ui-normal) ease,
-      opacity var(--duration-ui-normal) ease;
-  }
-
-  .app-sidebar__brand:hover .app-sidebar__collapse-icon,
-  .app-sidebar__brand:focus-visible .app-sidebar__collapse-icon {
-    color: var(--color-app-body);
-    opacity: 1;
-  }
-
-  .app-sidebar__nav {
+    z-index: 20;
     display: flex;
     min-height: 0;
-    flex: 1;
     flex-direction: column;
-    overflow: hidden;
-    padding: 8px;
-  }
-
-  .app-sidebar__nav-item {
-    position: relative;
-    display: flex;
-    width: 100%;
-    height: 36px;
-    flex: 0 0 36px;
     align-items: center;
-    gap: 10px;
-    border-radius: var(--radius-sm);
-    padding: 0 10px;
-    color: var(--color-app-muted);
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 18px;
-    text-align: left;
-    transition:
-      color var(--duration-ui-normal) ease,
-      background-color var(--duration-ui-normal) ease;
+    gap: 4px;
+    padding: 10px 0 12px;
+    background: var(--color-ink-0);
   }
 
-  .app-sidebar__nav-item + .app-sidebar__nav-item {
-    margin-top: 4px;
-  }
-
-  .app-sidebar__nav-item:hover {
-    color: var(--color-app-text);
-    background: var(--color-app-nav-hover);
-  }
-
-  .app-sidebar__nav-item::before {
+  .shell-rail__drag {
     position: absolute;
-    top: 8px;
-    bottom: 8px;
-    left: 0;
-    width: 2px;
-    border-radius: 0 2px 2px 0;
-    content: "";
-    background: transparent;
-  }
-
-  .app-sidebar__nav-item--active {
-    color: var(--color-app-text);
-    background: var(--color-app-selected);
-  }
-
-  .app-sidebar__nav-item--active::before {
-    background: var(--color-app-primary);
-  }
-
-  .app-sidebar__nav-icon {
-    width: 16px;
-    height: 16px;
-    flex: 0 0 16px;
-    color: var(--color-app-subtle);
-    transition: color var(--duration-ui-normal) ease;
-  }
-
-  .app-sidebar__nav-item:hover .app-sidebar__nav-icon {
-    color: var(--color-app-body);
-  }
-
-  .app-sidebar__nav-item--active .app-sidebar__nav-icon {
-    color: var(--color-app-primary);
-  }
-
-  .app-sidebar__nav-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .app-sidebar__footer {
-    flex: 0 0 auto;
-    border-top: 1px solid var(--color-app-border-subtle);
-    padding: 8px;
-  }
-
-  .app-sidebar[data-collapsed="true"] .app-sidebar__brand {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  .app-sidebar[data-collapsed="true"] .app-sidebar__nav-item {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  .app-workspace-column {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    width: var(--shell-workspace-width);
-    min-width: 0;
-    flex: 0 0 var(--shell-workspace-width);
-    padding:
-      var(--shell-titlebar-height)
-      var(--shell-edge-gap)
-      var(--shell-edge-gap)
-      0;
-    transition:
-      width var(--duration-ui-layout) var(--ease-ui),
-      flex-basis var(--duration-ui-layout) var(--ease-ui);
-  }
-
-  .app-titlebar {
-    position: absolute;
-    inset: 0 var(--shell-edge-gap) auto 0;
-    z-index: 30;
-    display: flex;
-    height: var(--shell-titlebar-height);
-    align-items: center;
-    gap: 12px;
-    padding: 0 4px 0 12px;
+    inset: 0 0 auto;
+    height: var(--shell-topbar-height);
     -webkit-app-region: drag;
   }
 
-  .app-titlebar--window-edge {
-    padding-right: var(--shell-window-controls-inset);
+  .shell-rail__logo {
+    position: relative;
+    display: grid;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 14px;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    font: 700 16px/1 var(--font-num);
+    -webkit-app-region: drag;
   }
 
-  .app-titlebar__title {
+  .shell-rail__item {
+    position: relative;
+    display: grid;
+    width: 56px;
+    justify-items: center;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+    padding: 8px 0 7px;
+    color: var(--color-text-4);
+    font-size: var(--text-meta);
+    line-height: 1;
+    transition:
+      color var(--duration-ui-fast) ease,
+      background-color var(--duration-ui-fast) ease;
+  }
+
+  .shell-rail__item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .shell-rail__item:hover {
+    color: var(--color-text-2);
+    background: var(--color-app-nav-hover);
+  }
+
+  .shell-rail__item[aria-current="page"] {
+    color: var(--color-text-1);
+    background: var(--color-ink-3);
+  }
+
+  .shell-rail__item[aria-current="page"]::before {
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: -8px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    content: "";
+    background: var(--color-text-1);
+  }
+
+  .shell-rail__item:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-ui-focus);
+  }
+
+  .shell-rail__badge {
+    position: absolute;
+    top: 3px;
+    right: 7px;
+    min-width: 15px;
+    height: 15px;
+    border: 2px solid var(--color-ink-0);
+    border-radius: 999px;
+    padding: 0 3px;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    font: 700 10px/11px var(--font-num);
+    text-align: center;
+  }
+
+  .shell-rail__spacer {
+    flex: 1;
+  }
+
+  /* ---------- 主区 ---------- */
+  .shell-main {
+    display: grid;
     min-width: 0;
-    overflow: hidden;
-    color: var(--color-app-body);
-    font-size: 13px;
+    min-height: 0;
+    grid-template-rows: var(--shell-topbar-height) minmax(0, 1fr);
+  }
+
+  .shell-topbar {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+    padding: 0 calc(var(--shell-window-controls-width) + 8px) 0 16px;
+    background: var(--color-ink-0);
+    -webkit-app-region: drag;
+  }
+
+  .shell-topbar__title {
+    flex: none;
+    color: var(--color-text-1);
+    font-size: var(--text-list);
     font-weight: 600;
-    line-height: 18px;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .app-titlebar__interactive {
+  .shell-topbar__extra {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
     -webkit-app-region: no-drag;
   }
 
-  .app-titlebar__actions {
+  .shell-topbar__fill {
+    min-width: 12px;
+    flex: 1 1 auto;
+    align-self: stretch;
+  }
+
+  .shell-topbar__actions {
     display: flex;
+    flex: none;
     align-items: center;
     gap: 4px;
-    margin-left: auto;
     -webkit-app-region: no-drag;
   }
 
-  .app-titlebar__action {
+  .shell-icon-btn {
     position: relative;
     display: grid;
     width: 32px;
     height: 32px;
     place-items: center;
     border-radius: var(--radius-sm);
-    color: var(--color-app-muted);
+    color: var(--color-text-3);
     transition:
-      color var(--duration-ui-normal) ease,
-      background-color var(--duration-ui-normal) ease;
+      color var(--duration-ui-fast) ease,
+      background-color var(--duration-ui-fast) ease;
   }
 
-  .app-titlebar__action:hover {
-    color: var(--color-app-text);
-    background: var(--color-app-nav-hover);
-  }
-
-  .app-titlebar__action--active {
-    color: var(--color-app-text);
-    background: var(--color-app-selected);
-  }
-
-  .app-titlebar__action-icon {
+  .shell-icon-btn svg {
     width: 16px;
     height: 16px;
   }
 
-  .app-titlebar__badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    display: flex;
-    min-width: 16px;
-    height: 16px;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--color-app-shell);
-    border-radius: 9999px;
-    padding: 0 3px;
-    color: var(--color-app-primary-foreground);
-    background: var(--color-app-primary);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 12px;
-    font-variant-numeric: tabular-nums;
+  .shell-icon-btn:hover {
+    color: var(--color-text-1);
+    background: var(--color-app-nav-hover);
   }
 
-  .app-workspace-frame {
+  .shell-icon-btn[data-active="true"] {
+    color: var(--color-text-1);
+    background: var(--color-ink-3);
+  }
+
+  .shell-icon-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-ui-focus);
+  }
+
+  .shell-icon-btn__badge {
+    position: absolute;
+    top: 2px;
+    right: 1px;
+    min-width: 15px;
+    height: 15px;
+    border: 2px solid var(--color-ink-0);
+    border-radius: 999px;
+    padding: 0 3px;
+    color: var(--color-app-on-danger);
+    background: var(--color-enemy);
+    font: 700 10px/11px var(--font-num);
+    text-align: center;
+  }
+
+  .shell-conn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    border-radius: 999px;
+    padding: 0 10px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+  }
+
+  .shell-conn i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-text-4);
+  }
+
+  .shell-conn[data-connected="true"] {
+    color: var(--color-text-2);
+  }
+
+  .shell-conn[data-connected="true"] i {
+    background: var(--color-ok);
+    box-shadow: 0 0 0 3px var(--color-ok-soft);
+  }
+
+  /* ---------- 全局查人 ---------- */
+  .shell-search {
+    display: flex;
+    width: min(460px, 38vw);
+    height: 32px;
+    flex: none;
+    align-items: stretch;
+    border: 1px solid var(--color-line-2);
+    border-radius: var(--radius-sm);
+    background: var(--color-ink-1);
+    transition:
+      border-color var(--duration-ui-fast) ease,
+      box-shadow var(--duration-ui-fast) ease;
+    -webkit-app-region: no-drag;
+  }
+
+  .shell-search:focus-within {
+    border-color: var(--color-line-3);
+    box-shadow: var(--shadow-ui-focus-soft);
+  }
+
+  .shell-search__field {
+    position: relative;
     display: flex;
     min-width: 0;
     flex: 1;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--color-app-border);
-    border-radius: var(--shell-workspace-radius);
-    background: var(--color-app-bg);
-    box-shadow: var(--shadow-ui-shell);
+    align-items: center;
   }
 
-  .app-workspace-content {
-    min-height: 0;
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--shell-default-page-padding);
-    background: var(--color-app-bg);
+  .shell-search__field svg {
+    position: absolute;
+    left: 10px;
+    width: 14px;
+    height: 14px;
+    color: var(--color-text-4);
+    pointer-events: none;
   }
 
-  .app-workspace-content--full-bleed {
-    overflow: hidden;
-    padding: 0;
-  }
-
-  .app-workspace-content__inner {
+  .shell-search input {
     width: 100%;
-    max-width: 1024px;
-    margin-inline: auto;
+    height: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 0 8px 0 32px;
+    color: var(--color-text-1);
+    background: transparent;
+    font-size: var(--text-body);
+    outline: none;
+    cursor: text;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
-  .app-workspace-content__inner--full-bleed {
+  .shell-search input::placeholder {
+    color: var(--color-text-4);
+  }
+
+  .shell-search__kbd {
+    align-self: center;
+    margin-right: 6px;
+    border: 1px solid var(--color-line-2);
+    border-radius: var(--radius-xs);
+    padding: 2px 5px;
+    color: var(--color-text-4);
+    font: 500 11px/1 var(--font-num);
+    white-space: nowrap;
+  }
+
+  .shell-search__submit {
+    flex: none;
+    border-radius: 0 5px 5px 0;
+    padding: 0 14px;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .shell-search__submit:hover {
+    background: var(--color-app-primary-hover);
+  }
+
+  /* ---------- 页面与抽屉 ---------- */
+  .shell-body {
+    position: relative;
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell[data-drawer="docked"] .shell-body {
+    grid-template-columns: minmax(0, 1fr) var(--shell-drawer-width);
+  }
+
+  .shell-page {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--color-line-1);
+    border-left: 1px solid var(--color-line-1);
+    border-top-left-radius: var(--radius-lg);
+    background: var(--color-ink-1);
+    box-shadow: var(--shadow-ui-panel);
+  }
+
+  .shell-page__scroll {
     height: 100%;
-    max-width: none;
-    margin-inline: 0;
+    overflow-y: auto;
+  }
+
+  .shell-page__pad {
+    margin: 0 auto;
+    max-width: 1280px;
+    padding: 24px 28px 32px;
+  }
+
+  .shell-drawer {
+    position: relative;
+    z-index: 25;
+    display: none;
+    min-height: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--color-line-1);
+    background: var(--color-ink-0);
+  }
+
+  .shell[data-drawer="docked"] .shell-drawer {
+    display: block;
+  }
+
+  .shell[data-drawer="overlay"] .shell-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: block;
+    width: var(--shell-drawer-width);
+    border-left: 1px solid var(--color-line-2);
+    box-shadow: -24px 0 48px -24px color-mix(in srgb, var(--color-shadow) 90%, transparent);
+    animation: shell-drawer-in var(--duration-ui-layout) var(--ease-ui);
+  }
+
+  .shell-drawer > * {
+    height: 100%;
+  }
+
+  @keyframes shell-drawer-in {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+  }
+
+  /* ---------- 雷达后台运行时的导航轨状态 ---------- */
+  .shell-scout {
+    position: relative;
+    display: grid;
+    width: 44px;
+    height: 44px;
+    margin-top: 4px;
+    place-items: center;
+    border-radius: 50%;
+  }
+
+  .shell-scout[data-running="true"]::before {
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--color-line-3);
+    border-top-color: var(--color-text-1);
+    border-radius: 50%;
+    content: "";
+    animation: app-orbit-rotate 1.6s linear infinite;
+  }
+
+  .shell-scout__count {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    min-width: 17px;
+    height: 17px;
+    border: 2px solid var(--color-ink-0);
+    border-radius: 999px;
+    padding: 0 3px;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+    font: 700 10px/13px var(--font-num);
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shell[data-drawer="overlay"] .shell-drawer,
+    .shell-scout[data-running="true"]::before {
+      animation: none;
+    }
   }
 }

@@ -47,7 +47,7 @@ export function ProfileIcon({
         title={title}
         aria-label={alt}
         onClick={onClick}
-        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-app-surface-soft text-[10px] font-semibold text-app-muted ${className}`}
+        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-app-surface-soft text-[11px] font-semibold text-app-muted ${className}`}
         style={mergedStyle}
       >
         {(alt || '?').slice(0, 1).toUpperCase()}

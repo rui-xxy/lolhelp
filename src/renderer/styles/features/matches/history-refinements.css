@@ -47,7 +47,7 @@
     cursor: grab;
     align-items: center;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--color-app-text) 1.2%, transparent);
     color: var(--color-app-muted);
     outline: none;
@@ -80,7 +80,7 @@
     position: absolute;
     inset: 0;
     z-index: 0;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background:
       linear-gradient(
         180deg,
@@ -212,7 +212,7 @@
     flex: 0 0 19px;
     align-items: center;
     justify-content: center;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     color: var(--color-app-subtle);
     opacity: 0;
     outline: none;
@@ -258,7 +258,7 @@
     height: 26px;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--color-app-subtle);
     outline: none;
     transition:
@@ -292,7 +292,7 @@
     width: 230px;
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--color-app-text) 9%, transparent);
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     padding: 5px;
     background: color-mix(in srgb, var(--color-app-surface) 96%, transparent);
     box-shadow: var(--shadow-ui-popover);
@@ -306,7 +306,7 @@
     justify-content: space-between;
     padding: 0 7px;
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
   }
@@ -329,7 +329,7 @@
     min-height: 34px;
     grid-template-columns: minmax(0, 1fr) 26px;
     align-items: center;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     transition:
       background-color 100ms ease,
       color 100ms ease;
@@ -352,7 +352,7 @@
     grid-template-columns: 18px minmax(0, 1fr) 14px;
     align-items: center;
     gap: 7px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 0 5px 0 7px;
     color: var(--color-app-muted);
     text-align: left;
@@ -367,7 +367,7 @@
 
   .match-player-tabs-menu__item > span {
     overflow: hidden;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 560;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -385,7 +385,7 @@
     height: 22px;
     align-items: center;
     justify-content: center;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     color: var(--color-app-subtle);
     opacity: 0.58;
     outline: none;
@@ -419,10 +419,10 @@
     height: 31px;
     align-items: center;
     gap: 8px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 0 8px;
     color: color-mix(in srgb, var(--color-app-danger) 62%, var(--color-app-muted));
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 560;
     outline: none;
     transition:
@@ -481,6 +481,7 @@
     min-height: 48px;
     grid-template-columns: 36px minmax(0, 1fr);
   }
+
 
   .match-history-entry {
     opacity: var(--history-row-opacity, 1);
@@ -558,7 +559,7 @@
   }
 
   .match-history-entry--day-start.match-history-entry--day-end::after {
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
   }
 
   .match-history-entry > .match-history-gutter,
@@ -659,55 +660,60 @@
     bottom: 12px;
   }
 
+  /* 时间轴上的每一局：一颗竖着的小胶囊，蓝胜红负，压在轴线上。
+     正在看的那一天全亮并带一点光，其余日子淡下去（--history-day-focus 由滚动位置算出）。 */
+  .match-history-entry {
+    --history-node: var(--color-app-win);
+  }
+
+  .match-history-entry[data-result='loss'] {
+    --history-node: var(--color-app-loss);
+  }
+
   .match-history-gutter__node {
     position: absolute;
     top: 50%;
     left: 27px;
     z-index: 3;
-    width: 3px;
-    height: 3px;
+    width: 4px;
+    height: 12px;
     border-radius: 999px;
     background: color-mix(
       in srgb,
-      var(--color-app-text) var(--history-day-node-percent, 18%),
+      var(--history-node) calc(26% + var(--history-day-focus, 0) * 74%),
       transparent
     );
-    box-shadow: 0 0 6px
+    box-shadow: 0 0 calc(var(--history-day-focus, 0) * 8px)
       color-mix(
         in srgb,
-        var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
+        var(--history-node) calc(var(--history-day-focus, 0) * 55%),
         transparent
       );
     transform: translate(-50%, -50%);
     transition:
-      width 120ms var(--ease-ui),
-      height 120ms var(--ease-ui),
+      width 140ms var(--ease-ui),
+      height 160ms var(--ease-ui),
       background-color 72ms linear,
       box-shadow 72ms linear;
   }
 
-  .match-history-entry--day-start .match-history-gutter__node {
-    width: 6px;
-    height: 6px;
-    border: 2px solid var(--color-app-bg-soft);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-app-text) 10%, transparent),
-      0 0 8px
-        color-mix(
-          in srgb,
-          var(--color-app-text) var(--history-day-rail-shadow-percent, 0%),
-          transparent
-        );
-  }
-
   .match-history-entry:hover .match-history-gutter__node {
-    width: 4px;
-    height: 4px;
+    height: 16px;
   }
 
-  .match-history-entry--day-start:hover .match-history-gutter__node {
-    width: 7px;
-    height: 7px;
+  /* 当前选中的那一局：胶囊更长，外面一圈同色的环 */
+  .match-history-entry:has(.match-result-card--selected) .match-history-gutter__node {
+    width: 5px;
+    height: 20px;
+    background: var(--history-node);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--history-node) 22%, transparent),
+      0 0 10px color-mix(in srgb, var(--history-node) 55%, transparent);
+  }
+
+  /* 结果已经画在时间轴上，卡片左边那道小色条就不要了 */
+  .match-history-entry > .match-result-card::before {
+    display: none;
   }
 
   .match-history-gutter__handoff {
@@ -732,10 +738,10 @@
 
   .match-history-gutter__stamp {
     position: absolute;
-    top: 8px;
-    left: 0;
+    top: 5px;
+    left: -3px;
     display: flex;
-    width: 20px;
+    width: 24px;
     flex-direction: column;
     align-items: flex-end;
     font-variant-numeric: tabular-nums;
@@ -744,20 +750,22 @@
     transition: opacity 72ms linear;
   }
 
+  /* 日期戳：大号日期数字 + 今天 / 昨天 / 星期 / 月份 */
   .match-history-gutter__stamp strong {
-    color: var(--color-app-text);
-    font-size: 10px;
+    color: var(--color-text-1);
+    font-family: var(--font-num);
+    font-size: 15px;
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
 
   .match-history-gutter__stamp em {
-    margin-top: 2px;
-    color: var(--color-app-muted);
-    font-size: 9px;
+    margin-top: 3px;
+    color: var(--color-text-3);
+    font-size: 11px;
     font-style: normal;
     font-weight: 600;
-    letter-spacing: 0.06em;
+    white-space: nowrap;
   }
 
   .match-history-loading {
@@ -793,25 +801,30 @@
   }
 
   .match-history-loading > em {
-    font-size: 9px;
+    font-size: 11px;
     font-style: normal;
     font-weight: 500;
   }
 
+  /* ===========================================================================
+     战绩列表底部的月历条：一条平滑的活动曲线，高低 = 当天局数，
+     颜色沿日期渐变（赢得多偏蓝、输得多偏红）；列表正在看的那一天有一道竖向的光。
+     =========================================================================== */
   .match-calendar-scrubber {
     position: relative;
     flex: 0 0 auto;
-    border-top: 1px solid var(--color-app-border);
-    padding: 7px 8px 8px;
+    border-top: 1px solid var(--color-line-1);
+    padding: 9px 10px 6px;
     background: var(--color-app-bg-soft);
   }
 
   .match-calendar-head {
     position: relative;
     display: flex;
-    height: 18px;
-    align-items: center;
+    height: 20px;
+    align-items: baseline;
     justify-content: space-between;
+    gap: 8px;
     padding: 0 2px;
     font-variant-numeric: tabular-nums;
   }
@@ -821,158 +834,168 @@
   .match-calendar-meta {
     display: inline-flex;
     align-items: baseline;
+    white-space: nowrap;
   }
 
   .match-calendar-month {
     gap: 4px;
   }
 
+  .match-calendar-current strong {
+    color: var(--color-text-1);
+    font-family: var(--font-num);
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
   .match-calendar-month strong {
-    color: var(--color-app-body);
+    color: var(--color-text-1);
+    font-family: var(--font-num);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .match-calendar-month strong small,
+  .match-calendar-current strong small {
+    margin-left: 1px;
+    color: var(--color-text-2);
+    font-family: var(--font-sans);
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.04em;
   }
 
   .match-calendar-month em {
-    color: var(--color-app-subtle);
-    font-size: 9px;
+    color: var(--color-text-4);
+    font-family: var(--font-num);
+    font-size: 11px;
     font-style: normal;
-    font-weight: 500;
   }
 
   .match-calendar-current {
-    position: absolute;
-    left: 50%;
+    min-width: 0;
     gap: 5px;
-    transform: translateX(-50%);
-  }
-
-  .match-calendar-current strong {
-    color: var(--color-app-text);
-    font-size: 11px;
-    font-weight: 600;
+    animation: match-calendar-swap 220ms var(--ease-ui);
   }
 
   .match-calendar-current em {
-    color: var(--color-app-muted);
-    font-size: 9px;
+    color: var(--color-text-3);
+    font-size: 11px;
     font-style: normal;
     font-weight: 500;
   }
 
+  .match-calendar-current__record {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 2px;
+  }
+
+  .match-calendar-current__record b {
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  .match-calendar-current__record b[data-result='win'] {
+    color: var(--color-ally);
+  }
+
+  .match-calendar-current__record b[data-result='loss'] {
+    color: var(--color-enemy);
+  }
+
+  .match-calendar-current__record b[data-zero='true'] {
+    color: var(--color-text-4);
+  }
+
   .match-calendar-meta {
-    gap: 3px;
-    color: var(--color-app-subtle);
-    font-size: 9px;
+    gap: 2px;
+    color: var(--color-text-3);
+    font-size: 11px;
     font-weight: 500;
   }
 
   .match-calendar-meta strong {
-    color: var(--color-app-body);
-    font-size: 10px;
+    color: var(--color-text-1);
+    font-family: var(--font-num);
+    font-size: 13px;
     font-weight: 600;
   }
 
-  .match-calendar-meta em,
-  .match-calendar-meta i {
+  .match-calendar-meta em {
     font-style: normal;
   }
 
-  .match-calendar-meta i {
-    margin-left: 4px;
-    color: var(--color-app-subtle);
+  .match-calendar-meta > i {
+    width: 3px;
+    height: 3px;
+    align-self: center;
+    margin: 0 4px;
+    border-radius: 999px;
+    background: var(--color-text-4);
   }
 
+  .match-calendar-meta__sync {
+    color: var(--color-text-3);
+    font-style: normal;
+    animation: match-calendar-sync 1s ease-in-out infinite alternate;
+  }
+
+  /* 舞台：上面是活动曲线（SVG），下面一排是透明的日期点击区和刻度 */
   .match-calendar-stage {
     position: relative;
-    height: 47px;
-    margin-top: 3px;
+    height: 48px;
+    margin-top: 8px;
+    padding: 0 2px;
     cursor: ew-resize;
     touch-action: none;
     user-select: none;
-    border-radius: var(--radius-md);
-    padding: 5px 4px 11px;
-    background: color-mix(in srgb, var(--color-app-text) 2%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
-    transition:
-      background-color 120ms ease,
-      box-shadow 120ms ease;
   }
 
-  .match-calendar-stage--dragging {
-    background: color-mix(in srgb, var(--color-app-text) 3.2%, transparent);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 8%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--color-app-text) 2.5%, transparent);
-  }
-
-  .match-calendar-depth,
-  .match-calendar-range,
-  .match-calendar-cursor {
+  .match-calendar-wave {
     position: absolute;
+    top: 0;
+    right: 2px;
+    left: 2px;
+    display: block;
+    width: calc(100% - 4px);
+    height: 32px;
+    overflow: visible;
     pointer-events: none;
   }
 
-  .match-calendar-depth {
-    top: 5px;
-    right: 4px;
-    bottom: 11px;
-    border-radius: 5px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--color-app-text) 2.8%, transparent)
-    );
-    transition: width 110ms linear;
+  .match-calendar-wave__base {
+    stroke: var(--color-line-1);
+    stroke-width: 1;
   }
 
-  .match-calendar-range {
-    top: 5px;
-    bottom: 11px;
-    z-index: 1;
-    border-radius: 5px;
-    background: color-mix(in srgb, var(--color-app-text) 2.3%, transparent);
-    transition:
-      left 140ms var(--ease-ui),
-      width 140ms var(--ease-ui);
+  .match-calendar-wave__known {
+    stroke: var(--color-line-2);
+    stroke-width: 1;
   }
 
-  .match-calendar-cursor {
-    top: 3px;
-    bottom: 9px;
-    z-index: 3;
-    border: 1px solid color-mix(in srgb, var(--color-app-text) 14%, transparent);
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-app-bg) 22%, transparent);
-    transition: left 140ms var(--ease-ui);
+  .match-calendar-wave__area {
+    opacity: 0.9;
   }
 
-  .match-calendar-cursor::before {
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    width: 5px;
-    height: 1px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-app-text) 36%, transparent);
-    content: "";
-    transform: translateX(-50%);
-    transition:
-      width 120ms var(--ease-ui),
-      background-color 120ms ease;
+  .match-calendar-wave__line {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.75;
   }
 
-  .match-calendar-stage--dragging .match-calendar-cursor {
-    border-color: color-mix(in srgb, var(--color-app-text) 24%, transparent);
-    background: color-mix(in srgb, var(--color-app-text) 7%, transparent);
-    transition: none;
+  /* 正在看的那天附近的一小段曲线加粗点亮 */
+  .match-calendar-wave__line--focus {
+    stroke-width: 2.5;
+    opacity: 1;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-glow) 60%, transparent));
   }
 
-  .match-calendar-stage--dragging .match-calendar-cursor::before {
-    width: 7px;
-    background: color-mix(in srgb, var(--color-app-text) 62%, transparent);
+  .match-calendar-wave__cursor {
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-glow) 70%, transparent));
   }
 
   .match-calendar-stage--dragging .match-calendar-day {
@@ -985,102 +1008,69 @@
 
   .match-calendar-days {
     position: relative;
-    z-index: 4;
+    z-index: 2;
     display: flex;
-    height: 31px;
-    align-items: flex-start;
+    height: 100%;
   }
 
   .match-calendar-day {
     position: relative;
-    display: flex;
     min-width: 0;
-    height: 31px;
+    height: 100%;
     flex: 1 1 0;
-    cursor: pointer;
-    align-items: flex-start;
-    justify-content: center;
     border: 0;
+    border-radius: var(--radius-xs);
     padding: 0;
     background: transparent;
+    cursor: pointer;
     outline: none;
+    transition: background-color 120ms ease;
   }
 
-  .match-calendar-day[aria-disabled="true"] {
+  .match-calendar-day[aria-disabled='true'] {
     cursor: default;
   }
 
-  .match-calendar-day__well {
-    position: relative;
-    display: flex;
-    width: 5px;
-    height: 27px;
-    align-items: flex-end;
-    overflow: hidden;
-    border-radius: 3px;
-    background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent);
-    transition:
-      width 120ms var(--ease-ui),
-      background-color 120ms ease;
-  }
-
-  .match-calendar-day__fill {
-    display: block;
-    width: 100%;
-    min-height: 2px;
-    border-radius: 3px 3px 0 0;
-    background: var(--color-app-body);
-    transform-origin: bottom;
-    transition:
-      height 160ms var(--ease-ui),
-      opacity 120ms ease,
-      background-color 120ms ease;
-  }
-
-  .match-calendar-day:hover .match-calendar-day__well,
-  .match-calendar-day:focus-visible .match-calendar-day__well {
-    width: 6px;
-    background: color-mix(in srgb, var(--color-app-text) 7%, transparent);
-  }
-
-  .match-calendar-day:hover .match-calendar-day__fill,
-  .match-calendar-day:focus-visible .match-calendar-day__fill,
-  .match-calendar-day--active .match-calendar-day__fill {
-    background: var(--color-app-text);
-  }
-
-  .match-calendar-day--unknown .match-calendar-day__well {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-app-text) 7%, transparent);
-    background: transparent;
-  }
-
-  .match-calendar-day--unknown .match-calendar-day__fill {
-    background: color-mix(in srgb, var(--color-app-text) 20%, transparent);
-  }
-
-  .match-calendar-day--future {
+  .match-calendar-day[data-state='future'] {
     pointer-events: none;
-    opacity: 0.16;
   }
 
+  /* 悬停时那一天的竖条区域微微亮一下 */
+  .match-calendar-day[data-state='played']:hover {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in srgb, var(--color-text-1) 6%, transparent) 62%,
+      transparent 66%
+    );
+  }
+
+  /* 日期刻度：1 / 8 / 15 / 22 / 月末，加上正在看的那天（用光的颜色） */
   .match-calendar-day__index {
     position: absolute;
-    top: 31px;
+    top: 36px;
     left: 50%;
-    color: var(--color-app-subtle);
-    font-size: 9px;
+    color: var(--color-text-4);
+    font-family: var(--font-num);
+    font-size: 11px;
     font-weight: 500;
     line-height: 1;
     transform: translateX(-50%);
   }
 
   .match-calendar-day--active .match-calendar-day__index {
-    color: var(--color-app-body);
+    z-index: 1;
+    border-radius: 999px;
+    background: var(--color-app-bg-soft);
+    padding: 0 3px;
+    color: var(--color-text-1);
+    font-weight: 600;
+    box-shadow: 0 0 0 3px var(--color-app-bg-soft);
   }
 
   .match-calendar-day__tooltip {
     position: absolute;
-    bottom: calc(100% + 9px);
+    bottom: calc(100% + 6px);
     left: 50%;
     z-index: 70;
     display: flex;
@@ -1088,9 +1078,8 @@
     min-width: 104px;
     flex-direction: column;
     gap: 2px;
-    border: 1px solid var(--color-app-border-strong);
     border-radius: var(--radius-sm);
-    padding: 6px 7px;
+    padding: 6px 8px;
     background: var(--color-app-elevated);
     box-shadow: var(--shadow-ui-popover);
     pointer-events: none;
@@ -1101,25 +1090,67 @@
       transform 120ms var(--ease-ui);
   }
 
+  .match-calendar-day:first-child .match-calendar-day__tooltip,
+  .match-calendar-day:nth-child(2) .match-calendar-day__tooltip,
+  .match-calendar-day:nth-child(3) .match-calendar-day__tooltip {
+    left: 0;
+    transform: translate(0, 3px);
+  }
+
+  .match-calendar-day:nth-last-child(-n + 3) .match-calendar-day__tooltip {
+    right: 0;
+    left: auto;
+    transform: translate(0, 3px);
+  }
+
   .match-calendar-day:hover .match-calendar-day__tooltip,
   .match-calendar-day:focus-visible .match-calendar-day__tooltip {
     opacity: 1;
     transform: translate(-50%, 0);
   }
 
+  .match-calendar-day:first-child:hover .match-calendar-day__tooltip,
+  .match-calendar-day:nth-child(2):hover .match-calendar-day__tooltip,
+  .match-calendar-day:nth-child(3):hover .match-calendar-day__tooltip,
+  .match-calendar-day:nth-last-child(-n + 3):hover .match-calendar-day__tooltip {
+    transform: translate(0, 0);
+  }
+
   .match-calendar-day__tooltip strong {
-    color: var(--color-app-text);
-    font-size: 9px;
+    color: var(--color-text-1);
+    font-size: 11px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.3;
   }
 
   .match-calendar-day__tooltip em {
-    color: var(--color-app-subtle);
-    font-size: 9px;
+    color: var(--color-text-3);
+    font-size: 11px;
     font-style: normal;
     font-weight: 500;
-    line-height: 1.2;
+    line-height: 1.3;
+  }
+
+  @keyframes match-calendar-swap {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes match-calendar-sync {
+    from {
+      opacity: 0.45;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes matchHistoryLoading {
@@ -1163,11 +1194,11 @@
   }
 
   .match-result-card--win::before {
-    background-color: var(--color-app-success);
+    background-color: var(--color-app-win);
   }
 
   .match-result-card--loss::before {
-    background-color: var(--color-app-danger);
+    background-color: var(--color-app-loss);
   }
 
   .match-result-card:hover::before {
@@ -1235,11 +1266,11 @@
   }
 
   .match-result-card--win.match-result-card--selected::before {
-    background: var(--color-app-success);
+    background: var(--color-app-win);
   }
 
   .match-result-card--loss.match-result-card--selected::before {
-    background: var(--color-app-danger);
+    background: var(--color-app-loss);
   }
 
   .match-result-card--checked,
@@ -1291,7 +1322,7 @@
     border-radius: 0;
     padding: 0;
     background: transparent !important;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     line-height: 1;
     transform: none;
@@ -1309,11 +1340,11 @@
   }
 
   .match-result-card--win .match-result-badge {
-    color: var(--color-app-success);
+    color: var(--color-app-win);
   }
 
   .match-result-card--loss .match-result-badge {
-    color: var(--color-app-danger);
+    color: var(--color-app-loss);
   }
 
   .match-result-kda {
@@ -1413,7 +1444,7 @@
     border-radius: 999px;
     background: var(--color-app-surface-soft);
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1;
     transition:
@@ -1472,7 +1503,7 @@
 
   .match-result-player-peek__copy span {
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 500;
     line-height: 1.3;
     white-space: nowrap;
@@ -1518,7 +1549,7 @@
 
   .match-result-time-value {
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     transition: color 120ms ease;
@@ -1597,5 +1628,117 @@
     text-decoration: none;
     text-shadow: none;
     outline: none;
+  }
+}
+
+@layer components {
+  /* ===========================================================================
+     战绩列表每一天的日期标题（HistoryDayHead）。
+     吸在列表顶部：往下滚时下一天的标题把上一天的顶上去，顶上永远是当前这一天。
+     大号日期数字压在时间轴上，后面写 今天/昨天/星期 和完整日期，右边是当天胜负。
+     =========================================================================== */
+  .match-history-dayhead {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    display: grid;
+    height: 32px;
+    flex: 0 0 32px;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    margin-top: 4px;
+    padding-right: 10px;
+    background: color-mix(in srgb, var(--color-app-bg-soft) 90%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 var(--color-line-1);
+  }
+
+  .match-history-day {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .match-history-day:first-child > .match-history-dayhead {
+    margin-top: 0;
+  }
+
+  /* 日期数字：中心对准时间轴（x = 27px） */
+  .match-history-dayhead__num {
+    width: 28px;
+    margin-left: 13px;
+    color: var(--color-text-2);
+    font-family: var(--font-num);
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    text-align: center;
+    transition: color 160ms ease;
+  }
+
+  .match-history-dayhead__label {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 7px;
+    padding-left: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .match-history-dayhead__label b {
+    color: var(--color-text-1);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .match-history-dayhead__label em {
+    overflow: hidden;
+    color: var(--color-text-3);
+    font-size: 11px;
+    font-style: normal;
+    text-overflow: ellipsis;
+  }
+
+  .match-history-dayhead__record {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .match-history-dayhead__record em {
+    color: var(--color-text-3);
+    font-style: normal;
+  }
+
+  .match-history-dayhead__record b {
+    font-weight: 650;
+  }
+
+  .match-history-dayhead__record b[data-result='win'] {
+    color: var(--color-ally);
+  }
+
+  .match-history-dayhead__record b[data-result='loss'] {
+    color: var(--color-enemy);
+  }
+
+  .match-history-dayhead__record b[data-zero='true'] {
+    color: var(--color-text-4);
+  }
+
+  /* 正在看的那一天：数字用光的颜色，下沿多一道渐隐的光 */
+  .match-history-dayhead[data-active='true'] .match-history-dayhead__num {
+    color: color-mix(in srgb, var(--color-glow) 60%, var(--color-text-1));
+  }
+
+  .match-history-dayhead[data-active='true'] {
+    box-shadow:
+      0 1px 0 var(--color-line-1),
+      inset 0 -1px 0 color-mix(in srgb, var(--color-glow) 28%, transparent);
   }
 }

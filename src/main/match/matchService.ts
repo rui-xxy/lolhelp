@@ -13,6 +13,9 @@ import { extractMatchDetail, buildLookupSummary, type SgpGame } from './matchMap
 import type {
   PlayerLookupRequest,
   PlayerLookupResult,
+  PlayerMatchBrief,
+  PlayerMatchBriefMate,
+  PlayerMatchBriefResult,
   PlayerMatchDetail,
   PlayerRankSummary,
 } from '../../shared/api';
@@ -886,4 +889,98 @@ export async function fetchMatchesByPuuid(
     console.warn('[match] puuid 战绩拉取失败:', puuid, err);
     return [];
   }
+}
+
+// ============================================================================
+// 战绩速览（高手雷达点卡片时用）
+// 只发一次 SGP SUMMARY 请求，不查段位、不查 LCU 资料；回传前把每场裁成列表需要的
+// 几个字段，常一起玩的队友（同队 ≥2 场）也在这里算好，IPC 传输量只有完整战绩的零头。
+// ============================================================================
+const BRIEF_DEFAULT_COUNT = 20;
+const BRIEF_MAX_COUNT = 40;
+
+export async function fetchMatchBriefsByPuuid(
+  puuid: string,
+  count: number = BRIEF_DEFAULT_COUNT,
+  region?: string,
+): Promise<PlayerMatchBriefResult> {
+  const empty = (error: string): PlayerMatchBriefResult => ({ puuid, matches: [], mates: [], error });
+  if (!puuid) return empty('缺少玩家标识');
+
+  let auth;
+  try {
+    auth = await getSgpAuthForRegion(region, true);
+  } catch (err) {
+    return empty(err instanceof Error ? err.message : String(err));
+  }
+
+  const safeCount = Math.min(BRIEF_MAX_COUNT, Math.max(1, Math.floor(count || BRIEF_DEFAULT_COUNT)));
+  let games: SgpGame[];
+  try {
+    const resp = await requestWithRetry<{ games: SgpGame[] }>(
+      new SgpClient(auth),
+      '/match-history-query/v1/products/lol/player/' + puuid + '/SUMMARY',
+      { startIndex: 0, count: safeCount },
+    );
+    games = resp.games ?? [];
+  } catch (err) {
+    return empty(`战绩获取失败：${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const details: PlayerMatchDetail[] = [];
+  for (const game of games) {
+    try {
+      details.push(extractMatchDetail(game, puuid));
+    } catch (err) {
+      console.warn('[match] 速览单场映射失败，跳过:', err);
+    }
+  }
+
+  // 同队出现的次数
+  const mateCounts = new Map<string, PlayerMatchBriefMate>();
+  const teammatesByGame = new Map<number, string[]>();
+  for (const match of details) {
+    const myTeam = match.participants.find((p) => p.puuid === puuid)?.teamId;
+    if (myTeam == null) continue;
+    const teammates: string[] = [];
+    for (const p of match.participants) {
+      if (!p.puuid || p.puuid === puuid || p.teamId !== myTeam) continue;
+      teammates.push(p.puuid);
+      const known = mateCounts.get(p.puuid);
+      if (known) {
+        known.count += 1;
+      } else {
+        mateCounts.set(p.puuid, {
+          puuid: p.puuid,
+          riotId: p.riotId || p.summonerName || p.gameName || '未知',
+          profileIconId: p.profileIconId,
+          profileIconUrl: p.profileIconUrl,
+          count: 1,
+        });
+      }
+    }
+    teammatesByGame.set(match.gameId, teammates);
+  }
+  const mates = [...mateCounts.values()].filter((mate) => mate.count >= 2).sort((a, b) => b.count - a.count);
+  const recurring = new Set(mates.map((mate) => mate.puuid));
+
+  const matches: PlayerMatchBrief[] = details.map((match) => ({
+    gameId: match.gameId,
+    queueId: match.queueId,
+    queueName: match.queueName,
+    gameCreation: match.gameCreation,
+    gameDuration: match.gameDuration,
+    championId: match.championId,
+    championName: match.championName,
+    championAvatar: match.championAvatar,
+    championSplashUrl: match.championSplashUrl,
+    kills: match.kills,
+    deaths: match.deaths,
+    assists: match.assists,
+    kda: match.kda,
+    win: match.win,
+    mates: (teammatesByGame.get(match.gameId) ?? []).filter((id) => recurring.has(id)),
+  }));
+
+  return { puuid, matches, mates };
 }

@@ -12,9 +12,11 @@ import type {
   LiveBattleUpdateEvent,
   LiveStateChangeEvent,
   PlayerLookupRequest,
+  PlayerMatchBriefRequest,
   ReplayAvailabilityRequest,
   ScoutConfig,
   ScoutProgress,
+  WindowChromeColors,
 } from '../shared/api';
 import { IPC_CHANNELS } from '../shared/channels';
 
@@ -53,6 +55,8 @@ const lolHelper: LolHelper = {
   match: {
     search: (req: PlayerLookupRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH, req),
+    getMatchBriefs: (req: PlayerMatchBriefRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_BRIEFS, req),
     getPlayerRanks: (puuid: string, region?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid, region),
     getSavedMatchesSummary: () =>
@@ -127,6 +131,8 @@ const lolHelper: LolHelper = {
   window: {
     setWidth: (width: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_WIDTH, width),
+    setChrome: (chrome: WindowChromeColors) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_CHROME, chrome),
   },
   db: {
     getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_SETTINGS),
@@ -144,6 +150,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_CHAMPION_GUIDE, championId),
     getProfileIcons: () =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_PROFILE_ICONS),
+    getChampionSkins: (championId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ASSIST_GET_CHAMPION_SKINS, championId),
     lockCurrentChampion: () =>
       ipcRenderer.invoke(IPC_CHANNELS.ASSIST_LOCK_CURRENT_CHAMPION),
     applyAccountSettings: () =>
@@ -179,6 +187,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.CONFIG_APPLY_PROFILE, req),
     deleteProfile: (profileId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.CONFIG_DELETE_PROFILE, profileId),
+    getProfile: (profileId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONFIG_GET_PROFILE, profileId),
   },
   scout: {
     // find：长任务。onProgress 通过 scout:progress 推送（每出一个达标者回调一次）。

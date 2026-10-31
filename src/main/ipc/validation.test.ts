@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  validateMatchBriefRequest,
   validatePlayerLookupRequest,
   validateRootPath,
   validateScoutConfig,
@@ -33,5 +34,16 @@ describe('IPC validation', () => {
         targetCount: 1000,
       }),
     ).toThrow(/目标人数/);
+  });
+
+  it('bounds match brief requests', () => {
+    expect(validateMatchBriefRequest({ puuid: ' abc ', region: 'HN1', count: 20 })).toEqual({
+      puuid: 'abc',
+      region: 'HN1',
+      count: 20,
+    });
+    expect(() => validateMatchBriefRequest({ puuid: '' })).toThrow();
+    expect(() => validateMatchBriefRequest({ puuid: 'abc', count: 500 })).toThrow();
+    expect(() => validateMatchBriefRequest({ puuid: 'abc', region: 'HN1;rm' })).toThrow();
   });
 });

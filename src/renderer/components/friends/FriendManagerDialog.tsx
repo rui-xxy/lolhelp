@@ -176,13 +176,13 @@ export function FriendManagerDialog({
         </div>
 
         {acceptedAlerts.length > 0 && (
-          <div className="shrink-0 border-b border-app-border bg-emerald-50/35 px-5 py-2.5">
-            <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
+          <div className="shrink-0 border-b border-app-border bg-ok-soft px-5 py-2.5">
+            <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold text-ok">
               <CheckCircle2 className="size-3.5" />
               最近已添加
               <span className="font-normal text-app-muted">{acceptedAlerts.length}</span>
             </div>
-            <div className="divide-y divide-emerald-100/70">
+            <div className="divide-y divide-line-2">
               {acceptedAlerts.slice(0, 3).map((alert) => (
                 <div key={alert.id} className="flex h-11 items-center gap-2.5">
                   <ProfileIcon
@@ -191,15 +191,15 @@ export function FriendManagerDialog({
                     srcs={alert.iconUrls}
                     alt={alert.riotId}
                     size={30}
-                    className="ring-1 ring-emerald-200"
+                    className="ring-1 ring-ok/30"
                   />
                   <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
                     {alert.riotId}
                   </span>
-                  <span className="rounded-sm bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="rounded-sm bg-ok-soft px-2 py-0.5 text-[11px] font-semibold text-ok">
                     已添加
                   </span>
-                  <span className="flex w-20 items-center justify-end gap-1 text-[10px] text-app-muted">
+                  <span className="flex w-20 items-center justify-end gap-1 text-[11px] text-app-muted">
                     <Clock3 className="size-3" />
                     {formatAcceptedAge(alert.acceptedAt)}
                   </span>
@@ -214,7 +214,7 @@ export function FriendManagerDialog({
             <Inbox className="size-3.5 text-app-primary" />
             待处理申请
           </div>
-          <span className="ml-2 rounded-full bg-app-primary-soft px-2 py-0.5 text-[10px] font-semibold text-app-primary">
+          <span className="ml-2 rounded-full bg-app-primary-soft px-2 py-0.5 text-[11px] font-semibold text-app-primary">
             {requests.length}
           </span>
           <div className="ml-auto flex items-center gap-3 text-[11px] text-app-muted">

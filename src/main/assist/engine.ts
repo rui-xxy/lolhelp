@@ -46,6 +46,9 @@ interface EndOfGameStats {
       summonerId?: number;
       summonerName?: string;
       gameName?: string;
+      tagLine?: string;
+      riotIdGameName?: string;
+      riotIdTagLine?: string;
       isLocalPlayer?: boolean;
     }>;
   }>;
@@ -251,11 +254,8 @@ async function handleChampionSelect(client: LcuClient): Promise<void> {
 
 async function honorPlayers(client: LcuClient): Promise<void> {
   const settings = getSettings().assist;
-  if (
-    !settings.autoHonorTeammates &&
-    !settings.autoHonorSummonerId &&
-    !settings.autoHonorSummonerName
-  ) return;
+  // 总开关关掉就什么都不点；指定的玩家只是在开着的前提下缩小范围。
+  if (!settings.autoHonorTeammates) return;
 
   const ballot = await client.get<HonorBallot>('/lol-honor-v2/v1/ballot');
   const eligible = ballot.eligiblePlayers ?? [];
@@ -268,12 +268,18 @@ async function honorPlayers(client: LcuClient): Promise<void> {
     const stats = await client.get<EndOfGameStats>(
       '/lol-end-of-game/v1/eog-stats-block',
     ).catch((): EndOfGameStats => ({}));
-    const requested = normalizeRiotId(settings.autoHonorSummonerName);
+    // 支持「游戏名#编号」：名字必须一致；编号只有双方都有时才比较。
+    const [requestedName = '', requestedTag = ''] = settings.autoHonorSummonerName.split('#');
+    const wantName = normalizeRiotId(requestedName);
+    const wantTag = normalizeRiotId(requestedTag);
     const matched = (stats.teams ?? [])
       .flatMap((team) => team.players ?? [])
       .find((player) => {
-        const name = player.gameName || player.summonerName || '';
-        return !player.isLocalPlayer && normalizeRiotId(name) === requested;
+        const name = player.riotIdGameName || player.gameName || player.summonerName || '';
+        const tag = normalizeRiotId(player.riotIdTagLine || player.tagLine || '');
+        return !player.isLocalPlayer
+          && normalizeRiotId(name.split('#')[0]) === wantName
+          && (!wantTag || !tag || tag === wantTag);
       });
     if (matched?.summonerId) {
       targets = eligible.filter(

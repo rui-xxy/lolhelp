@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { PlayerMatchDetail } from '../../../shared/api';
 import { ChevronRight } from 'lucide-react';
 import { ProfileIcon } from '../ProfileIcon';
 import { GameIcon } from './GameIcon';
 import { getHistoryDayKey } from './MatchActivityNavigator';
+import { HistoryDayHead, buildHistoryDayRecords } from './HistoryDayHead';
 
 export interface RecurringMate {
   puuid: string;
@@ -73,6 +74,18 @@ export function MatchList({
   const [mateClickPulse, setMateClickPulse] = useState<MateClickPulse | null>(null);
   const peekTimerRef = useRef<number | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
+  const dayRecords = useMemo(() => buildHistoryDayRecords(matches), [matches]);
+  // 按天分组：每一天是一个 section，日期标题吸在 section 顶上，滚到下一天时被顶出去
+  const dayGroups = useMemo(() => {
+    const groups: Array<{ dayKey: string; indexes: number[] }> = [];
+    matches.forEach((match, index) => {
+      const dayKey = getHistoryDayKey(match.gameCreation);
+      const last = groups[groups.length - 1];
+      if (last && last.dayKey === dayKey) last.indexes.push(index);
+      else groups.push({ dayKey, indexes: [index] });
+    });
+    return groups;
+  }, [matches]);
 
   useEffect(() => {
     return () => {
@@ -125,7 +138,11 @@ export function MatchList({
 
   return (
     <div className="match-history-stream">
-      {matches.map((match, index) => {
+      {dayGroups.map((group) => (
+        <section key={group.dayKey} className="match-history-day">
+        <HistoryDayHead dayKey={group.dayKey} record={dayRecords.get(group.dayKey)} active={group.dayKey === activeDayKey} />
+        {group.indexes.map((index) => {
+        const match = matches[index];
         const isSelected = match.gameId === selectedGameId;
         const isChecked = selectedIds?.has(match.gameId) ?? false;
         const playedAt = formatPlayedAt(match.gameCreation);
@@ -156,6 +173,10 @@ export function MatchList({
           <div
             key={match.gameId}
             data-history-day-key={dayKey}
+            data-result={match.win ? 'win' : 'loss'}
+            style={match.championSplashUrl
+              ? ({ '--match-splash': `url("${match.championSplashUrl}")` } as CSSProperties)
+              : undefined}
             className={`match-history-entry ${startsDay ? 'match-history-entry--day-start' : ''} ${
               endsDay ? 'match-history-entry--day-end' : ''
             } ${isActiveDay ? 'match-history-entry--active-day' : ''} ${
@@ -168,17 +189,10 @@ export function MatchList({
           >
             <div
               className="match-history-gutter"
-              data-history-day={startsDay ? dayKey : undefined}
-              title={startsDay ? `${monthPart}月${dayPart}日` : undefined}
+              title={`${Number(monthPart)}月${Number(dayPart)}日`}
               aria-hidden="true"
             >
               {startsDay && <span className="match-history-gutter__handoff" aria-hidden="true" />}
-              {startsDay && (
-                <span className="match-history-gutter__stamp">
-                  <strong>{dayPart}</strong>
-                  <em>{monthPart}</em>
-                </span>
-              )}
               <span className="match-history-gutter__node" />
             </div>
             <button
@@ -281,6 +295,8 @@ export function MatchList({
           </div>
         );
       })}
+        </section>
+      ))}
       {mateClickPulse &&
         createPortal(
           <span

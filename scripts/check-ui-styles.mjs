@@ -48,8 +48,10 @@ if (importantCount > 35) {
   errors.push(`!important 数量从基线 35 增长到 ${importantCount}。`);
 }
 
+// tokens.css / themes.css 是颜色定义本身；light.css 是浅色模式对老样式的颜色修正表，三者都不计入。
+const COLOR_DEFINITION_FILES = new Set(['tokens.css', 'themes.css', 'light.css']);
 const legacyCssColorCount = cssFiles
-  .filter((file) => path.basename(file) !== 'tokens.css')
+  .filter((file) => !COLOR_DEFINITION_FILES.has(path.basename(file)))
   .reduce(
     (total, file) => total + count(
       fs.readFileSync(file, 'utf8'),
@@ -57,8 +59,29 @@ const legacyCssColorCount = cssFiles
     ),
     0,
   );
-if (legacyCssColorCount > 786) {
-  errors.push(`CSS 硬编码颜色数量从基线 786 增长到 ${legacyCssColorCount}。`);
+// 2026-10 改版后的基线：每迁移一页就把这个数调低，只许减少。
+const LEGACY_CSS_COLOR_BUDGET = 439;
+if (legacyCssColorCount > LEGACY_CSS_COLOR_BUDGET) {
+  errors.push(`CSS 硬编码颜色数量从基线 ${LEGACY_CSS_COLOR_BUDGET} 增长到 ${legacyCssColorCount}。`);
+}
+
+// 设计基线（tokens.css）：字号不小于 11px、不用衬线字体、圆角只用 token 或 0/1/2/999px。
+for (const file of cssFiles) {
+  if (COLOR_DEFINITION_FILES.has(path.basename(file))) continue;
+  const source = fs.readFileSync(file, 'utf8');
+  const lines = source.split(/\r?\n/);
+  lines.forEach((text, index) => {
+    const location = `${relative(file)}:${index + 1}`;
+    const size = text.match(/font-size:\s*([0-9.]+)px/);
+    if (size && Number(size[1]) < 11) errors.push(`${location} 字号 ${size[1]}px 小于 11px。`);
+    if (/font-family:[^;]*\b(Georgia|Times New Roman|serif)\b/.test(text) && !/sans-serif/.test(text)) {
+      errors.push(`${location} 使用了衬线字体；数字请用 var(--font-num)。`);
+    }
+    const radius = text.match(/border-radius:\s*([0-9.]+)px\s*;/);
+    if (radius && ![0, 1, 2, 999].includes(Number(radius[1]))) {
+      errors.push(`${location} 圆角 ${radius[1]}px 不在规范内；请用 var(--radius-xs|sm|lg) 或 999px。`);
+    }
+  });
 }
 
 const tsxFiles = walk(rendererRoot, ['.tsx']);
@@ -73,6 +96,16 @@ for (const file of tsxFiles) {
   if (name.endsWith('.test.tsx') || allowedColorFiles.has(name)) continue;
   const source = fs.readFileSync(file, 'utf8');
   const hardcodedColors = [...source.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\s*\(/g)];
+  const paletteClass = source.match(/\b(?:bg|text|border|ring|divide|from|to|fill|stroke)-(?:red|green|blue|yellow|gray|slate|zinc|neutral|stone|emerald|amber|rose|sky|orange|lime|teal|cyan|indigo|violet|purple|fuchsia|pink)-\d{2,3}\b|\b(?:bg|text|border|ring)-(?:white|black)\b/);
+  if (paletteClass) {
+    const line = source.slice(0, paletteClass.index).split(/\r?\n/).length;
+    errors.push(`${name}:${line} 使用了 Tailwind 原生色板 ${paletteClass[0]}；请用 tokens.css 的语义色。`);
+  }
+  const tinyText = source.match(/text-\[(?:[0-9]|10)(?:\.\d+)?px\]/);
+  if (tinyText) {
+    const line = source.slice(0, tinyText.index).split(/\r?\n/).length;
+    errors.push(`${name}:${line} ${tinyText[0]} 小于 11px。`);
+  }
   if (hardcodedColors.length > 0) {
     const line = source.slice(0, hardcodedColors[0].index).split(/\r?\n/).length;
     errors.push(`${name}:${line} 含硬编码颜色；请使用 tokens.css 或 styles/palette.ts。`);

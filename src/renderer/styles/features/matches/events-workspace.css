@@ -82,7 +82,7 @@
     min-height: 68px;
     padding: 9px 12px 9px 3px;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
   }
   .lol-event-analyzer__event--blue {
@@ -189,7 +189,7 @@
     object-fit: contain;
   }
   .md-event-action small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .lol-event-analyzer__unknown-avatar {
     display: grid;
@@ -250,7 +250,7 @@
   }
   .lol-fight-window {
     border: 1px solid var(--analysis-line);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--analysis-panel);
   }
@@ -316,7 +316,7 @@
     width: 28px;
     height: 28px;
     place-items: center;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--color-app-muted);
   }
   .lol-event-control-head > button:hover:not(:disabled) {
@@ -340,7 +340,7 @@
     align-items: center;
     gap: 10px;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     padding: 6px 9px;
     background: transparent;
     color: var(--color-app-muted);
@@ -361,7 +361,7 @@
     color: var(--color-app-muted);
     min-width: 26px;
     padding: 1px 5px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     background: var(--color-frost-fill-soft);
     text-align: center;
   }
@@ -388,11 +388,11 @@
     position: absolute;
     right: -4px;
     bottom: -2px;
-    font-size: 9px;
+    font-size: 11px;
     line-height: 12px;
     font-weight: 600;
     background: var(--analysis-panel);
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     padding: 0 2px;
   }
   .lol-event-player-scope {
@@ -402,11 +402,11 @@
     padding: 3px;
     margin: 10px 0 14px;
     border: 1px solid var(--analysis-line);
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
   }
   .lol-event-player-scope > button {
     min-height: 29px;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     color: var(--color-app-muted);
     font-size: 12px;
   }
@@ -419,7 +419,7 @@
     margin: 6px 10px 16px 68px;
     padding: 16px;
     border: 1px solid var(--color-app-border);
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--analysis-panel) 78%, var(--color-app-bg));
   }
   .lol-event-inspector__head {
@@ -435,7 +435,7 @@
     width: 28px;
     height: 28px;
     place-items: center;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--analysis-surface);
     color: var(--color-app-muted);
   }
@@ -535,7 +535,7 @@
   }
   .lol-event-damage-group {
     border: 1px solid var(--analysis-line);
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--analysis-surface) 72%, var(--color-app-bg));
   }
   .lol-event-damage-group__head {
@@ -585,7 +585,7 @@
   }
   .lol-event-damage-group__head > div, .lol-event-damage-source > div {
     height: 4px;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     background: var(--color-frost-fill-active);
     overflow: hidden;
   }
@@ -639,7 +639,7 @@
   .lol-event-damage-source__icon {
     width: 26px;
     height: 26px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     object-fit: cover;
   }
   .lol-event-damage-source__fallback {
@@ -648,7 +648,7 @@
     height: 26px;
     place-items: center;
     background: var(--analysis-panel);
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     color: var(--color-app-muted);
     font-size: 11px;
     font-style: normal;
@@ -679,7 +679,7 @@
     aspect-ratio: 1;
     margin-top: 8px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--analysis-surface);
   }
   .lol-event-map > img {
@@ -705,8 +705,8 @@
     left: 6px;
     background: var(--analysis-panel);
     padding: 3px 5px;
-    border-radius: 3px;
-    font-size: 10px;
+    border-radius: var(--radius-xs);
+    font-size: 11px;
   }
   @container (max-width: 900px) {
     .lol-event-analyzer__layout {

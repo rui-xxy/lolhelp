@@ -1,235 +1,201 @@
 import { useCallback, useState } from 'react';
 import type { LolGameConfigValues } from '../../../shared/api';
 import {
+  CAMERA_LOCK_OPTIONS,
+  COOLDOWN_FORMAT_OPTIONS,
+  FRAME_CAP_OPTIONS,
+  GAME_FIELDS,
+  QUALITY_OPTIONS,
+  RESOLUTION_PRESETS,
+  SUMMONER_NAME_OPTIONS,
+  WINDOW_MODES,
+} from './configFields';
+import {
   CheckboxRow,
-  SectionDot,
+  SectionTabs,
+  Segmented,
   SelectRow,
+  SettingRow,
   SettingsGroup,
   SettingsSection,
   SliderRow,
   VolumeRow,
+  scrollToSettingsSection,
   useSettingsScrollSpy,
 } from './SettingsControls';
 
-type GameSectionKey =
-  | 'controls'
-  | 'gameplay'
-  | 'alerts'
-  | 'combat'
-  | 'cooldowns'
-  | 'video'
-  | 'interface'
-  | 'audio';
+type GameSectionKey = 'video' | 'controls' | 'interface' | 'combat' | 'audio';
 
 const GAME_SECTIONS: { key: GameSectionKey; label: string }[] = [
-  { key: 'controls', label: '控制' },
-  { key: 'gameplay', label: '游戏设置' },
-  { key: 'alerts', label: '通知' },
-  { key: 'combat', label: '技能和攻击显示' },
-  { key: 'cooldowns', label: '技能冷却显示' },
   { key: 'video', label: '画面' },
+  { key: 'controls', label: '操作' },
   { key: 'interface', label: '界面' },
+  { key: 'combat', label: '战斗提示' },
   { key: 'audio', label: '声音' },
 ];
 
-const WINDOW_MODES = [
-  { value: '0', label: '全屏' },
-  { value: '1', label: '窗口' },
-  { value: '2', label: '无边框' },
-];
+const QUALITY_KEYS = ['shadowQuality', 'characterQuality', 'effectsQuality', 'environmentQuality'] as const;
 
-const RESOLUTION_PRESETS = [
-  [1280, 720],
-  [1600, 900],
-  [1920, 1080],
-  [2560, 1440],
-  [3840, 2160],
-];
+type Change = <K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => void;
 
-const QUALITY_OPTIONS = [
-  { value: 0, label: '低' },
-  { value: 1, label: '中低' },
-  { value: 2, label: '中' },
-  { value: 3, label: '高' },
-  { value: 4, label: '极高' },
-];
-
-const FRAME_CAP_OPTIONS = [
-  { value: 0, label: '不限制' },
-  { value: 1, label: '显示器刷新率' },
-  { value: 2, label: '144 FPS' },
-  { value: 3, label: '120 FPS' },
-  { value: 4, label: '60 FPS' },
-  { value: 5, label: '30 FPS' },
-];
-
-const CAMERA_LOCK_OPTIONS = [
-  { value: 0, label: '基于红/蓝方的镜头偏移' },
-  { value: 1, label: '固定偏移' },
-  { value: 2, label: '无偏移' },
-];
-
-const SUMMONER_NAME_OPTIONS = [
-  { value: 0, label: '无' },
-  { value: 1, label: '玩家名称' },
-  { value: 2, label: '英雄名称' },
-];
-
-const COOLDOWN_FORMAT_OPTIONS = [
-  { value: 0, label: '无' },
-  { value: 1, label: '秒' },
-  { value: 2, label: '分钟 + 秒' },
-];
+function ResolutionPicker({ values, onChange }: { values: LolGameConfigValues; onChange: Change }) {
+  const isPreset = RESOLUTION_PRESETS.some(([width, height]) => width === values.width && height === values.height);
+  return (
+    <div className="st-res">
+      <div className="st-res__chips" role="radiogroup" aria-label="常用分辨率">
+        {RESOLUTION_PRESETS.map(([width, height]) => (
+          <button
+            key={`${width}x${height}`}
+            type="button"
+            role="radio"
+            aria-checked={values.width === width && values.height === height}
+            onClick={() => {
+              onChange('width', width);
+              onChange('height', height);
+            }}
+          >
+            {width} × {height}
+          </button>
+        ))}
+      </div>
+      <div className="st-res__custom" data-active={isPreset ? undefined : 'true'}>
+        <span>{isPreset ? '其他' : '自定义'}</span>
+        <input
+          type="number"
+          aria-label="宽"
+          value={values.width}
+          onChange={(event) => onChange('width', Number(event.target.value))}
+        />
+        <i>×</i>
+        <input
+          type="number"
+          aria-label="高"
+          value={values.height}
+          onChange={(event) => onChange('height', Number(event.target.value))}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function GameSettings({
   values,
   onChange,
 }: {
   values: LolGameConfigValues;
-  onChange: <K extends keyof LolGameConfigValues>(
-    key: K,
-    value: LolGameConfigValues[K],
-  ) => void;
+  onChange: Change;
 }) {
-  const [activeSection, setActiveSection] = useState<GameSectionKey>('controls');
+  const [activeSection, setActiveSection] = useState<GameSectionKey>('video');
   useSettingsScrollSpy<GameSectionKey>('game', GAME_SECTIONS, setActiveSection);
 
   const goToSection = useCallback((section: GameSectionKey) => {
     setActiveSection(section);
-    document.getElementById(`game-section-${section}`)?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth',
-    });
+    scrollToSettingsSection('game', section);
   }, []);
 
+  // 四项画质一样时，「整体画质」就亮在那一档；不一样时哪档都不亮。
+  const qualities = QUALITY_KEYS.map((key) => values[key]);
+  const overallQuality = qualities.every((quality) => quality === qualities[0]) ? qualities[0] : -1;
+
   return (
-    <div className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)_28px] gap-4 pb-8">
-      <div className="min-w-0 space-y-8">
-        <SettingsSection prefix="game" id="controls" title="控制">
+    <>
+      <SectionTabs sections={GAME_SECTIONS} active={activeSection} onSelect={goToSection} />
+      <div className="st-sections">
+        <SettingsSection prefix="game" id="video" title="画面" description="分辨率和画质。改完下次进游戏生效。">
           <SettingsGroup>
-            <SliderRow label="鼠标速度" value={values.gameMouseSpeed} min={0} max={100} onChange={(value) => onChange('gameMouseSpeed', value)} />
-            <SliderRow label="镜头移动速度（鼠标）" value={values.mapScrollSpeed} min={0} max={100} onChange={(value) => onChange('mapScrollSpeed', value)} />
-            <SliderRow label="镜头移动速度（键盘）" value={values.keyboardScrollSpeed} min={0} max={100} onChange={(value) => onChange('keyboardScrollSpeed', value)} />
-            <CheckboxRow label="复活时移动镜头" checked={values.snapCameraOnRespawn} onChange={(value) => onChange('snapCameraOnRespawn', value)} />
-            <CheckboxRow label="启用镜头平滑" checked={values.scrollSmoothingEnabled} onChange={(value) => onChange('scrollSmoothingEnabled', value)} />
-            <CheckboxRow label="按住鼠标拖拽滚屏" checked={values.middleClickDragScrollEnabled} onChange={(value) => onChange('middleClickDragScrollEnabled', value)} />
-            <SelectRow label="镜头锁定模式" value={values.cameraLockMode} options={CAMERA_LOCK_OPTIONS} onChange={(value) => onChange('cameraLockMode', Number(value))} />
+            <SelectRow label={GAME_FIELDS.windowMode.label} value={values.windowMode} options={WINDOW_MODES} segmented onChange={(value) => onChange('windowMode', value)} />
+            <SettingRow label={GAME_FIELDS.width.label} hint="一般选和显示器一样的" wide>
+              <ResolutionPicker values={values} onChange={onChange} />
+            </SettingRow>
+            <SelectRow label={GAME_FIELDS.frameCapType.label} value={values.frameCapType} options={FRAME_CAP_OPTIONS} onChange={(value) => onChange('frameCapType', Number(value))} />
+            <CheckboxRow label={GAME_FIELDS.waitForVerticalSync.label} hint="画面不撕裂，但会多一点操作延迟" checked={values.waitForVerticalSync} onChange={(value) => onChange('waitForVerticalSync', value)} />
+            <CheckboxRow label={GAME_FIELDS.enableFxaa.label} checked={values.enableFxaa} onChange={(value) => onChange('enableFxaa', value)} />
+          </SettingsGroup>
+          <SettingsGroup title="画质">
+            <SettingRow label="整体画质" hint="一键把下面四项调成同一档">
+              <Segmented
+                label="整体画质"
+                value={overallQuality}
+                options={QUALITY_OPTIONS}
+                onChange={(value) => QUALITY_KEYS.forEach((key) => onChange(key, value))}
+              />
+            </SettingRow>
+            <SelectRow label={GAME_FIELDS.shadowQuality.label} value={values.shadowQuality} options={QUALITY_OPTIONS} segmented onChange={(value) => onChange('shadowQuality', Number(value))} />
+            <SelectRow label={GAME_FIELDS.characterQuality.label} value={values.characterQuality} options={QUALITY_OPTIONS} segmented onChange={(value) => onChange('characterQuality', Number(value))} />
+            <SelectRow label={GAME_FIELDS.effectsQuality.label} value={values.effectsQuality} options={QUALITY_OPTIONS} segmented onChange={(value) => onChange('effectsQuality', Number(value))} />
+            <SelectRow label={GAME_FIELDS.environmentQuality.label} value={values.environmentQuality} options={QUALITY_OPTIONS} segmented onChange={(value) => onChange('environmentQuality', Number(value))} />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="gameplay" title="游戏设置">
-          <SettingsGroup>
-            <CheckboxRow label="自动攻击" checked={values.autoAcquireTarget} onChange={(value) => onChange('autoAcquireTarget', value)} />
-            <CheckboxRow label="使用移动预测" checked={values.predictMovement} onChange={(value) => onChange('predictMovement', value)} />
-            <CheckboxRow label="显示防御塔射程指示器" checked={values.showTurretRangeIndicators} onChange={(value) => onChange('showTurretRangeIndicators', value)} />
-            <CheckboxRow label="依据鼠标指针攻击移动" checked={values.enableTargetedAttackMove} onChange={(value) => onChange('enableTargetedAttackMove', value)} />
-            <CheckboxRow label="显示推荐打野路线" checked={values.recommendJunglePaths} onChange={(value) => onChange('recommendJunglePaths', value)} />
-            <CheckboxRow label="“只以英雄为目标”视为可开关选项" checked={values.targetChampionsOnlyAsToggle} onChange={(value) => onChange('targetChampionsOnlyAsToggle', value)} />
+        <SettingsSection prefix="game" id="controls" title="操作">
+          <SettingsGroup title="鼠标和镜头">
+            <SliderRow label={GAME_FIELDS.gameMouseSpeed.label} value={values.gameMouseSpeed} min={0} max={100} onChange={(value) => onChange('gameMouseSpeed', value)} />
+            <SliderRow label={GAME_FIELDS.mapScrollSpeed.label} value={values.mapScrollSpeed} min={0} max={100} onChange={(value) => onChange('mapScrollSpeed', value)} />
+            <SliderRow label={GAME_FIELDS.keyboardScrollSpeed.label} value={values.keyboardScrollSpeed} min={0} max={100} onChange={(value) => onChange('keyboardScrollSpeed', value)} />
+            <SelectRow label={GAME_FIELDS.cameraLockMode.label} value={values.cameraLockMode} options={CAMERA_LOCK_OPTIONS} segmented onChange={(value) => onChange('cameraLockMode', Number(value))} />
+            <CheckboxRow label={GAME_FIELDS.snapCameraOnRespawn.label} checked={values.snapCameraOnRespawn} onChange={(value) => onChange('snapCameraOnRespawn', value)} />
+            <CheckboxRow label={GAME_FIELDS.scrollSmoothingEnabled.label} checked={values.scrollSmoothingEnabled} onChange={(value) => onChange('scrollSmoothingEnabled', value)} />
+            <CheckboxRow label={GAME_FIELDS.middleClickDragScrollEnabled.label} checked={values.middleClickDragScrollEnabled} onChange={(value) => onChange('middleClickDragScrollEnabled', value)} />
           </SettingsGroup>
-        </SettingsSection>
-
-        <SettingsSection prefix="game" id="alerts" title="通知">
-          <SettingsGroup>
-            <CheckboxRow label="受伤时屏幕闪烁" checked={values.flashScreenWhenDamaged} onChange={(value) => onChange('flashScreenWhenDamaged', value)} />
-            <CheckboxRow label="失控时屏幕闪烁" checked={values.flashScreenWhenStunned} onChange={(value) => onChange('flashScreenWhenStunned', value)} />
-            <CheckboxRow label="显示屏幕外的事件信号" checked={values.showOffScreenPointsOfInterest} onChange={(value) => onChange('showOffScreenPointsOfInterest', value)} />
-          </SettingsGroup>
-        </SettingsSection>
-
-        <SettingsSection prefix="game" id="combat" title="技能和攻击显示">
-          <SettingsGroup>
-            <CheckboxRow label="攻击时显示目标框架" checked={values.autoDisplayTarget} onChange={(value) => onChange('autoDisplayTarget', value)} />
-            <CheckboxRow label="启用线状弹道显示" checked={values.enableLineMissileVis} onChange={(value) => onChange('enableLineMissileVis', value)} />
-            <CheckboxRow label="显示攻击距离" checked={values.showAttackRadius} onChange={(value) => onChange('showAttackRadius', value)} />
-            <CheckboxRow label="只能使用热键施放技能" checked={values.disableHudSpellClick} onChange={(value) => onChange('disableHudSpellClick', value)} />
-            <CheckboxRow label="显示技能消耗" checked={values.showSpellCosts} onChange={(value) => onChange('showSpellCosts', value)} />
-            <CheckboxRow label="显示推荐技能加点" checked={values.showSpellRecommendations} onChange={(value) => onChange('showSpellRecommendations', value)} />
-            <CheckboxRow label="显示中立营地计时" checked={values.showNeutralCamps} onChange={(value) => onChange('showNeutralCamps', value)} />
-          </SettingsGroup>
-        </SettingsSection>
-
-        <SettingsSection prefix="game" id="cooldowns" title="技能冷却显示">
-          <SettingsGroup>
-            <SelectRow label="冷却格式" value={values.numericCooldownFormat} options={COOLDOWN_FORMAT_OPTIONS} onChange={(value) => onChange('numericCooldownFormat', Number(value))} />
-          </SettingsGroup>
-        </SettingsSection>
-
-        <SettingsSection prefix="game" id="video" title="画面">
-          <SettingsGroup>
-            <SelectRow label="窗口模式" value={values.windowMode} options={WINDOW_MODES} onChange={(value) => onChange('windowMode', value)} />
-            <div className="grid min-h-10 grid-cols-[minmax(150px,1fr)_minmax(300px,1.4fr)] items-center gap-4 py-2">
-              <span className="text-sm text-app-body">分辨率</span>
-              <div className="flex flex-wrap items-center gap-2">
-                <input type="number" value={values.width} onChange={(event) => onChange('width', Number(event.target.value))} className="h-8 w-20 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10" />
-                <span className="text-xs text-app-muted">x</span>
-                <input type="number" value={values.height} onChange={(event) => onChange('height', Number(event.target.value))} className="h-8 w-20 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10" />
-                <select
-                  value={`${values.width}x${values.height}`}
-                  onChange={(event) => {
-                    const [width, height] = event.target.value.split('x').map(Number);
-                    onChange('width', width);
-                    onChange('height', height);
-                  }}
-                  className="h-8 min-w-28 rounded-sm border border-app-border bg-app-surface px-2 text-xs outline-none focus:border-app-primary/55 focus:ring-2 focus:ring-app-primary/10"
-                >
-                  {RESOLUTION_PRESETS.map(([width, height]) => (
-                    <option key={`${width}x${height}`} value={`${width}x${height}`}>
-                      {width} x {height}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <SelectRow label="阴影质量" value={values.shadowQuality} options={QUALITY_OPTIONS} onChange={(value) => onChange('shadowQuality', Number(value))} />
-            <SelectRow label="角色质量" value={values.characterQuality} options={QUALITY_OPTIONS} onChange={(value) => onChange('characterQuality', Number(value))} />
-            <SelectRow label="特效质量" value={values.effectsQuality} options={QUALITY_OPTIONS} onChange={(value) => onChange('effectsQuality', Number(value))} />
-            <SelectRow label="环境质量" value={values.environmentQuality} options={QUALITY_OPTIONS} onChange={(value) => onChange('environmentQuality', Number(value))} />
-            <SelectRow label="帧率上限" value={values.frameCapType} options={FRAME_CAP_OPTIONS} onChange={(value) => onChange('frameCapType', Number(value))} />
-            <CheckboxRow label="垂直同步" checked={values.waitForVerticalSync} onChange={(value) => onChange('waitForVerticalSync', value)} />
-            <CheckboxRow label="抗锯齿 FXAA" checked={values.enableFxaa} onChange={(value) => onChange('enableFxaa', value)} />
+          <SettingsGroup title="攻击和施法">
+            <CheckboxRow label={GAME_FIELDS.autoAcquireTarget.label} hint="站着不动时自动打身边的目标" checked={values.autoAcquireTarget} onChange={(value) => onChange('autoAcquireTarget', value)} />
+            <CheckboxRow label={GAME_FIELDS.predictMovement.label} checked={values.predictMovement} onChange={(value) => onChange('predictMovement', value)} />
+            <CheckboxRow label={GAME_FIELDS.enableTargetedAttackMove.label} hint="A 键优先打离鼠标最近的目标，而不是离英雄最近的" checked={values.enableTargetedAttackMove} onChange={(value) => onChange('enableTargetedAttackMove', value)} />
+            <CheckboxRow label={GAME_FIELDS.targetChampionsOnlyAsToggle.label} hint="不用一直按住" checked={values.targetChampionsOnlyAsToggle} onChange={(value) => onChange('targetChampionsOnlyAsToggle', value)} />
+            <CheckboxRow label={GAME_FIELDS.disableHudSpellClick.label} hint="点技能栏图标不会放技能" checked={values.disableHudSpellClick} onChange={(value) => onChange('disableHudSpellClick', value)} />
+            <CheckboxRow label={GAME_FIELDS.showTurretRangeIndicators.label} checked={values.showTurretRangeIndicators} onChange={(value) => onChange('showTurretRangeIndicators', value)} />
+            <CheckboxRow label={GAME_FIELDS.recommendJunglePaths.label} checked={values.recommendJunglePaths} onChange={(value) => onChange('recommendJunglePaths', value)} />
           </SettingsGroup>
         </SettingsSection>
 
         <SettingsSection prefix="game" id="interface" title="界面">
-          <SettingsGroup>
-            <SelectRow label="生命槽上方名称" value={values.showSummonerNames} options={SUMMONER_NAME_OPTIONS} onChange={(value) => onChange('showSummonerNames', Number(value))} />
-            <SliderRow label="用户界面缩放" value={values.globalScale} min={0} max={100} onChange={(value) => onChange('globalScale', value)} />
-            <SliderRow label="聊天缩放" value={values.chatScale} min={0} max={100} onChange={(value) => onChange('chatScale', value)} />
-            <SliderRow label="小地图缩放" value={values.minimapScale} min={0} max={100} onChange={(value) => onChange('minimapScale', value)} />
-            <SliderRow label="指针缩放" value={values.cursorScale} min={0} max={100} onChange={(value) => onChange('cursorScale', value)} />
-            <CheckboxRow label="启用用户界面动画" checked={values.enableHudAnimations} onChange={(value) => onChange('enableHudAnimations', value)} />
-            <CheckboxRow label="显示 FPS 和延迟" checked={values.showFpsAndLatency} onChange={(value) => onChange('showFpsAndLatency', value)} />
-            <CheckboxRow label="聊天显示时间戳" checked={values.showTimestamps} onChange={(value) => onChange('showTimestamps', value)} />
-            <CheckboxRow label="显示队友聊天" checked={values.showAlliedChat} onChange={(value) => onChange('showAlliedChat', value)} />
-            <CheckboxRow label="显示所有人聊天" checked={values.showAllChannelChat} onChange={(value) => onChange('showAllChannelChat', value)} />
-            <CheckboxRow label="隐藏玩家名字" checked={values.hidePlayerNames} onChange={(value) => onChange('hidePlayerNames', value)} />
+          <SettingsGroup title="大小">
+            <SliderRow label={GAME_FIELDS.globalScale.label} value={values.globalScale} min={0} max={100} onChange={(value) => onChange('globalScale', value)} />
+            <SliderRow label={GAME_FIELDS.minimapScale.label} value={values.minimapScale} min={0} max={100} onChange={(value) => onChange('minimapScale', value)} />
+            <SliderRow label={GAME_FIELDS.chatScale.label} value={values.chatScale} min={0} max={100} onChange={(value) => onChange('chatScale', value)} />
+            <SliderRow label={GAME_FIELDS.cursorScale.label} value={values.cursorScale} min={0} max={100} onChange={(value) => onChange('cursorScale', value)} />
+          </SettingsGroup>
+          <SettingsGroup title="显示">
+            <SelectRow label={GAME_FIELDS.showSummonerNames.label} value={values.showSummonerNames} options={SUMMONER_NAME_OPTIONS} segmented onChange={(value) => onChange('showSummonerNames', Number(value))} />
+            <SelectRow label={GAME_FIELDS.numericCooldownFormat.label} value={values.numericCooldownFormat} options={COOLDOWN_FORMAT_OPTIONS} segmented onChange={(value) => onChange('numericCooldownFormat', Number(value))} />
+            <CheckboxRow label={GAME_FIELDS.showFpsAndLatency.label} checked={values.showFpsAndLatency} onChange={(value) => onChange('showFpsAndLatency', value)} />
+            <CheckboxRow label={GAME_FIELDS.enableHudAnimations.label} checked={values.enableHudAnimations} onChange={(value) => onChange('enableHudAnimations', value)} />
+            <CheckboxRow label={GAME_FIELDS.hidePlayerNames.label} hint="和客户端「隐藏所有人的名字」是同一个开关" checked={values.hidePlayerNames} onChange={(value) => onChange('hidePlayerNames', value)} />
+          </SettingsGroup>
+          <SettingsGroup title="聊天">
+            <CheckboxRow label={GAME_FIELDS.showTimestamps.label} checked={values.showTimestamps} onChange={(value) => onChange('showTimestamps', value)} />
+            <CheckboxRow label={GAME_FIELDS.showAlliedChat.label} checked={values.showAlliedChat} onChange={(value) => onChange('showAlliedChat', value)} />
+            <CheckboxRow label={GAME_FIELDS.showAllChannelChat.label} checked={values.showAllChannelChat} onChange={(value) => onChange('showAllChannelChat', value)} />
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="audio" title="声音">
+        <SettingsSection prefix="game" id="combat" title="战斗提示">
           <SettingsGroup>
-            <CheckboxRow label="启用游戏音频" checked={values.enableAudio} onChange={(value) => onChange('enableAudio', value)} />
-            <VolumeRow label="总音量" volume={values.masterVolume} muted={values.masterMute} onVolume={(value) => onChange('masterVolume', value)} onMuted={(value) => onChange('masterMute', value)} />
-            <VolumeRow label="音乐" volume={values.musicVolume} muted={values.musicMute} onVolume={(value) => onChange('musicVolume', value)} onMuted={(value) => onChange('musicMute', value)} />
-            <VolumeRow label="音效" volume={values.sfxVolume} muted={values.sfxMute} onVolume={(value) => onChange('sfxVolume', value)} onMuted={(value) => onChange('sfxMute', value)} />
-            <VolumeRow label="环境音" volume={values.ambienceVolume} muted={values.ambienceMute} onVolume={(value) => onChange('ambienceVolume', value)} onMuted={(value) => onChange('ambienceMute', value)} />
-            <VolumeRow label="信号" volume={values.pingsVolume} muted={values.pingsMute} onVolume={(value) => onChange('pingsVolume', value)} onMuted={(value) => onChange('pingsMute', value)} />
-            <VolumeRow label="播报员" volume={values.announcerVolume} muted={values.announcerMute} onVolume={(value) => onChange('announcerVolume', value)} onMuted={(value) => onChange('announcerMute', value)} />
-            <VolumeRow label="语音" volume={values.voiceVolume} muted={values.voiceMute} onVolume={(value) => onChange('voiceVolume', value)} onMuted={(value) => onChange('voiceMute', value)} />
+            <CheckboxRow label={GAME_FIELDS.showAttackRadius.label} checked={values.showAttackRadius} onChange={(value) => onChange('showAttackRadius', value)} />
+            <CheckboxRow label={GAME_FIELDS.autoDisplayTarget.label} checked={values.autoDisplayTarget} onChange={(value) => onChange('autoDisplayTarget', value)} />
+            <CheckboxRow label={GAME_FIELDS.enableLineMissileVis.label} checked={values.enableLineMissileVis} onChange={(value) => onChange('enableLineMissileVis', value)} />
+            <CheckboxRow label={GAME_FIELDS.showSpellCosts.label} checked={values.showSpellCosts} onChange={(value) => onChange('showSpellCosts', value)} />
+            <CheckboxRow label={GAME_FIELDS.showSpellRecommendations.label} checked={values.showSpellRecommendations} onChange={(value) => onChange('showSpellRecommendations', value)} />
+            <CheckboxRow label={GAME_FIELDS.showNeutralCamps.label} checked={values.showNeutralCamps} onChange={(value) => onChange('showNeutralCamps', value)} />
+            <CheckboxRow label={GAME_FIELDS.flashScreenWhenDamaged.label} checked={values.flashScreenWhenDamaged} onChange={(value) => onChange('flashScreenWhenDamaged', value)} />
+            <CheckboxRow label={GAME_FIELDS.flashScreenWhenStunned.label} checked={values.flashScreenWhenStunned} onChange={(value) => onChange('flashScreenWhenStunned', value)} />
+            <CheckboxRow label={GAME_FIELDS.showOffScreenPointsOfInterest.label} checked={values.showOffScreenPointsOfInterest} onChange={(value) => onChange('showOffScreenPointsOfInterest', value)} />
+          </SettingsGroup>
+        </SettingsSection>
+
+        <SettingsSection prefix="game" id="audio" title="声音" description="点左边的喇叭可以单独静音。">
+          <SettingsGroup>
+            <CheckboxRow label={GAME_FIELDS.enableAudio.label} hint="关掉后游戏里完全没有声音" checked={values.enableAudio} onChange={(value) => onChange('enableAudio', value)} />
+            <VolumeRow label={GAME_FIELDS.masterVolume.label} volume={values.masterVolume} muted={values.masterMute} onVolume={(value) => onChange('masterVolume', value)} onMuted={(value) => onChange('masterMute', value)} />
+            <VolumeRow label={GAME_FIELDS.musicVolume.label} volume={values.musicVolume} muted={values.musicMute} onVolume={(value) => onChange('musicVolume', value)} onMuted={(value) => onChange('musicMute', value)} />
+            <VolumeRow label={GAME_FIELDS.sfxVolume.label} volume={values.sfxVolume} muted={values.sfxMute} onVolume={(value) => onChange('sfxVolume', value)} onMuted={(value) => onChange('sfxMute', value)} />
+            <VolumeRow label={GAME_FIELDS.ambienceVolume.label} volume={values.ambienceVolume} muted={values.ambienceMute} onVolume={(value) => onChange('ambienceVolume', value)} onMuted={(value) => onChange('ambienceMute', value)} />
+            <VolumeRow label={GAME_FIELDS.pingsVolume.label} volume={values.pingsVolume} muted={values.pingsMute} onVolume={(value) => onChange('pingsVolume', value)} onMuted={(value) => onChange('pingsMute', value)} />
+            <VolumeRow label={GAME_FIELDS.announcerVolume.label} volume={values.announcerVolume} muted={values.announcerMute} onVolume={(value) => onChange('announcerVolume', value)} onMuted={(value) => onChange('announcerMute', value)} />
+            <VolumeRow label={GAME_FIELDS.voiceVolume.label} volume={values.voiceVolume} muted={values.voiceMute} onVolume={(value) => onChange('voiceVolume', value)} onMuted={(value) => onChange('voiceMute', value)} />
           </SettingsGroup>
         </SettingsSection>
       </div>
-
-      <aside className="sticky top-4 flex h-[360px] flex-col items-center justify-center gap-3">
-        {GAME_SECTIONS.map((item) => (
-          <SectionDot
-            key={item.key}
-            active={activeSection === item.key}
-            label={item.label}
-            onClick={() => goToSection(item.key)}
-          />
-        ))}
-      </aside>
-    </div>
+    </>
   );
 }

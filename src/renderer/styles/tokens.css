@@ -1,5 +1,46 @@
-@theme {
-  /* Graphite Frost — neutral matte mineral greys. */
+/* =============================================================================
+   设计基线：Graphite Frost（石墨磨砂）
+   - 中性色沿用项目原来的哑光石墨灰（偏暖的中性灰），层级靠明度区分。
+   - 彩色表达含义：蓝 = 我方/胜，红 = 敌方/负，金 = 成就，绿 = 操作成功。
+   - 新组件用 ink / line / text 这组变量；旧变量名（--color-app-*）保持原值不变。
+   ============================================================================= */
+@theme static {
+  /* ---------- 石墨中性色 ---------- */
+  --color-ink-0: #282929;   /* 窗口外壳：导航轨、顶栏 */
+  --color-ink-1: #303131;   /* 页面画布 */
+  --color-ink-2: #383939;   /* 面板 / 卡片 */
+  --color-ink-3: #404141;   /* 抬升 / 悬停 */
+  --color-ink-4: #484949;   /* 选中 / 浮层 */
+  --color-ink-5: #525453;   /* 控件按下 */
+
+  --color-line-1: rgb(255 255 250 / 0.055);
+  --color-line-2: rgb(255 255 250 / 0.085);
+  --color-line-3: rgb(255 255 250 / 0.14);
+
+  --color-text-1: #F1F1ED;
+  --color-text-2: #D0D1CC;
+  --color-text-3: #A0A29D;
+  --color-text-4: #7E807B;
+  --color-shadow: #000000;
+  --color-scrim: rgb(12 12 12 / 0.62);   /* 弹窗遮罩 */
+
+  /* ---------- 语义色 ---------- */
+  --color-ally: #7FB2F5;
+  --color-ally-soft: rgb(127 178 245 / 0.14);
+  --color-ally-line: rgb(127 178 245 / 0.32);
+  --color-enemy: #D77A7C;
+  --color-enemy-soft: rgb(215 122 124 / 0.13);
+  --color-enemy-line: rgb(215 122 124 / 0.30);
+  --color-gold: #C9B181;
+  --color-gold-soft: rgb(201 177 129 / 0.14);
+  --color-gold-line: rgb(201 177 129 / 0.32);
+  --color-gold-text: #E0CDA4;
+  --color-ok: #83B08E;
+  --color-ok-soft: rgb(131 176 142 / 0.12);
+  --color-warn: #D9A066;
+  --color-warn-soft: rgb(217 160 102 / 0.13);
+
+  /* ---------- 原有变量（Graphite Frost 原值） ---------- */
   --color-app-bg: #303131;
   --color-app-bg-soft: #353636;
   --color-app-shell: #292a2a;
@@ -11,9 +52,10 @@
 
   --color-app-border: #4a4c4b;
   --color-app-border-strong: #5f615f;
+  --color-app-border-subtle: #424443;
 
-  --color-app-nav-hover: rgba(255, 255, 250, 0.045);
-  --color-app-selected: rgba(238, 238, 232, 0.085);
+  --color-app-nav-hover: rgb(255 255 250 / 0.045);
+  --color-app-selected: rgb(238 238 232 / 0.085);
   --color-app-focus: #c7c8c2;
 
   --color-app-text: #f1f1ed;
@@ -23,7 +65,7 @@
 
   --color-app-primary: #d8d9d3;
   --color-app-primary-hover: #efefe9;
-  --color-app-primary-soft: rgba(224, 225, 218, 0.1);
+  --color-app-primary-soft: rgb(224 225 218 / 0.1);
   --color-app-primary-foreground: #262727;
   --color-app-accent: #c8c9c3;
 
@@ -32,77 +74,143 @@
   --color-app-success: #83b08e;
   --color-app-link: #a6b5bf;
   --color-app-info: #91a8b4;
-  --color-app-info-soft: rgba(145, 168, 180, 0.11);
+  --color-app-info-soft: rgb(145 168 180 / 0.11);
   --color-app-team-mine: #8daabd;
   --color-app-team-enemy: #cb8587;
 
-  /* Match analysis: quieter canvas and a distinct inset panel hierarchy. */
+  /* 战绩分析：更安静的画布和独立的内嵌面板层级（原值） */
   --color-analysis-bg: #222629;
   --color-analysis-panel: #282d30;
   --color-analysis-surface: #30373b;
   --color-analysis-accent: #99bdcc;
   --color-analysis-gold: #c9b181;
 
-  --color-app-win: #83b08e;
-  --color-app-win-bg: rgba(131, 176, 142, 0.11);
-  --color-app-win-border: rgba(131, 176, 142, 0.25);
-  --color-app-loss: #d77a7c;
-  --color-app-loss-bg: rgba(215, 122, 124, 0.1);
-  --color-app-loss-border: rgba(215, 122, 124, 0.25);
+  /* 胜负：蓝胜红负 */
+  --color-app-win: var(--color-ally);
+  --color-app-win-bg: var(--color-ally-soft);
+  --color-app-win-border: var(--color-ally-line);
+  --color-app-loss: var(--color-enemy);
+  --color-app-loss-bg: var(--color-enemy-soft);
+  --color-app-loss-border: var(--color-enemy-line);
 
+  /* ---------- 段位色：只用于段位标记 ---------- */
+  --color-tier-iron: #8C7F79;
+  --color-tier-bronze: #B0724F;
+  --color-tier-silver: #A4B3BE;
+  --color-tier-gold: #D8AA55;
+  --color-tier-platinum: #4FB2A8;
+  --color-tier-emerald: #3FB37F;
+  --color-tier-diamond: #6F8FF0;
+  --color-tier-master: #B06BE0;
+  --color-tier-grandmaster: #E2585E;
+  --color-tier-challenger: #F0C66A;
+
+  /* 强度分级（英雄数据 / 大乱斗）：热 → 冷，越强越暖 */
+  --color-grade-splus: #E2848C;
+  --color-grade-s: #E0A15E;
+  --color-grade-a: #D4BC7C;
+  --color-grade-b: #6FBBB2;
+  --color-grade-c: #8FA6C4;
+  --color-grade-d: #8A919B;
+
+  /* 组队标识（实时对局小队 / 战绩里常一起玩的人），与 palette.ts 的 LIVE_PARTY_COLORS 一致 */
+  --color-party-teal: #49C7C0;
+  --color-party-amber: #D6A95B;
+  --color-party-green: #7CC58C;
+  --color-party-violet: #BCA1ED;
+  --color-party-coral: #ED997B;
+  --color-party-sky: #72B8F2;
+
+  /* 海克斯强化稀有度（游戏内语义） */
+  --color-rarity-prismatic: #A88BC9;
+  --color-rarity-gold: #CFA35A;
+  --color-rarity-silver: #8EA1AD;
+
+  /* ---------- 字体 ---------- */
   --font-sans: Inter, "Microsoft YaHei UI", "PingFang SC", "Segoe UI",
     ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    "Courier New", monospace;
-  --tracking-label: 0.14em;
+  /* 数字：Windows 自带的 DIN 风格窄体，等宽数字 */
+  --font-num: "Bahnschrift SemiCondensed", "Bahnschrift", "DIN Alternate", "Segoe UI", "Microsoft YaHei UI",
+    sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --tracking-label: 0.06em;
 
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* ---------- 字号：7 级（中文最小 12px，11px 只给数字与英文缩写） ---------- */
+  --text-cap: 11px;
+  --text-cap--line-height: 16px;
+  --text-meta: 12px;
+  --text-meta--line-height: 18px;
+  --text-body: 13px;
+  --text-body--line-height: 20px;
+  --text-list: 14px;
+  --text-list--line-height: 22px;
+  --text-section: 16px;
+  --text-section--line-height: 24px;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-hero: 28px;
+  --text-hero--line-height: 34px;
 
-  --shadow-ui-sm: inset 0 1px 0 rgba(255, 255, 250, 0.035);
-  --shadow-ui-shell: inset 0 1px 0 rgba(255, 255, 250, 0.035), 0 14px 34px -28px rgba(0, 0, 0, 0.72);
-  --shadow-ui-popover: 0 0 0 1px #5f615f, 0 20px 46px -24px rgba(0, 0, 0, 0.72);
-  --shadow-ui-focus: 0 0 0 3px rgba(216, 217, 211, 0.13);
-  --shadow-ui-focus-soft: 0 0 0 3px rgba(216, 217, 211, 0.08);
-  --shadow-ui-focus-compact: 0 0 0 2px rgba(216, 217, 211, 0.14);
-  --shadow-ui-info-focus: 0 0 0 3px rgba(145, 168, 180, 0.1);
-  --shadow-ui-primary-hover: inset 0 1px 0 rgba(255, 255, 250, 0.05);
-  --shadow-ui-neutral-ring: 0 0 0 3px rgba(255, 255, 250, 0.045);
-  --shadow-ui-neutral-sm: 0 1px 2px rgba(0, 0, 0, 0.16);
-  --shadow-ui-rank-emblem: 0 2px 5px rgba(0, 0, 0, 0.18);
-  --shadow-ui-switch-thumb: 0 0 0 4px rgba(216, 217, 211, 0.08);
-  --shadow-ui-switch-track: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
-  --drop-shadow-ui-rank-emblem: 0 2px 5px rgba(0, 0, 0, 0.18);
+  /* ---------- 圆角：4 档 ---------- */
+  --radius-xs: 4px;   /* 标签 */
+  --radius-sm: 6px;   /* 控件 */
+  --radius-md: 6px;
+  --radius-lg: 10px;  /* 面板、弹窗 */
+  --radius-xl: 10px;
 
-  /* Material recipes: keep feature CSS free from ad-hoc neutral colors. */
-  --color-frost-line-faint: rgba(255, 255, 250, 0.04);
-  --color-frost-line-soft: rgba(255, 255, 250, 0.055);
-  --color-frost-line: rgba(255, 255, 250, 0.075);
-  --color-frost-line-strong: rgba(255, 255, 250, 0.13);
-  --color-frost-fill-faint: rgba(255, 255, 250, 0.018);
-  --color-frost-fill-soft: rgba(255, 255, 250, 0.035);
-  --color-frost-fill-hover: rgba(255, 255, 250, 0.04);
-  --color-frost-fill-active: rgba(255, 255, 250, 0.075);
-  --color-frost-highlight: rgba(255, 255, 250, 0.18);
-  --color-frost-shadow-soft: rgba(0, 0, 0, 0.18);
-  --color-frost-shadow-medium: rgba(0, 0, 0, 0.22);
-  --color-frost-shadow-deep: rgba(0, 0, 0, 0.85);
-  --color-frost-indicator: rgba(222, 223, 217, 0.78);
+  /* ---------- 光与阴影（原值） ---------- */
+  --shadow-ui-sm: inset 0 1px 0 rgb(255 255 250 / 0.035);
+  --shadow-ui-panel: inset 0 1px 0 rgb(255 255 250 / 0.035);
+  --shadow-ui-shell: inset 0 1px 0 rgb(255 255 250 / 0.035), 0 14px 34px -28px rgb(0 0 0 / 0.72);
+  --shadow-ui-popover: 0 0 0 1px #5f615f, 0 20px 46px -24px rgb(0 0 0 / 0.72);
+  --shadow-ui-inset-line: inset 0 0 0 1px var(--color-line-2);
+  --shadow-ui-inset-strong: inset 0 0 0 1px var(--color-line-3);
+  --shadow-ui-ok-ring: 0 0 0 3px var(--color-ok-soft);
+  --shadow-ui-focus: 0 0 0 3px rgb(216 217 211 / 0.13);
+  --shadow-ui-focus-soft: 0 0 0 3px rgb(216 217 211 / 0.08);
+  --shadow-ui-focus-compact: 0 0 0 2px rgb(216 217 211 / 0.14);
+  --shadow-ui-info-focus: 0 0 0 3px rgb(145 168 180 / 0.1);
+  --shadow-ui-primary-hover: inset 0 1px 0 rgb(255 255 250 / 0.05);
+  --shadow-ui-neutral-ring: 0 0 0 3px rgb(255 255 250 / 0.045);
+  --shadow-ui-neutral-sm: 0 1px 2px rgb(0 0 0 / 0.16);
+  --shadow-ui-rank-emblem: 0 2px 5px rgb(0 0 0 / 0.18);
+  --shadow-ui-switch-thumb: 0 0 0 4px rgb(216 217 211 / 0.08);
+  --shadow-ui-switch-track: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+  --drop-shadow-ui-rank-emblem: 0 2px 5px rgb(0 0 0 / 0.18);
+
+  /* 材质配方（原值）：特性样式不直接写中性色字面量 */
+  --color-frost-line-faint: rgb(255 255 250 / 0.04);
+  --color-frost-line-soft: rgb(255 255 250 / 0.055);
+  --color-frost-line: rgb(255 255 250 / 0.075);
+  --color-frost-line-strong: rgb(255 255 250 / 0.13);
+  --color-frost-fill-faint: rgb(255 255 250 / 0.018);
+  --color-frost-fill-soft: rgb(255 255 250 / 0.035);
+  --color-frost-fill-hover: rgb(255 255 250 / 0.04);
+  --color-frost-fill-active: rgb(255 255 250 / 0.075);
+  --color-frost-highlight: rgb(255 255 250 / 0.18);
+  --color-frost-shadow-soft: rgb(0 0 0 / 0.18);
+  --color-frost-shadow-medium: rgb(0 0 0 / 0.22);
+  --color-frost-shadow-deep: rgb(0 0 0 / 0.85);
+  --color-frost-indicator: rgb(222 223 217 / 0.78);
   --color-frame-panel: #303131;
   --color-app-on-danger: #ffffff;
-  --color-scrollbar: rgba(235, 235, 229, 0.16);
-  --color-scrollbar-hover: rgba(235, 235, 229, 0.25);
-  --color-scrollbar-active: rgba(235, 235, 229, 0.34);
-  --color-scrollbar-firefox: rgba(235, 235, 229, 0.18);
-  --fill-frost-shell: radial-gradient(circle at 50% -18%, rgba(255, 255, 250, 0.035), transparent 42%);
-  --fill-frost-active: linear-gradient(180deg, rgba(255, 255, 250, 0.055), rgba(255, 255, 250, 0.025));
-  --fill-frost-frame: linear-gradient(180deg, rgba(255, 255, 250, 0.018), transparent 18%);
+  --color-scrollbar: rgb(235 235 229 / 0.16);
+  --color-scrollbar-hover: rgb(235 235 229 / 0.25);
+  --color-scrollbar-active: rgb(235 235 229 / 0.34);
+  --color-scrollbar-firefox: rgb(235 235 229 / 0.18);
+  --fill-frost-shell: radial-gradient(circle at 50% -18%, rgb(255 255 250 / 0.035), transparent 42%);
+  --fill-frost-active: linear-gradient(180deg, rgb(255 255 250 / 0.055), rgb(255 255 250 / 0.025));
+  --fill-frost-frame: linear-gradient(180deg, rgb(255 255 250 / 0.018), transparent 18%);
+  --fill-panel: linear-gradient(180deg, #3B3C3C, #373838);
+  /* 黄铜：金色只做细线、文字、小徽标 */
+  --fill-brass-line: linear-gradient(180deg, #F0D3A3, #937540 62%, #564527);
+  --fill-brass-text: linear-gradient(180deg, #F0D3A3 0%, #CFAB6D 48%, #937540 100%);
+  --fill-brass-base: linear-gradient(180deg, #4A4232, #3C3628);
 
   --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
   --duration-ui-fast: 150ms;
   --duration-ui-normal: 200ms;
+  --duration-ui-layout: 200ms;
 }
 
 @theme inline {
@@ -121,7 +229,7 @@
   --color-accent: var(--color-app-surface-soft);
   --color-accent-foreground: var(--color-app-text);
   --color-destructive: var(--color-app-danger);
-  --color-destructive-foreground: #ffffff;
+  --color-destructive-foreground: var(--color-app-on-danger);
   --color-border: var(--color-app-border);
   --color-input: var(--color-app-border-strong);
   --color-ring: var(--color-app-focus);
@@ -129,4 +237,12 @@
 
 :root {
   --app-frost-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  /* 原画取色氛围：默认中性灰，页面可按英雄覆盖 */
+  --ambient-a: rgb(120 122 118 / 0.35);
+  --ambient-b: rgb(80 82 80 / 0.3);
+  /* 布局 */
+  --shell-rail-width: 72px;
+  --shell-topbar-height: 48px;
+  --shell-window-controls-width: 138px;
+  --shell-drawer-width: 300px;
 }

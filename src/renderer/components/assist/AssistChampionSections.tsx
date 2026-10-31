@@ -1,105 +1,91 @@
+import { Coins, MessageSquareText, Pencil, Plus, Shuffle, Sparkles, Swords, TriangleAlert, WandSparkles } from 'lucide-react';
 import type {
   AssistOperationResult,
   AssistRole,
   AssistSettings,
   ChampionSummary,
 } from '../../../shared/api';
-import { GameIcon } from '../match/GameIcon';
+import { LaneIcon } from '../LaneIcon';
+import { ChampionAvatar, championDisplayName, type ChampionPickerRequest } from './AssistChampionPicker';
 import {
-  ActionButton,
-  SelectInput,
-  SettingCard,
-  ToggleRow,
+  Btn,
+  ChipChoices,
+  Choices,
+  Feature,
+  Panel,
+  PanelFoot,
 } from './AssistControls';
 
 type UpdateAssist = (updater: (assist: AssistSettings) => AssistSettings) => void;
 type UpdateBoolean = (key: keyof AssistSettings, value: boolean) => void;
-type OpenPicker = (
-  title: string,
-  ids: number[],
-  max: number,
-  apply: (ids: number[]) => void,
-) => void;
+type OpenPicker = (request: ChampionPickerRequest) => void;
 
-const roleLabels: Record<AssistRole, string> = {
-  top: '上路',
-  jungle: '打野',
-  middle: '中路',
-  bottom: '下路',
-  utility: '辅助',
-};
-
-const positionOptions: Array<[string, string]> = [
-  ['TOP', '上路'],
-  ['JUNGLE', '打野'],
-  ['MIDDLE', '中路'],
-  ['BOTTOM', '下路'],
-  ['UTILITY', '辅助'],
-  ['FILL', '补位'],
+const ROLES: Array<{ role: AssistRole; label: string }> = [
+  { role: 'top', label: '上单' },
+  { role: 'jungle', label: '打野' },
+  { role: 'middle', label: '中路' },
+  { role: 'bottom', label: '下路' },
+  { role: 'utility', label: '辅助' },
 ];
 
-function championName(champion: ChampionSummary): string {
-  return champion.title || champion.name;
-}
+const QUICK_POSITIONS = [
+  { value: 'TOP', label: '上单' },
+  { value: 'JUNGLE', label: '打野' },
+  { value: 'MIDDLE', label: '中路' },
+  { value: 'BOTTOM', label: '下路' },
+  { value: 'UTILITY', label: '辅助' },
+  { value: 'FILL', label: '补位' },
+];
 
-function ChampionSlotPicker({
+// 一排英雄头像（带序号，序号就是优先级），最后一格是「＋」。整排点一下打开选择器。
+function ChampionStrip({
   label,
   ids,
-  maxVisible = 6,
+  maxVisible = 7,
+  ban = false,
   championMap,
   onClick,
 }: {
   label: string;
   ids: number[];
   maxVisible?: number;
+  ban?: boolean;
   championMap: Map<number, ChampionSummary>;
   onClick: () => void;
 }) {
   const champions = ids
     .map((id) => championMap.get(id))
     .filter((champion): champion is ChampionSummary => Boolean(champion));
-  const visibleChampions = champions.slice(0, maxVisible);
-  const names = champions.map(championName).join('、');
+  const visible = champions.slice(0, maxVisible);
+  const hidden = champions.length - visible.length;
 
   return (
     <button
       type="button"
+      className={`as-strip ${ban ? 'as-strip--ban' : ''}`}
       onClick={onClick}
-      title={names || label}
-      aria-label={label}
-      className="group flex min-h-12 w-full min-w-0 items-center gap-2 rounded-sm border border-app-border bg-app-bg px-2.5 py-2 text-left transition-colors hover:border-app-primary hover:bg-app-surface-soft focus:outline-none focus:ring-2 focus:ring-app-primary/20"
+      aria-label={`${label}：${champions.map(championDisplayName).join('、') || '未设置'}`}
     >
-      {visibleChampions.length > 0 ? (
-        <>
-          <span className="flex shrink-0 -space-x-2">
-            {visibleChampions.map((champion) => (
-              <GameIcon
-                key={champion.id}
-                src={champion.avatar}
-                alt={championName(champion)}
-                title={championName(champion)}
-                size={32}
-                rounded
-                className="ring-2 ring-app-bg group-hover:ring-app-surface-soft"
-              />
-            ))}
-            {champions.length > visibleChampions.length && (
-              <span className="flex size-8 items-center justify-center rounded-full bg-app-primary-soft text-[10px] font-semibold text-app-primary ring-2 ring-app-bg">
-                +{champions.length - visibleChampions.length}
-              </span>
-            )}
+      {visible.map((champion, index) => (
+        <span key={champion.id} className="as-strip__item">
+          <span className="as-strip__face">
+            <ChampionAvatar champion={champion} />
+            {ban ? <i className="as-strip__ban">禁</i> : champions.length > 1 && <i className="as-strip__order">{index + 1}</i>}
           </span>
-          <span className="min-w-0 flex-1 truncate text-xs font-medium text-app-text">
-            {names}
-          </span>
-        </>
-      ) : (
-        <>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-app-border bg-app-surface text-xs text-app-subtle group-hover:border-app-primary group-hover:text-app-primary">
-            +
-          </span>
-          <span className="min-w-0 flex-1 truncate text-xs text-app-muted">未设置</span>
-        </>
+          <span className="as-strip__name">{championDisplayName(champion)}</span>
+        </span>
+      ))}
+      {hidden > 0 && (
+        <span className="as-strip__item">
+          <span className="as-strip__face as-strip__more">+{hidden}</span>
+          <span className="as-strip__name">更多</span>
+        </span>
+      )}
+      {(!ban || champions.length === 0) && (
+        <span className="as-strip__item">
+          <span className="as-strip__add" aria-hidden="true">{champions.length === 0 ? <Plus /> : <Pencil />}</span>
+          <span className="as-strip__name">{champions.length === 0 ? (ban ? '不禁' : '添加') : '调整'}</span>
+        </span>
       )}
     </button>
   );
@@ -124,110 +110,169 @@ export function ChampionsSection({
   setRoleChampionArray: (role: AssistRole, ids: number[]) => void;
   setBan: (role: AssistRole | 'arena', ids: number[]) => void;
 }) {
+  const off = !assist.autoChampionEnabled;
   return (
     <>
-      <SettingCard title="自动选人与换人">
-        <ToggleRow
-          label="开启自动禁选英雄"
-          description="只在轮到你操作时执行；首选不可用会尝试下一个。"
+      <section className="as-panel">
+        <Feature
+          icon={<WandSparkles />}
+          title="自动选英雄、禁英雄"
+          description="轮到你选人或禁人时，按下面的顺序自动操作；前一个被选走或被禁了，就试下一个。只在轮到你时动手，不会抢在你前面。"
           checked={assist.autoChampionEnabled}
           onChange={(value) => updateBoolean('autoChampionEnabled', value)}
         />
-        {([
-          ['normal', '匹配通用英雄'],
-          ['aram', '大乱斗换人顺序'],
-          ['arena', '斗魂竞技场英雄'],
-        ] as const).map(([key, label]) => (
-          <div key={key} className="grid grid-cols-[160px_minmax(0,1fr)] items-center gap-3 py-2">
-            <span className="text-sm text-app-body">{label}</span>
-            <ChampionSlotPicker
-              label={label}
-              ids={assist.champions[key]}
-              championMap={championMap}
-              onClick={() => openPicker(
-                label,
-                assist.champions[key],
-                24,
-                (ids) => setChampionArray(key, ids),
-              )}
-            />
+      </section>
+
+      <Panel
+        title="按模式选英雄"
+        description="排在前面的优先。点一下可以增减英雄、调整顺序。"
+        muted={off}
+      >
+        {off && (
+          <div className="as-notice">
+            <TriangleAlert />
+            总开关关着，下面的设置先存着，暂时不会生效。
           </div>
-        ))}
-      </SettingCard>
-      <SettingCard title="按位置选用与禁用">
-        <div className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-0.5 text-[11px] font-medium text-app-subtle">
-          <span>位置</span>
-          <span>自动选用英雄</span>
-          <span>自动禁用英雄</span>
+        )}
+        <div className="as-rows">
+          {([
+            ['normal', '匹配 / 排位', '没给位置单独设英雄时，用这里的顺序'],
+            ['aram', '大乱斗', '能换英雄时，按顺序把想玩的换到手里'],
+            ['arena', '斗魂竞技场', '斗魂模式里优先选这些'],
+          ] as const).map(([key, label, hint]) => (
+            <div key={key} className="as-row">
+              <div className="as-row__label">
+                <b>{label}</b>
+                <span>{hint}</span>
+              </div>
+              <ChampionStrip
+                label={label}
+                ids={assist.champions[key]}
+                championMap={championMap}
+                onClick={() => openPicker({
+                  title: `${label}：想玩的英雄`,
+                  ids: assist.champions[key],
+                  max: 24,
+                  apply: (ids) => setChampionArray(key, ids),
+                })}
+              />
+            </div>
+          ))}
         </div>
-        {(Object.keys(roleLabels) as AssistRole[]).map((role) => (
-          <div key={role} className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
-            <span className="text-sm font-medium text-app-body">{roleLabels[role]}</span>
-            <ChampionSlotPicker
-              label={`${roleLabels[role]}自动选用英雄`}
-              ids={assist.champions.byRole[role]}
-              championMap={championMap}
-              onClick={() => openPicker(
-                `${roleLabels[role]}选用`,
-                assist.champions.byRole[role],
-                24,
-                (ids) => setRoleChampionArray(role, ids),
-              )}
-            />
-            <ChampionSlotPicker
-              label={`${roleLabels[role]}自动禁用英雄`}
-              ids={assist.champions.bans[role] ? [assist.champions.bans[role]] : []}
+      </Panel>
+
+      <Panel
+        title="按位置选英雄、禁英雄"
+        description="排位里分到哪个位置，就用那一行的设置。每个位置可以禁一个英雄。"
+        muted={off}
+      >
+        <div className="as-lanes">
+          <div className="as-lane-row as-lane-row--head">
+            <span>位置</span>
+            <span>想玩的英雄（按顺序尝试）</span>
+            <span>要禁的英雄</span>
+          </div>
+          {ROLES.map(({ role, label }) => (
+            <div key={role} className="as-lane-row">
+              <span className="as-lane-name">
+                <LaneIcon lane={role} className="" />
+                {label}
+              </span>
+              <ChampionStrip
+                label={`${label}想玩的英雄`}
+                ids={assist.champions.byRole[role]}
+                championMap={championMap}
+                onClick={() => openPicker({
+                  title: `${label}：想玩的英雄`,
+                  ids: assist.champions.byRole[role],
+                  max: 24,
+                  apply: (ids) => setRoleChampionArray(role, ids),
+                })}
+              />
+              <ChampionStrip
+                label={`${label}要禁的英雄`}
+                ids={assist.champions.bans[role] ? [assist.champions.bans[role]] : []}
+                maxVisible={1}
+                ban
+                championMap={championMap}
+                onClick={() => openPicker({
+                  title: `${label}：要禁的英雄`,
+                  hint: '只能禁一个。点一下就选好',
+                  mode: 'ban',
+                  ids: assist.champions.bans[role] ? [assist.champions.bans[role]] : [],
+                  max: 1,
+                  apply: (ids) => setBan(role, ids),
+                })}
+              />
+            </div>
+          ))}
+          <div className="as-lane-row">
+            <span className="as-lane-name">
+              <Swords />
+              斗魂
+            </span>
+            <span className="as-field__hint">斗魂竞技场只有禁用阶段按位置区分</span>
+            <ChampionStrip
+              label="斗魂要禁的英雄"
+              ids={assist.champions.bans.arena ? [assist.champions.bans.arena] : []}
               maxVisible={1}
+              ban
               championMap={championMap}
-              onClick={() => openPicker(
-                `${roleLabels[role]}禁用`,
-                assist.champions.bans[role] ? [assist.champions.bans[role]] : [],
-                1,
-                (ids) => setBan(role, ids),
-              )}
+              onClick={() => openPicker({
+                title: '斗魂竞技场：要禁的英雄',
+                hint: '只能禁一个。点一下就选好',
+                mode: 'ban',
+                ids: assist.champions.bans.arena ? [assist.champions.bans.arena] : [],
+                max: 1,
+                apply: (ids) => setBan('arena', ids),
+              })}
             />
           </div>
-        ))}
-        <div className="grid grid-cols-[70px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
-          <span className="text-sm font-medium text-app-body">斗魂</span>
-          <span />
-          <ChampionSlotPicker
-            label="斗魂自动禁用英雄"
-            ids={assist.champions.bans.arena ? [assist.champions.bans.arena] : []}
-            maxVisible={1}
-            championMap={championMap}
-            onClick={() => openPicker(
-              '斗魂禁用',
-              assist.champions.bans.arena ? [assist.champions.bans.arena] : [],
-              1,
-              (ids) => setBan('arena', ids),
-            )}
-          />
         </div>
-      </SettingCard>
-      <SettingCard title="快速游戏位置">
-        <div className="grid grid-cols-2 gap-3">
-          <SelectInput
-            value={assist.champions.quickGameFirstPosition}
-            options={positionOptions}
-            onChange={(value) => updateAssist((next) => {
-              next.champions.quickGameFirstPosition = value;
-              return next;
-            })}
-          />
-          <SelectInput
-            value={assist.champions.quickGameSecondPosition}
-            options={positionOptions}
-            onChange={(value) => updateAssist((next) => {
-              next.champions.quickGameSecondPosition = value;
-              return next;
-            })}
-          />
+      </Panel>
+
+      <Panel title="快速游戏的位置" description="开快速游戏时，帮你提前选好两个想去的位置。">
+        <div className="as-panel__body">
+          <div className="as-lane-picks">
+            {([
+              ['quickGameFirstPosition', '第一位置'],
+              ['quickGameSecondPosition', '第二位置'],
+            ] as const).map(([key, label]) => (
+              <div key={key}>
+                <span>{label}</span>
+                <ChipChoices
+                  label={label}
+                  value={assist.champions[key]}
+                  options={QUICK_POSITIONS.map((position) => ({
+                    value: position.value,
+                    label: (
+                      <>
+                        {position.value === 'FILL' ? <Shuffle /> : <LaneIcon lane={position.value} className="" />}
+                        {position.label}
+                      </>
+                    ),
+                  }))}
+                  onChange={(value) => updateAssist((next) => {
+                    next.champions[key] = value;
+                    return next;
+                  })}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </SettingCard>
+      </Panel>
     </>
   );
 }
+
+type Strategy = 'off' | 'winRate' | 'pickRate';
+
+const STRATEGY_OPTIONS: Array<{ value: Strategy; title: string; description: string }> = [
+  { value: 'off', title: '不自动', description: '自己配，或者用客户端自带的推荐' },
+  { value: 'winRate', title: '胜率最高', description: '用当前版本赢得最多的方案' },
+  { value: 'pickRate', title: '最多人用', description: '用当前版本最常见、最稳的方案' },
+];
 
 export function BuildsSection({
   assist,
@@ -242,70 +287,80 @@ export function BuildsSection({
     operation: () => Promise<AssistOperationResult[]>,
   ) => Promise<void>;
 }) {
+  const itemStrategy: Strategy = assist.autoWinRateItems ? 'winRate' : assist.autoPickRateItems ? 'pickRate' : 'off';
+  const runeStrategy: Strategy = assist.autoWinRateRunes ? 'winRate' : assist.autoPickRateRunes ? 'pickRate' : 'off';
   return (
     <>
-      <SettingCard title="自动装备">
-        <ToggleRow
-          label="自动使用胜率最高配装"
-          checked={assist.autoWinRateItems}
-          onChange={(value) => updateAssist((next) => ({
-            ...next,
-            autoWinRateItems: value,
-            autoPickRateItems: value ? false : next.autoPickRateItems,
-          }))}
-        />
-        <ToggleRow
-          label="自动使用使用率最高配装"
-          checked={assist.autoPickRateItems}
-          onChange={(value) => updateAssist((next) => ({
-            ...next,
-            autoPickRateItems: value,
-            autoWinRateItems: value ? false : next.autoWinRateItems,
-          }))}
-        />
-        <ToggleRow
-          label="将配装结果发送到房间"
-          checked={assist.sendItemsMessage}
-          onChange={(value) => updateBoolean('sendItemsMessage', value)}
-        />
-      </SettingCard>
-      <SettingCard title="自动符文">
-        <ToggleRow
-          label="自动使用胜率最高符文"
-          checked={assist.autoWinRateRunes}
-          onChange={(value) => updateAssist((next) => ({
-            ...next,
-            autoWinRateRunes: value,
-            autoPickRateRunes: value ? false : next.autoPickRateRunes,
-          }))}
-        />
-        <ToggleRow
-          label="自动使用使用率最高符文"
-          checked={assist.autoPickRateRunes}
-          onChange={(value) => updateAssist((next) => ({
-            ...next,
-            autoPickRateRunes: value,
-            autoWinRateRunes: value ? false : next.autoWinRateRunes,
-          }))}
-        />
-        <ToggleRow
-          label="将符文结果发送到房间"
+      <Panel title="符文页" description="锁定英雄后，自动按选择的方案生成一页符文并启用。">
+        <div className="as-feature">
+          <span className="as-feature__icon" aria-hidden="true"><Sparkles /></span>
+          <div>
+            <div className="as-feature__title">符文用哪套</div>
+            <div className="as-feature__desc">选「不自动」就不会动你的符文页。</div>
+          </div>
+          <span />
+          <div className="as-feature__options">
+            <Choices<Strategy>
+              label="符文方案"
+              value={runeStrategy}
+              options={STRATEGY_OPTIONS}
+              onChange={(value) => updateAssist((next) => ({
+                ...next,
+                autoWinRateRunes: value === 'winRate',
+                autoPickRateRunes: value === 'pickRate',
+              }))}
+            />
+          </div>
+        </div>
+        <Feature
+          icon={<MessageSquareText />}
+          title="把符文方案发到选人聊天"
+          description="队友能看到你带的是什么符文。"
           checked={assist.sendRunesMessage}
           onChange={(value) => updateBoolean('sendRunesMessage', value)}
         />
-        <div className="flex gap-2 pt-2">
-          <ActionButton
+      </Panel>
+
+      <Panel title="出装" description="锁定英雄后，自动把推荐出装写进游戏里的「推荐物品」。">
+        <div className="as-feature">
+          <span className="as-feature__icon" aria-hidden="true"><Coins /></span>
+          <div>
+            <div className="as-feature__title">出装用哪套</div>
+            <div className="as-feature__desc">选「不自动」就保留客户端默认的推荐物品。</div>
+          </div>
+          <span />
+          <div className="as-feature__options">
+            <Choices<Strategy>
+              label="出装方案"
+              value={itemStrategy}
+              options={STRATEGY_OPTIONS}
+              onChange={(value) => updateAssist((next) => ({
+                ...next,
+                autoWinRateItems: value === 'winRate',
+                autoPickRateItems: value === 'pickRate',
+              }))}
+            />
+          </div>
+        </div>
+        <Feature
+          icon={<MessageSquareText />}
+          title="把出装方案发到选人聊天"
+          description="队友能看到你准备怎么出装。"
+          checked={assist.sendItemsMessage}
+          onChange={(value) => updateBoolean('sendItemsMessage', value)}
+        />
+        <PanelFoot note="已经选好英雄了？点一下，马上按上面的方案写入符文和出装。">
+          <Btn
+            tone="primary"
             onClick={() => void runOperation(() =>
               window.lolHelper.assist.applyRecommendation({
-                strategy: assist.autoWinRateRunes || assist.autoWinRateItems
-                  ? 'winRate'
-                  : 'pickRate',
+                strategy: assist.autoWinRateRunes || assist.autoWinRateItems ? 'winRate' : 'pickRate',
               }))}
           >
-            立即读取当前英雄并应用
-          </ActionButton>
-        </div>
-      </SettingCard>
+            应用到当前英雄
+          </Btn>
+        </PanelFoot>
+      </Panel>
     </>
   );
 }

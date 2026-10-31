@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity,
   Bell,
   BookmarkCheck,
+  Bot,
   ChartNoAxesColumnIncreasing,
   History,
   Home,
@@ -11,24 +12,22 @@ import {
   ScanSearch,
   Settings,
   Users,
-  Wrench,
 } from 'lucide-react';
 import { APP_LAYOUT } from '../../shared/constants';
-import type { ScoutHit, ScoutPlayerEvent, ScoutProgress } from '../../shared/api';
+import type { ScoutHit, ScoutProgress } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
-import { GameIcon } from './match/GameIcon';
 
 // 视图标识：每加一个页面，这里加一个值，并在 App.tsx 的页面映射里对应。
-export type View = 'home' | 'matches' | 'live' | 'scout' | 'ranking' | 'assist';
+export type View = 'home' | 'matches' | 'live' | 'scout' | 'ranking' | 'assist' | 'settings';
 
-const NAV_ITEMS = [
-  { view: 'home', label: '概览', title: '主页概览', icon: Home },
-  { view: 'matches', label: '战绩', title: '历史战绩', icon: History },
-  { view: 'live', label: '实时', title: '实时对局', icon: Activity },
+const NAV_ITEMS: Array<{ view: View; label: string; title: string; icon: typeof Home }> = [
+  { view: 'home', label: '首页', title: '首页', icon: Home },
+  { view: 'matches', label: '战绩', title: '战绩查询', icon: History },
+  { view: 'live', label: '对局', title: '当前对局', icon: Activity },
   { view: 'scout', label: '雷达', title: '高手雷达', icon: ScanSearch },
-  { view: 'ranking', label: '排行', title: '英雄排行', icon: ChartNoAxesColumnIncreasing },
-  { view: 'assist', label: '工具', title: '辅助功能', icon: Wrench },
-] as const;
+  { view: 'ranking', label: '数据', title: '英雄数据', icon: ChartNoAxesColumnIncreasing },
+  { view: 'assist', label: '助手', title: '对局助手', icon: Bot },
+];
 
 export interface ScoutSidebarStatus {
   running: boolean;
@@ -40,273 +39,90 @@ export interface ScoutSidebarStatus {
   finishedAt?: number | null;
 }
 
+export interface ShellConnection {
+  connected: boolean;
+  label: string;
+}
+
+// 顶栏右侧的快捷入口：和改版前一样，每个功能一个按钮，一键直达。
+export interface ShellActions {
+  savedOpen: boolean;
+  onOpenSaved: () => void;
+  followOpen: boolean;
+  followCount: number;
+  onOpenFollow: () => void;
+  friendRequestsOpen: boolean;
+  friendRequestCount: number;
+  onOpenFriendRequests: () => void;
+}
+
 interface AppShellProps {
   title: string;
   activeView: View;
-  onNavigate: (view: View) => void; // 点击导航项回调
-  children: React.ReactNode; // 主工作区内容
-  fullBleed?: boolean;
-  headerExtra?: React.ReactNode;
-  friendPanelHidden?: boolean; // 好友栏是否隐藏
-  onToggleFriendPanel?: () => void; // 展开/隐藏好友栏
-  chatSessionsOpen?: boolean; // 会话管理窗口是否打开
-  savedMatchesOpen?: boolean;
-  followAccountsOpen?: boolean;
-  friendManagerOpen?: boolean;
-  friendRequestAlertCount?: number;
-  followAlertCount?: number;
-  onOpenSavedMatches?: () => void;
-  onOpenFollowAccounts?: () => void;
-  onOpenChatSessions?: () => void; // 打开会话管理窗口
-  onOpenFriendManager?: () => void;
-  friendPanel?: React.ReactNode; // 常驻右侧好友栏
-  onOpenSettings?: () => void; // 打开设置窗口
-  settingsOpen?: boolean;
+  onNavigate: (view: View) => void;
+  children: ReactNode;
+  headerExtra?: ReactNode;
+  search?: ReactNode;
+  connection: ShellConnection;
+  actions: ShellActions;
+  chatOpen?: boolean;
+  onOpenChat?: () => void;
+  friendDrawerOpen: boolean;
+  onToggleFriendDrawer: () => void;
+  onCloseFriendDrawer: () => void;
+  friendPanel?: ReactNode;
+  friendOnlineCount?: number;
   scoutStatus?: ScoutSidebarStatus | null;
-  onScoutPlayerSearch?: (name: string, region?: string) => void;
   onScoutStatusClick?: () => void;
 }
 
-function getScoutHitRiotId(hit: ScoutHit | null | undefined): string {
-  return hit?.profile.riotId?.trim() || '';
-}
-
-function getScoutHitDisplayName(hit: ScoutHit | null | undefined): string {
-  const riotId = getScoutHitRiotId(hit);
-  return riotId.split('#')[0] || riotId || '搜寻中';
-}
-
-function getScoutPlayerRiotId(player: ScoutPlayerEvent | null | undefined): string {
-  return player?.profile?.riotId?.trim() || '';
-}
-
-function getScoutPlayerDisplayName(player: ScoutPlayerEvent | null | undefined): string {
-  const riotId = getScoutPlayerRiotId(player);
-  return riotId.split('#')[0] || riotId || '搜寻中';
-}
-
-function formatScoutElapsed(milliseconds: number): string {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return hours > 0
-    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
-    : `${minutes}:${pad(seconds)}`;
-}
-
-function SidebarScoutStatus({
-  status,
-  collapsed,
-  onPlayerSearch,
-  onRestore,
-}: {
-  status?: ScoutSidebarStatus | null;
-  collapsed: boolean;
-  onPlayerSearch?: (name: string, region?: string) => void;
-  onRestore?: () => void;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-
+function useWindowWidth(): number {
+  const [width, setWidth] = useState(() => window.innerWidth);
   useEffect(() => {
-    if (!status?.running) {
-      setNow(Date.now());
-      return undefined;
-    }
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
 
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [status?.running, status?.startedAt]);
-
-  if (!status || (!status.running && !status.progress && status.hits.length === 0)) return null;
-
+function RailScoutStatus({
+  status,
+  onClick,
+}: {
+  status: ScoutSidebarStatus;
+  onClick?: () => void;
+}) {
   const latestHit = status.progress?.latestHit ?? status.hits[status.hits.length - 1] ?? null;
-  const latestPlayer = status.progress?.latestPlayer ?? null;
-  const latestProfile = latestHit?.profile ?? null;
-  const latestChampionAvatar = latestPlayer?.recentChampionAvatar || '';
-  const latestChampionName = latestPlayer?.recentChampionName || '最近英雄';
-  const latestRiotId = getScoutHitRiotId(latestHit) || getScoutPlayerRiotId(latestPlayer);
-  const latestMatch = latestHit?.qualifyingMatches[0];
-  const latestScore = latestMatch
-    ? `${latestMatch.kills}/${latestMatch.deaths}/${latestMatch.assists}`
-    : latestPlayer?.recentKills !== undefined &&
-        latestPlayer.recentDeaths !== undefined &&
-        latestPlayer.recentAssists !== undefined
-      ? `${latestPlayer.recentKills}/${latestPlayer.recentDeaths}/${latestPlayer.recentAssists}`
-      : '';
-  const foundCount = status.hits.length;
-  const elapsedMs = status.startedAt
-    ? Math.max(0, (status.running ? now : (status.finishedAt ?? now)) - status.startedAt)
-    : 0;
-  const elapsedText = formatScoutElapsed(elapsedMs);
-  const statusText = status.running
-    ? '搜索中'
-    : status.progress?.phase === 'aborted'
-      ? '已取消'
-      : status.progress?.phase === 'error'
-        ? '异常'
-        : '已完成';
-  const canOpenLatest = Boolean(latestRiotId && onPlayerSearch);
-  const openLatest = () => {
-    if (onRestore) {
-      onRestore();
-      return;
-    }
-    if (!canOpenLatest) return;
-    onPlayerSearch?.(latestRiotId, status.region);
-  };
-  const displayName = latestHit
-    ? getScoutHitDisplayName(latestHit)
-    : latestPlayer?.profile
-      ? getScoutPlayerDisplayName(latestPlayer)
-    : status.running
-      ? '正在搜寻高手'
-      : '暂无命中';
-
-  if (collapsed) {
-    return (
-      <div className="flex justify-center px-2 pt-2">
-        <button
-          type="button"
-          onClick={openLatest}
-          disabled={!canOpenLatest && !onRestore}
-          title={`高手雷达：${statusText}，已找到 ${foundCount} 人${latestRiotId ? `，最新 ${latestRiotId}` : ''}`}
-          className={`sidebar-scout-compact ${status.running ? 'sidebar-scout-compact--running' : ''}`}
-        >
-          <span className="sidebar-scout-compact__pulse" aria-hidden="true" />
-          {latestProfile ? (
-            <ProfileIcon
-              iconId={latestProfile.profileIconId}
-              src={latestProfile.profileIconUrl}
-              alt={displayName}
-              size={30}
-              className="relative z-10 ring-2 ring-white"
-            />
-          ) : latestChampionAvatar ? (
-            <GameIcon
-              src={latestChampionAvatar}
-              alt={latestChampionName}
-              size={30}
-              rounded
-              className="relative z-10 ring-2 ring-white"
-            />
-          ) : (
-            <span className="sidebar-scout-orb sidebar-scout-orb--compact" aria-hidden="true" />
-          )}
-          {foundCount > 0 && <span className="sidebar-scout-compact__badge">{foundCount}</span>}
-        </button>
-      </div>
-    );
-  }
-
+  const latestRiotId = latestHit?.profile.riotId ?? '';
+  const stateText = status.running ? '搜索中' : status.progress?.phase === 'error' ? '异常' : '已完成';
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <section className={`sidebar-scout-card shrink-0 ${status.running ? 'sidebar-scout-card--running' : ''}`}>
-        <button
-          type="button"
-          onClick={openLatest}
-          disabled={!canOpenLatest && !onRestore}
-          className="sidebar-scout-player"
-        >
-          <span className="sidebar-scout-avatar">
-            {latestProfile ? (
-              <ProfileIcon
-                iconId={latestProfile.profileIconId}
-                src={latestProfile.profileIconUrl}
-                alt={displayName}
-                size={34}
-                className="sidebar-scout-avatar__image"
-              />
-            ) : latestChampionAvatar ? (
-              <GameIcon
-                src={latestChampionAvatar}
-                alt={latestChampionName}
-                size={34}
-                rounded
-                className="sidebar-scout-avatar__image"
-              />
-            ) : (
-              <span className="sidebar-scout-orb" aria-hidden="true" />
-            )}
-            {status.running && <span className="sidebar-scout-avatar__live" />}
-          </span>
-          <div className="min-w-0 flex-1 text-left">
-            <div className="truncate text-xs font-semibold text-app-text">
-              {displayName}
-            </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-app-muted">
-              {latestMatch || latestPlayer?.recentChampionAvatar ? (
-                <>
-                  <GameIcon
-                    src={latestMatch?.championAvatar || latestPlayer?.recentChampionAvatar || ''}
-                    alt={latestMatch?.championName || latestPlayer?.recentChampionName || '最近英雄'}
-                    size={14}
-                    rounded
-                  />
-                  <span className="truncate">
-                    {latestMatch?.championName || latestPlayer?.recentChampionName || '正在检查'}
-                  </span>
-                  <span className="sidebar-scout-score">{latestScore}</span>
-                </>
-              ) : (
-                <span>{status.running ? '实时筛选达标对局' : '命中后显示最新玩家'}</span>
-              )}
-            </div>
-          </div>
-        </button>
-
-        <div className="sidebar-scout-foot">
-          <span>已找到 <b>{foundCount}</b></span>
-          <span>计时 <b>{elapsedText}</b></span>
-        </div>
-      </section>
-
-      {status.hits.length > 0 && (
-        <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-app-border/70 pt-2">
-          <div className="app-eyebrow flex h-6 shrink-0 items-center justify-between px-1">
-            <span>( 已找到的高手 )</span>
-            <span>{status.hits.length}</span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
-            {[...status.hits].reverse().map((hit) => {
-              const riotId = getScoutHitRiotId(hit);
-              const match = hit.qualifyingMatches[0];
-              const score = match ? `${match.kills}/${match.deaths}/${match.assists}` : '';
-              return (
-                <button
-                  key={hit.profile.puuid || riotId}
-                  type="button"
-                  disabled={!riotId || !onPlayerSearch}
-                  onClick={() => onPlayerSearch?.(riotId, status.region)}
-                  title={riotId ? `查看 ${riotId} 的战绩` : undefined}
-                  className="group flex h-11 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left transition-colors hover:bg-app-nav-hover disabled:cursor-default"
-                >
-                  <ProfileIcon
-                    iconId={hit.profile.profileIconId}
-                    src={hit.profile.profileIconUrl}
-                    alt={riotId || '高手'}
-                    size={28}
-                    className="ring-1 ring-app-border"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] font-semibold text-app-text group-hover:text-app-primary">
-                      {getScoutHitDisplayName(hit)}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-app-muted">
-                      <span>{hit.qualifyingMatches.length} 场达标</span>
-                      {score && <span className="font-semibold text-app-primary">{score}</span>}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="shell-scout"
+      data-running={status.running ? 'true' : 'false'}
+      title={`高手雷达：${stateText}，已找到 ${status.hits.length} 人${latestRiotId ? `，最新 ${latestRiotId}` : ''}`}
+      aria-label="回到高手雷达"
+    >
+      {latestHit ? (
+        <ProfileIcon
+          iconId={latestHit.profile.profileIconId}
+          src={latestHit.profile.profileIconUrl}
+          alt={latestRiotId || '最新命中'}
+          size={34}
+        />
+      ) : (
+        <ScanSearch className="size-4 text-text-3" />
       )}
-    </div>
+      {status.hits.length > 0 && <span className="shell-scout__count">{status.hits.length}</span>}
+    </button>
   );
+}
+
+function AlertBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return <span className="shell-icon-btn__badge">{count > 99 ? '99+' : count}</span>;
 }
 
 export function AppShell({
@@ -314,203 +130,157 @@ export function AppShell({
   activeView,
   onNavigate,
   children,
-  fullBleed = false,
   headerExtra,
-  friendPanelHidden = false,
-  onToggleFriendPanel,
-  chatSessionsOpen = false,
-  savedMatchesOpen = false,
-  followAccountsOpen = false,
-  friendManagerOpen = false,
-  friendRequestAlertCount = 0,
-  followAlertCount = 0,
-  onOpenSavedMatches,
-  onOpenFollowAccounts,
-  onOpenChatSessions,
-  onOpenFriendManager,
+  search,
+  connection,
+  actions,
+  chatOpen = false,
+  onOpenChat,
+  friendDrawerOpen,
+  onToggleFriendDrawer,
+  onCloseFriendDrawer,
   friendPanel,
-  onOpenSettings,
-  settingsOpen = false,
+  friendOnlineCount,
   scoutStatus,
-  onScoutPlayerSearch,
   onScoutStatusClick,
 }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
-  const effectiveCollapsed = collapsed;
-  const sidebarWidth = effectiveCollapsed
-    ? APP_LAYOUT.collapsedSidebarWidth
-    : APP_LAYOUT.expandedSidebarWidth;
-  const workspaceWidth = APP_LAYOUT.workspaceWidth - sidebarWidth;
-  const toggleSidebar = () => setCollapsed((value) => !value);
+  const windowWidth = useWindowWidth();
+  const canDock = windowWidth >= APP_LAYOUT.friendDrawerDockMinWidth;
+  const drawerMode = !friendPanel || !friendDrawerOpen ? 'closed' : canDock ? 'docked' : 'overlay';
+
+  useEffect(() => {
+    if (drawerMode !== 'overlay') return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseFriendDrawer();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [drawerMode, onCloseFriendDrawer]);
 
   return (
-    <div className="app-shell">
-      <aside
-        className="app-shell-sidebar"
-        data-collapsed={effectiveCollapsed ? 'true' : 'false'}
-        style={{ width: `${sidebarWidth}px` }}
-      >
-        <div className="app-shell-drag-region" aria-hidden="true" />
-        <div className="app-shell-brand-row">
-          <button
-            onClick={toggleSidebar}
-            title={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-            aria-label={effectiveCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-            className="app-shell-brand"
-          >
-            <span className="app-shell-brand-mark" aria-hidden="true">L</span>
-            {!effectiveCollapsed && (
-              <span className="app-shell-brand-copy">
-                <span className="app-shell-brand-title">LOL 助手</span>
-              </span>
-            )}
-          </button>
-        </div>
-
-        <nav className="app-shell-nav">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = activeView === item.view;
-            return (
+    <div className="shell" data-drawer={drawerMode}>
+      <nav className="shell-rail" aria-label="主导航">
+        <div className="shell-rail__drag" aria-hidden="true" />
+        <span className="shell-rail__logo" aria-hidden="true">L</span>
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.view} className="contents">
               <button
-                key={item.view}
                 type="button"
                 onClick={() => onNavigate(item.view)}
-                title={effectiveCollapsed ? item.title : undefined}
-                aria-label={item.title}
-                aria-current={active ? 'page' : undefined}
-                data-active={active ? 'true' : 'false'}
-                className="app-shell-nav-item"
+                title={item.title}
+                aria-current={activeView === item.view ? 'page' : undefined}
+                className="shell-rail__item"
               >
-                <Icon className="app-shell-nav-icon" />
-                {!effectiveCollapsed && <span className="truncate">{item.label}</span>}
+                <Icon />
+                {item.label}
               </button>
-            );
-          })}
-          <SidebarScoutStatus
-            status={scoutStatus}
-            collapsed={effectiveCollapsed}
-            onPlayerSearch={onScoutPlayerSearch}
-            onRestore={onScoutStatusClick}
-          />
-        </nav>
-
-        <div className="app-shell-sidebar-footer">
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              title={effectiveCollapsed ? '设置' : undefined}
-              data-active={settingsOpen ? 'true' : 'false'}
-              className="app-shell-nav-item"
-            >
-              <Settings className="app-shell-nav-icon" />
-              {!effectiveCollapsed && <span className="truncate">设置</span>}
-            </button>
-          )}
-        </div>
-      </aside>
-
-      <div className="app-shell-workspace" style={{ width: `${workspaceWidth}px` }}>
-        <header className={`app-shell-header ${friendPanelHidden ? 'app-shell-header--friend-hidden' : ''}`}>
-          {headerExtra ? (
-            <div className="app-shell-header-interactive">{headerExtra}</div>
-          ) : (
-            <span className="app-shell-header-title">{title}</span>
-          )}
-          <div className="app-shell-header-drag-region" aria-hidden="true" />
-          {(onOpenSavedMatches || onOpenFollowAccounts || onOpenChatSessions || onOpenFriendManager || onToggleFriendPanel) && (
-            <div className="app-shell-header-actions">
-              {onOpenSavedMatches && (
-                <button
-                  type="button"
-                  onClick={onOpenSavedMatches}
-                  data-active={savedMatchesOpen ? 'true' : 'false'}
-                  className="app-shell-icon-action"
-                  title="保存的战绩"
-                  aria-label="保存的战绩"
-                >
-                  <BookmarkCheck className="size-4" />
-                </button>
-              )}
-              {onOpenFollowAccounts && (
-                <button
-                  type="button"
-                  onClick={onOpenFollowAccounts}
-                  data-active={followAccountsOpen ? 'true' : 'false'}
-                  className="app-shell-icon-action"
-                  title="关注账号"
-                  aria-label="关注账号"
-                >
-                  <Bell className="size-4" />
-                  {followAlertCount > 0 && (
-                    <span className="app-shell-alert-badge">
-                      {followAlertCount > 99 ? '99+' : followAlertCount}
-                    </span>
-                  )}
-                </button>
-              )}
-              {onOpenChatSessions && (
-                <button
-                  type="button"
-                  onClick={onOpenChatSessions}
-                  data-active={chatSessionsOpen ? 'true' : 'false'}
-                  className="app-shell-icon-action"
-                  title="会话管理"
-                  aria-label="会话管理"
-                >
-                  <MessageCircleMore className="size-4" />
-                </button>
-              )}
-              {onOpenFriendManager && (
-                <button
-                  type="button"
-                  onClick={onOpenFriendManager}
-                  data-active={friendManagerOpen ? 'true' : 'false'}
-                  className="app-shell-icon-action"
-                  title="好友申请"
-                  aria-label="好友申请"
-                >
-                  <MailPlus className="size-4" />
-                  {friendRequestAlertCount > 0 && (
-                    <span className="app-shell-alert-badge">
-                      {friendRequestAlertCount > 99 ? '99+' : friendRequestAlertCount}
-                    </span>
-                  )}
-                </button>
-              )}
-              {onToggleFriendPanel && (
-                <button
-                  type="button"
-                  onClick={onToggleFriendPanel}
-                  data-active={friendPanelHidden ? 'false' : 'true'}
-                  className="app-shell-icon-action"
-                  title={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
-                  aria-label={friendPanelHidden ? '展开好友栏' : '隐藏好友栏'}
-                >
-                  <Users className="size-4" />
-                </button>
+              {item.view === 'scout' && scoutStatus && (
+                <RailScoutStatus status={scoutStatus} onClick={onScoutStatusClick} />
               )}
             </div>
-          )}
+          );
+        })}
+        <span className="shell-rail__spacer" />
+        <button
+          type="button"
+          onClick={() => onNavigate('settings')}
+          title="设置"
+          aria-current={activeView === 'settings' ? 'page' : undefined}
+          className="shell-rail__item"
+        >
+          <Settings />
+          设置
+        </button>
+      </nav>
+
+      <div className="shell-main">
+        <header className="shell-topbar">
+          <span className="shell-topbar__title">{title}</span>
+          {headerExtra && <div className="shell-topbar__extra">{headerExtra}</div>}
+          <div className="shell-topbar__fill" aria-hidden="true" />
+          {search}
+          <div className="shell-topbar__fill" aria-hidden="true" />
+          <span className="shell-conn" data-connected={connection.connected ? 'true' : 'false'} title={connection.connected ? '已连接英雄联盟客户端' : '未检测到英雄联盟客户端'}>
+            <i />
+            {connection.label}
+          </span>
+          <div className="shell-topbar__actions">
+            <button
+              type="button"
+              className="shell-icon-btn"
+              data-active={actions.savedOpen ? 'true' : 'false'}
+              onClick={actions.onOpenSaved}
+              title="保存的战绩"
+              aria-label="保存的战绩"
+            >
+              <BookmarkCheck />
+            </button>
+            <button
+              type="button"
+              className="shell-icon-btn"
+              data-active={actions.followOpen ? 'true' : 'false'}
+              onClick={actions.onOpenFollow}
+              title="关注账号"
+              aria-label={actions.followCount > 0 ? `关注账号，${actions.followCount} 条新对局` : '关注账号'}
+            >
+              <Bell />
+              <AlertBadge count={actions.followCount} />
+            </button>
+            {onOpenChat && (
+              <button
+                type="button"
+                className="shell-icon-btn"
+                data-active={chatOpen ? 'true' : 'false'}
+                onClick={onOpenChat}
+                title="会话管理"
+                aria-label="会话管理"
+              >
+                <MessageCircleMore />
+              </button>
+            )}
+            <button
+              type="button"
+              className="shell-icon-btn"
+              data-active={actions.friendRequestsOpen ? 'true' : 'false'}
+              onClick={actions.onOpenFriendRequests}
+              title="好友申请"
+              aria-label={actions.friendRequestCount > 0 ? `好友申请，${actions.friendRequestCount} 条未读` : '好友申请'}
+            >
+              <MailPlus />
+              <AlertBadge count={actions.friendRequestCount} />
+            </button>
+            {friendPanel && (
+              <button
+                type="button"
+                className="shell-icon-btn"
+                data-active={friendDrawerOpen ? 'true' : 'false'}
+                onClick={onToggleFriendDrawer}
+                title={friendDrawerOpen ? '隐藏好友栏' : `展开好友栏${friendOnlineCount ? ` · ${friendOnlineCount} 在线` : ''}`}
+                aria-label={friendDrawerOpen ? '隐藏好友栏' : '展开好友栏'}
+                aria-pressed={friendDrawerOpen}
+              >
+                <Users />
+              </button>
+            )}
+          </div>
         </header>
 
-        <section className="app-shell-frame">
-          <main className={`app-shell-main ${fullBleed ? '' : 'p-8'}`}>
-            <div className={fullBleed ? 'h-full' : 'mx-auto max-w-5xl'}>{children}</div>
+        <div className="shell-body">
+          <main
+            className="shell-page"
+            onPointerDown={drawerMode === 'overlay' ? onCloseFriendDrawer : undefined}
+          >
+            {children}
           </main>
-        </section>
+          {friendPanel && (
+            <aside className="shell-drawer" aria-label="好友" aria-hidden={drawerMode === 'closed'}>
+              {friendPanel}
+            </aside>
+          )}
+        </div>
       </div>
-
-      {friendPanel && (
-        <aside
-          className={`friend-panel-column ${
-            friendPanelHidden ? 'friend-panel-column--hidden' : ''
-          }`}
-        >
-          {friendPanel}
-        </aside>
-      )}
     </div>
   );
 }

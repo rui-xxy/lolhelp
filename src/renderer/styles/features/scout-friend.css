@@ -1,0 +1,280 @@
+@layer components {
+  /* ===========================================================================
+     高手雷达 · 加好友按钮（ScoutFriendButton）
+     orb：贴在卡片头像右下角，悬停向右展开；pill：速览面板顶部。
+     =========================================================================== */
+
+  .scout-friend {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    color: var(--color-text-1);
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    isolation: isolate;
+    transition:
+      background-color 220ms ease,
+      box-shadow 220ms ease,
+      color 220ms ease,
+      transform 220ms var(--ease-ui);
+  }
+
+  .scout-friend[aria-disabled='true'] {
+    cursor: default;
+  }
+
+  .scout-friend__icon {
+    position: relative;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    font-style: normal;
+    transition:
+      background-color 220ms ease,
+      color 220ms ease;
+  }
+
+  .scout-friend__label {
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+  }
+
+  /* 一道斜向的光从左扫到右 */
+  .scout-friend::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      color-mix(in srgb, var(--color-glow) 32%, transparent) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+
+  .scout-friend[data-state='idle']:hover::before,
+  .scout-friend[data-state='idle']:focus-visible::before {
+    animation: scout-friend-sheen 900ms var(--ease-ui);
+  }
+
+  /* 成功时冲出的一圈光 */
+  .scout-friend[data-state='sent']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 70%, transparent);
+    animation: scout-friend-burst 900ms var(--ease-ui) both;
+    pointer-events: none;
+  }
+
+  .scout-friend[data-state='sending'] .scout-friend__icon svg {
+    animation: scout-friend-spin 900ms linear infinite;
+  }
+
+  .scout-friend[data-state='error'] {
+    animation: scout-friend-shake 420ms var(--ease-ui);
+  }
+
+  .scout-friend:focus-visible {
+    outline: none;
+  }
+
+  /* ---------- orb：卡片头像上的小圆钮 ---------- */
+  .scout-friend--orb {
+    position: absolute;
+    bottom: -5px;
+    left: calc(100% - 15px);
+    z-index: 3;
+    height: 20px;
+    background: var(--color-app-surface);
+    color: var(--color-glow);
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 55%, transparent),
+      0 3px 8px -2px color-mix(in srgb, var(--color-shadow) 40%, transparent);
+  }
+
+  .scout-friend--orb .scout-friend__icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .scout-friend--orb .scout-friend__icon svg {
+    width: 11px;
+    height: 11px;
+    stroke-width: 2.4;
+  }
+
+  .scout-friend--orb .scout-friend__label {
+    max-width: 0;
+    padding-right: 0;
+    color: var(--color-text-1);
+    opacity: 0;
+    transition:
+      max-width 280ms var(--ease-ui),
+      padding 280ms var(--ease-ui),
+      opacity 180ms ease;
+  }
+
+  /* 卡片悬停时轻轻呼吸，提示这里能点 */
+  .scout-hit:hover .scout-friend--orb[data-state='idle'] {
+    animation: scout-friend-ping 1.6s ease-out infinite;
+  }
+
+  .scout-friend--orb:hover,
+  .scout-friend--orb:focus-visible,
+  .scout-friend--orb[data-state='sending'],
+  .scout-friend--orb[data-state='error'] {
+    background: color-mix(in srgb, var(--color-glow) 14%, var(--color-app-surface));
+    transform: translateY(-1px);
+  }
+
+  .scout-friend--orb:hover .scout-friend__label,
+  .scout-friend--orb:focus-visible .scout-friend__label,
+  .scout-friend--orb[data-state='sending'] .scout-friend__label,
+  .scout-friend--orb[data-state='error'] .scout-friend__label {
+    max-width: 72px;
+    padding-right: 9px;
+    opacity: 1;
+  }
+
+  .scout-friend--orb[data-state='sent'] {
+    background: var(--color-ok);
+    color: var(--color-app-surface);
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      0 3px 8px -2px color-mix(in srgb, var(--color-ok) 60%, transparent);
+  }
+
+  .scout-friend--orb[data-state='sent']:hover .scout-friend__label {
+    color: var(--color-app-surface);
+  }
+
+  .scout-friend--orb[data-state='error'] {
+    color: var(--color-enemy);
+    box-shadow:
+      0 0 0 2px var(--color-app-surface),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-enemy) 60%, transparent);
+  }
+
+  .scout-friend--orb[data-state='error'] .scout-friend__label {
+    color: var(--color-enemy);
+  }
+
+  /* ---------- pill：速览面板顶部 ---------- */
+  .scout-friend--pill {
+    height: 30px;
+    flex: 0 0 auto;
+    gap: 6px;
+    margin-left: auto;
+    background: color-mix(in srgb, var(--color-glow) 10%, transparent);
+    padding: 0 12px 0 3px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 42%, transparent);
+  }
+
+  .scout-friend--pill .scout-friend__icon {
+    width: 24px;
+    height: 24px;
+    background: var(--color-glow);
+    color: var(--color-app-bg-soft);
+  }
+
+  .scout-friend--pill .scout-friend__icon svg {
+    width: 13px;
+    height: 13px;
+    stroke-width: 2.3;
+  }
+
+  .scout-friend--pill .scout-friend__label {
+    font-size: 12px;
+  }
+
+  .scout-friend--pill[data-state='idle']:hover,
+  .scout-friend--pill[data-state='idle']:focus-visible {
+    background: color-mix(in srgb, var(--color-glow) 18%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 70%, transparent),
+      0 6px 16px -10px color-mix(in srgb, var(--color-glow) 90%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .scout-friend--pill[data-state='sent'] {
+    background: color-mix(in srgb, var(--color-ok) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ok) 50%, transparent);
+  }
+
+  .scout-friend--pill[data-state='sent'] .scout-friend__icon {
+    background: var(--color-ok);
+  }
+
+  .scout-friend--pill[data-state='error'] {
+    background: color-mix(in srgb, var(--color-enemy) 10%, transparent);
+    color: var(--color-enemy);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-enemy) 50%, transparent);
+  }
+
+  .scout-friend--pill[data-state='error'] .scout-friend__icon {
+    background: var(--color-enemy);
+  }
+
+  @keyframes scout-friend-sheen {
+    from {
+      transform: translateX(-120%);
+    }
+
+    to {
+      transform: translateX(120%);
+    }
+  }
+
+  @keyframes scout-friend-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes scout-friend-burst {
+    from {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 70%, transparent);
+    }
+
+    to {
+      box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-ok) 0%, transparent);
+    }
+  }
+
+  @keyframes scout-friend-ping {
+    0% {
+      box-shadow:
+        0 0 0 2px var(--color-app-surface),
+        inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 55%, transparent),
+        0 0 0 2px color-mix(in srgb, var(--color-glow) 45%, transparent);
+    }
+
+    100% {
+      box-shadow:
+        0 0 0 2px var(--color-app-surface),
+        inset 0 0 0 1px color-mix(in srgb, var(--color-glow) 55%, transparent),
+        0 0 0 9px color-mix(in srgb, var(--color-glow) 0%, transparent);
+    }
+  }
+
+  @keyframes scout-friend-shake {
+    20% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(1px); }
+  }
+}

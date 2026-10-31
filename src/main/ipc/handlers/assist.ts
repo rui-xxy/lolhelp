@@ -13,6 +13,7 @@ import {
   lockAssistCurrentChampion,
 } from '../../assist/championGuide';
 import { getAssistProfileIcons } from '../../assist/profileIcons';
+import { getAssistChampionSkins } from '../../assist/skinCatalog';
 import {
   claimAssistReward,
   claimAssistRewards,
@@ -45,6 +46,10 @@ export function registerAssistHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_GET_PROFILE_ICONS,
     () => getAssistProfileIcons(),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ASSIST_GET_CHAMPION_SKINS,
+    (_event, championId?: unknown) => getAssistChampionSkins(Number(championId ?? 0)),
   );
   ipcMain.handle(
     IPC_CHANNELS.ASSIST_LOCK_CURRENT_CHAMPION,

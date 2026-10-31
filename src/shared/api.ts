@@ -337,6 +337,16 @@ export interface AssistProfileIcon {
   icon: string;
 }
 
+// 某个英雄的皮肤（生涯背景用）。splash 是腾讯图床大图，splashFallback 是 CommunityDragon 备用图。
+export interface AssistChampionSkin {
+  id: number;
+  championId: number;
+  name: string;
+  isBase: boolean;
+  splash: string;
+  splashFallback: string;
+}
+
 export interface AssistRuntimeStatus {
   connected: boolean;
   phase: string;
@@ -435,6 +445,7 @@ export interface AssistApi {
   ) => Promise<AssistOperationResult[]>;
   getChampionGuide: (championId?: number) => Promise<AssistChampionGuide>;
   getProfileIcons: () => Promise<AssistProfileIcon[]>;
+  getChampionSkins: (championId: number) => Promise<AssistChampionSkin[]>;
   lockCurrentChampion: () => Promise<AssistOperationResult>;
   applyAccountSettings: () => Promise<AssistOperationResult[]>;
   getLoot: () => Promise<AssistLootSummary>;
@@ -593,6 +604,23 @@ export interface LolConfigProfileSummary {
   updatedAt: number;
   sourceRootPath: string;
   gameResolution: string;
+  // 保存时客户端登录的是哪个号（没登录时为空）。
+  sourceAccount?: string;
+}
+
+// 方案详情：方案里存的全部设置，用来展示「这个方案存了什么」。
+export interface LolConfigProfileDetail extends LolConfigProfileSummary {
+  values: LolConfigValues;
+}
+
+// 一套设置拆成的几块，应用方案时可以只选其中几块。
+export type LolConfigPart = 'video' | 'controls' | 'interface' | 'combat' | 'audio' | 'hotkeys' | 'client';
+
+// 读取配置时客户端的状态：设置会应用到哪个号、现在能不能写。
+export interface LolConfigClientState {
+  connected: boolean;
+  summonerName: string;
+  phase: string;
 }
 
 export interface LolConfigState {
@@ -602,6 +630,7 @@ export interface LolConfigState {
   files: LolConfigFileStatus[];
   profiles: LolConfigProfileSummary[];
   warnings: string[];
+  client?: LolConfigClientState;
 }
 
 export interface LolConfigApplyResult {
@@ -626,6 +655,8 @@ export interface LolConfigApplyValuesRequest {
 export interface LolConfigApplyProfileRequest {
   profileId: string;
   rootPath?: string;
+  // 只应用这几块；不传就是全部。
+  parts?: LolConfigPart[];
 }
 
 export interface LolConfigApi {
@@ -636,6 +667,7 @@ export interface LolConfigApi {
   saveProfile: (req: LolConfigSaveProfileRequest) => Promise<LolConfigProfileSummary[]>;
   applyProfile: (req: LolConfigApplyProfileRequest) => Promise<LolConfigApplyResult>;
   deleteProfile: (profileId: string) => Promise<LolConfigProfileSummary[]>;
+  getProfile: (profileId: string) => Promise<LolConfigProfileDetail | null>;
 }
 
 // 英雄摘要（给前端英雄选择器用，来自 heroData 的 HeroSummary 映射）
@@ -749,6 +781,9 @@ export interface LiveBattleInfo {
   myTeam: LiveBattlePlayer[];
   enemyTeam: LiveBattlePlayer[];
   error?: string;
+  // 对局会话编号：每开始一局新的（或离开对局重置）就加一。
+  // 前端据此判断手里的名单是不是上一局的，旧会话的数据一律丢弃。
+  session?: number;
 }
 
 export interface LiveStateChangeEvent {
@@ -759,10 +794,11 @@ export interface LiveStateChangeEvent {
   at: number;
 }
 
-export type LiveBattleUpdateEvent =
+export type LiveBattleUpdateEvent = (
   | { type: 'player'; side: 'my' | 'enemy'; puuid: string; player: LiveBattlePlayer }
   | { type: 'removed'; puuid: string }
-  | { type: 'reset' };
+  | { type: 'reset' }
+) & { session?: number };
 
 // live 域 API 契约
 export interface LiveApi {
@@ -773,8 +809,14 @@ export interface LiveApi {
 }
 
 // window 域：窗口控制
+export interface WindowChromeColors {
+  color: string; // 顶栏 / 窗口底色，#RRGGBB
+  symbolColor: string; // 右上角最小化/关闭按钮的图标颜色，#RRGGBB
+}
+
 export interface WindowApi {
   setWidth: (width: number) => Promise<void>;
+  setChrome: (chrome: WindowChromeColors) => Promise<void>;
 }
 
 // ============================================================================
@@ -1052,6 +1094,47 @@ export interface PlayerLookupRequest {
   tag?: string; // 模式筛选（q_420 单排/q_450 大乱斗/q_2400 海克斯大乱斗 等），不传=全部
 }
 
+// 战绩速览（高手雷达点卡片时用）：只请求一次 SGP 列表，只回传列表要显示的字段，
+// 不带装备、符文、伤害等明细，常一起玩的队友也在主进程算好。
+export interface PlayerMatchBriefRequest {
+  puuid: string;
+  region?: string;
+  count?: number; // 默认 20，最多 40
+}
+
+export interface PlayerMatchBriefMate {
+  puuid: string;
+  riotId: string;
+  profileIconId: number;
+  profileIconUrl: string;
+  count: number; // 同队出现的场数（≥2 才算常一起玩）
+}
+
+export interface PlayerMatchBrief {
+  gameId: number;
+  queueId: number;
+  queueName: string;
+  gameCreation: number;
+  gameDuration: number;
+  championId: number;
+  championName: string;
+  championAvatar: string;
+  championSplashUrl?: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  win: boolean;
+  mates: string[]; // 本局同队里「常一起玩」的人（puuid，对应 PlayerMatchBriefResult.mates）
+}
+
+export interface PlayerMatchBriefResult {
+  puuid: string;
+  matches: PlayerMatchBrief[];
+  mates: PlayerMatchBriefMate[];
+  error?: string;
+}
+
 // 战绩查询结果
 export interface PlayerLookupResult {
   profile: PlayerProfile;
@@ -1174,6 +1257,7 @@ export interface ReplayAvailabilityRequest {
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
+  getMatchBriefs: (req: PlayerMatchBriefRequest) => Promise<PlayerMatchBriefResult>;
   getPlayerRanks: (puuid: string, region?: string) => Promise<PlayerRankSummary[]>;
   getSavedMatchesSummary: () => Promise<SavedMatchesSummary>;
   getSavedMatchesCatalog: () => Promise<SavedMatchesCatalog>;

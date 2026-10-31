@@ -12,15 +12,15 @@
     --lol-muted: #8d9aa5;
     overflow: hidden;
     border: 1px solid rgba(196, 164, 95, 0.28);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     background:
       radial-gradient(circle at 72% 16%, rgba(17, 105, 130, 0.36), transparent 36%),
       radial-gradient(circle at 8% 22%, rgba(7, 41, 62, 0.92), transparent 28%),
       linear-gradient(135deg, var(--lol-bg) 0%, var(--lol-bg-2) 48%, #031018 100%);
     color: var(--lol-text);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 16px 42px rgba(0, 0, 0, 0.16);
+      inset 0 1px 0 color-mix(in srgb, var(--color-text-1) 5%, transparent),
+      0 16px 42px color-mix(in srgb, var(--color-shadow) 16%, transparent);
   }
 
   .lol-postgame-empty {
@@ -38,7 +38,7 @@
     padding: 16px 18px;
     background:
       linear-gradient(90deg, rgba(1, 10, 19, 0.7), rgba(6, 37, 54, 0.45)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent);
+      linear-gradient(180deg, color-mix(in srgb, var(--color-text-1) 3.5%, transparent), transparent);
   }
 
   .lol-postgame-result-mark {
@@ -48,7 +48,7 @@
     flex: 0 0 auto;
     place-items: center;
     border: 1px solid rgba(200, 170, 110, 0.7);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     background: rgba(1, 10, 19, 0.56);
     box-shadow: inset 0 0 18px rgba(200, 170, 110, 0.12);
     transform: rotate(-45deg);
@@ -132,7 +132,7 @@
   .lol-postgame-replay__notice {
     max-width: 220px;
     overflow: hidden;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 14px;
     text-overflow: ellipsis;
@@ -156,10 +156,10 @@
     gap: 5px;
     padding: 0 9px;
     border: 1px solid var(--color-app-border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-app-surface);
     color: var(--color-app-muted);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 650;
     line-height: 1;
     white-space: nowrap;
@@ -191,7 +191,7 @@
     color: var(--color-app-primary);
     box-shadow:
       0 1px 2px rgba(112, 23, 43, 0.06),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.48);
+      inset 0 0 0 1px color-mix(in srgb, var(--color-text-1) 48%, transparent);
   }
 
   .lol-postgame-replay__button:disabled {
@@ -221,7 +221,7 @@
   .lol-score-team {
     overflow: hidden;
     border: 1px solid rgba(200, 170, 110, 0.18);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: rgba(1, 10, 19, 0.28);
   }
 
@@ -232,7 +232,7 @@
     min-height: 32px;
     border-bottom: 1px solid rgba(200, 170, 110, 0.18);
     padding: 0 12px;
-    background: rgba(255, 255, 255, 0.035);
+    background: color-mix(in srgb, var(--color-text-1) 3.5%, transparent);
     color: var(--lol-muted);
     font-size: 12px;
     font-weight: 700;
@@ -261,7 +261,7 @@
 
   .lol-score-team-result {
     color: var(--lol-gold-bright);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.04em;
   }
 
@@ -301,7 +301,7 @@
   }
 
   .lol-score-row:hover {
-    background: rgba(255, 255, 255, 0.045);
+    background: color-mix(in srgb, var(--color-text-1) 4.5%, transparent);
   }
 
   .lol-score-row--target {
@@ -348,7 +348,7 @@
     border-radius: 999px;
     background: #010a13;
     color: var(--lol-gold-bright);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 800;
   }
 
@@ -408,7 +408,7 @@
     height: 24px;
     border: 1px solid rgba(200, 170, 110, 0.22);
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.035);
+    background: color-mix(in srgb, var(--color-text-1) 3.5%, transparent);
   }
 
   .lol-score-empty {
@@ -431,7 +431,7 @@
     display: block;
     margin-top: 2px;
     color: rgba(214, 208, 196, 0.56);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-score-number {
@@ -450,7 +450,7 @@
   .lol-overview-team,
   .lol-overview-card {
     border: 1px solid rgba(200, 170, 110, 0.22);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     background: rgba(1, 10, 19, 0.32);
   }
 
@@ -483,9 +483,9 @@
   }
 
   .lol-overview-team-grid div {
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     padding: 10px;
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--color-text-1) 4%, transparent);
   }
 
   .lol-overview-team-grid span,
@@ -573,7 +573,7 @@
     border-top: 1px solid rgba(200, 170, 110, 0.16);
     border-bottom: 1px solid rgba(200, 170, 110, 0.12);
     padding: 7px 10px;
-    background: rgba(255, 255, 255, 0.055);
+    background: color-mix(in srgb, var(--color-text-1) 5.5%, transparent);
     color: var(--lol-gold-bright);
     font-size: 12px;
     font-weight: 800;
@@ -706,7 +706,7 @@
     gap: 12px;
     min-height: 54px;
     border: 1px solid rgba(200, 170, 110, 0.14);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 9px 12px;
     background: rgba(1, 10, 19, 0.28);
   }
@@ -855,7 +855,7 @@
   }
 
   .lol-score-row:hover {
-    background: rgba(247, 248, 248, 0.05);
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
   }
 
   .lol-score-row--target {
@@ -870,8 +870,8 @@
 
   .lol-score-champion img,
   .lol-score-champion > span:first-child {
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: rgba(0, 0, 0, 0.05) 0 0 0 1px;
+    border: 1px solid color-mix(in srgb, var(--color-shadow) 6%, transparent);
+    box-shadow: color-mix(in srgb, var(--color-shadow) 5%, transparent) 0 0 0 1px;
   }
 
   .lol-score-champion > span:last-child {
@@ -1078,7 +1078,7 @@
   .lol-score-grid--head {
     min-height: 24px;
     padding: 0 8px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-score-row {
@@ -1105,7 +1105,7 @@
     bottom: -2px;
     min-width: 15px;
     height: 15px;
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .lol-score-player-name {
@@ -1116,7 +1116,7 @@
   .lol-score-player-copy span,
   .lol-score-kda span {
     margin-top: 0;
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .lol-score-runes,
@@ -1182,7 +1182,7 @@
 
   .lol-stats-row {
     min-height: 24px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-stats-label {
@@ -1190,7 +1190,7 @@
   }
 
   .lol-stats-value {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-charts {
@@ -1271,13 +1271,13 @@
 
   .lol-score-row {
     border-bottom: 0;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: transparent;
     padding-inline: 0;
   }
 
   .lol-score-row:hover {
-    background: rgba(247, 248, 248, 0.05);
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
   }
 
   .lol-score-row--target {
@@ -1296,7 +1296,7 @@
   .lol-runes-all img,
   .lol-score-item-empty {
     border-color: transparent;
-    background: rgba(0, 0, 0, 0.035);
+    background: color-mix(in srgb, var(--color-shadow) 3.5%, transparent);
   }
 
   .lol-stats-grid--icons,
@@ -1307,8 +1307,8 @@
   }
 
   .lol-stats-group-title {
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.035);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-shadow) 3.5%, transparent);
   }
 
   .lol-chart-track {
@@ -1325,7 +1325,7 @@
     border: 1px solid rgba(84, 90, 96, 0.9);
     border-radius: 0;
     background: #15191e;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-shadow) 22%, transparent);
   }
 
   .lol-score-enhancement--augment {
@@ -1355,7 +1355,7 @@
     -webkit-mask-size: contain;
     mask-size: contain;
     filter:
-      drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45))
+      drop-shadow(0 1px 0 color-mix(in srgb, var(--color-shadow) 45%, transparent))
       drop-shadow(0 0 2px currentColor);
   }
 
@@ -1419,7 +1419,7 @@
 
   .lol-score-enhancement--empty {
     border-color: rgba(170, 170, 170, 0.46);
-    background: rgba(0, 0, 0, 0.04);
+    background: color-mix(in srgb, var(--color-shadow) 4%, transparent);
     box-shadow: none;
   }
 }
@@ -1465,7 +1465,7 @@
   .lol-score-champion > span:last-child {
     min-width: 17px;
     height: 17px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-score-player-name {
@@ -1474,7 +1474,7 @@
   }
 
   .lol-score-player-copy span {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .lol-score-runes {

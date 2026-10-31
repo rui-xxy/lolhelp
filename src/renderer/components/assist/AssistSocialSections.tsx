@@ -1,16 +1,36 @@
+import { useMemo, useState } from 'react';
+import { Eye, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 import type {
   AssistOperationResult,
   AssistSettings,
   FriendInfo,
 } from '../../../shared/api';
 import {
-  ActionButton,
-  SelectInput,
-  SettingCard,
-  TextInput,
+  Btn,
+  ChipChoices,
+  Empty,
+  Field,
+  Panel,
+  PanelBody,
+  PanelFoot,
 } from './AssistControls';
+import { PRESENCE_OPTIONS, friendStatus, localizeAssistMessage } from './assistText';
 
 type UpdateAssist = (updater: (assist: AssistSettings) => AssistSettings) => void;
+
+type FriendFilter = 'all' | 'online' | 'game' | 'offline';
+
+const SIGNATURE_LIMIT = 100;
+
+function friendRiotId(friend: FriendInfo): string {
+  return friend.gameTag ? `${friend.gameName}#${friend.gameTag}` : friend.gameName;
+}
+
+function friendGroup(friend: FriendInfo): string {
+  const group = String(friend.groupName ?? '');
+  if (!group || group.startsWith('**')) return '';
+  return group;
+}
 
 export function FriendsSection({
   assist,
@@ -37,119 +57,215 @@ export function FriendsSection({
   deleteSelectedFriends: () => void;
   setOperationState: (message: string) => void;
 }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<FriendFilter>('all');
+  const [refreshing, setRefreshing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const presence = PRESENCE_OPTIONS.find((option) => option.value === assist.preferredPresence) ?? PRESENCE_OPTIONS[0];
+
+  const rows = useMemo(() => friends.map((friend) => ({ friend, status: friendStatus(friend) })), [friends]);
+  const counts = useMemo(() => ({
+    all: rows.length,
+    online: rows.filter(({ status }) => status.tone !== 'muted').length,
+    game: rows.filter(({ status }) => status.inGame).length,
+    offline: rows.filter(({ status }) => status.tone === 'muted').length,
+  }), [rows]);
+
+  const visible = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return rows.filter(({ friend, status }) => {
+      if (filter === 'online' && status.tone === 'muted') return false;
+      if (filter === 'game' && !status.inGame) return false;
+      if (filter === 'offline' && status.tone !== 'muted') return false;
+      if (!keyword) return true;
+      return [friend.gameName, friend.gameTag, friend.note, friendGroup(friend)]
+        .some((text) => String(text ?? '').toLowerCase().includes(keyword));
+    });
+  }, [filter, query, rows]);
+
+  const visibleIds = visible.map(({ friend }) => friend.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedFriendIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedFriendIds.has(id));
+
   return (
     <>
-      <SettingCard
-        title="好友展示设置"
-        description="好友列表仍在右侧常驻，这里控制你自己的在线展示。"
-      >
-        <div className="grid grid-cols-[160px_1fr] items-center gap-3">
-          <span className="text-sm text-app-body">在线状态</span>
-          <SelectInput
-            value={assist.preferredPresence}
-            options={[
-              ['auto', '跟随客户端'],
-              ['chat', '在线'],
-              ['away', '离开'],
-              ['dnd', '游戏中 / 请勿打扰'],
-              ['offline', '离线'],
-            ]}
-            onChange={(value) => updateAssist((next) => ({
-              ...next,
-              preferredPresence: value,
-            }))}
-          />
-        </div>
-        <div className="grid grid-cols-[160px_1fr] items-center gap-3">
-          <span className="text-sm text-app-body">个人签名</span>
-          <TextInput
-            value={assist.statusMessage}
-            placeholder="最长 100 字"
-            onChange={(value) => updateAssist((next) => ({
-              ...next,
-              statusMessage: value,
-            }))}
-          />
-        </div>
-        <ActionButton
-          onClick={() => void runOperation(() =>
-            window.lolHelper.assist.applyAccountSettings())}
-        >
-          立即应用在线状态和签名
-        </ActionButton>
-      </SettingCard>
-
-      <SettingCard
-        title={`好友管理（${friends.length}）`}
-        description="可查看状态、观战游戏中的好友，或批量删除。"
-      >
-        <div className="flex items-center gap-2">
-          <ActionButton onClick={() => void refreshFriends()}>刷新好友</ActionButton>
-          <span className="ml-auto text-[11px] text-app-muted">
-            已选择 {selectedFriendIds.size} 位
-          </span>
-          <button
-            type="button"
-            onClick={deleteSelectedFriends}
-            disabled={selectedFriendIds.size === 0}
-            className="h-8 rounded-sm px-3 text-xs font-medium text-app-danger transition-colors hover:bg-app-danger/5 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            删除选中
-          </button>
-        </div>
-        <div className="max-h-[390px] overflow-y-auto rounded-sm border border-app-border bg-app-surface divide-y divide-app-border/70">
-          {friends.length === 0 && (
-            <div className="flex h-28 items-center justify-center text-xs text-app-muted">
-              暂未读取到好友
-            </div>
-          )}
-          {friends.map((friend) => {
-            const riotId = friend.gameTag
-              ? `${friend.gameName}#${friend.gameTag}`
-              : friend.gameName;
-            return (
-              <label
-                key={friend.id}
-                className="group flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 transition-colors hover:bg-app-bg-soft/80"
-              >
+      <Panel title="我的在线状态" description="决定好友列表里别人看到你是什么状态，以及你的个人签名。">
+        <PanelBody>
+          <div className="as-fields">
+            <Field label="显示为" hint={presence.hint} wide>
+              <ChipChoices
+                label="在线状态"
+                value={presence.value}
+                options={PRESENCE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: (
+                    <>
+                      <i className="as-dot" data-tone={option.tone === 'muted' ? undefined : option.tone} />
+                      {option.label}
+                    </>
+                  ),
+                }))}
+                onChange={(value) => updateAssist((next) => ({ ...next, preferredPresence: value }))}
+              />
+            </Field>
+            <Field label="个人签名" optional hint="显示在你名字下面，留空就不改。" wide>
+              <div className="as-input-wrap">
                 <input
-                  type="checkbox"
-                  className="size-3.5 accent-app-primary"
-                  checked={selectedFriendIds.has(friend.id)}
-                  onChange={(event) => setSelectedFriendIds((current) => {
-                    const next = new Set(current);
-                    if (event.target.checked) next.add(friend.id);
-                    else next.delete(friend.id);
-                    return next;
-                  })}
+                  className="as-input"
+                  value={assist.statusMessage}
+                  maxLength={SIGNATURE_LIMIT}
+                  placeholder="例如：只玩大乱斗，来就开"
+                  onChange={(event) => updateAssist((next) => ({ ...next, statusMessage: event.target.value }))}
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium text-app-text group-hover:text-app-primary">
-                    {friend.note || riotId}
-                  </div>
-                  <div className="truncate text-[11px] text-app-muted">
-                    {riotId !== (friend.note || riotId) ? `${riotId} · ` : ''}
-                    {friend.lol?.gameQueueName || friend.lol?.gameStatus || friend.availability}
-                  </div>
-                </div>
-                {friend.lol?.gameStatus === 'inGame' && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void window.lolHelper.lcu.spectateFriend(friend.puuid)
-                        .then((result) => setOperationState(result.message));
-                    }}
-                    className="h-7 rounded-sm px-2 text-[11px] font-medium text-app-link hover:bg-app-primary-soft"
-                  >
-                    观战
-                  </button>
-                )}
-              </label>
-            );
-          })}
+                <small>{assist.statusMessage.length}/{SIGNATURE_LIMIT}</small>
+              </div>
+            </Field>
+          </div>
+        </PanelBody>
+        <PanelFoot note="选择会自动记住；点「应用」之后，客户端里才会改过来。">
+          <Btn
+            tone="primary"
+            busy={applying}
+            onClick={() => {
+              setApplying(true);
+              void runOperation(() => window.lolHelper.assist.applyAccountSettings())
+                .finally(() => setApplying(false));
+            }}
+          >
+            应用
+          </Btn>
+        </PanelFoot>
+      </Panel>
+
+      <Panel
+        title="好友"
+        count={friends.length}
+        description="游戏中的好友可以直接观战；不常联系的可以勾选后一起删除。"
+        extra={(
+          <Btn
+            size="sm"
+            busy={refreshing}
+            onClick={() => {
+              setRefreshing(true);
+              void refreshFriends().finally(() => setRefreshing(false));
+            }}
+          >
+            {!refreshing && <RefreshCw />}
+            刷新
+          </Btn>
+        )}
+      >
+        <div className="as-toolbar">
+          <div className="as-search">
+            <Search />
+            <input
+              className="as-input"
+              value={query}
+              placeholder="搜名字、备注、分组"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <ChipChoices<FriendFilter>
+            label="筛选好友"
+            value={filter}
+            options={[
+              { value: 'all', label: `全部 ${counts.all}` },
+              { value: 'online', label: `在线 ${counts.online}` },
+              { value: 'game', label: `游戏中 ${counts.game}` },
+              { value: 'offline', label: `离线 ${counts.offline}` },
+            ]}
+            onChange={setFilter}
+          />
         </div>
-      </SettingCard>
+
+        {friends.length === 0 ? (
+          <Empty icon={<Users />} title="还没读到好友">打开英雄联盟客户端后点「刷新」。</Empty>
+        ) : visible.length === 0 ? (
+          <Empty icon={<Search />} title="没有符合条件的好友">换个关键词或筛选试试。</Empty>
+        ) : (
+          <div className="as-friend-list">
+            {visible.map(({ friend, status }) => {
+              const riotId = friendRiotId(friend);
+              const selected = selectedFriendIds.has(friend.id);
+              const group = friendGroup(friend);
+              return (
+                <label key={friend.id} className="as-friend" data-selected={selected ? 'true' : undefined}>
+                  <input
+                    type="checkbox"
+                    className="as-check"
+                    checked={selected}
+                    onChange={(event) => setSelectedFriendIds((current) => {
+                      const next = new Set(current);
+                      if (event.target.checked) next.add(friend.id);
+                      else next.delete(friend.id);
+                      return next;
+                    })}
+                  />
+                  <span className="as-friend__avatar">
+                    {friend.iconUrl ? <img src={friend.iconUrl} alt="" loading="lazy" /> : <span />}
+                    <i className="as-dot" data-tone={status.tone === 'muted' ? undefined : status.tone} />
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="as-friend__name">
+                      <b>{friend.note || friend.gameName || riotId}</b>
+                      <small>{friend.note ? riotId : friend.gameTag ? `#${friend.gameTag}` : ''}</small>
+                    </div>
+                    <div className="as-friend__status">
+                      <span>{status.text}</span>
+                      {group && <span className="as-friend__group">{group}</span>}
+                    </div>
+                  </div>
+                  {status.inGame ? (
+                    <Btn
+                      size="sm"
+                      tone="ghost"
+                      onClick={() => void window.lolHelper.lcu.spectateFriend(friend.puuid)
+                        .then((result) => setOperationState(localizeAssistMessage(result.message)))}
+                    >
+                      <Eye />
+                      观战
+                    </Btn>
+                  ) : <span />}
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        {friends.length > 0 && (
+          <div className="as-selection">
+            <label className="as-status" style={{ cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="as-check"
+                checked={allVisibleSelected}
+                ref={(element) => {
+                  if (element) element.indeterminate = !allVisibleSelected && someVisibleSelected;
+                }}
+                onChange={(event) => setSelectedFriendIds((current) => {
+                  const next = new Set(current);
+                  visibleIds.forEach((id) => {
+                    if (event.target.checked) next.add(id);
+                    else next.delete(id);
+                  });
+                  return next;
+                })}
+              />
+              全选当前列表
+            </label>
+            <p>
+              {selectedFriendIds.size > 0 ? <>已选<b>{selectedFriendIds.size}</b>位好友</> : '勾选好友后可以一起删除'}
+            </p>
+            {selectedFriendIds.size > 0 && (
+              <Btn tone="ghost" onClick={() => setSelectedFriendIds(() => new Set())}>取消选择</Btn>
+            )}
+            <Btn tone="danger" onClick={deleteSelectedFriends} disabled={selectedFriendIds.size === 0}>
+              <Trash2 />
+              删除所选
+            </Btn>
+          </div>
+        )}
+      </Panel>
     </>
   );
 }

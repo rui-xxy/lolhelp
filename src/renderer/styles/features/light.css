@@ -1,0 +1,151 @@
+/* =============================================================================
+   浅色模式下的文字颜色修正：老样式里有不少写死的浅色文字（为深色底设计），
+   放到浅色底上会看不清。这里把它们换成同色相、更深的版本。
+   深色写死的浮层底色（提示框等）也换成浅色面板。只覆盖颜色，不动布局。
+   ============================================================================= */
+@layer components {
+  /* features/friends.css */
+  :root[data-mode="light"] .friend-row-timer { color: #3F6AA1; }
+  :root[data-mode="light"] .friend-status--ranked-solo { color: #4068AA; }
+  :root[data-mode="light"] .friend-status--ranked-flex { color: #6756A9; }
+  :root[data-mode="light"] .friend-status--normal-game { color: #007E3B; }
+  :root[data-mode="light"] .friend-status--aram { color: #007690; }
+  :root[data-mode="light"] .friend-status--arena { color: #854AA7; }
+  :root[data-mode="light"] .friend-status--tft { color: #007C72; }
+  :root[data-mode="light"] .friend-status--queue { color: #6A6B52; }
+  :root[data-mode="light"] .friend-status--champ-select { color: #A6425D; }
+  :root[data-mode="light"] .friend-status--lobby, :root[data-mode="light"] .friend-status--online { color: #007E3B; }
+  :root[data-mode="light"] .friend-status--offline { color: #636363; }
+  /* features/matches/history.css */
+  :root[data-mode="light"] .player-detail-name--premade-amber { color: #965900; }
+  :root[data-mode="light"] .player-detail-name--premade-cyan { color: #007891; }
+  :root[data-mode="light"] .player-detail-name--premade-violet { color: #7653AB; }
+  :root[data-mode="light"] .player-detail-name--premade-rose { color: #A34364; }
+  :root[data-mode="light"] .player-detail-name--premade-emerald { color: #00814F; }
+  /* features/scout.css */
+  :root[data-mode="light"] .scout-network-count b { color: #3B7281; }
+  :root[data-mode="light"] .scout-network-tooltip > span { color: #386F95; }
+  :root[data-mode="light"] .scout-network-feed { background: var(--color-app-elevated); }
+  :root[data-mode="light"] .scout-network-feed__header b { color: #4A6F7D; }
+  :root[data-mode="light"] .scout-network-feed__waiting svg { color: #3B5B65; }
+  :root[data-mode="light"] .scout-network-feed__item.is-checking .scout-network-feed__state { color: #3A7187; }
+  /* features/matches/detail.css */
+  :root[data-mode="light"] .lol-score-player-name { color: #534C3F; }
+  :root[data-mode="light"] .lol-score-player-copy span { color: rgb(82 76 66 / 0.72); }
+  :root[data-mode="light"] .lol-score-empty { color: rgb(82 76 66 / 0.58); }
+  :root[data-mode="light"] .lol-score-kda strong { color: var(--color-text-1); }
+  :root[data-mode="light"] .lol-score-kda span { color: rgb(82 76 66 / 0.7); }
+  :root[data-mode="light"] .lol-score-number { color: var(--color-text-1); }
+  :root[data-mode="light"] .lol-overview-team-grid strong { color: #514D42; }
+  :root[data-mode="light"] .lol-overview-card strong { color: #514D42; }
+  :root[data-mode="light"] .lol-chart-row > span { color: rgb(82 76 66 / 0.9); }
+  :root[data-mode="light"] .lol-runes-player button { color: #514D42; }
+  :root[data-mode="light"] .lol-score-enhancement { background: var(--color-app-elevated); }
+  /* features/matches/scoreboard.css */
+  :root[data-mode="light"] .lol-rift-team-bar { color: #5C646D; }
+  :root[data-mode="light"] .lol-rift-team-total { color: #484E55; }
+  :root[data-mode="light"] .lol-rift-player-name { color: #514D44; }
+  :root[data-mode="light"] .lol-rift-grid--head { color: #5E646D; }
+  :root[data-mode="light"] .lol-rift-rank { color: #5B646F; }
+  :root[data-mode="light"] .lol-rift-kda, :root[data-mode="light"] .lol-rift-damage { color: var(--color-text-1); }
+  :root[data-mode="light"] .lol-rift-damage { color: var(--color-text-1); }
+  /* features/ranking.css */
+  :root[data-mode="light"] .ranking-chapter-switch button:first-child.is-active > svg { color: #007C6C; }
+  /* features/mayhem.css */
+  :root[data-mode="light"] .mayhem-content-tabs button.is-active svg { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-augment-summary > span { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-removed-toggle:hover, :root[data-mode="light"] .mayhem-removed-toggle.is-active { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-augment-rank { color: #6A6258; }
+  :root[data-mode="light"] .mayhem-augment-icon { background: var(--color-app-elevated); }
+  :root[data-mode="light"] .mayhem-augment-identity small em { color: #A14662; }
+  :root[data-mode="light"] .mayhem-augment-rate.is-win { color: #007D60; }
+  :root[data-mode="light"] .mayhem-combo-rank { color: #6A6258; }
+  :root[data-mode="light"] .mayhem-combo-portraits .is-augment { background: var(--color-app-elevated); }
+  :root[data-mode="light"] .mayhem-combo-names > span { color: #775D86; }
+  :root[data-mode="light"] .mayhem-combo-names b { color: #925362; }
+  :root[data-mode="light"] .mayhem-combo-names em { color: #007C6D; }
+  :root[data-mode="light"] .mayhem-combo-names i { color: #8C5F00; }
+  :root[data-mode="light"] .mayhem-combo-description { color: #484E55; }
+  :root[data-mode="light"] .mayhem-combo-row:hover .mayhem-combo-votes { color: #7A5A89; }
+  :root[data-mode="light"] .mayhem-combo-page-status span { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-combo-page-controls button { color: #686358; }
+  :root[data-mode="light"] .mayhem-combo-page-controls button:hover:not(:disabled) { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-role-filter button.is-active { color: #087A6B; }
+  :root[data-mode="light"] .mayhem-list-summary > span { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-profile-copy > span { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-profile-balance [data-direction="down"] strong { color: #A6425D; }
+  :root[data-mode="light"] .mayhem-profile-balance [data-direction="up"] strong { color: #007D60; }
+  :root[data-mode="light"] .mayhem-section-kicker { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-skill-summary strong { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-build-option-stats strong { color: #007D60; }
+  :root[data-mode="light"] .mayhem-augment-row small { color: #5B646F; }
+  :root[data-mode="light"] .mayhem-skill-priority { color: #007C6C; }
+  :root[data-mode="light"] .mayhem-loading-orbit { color: #007C6C; }
+  /* features/matches/analytics.css */
+  :root[data-mode="light"] .lol-event > time { color: #5B656D; }
+  :root[data-mode="light"] .lol-event > .lol-event__dot { background: var(--color-app-elevated); }
+  :root[data-mode="light"] .lol-event__participants { color: #5D646B; }
+  :root[data-mode="light"] .lol-event__damage em { color: #AE3952; }
+  :root[data-mode="light"] .lol-events__filters > strong { color: #5C646C; }
+  :root[data-mode="light"] .lol-events__filters > label { color: #4A4D51; }
+  :root[data-mode="light"] .lol-events__select-all { color: #007F69; }
+
+  /* 手工补充：大乱斗强度分级的文字色是变量，脚本扫不到 */
+  :root[data-mode="light"] .mayhem-tier-group { --tier-ink: #5D646C; }
+  :root[data-mode="light"] .mayhem-tier-group--Splus { --tier-ink: #B0475F; }
+  :root[data-mode="light"] .mayhem-tier-group--S { --tier-ink: #8C6420; }
+  :root[data-mode="light"] .mayhem-tier-group--A { --tier-ink: #2C7A6A; }
+  :root[data-mode="light"] .mayhem-tier-group--B { --tier-ink: #3B6299; }
+  :root[data-mode="light"] .mayhem-tier-group--C,
+  :root[data-mode="light"] .mayhem-tier-group--D { --tier-ink: #5D646C; }
+
+  /* ---------- 以下为手写部分（不是脚本生成的）---------- */
+  /* 开黑 / 常一起玩的玩家：浅色底上换成更深的同色系，去掉发光（浅底上发光会糊） */
+  :root[data-mode="light"] .lol-rift-row--linked,
+  :root[data-mode="light"] .lol-rift-row--linked-amber,
+  :root[data-mode="light"] .lol-score-player-name--linked-amber {
+    --lol-score-link-color: #93600C;
+    --lol-score-link-soft: rgb(147 96 12 / 0.24);
+    --lol-score-link-glow: transparent;
+  }
+
+  :root[data-mode="light"] .lol-rift-row--linked-cyan,
+  :root[data-mode="light"] .lol-score-player-name--linked-cyan {
+    --lol-score-link-color: #08708A;
+    --lol-score-link-soft: rgb(8 112 138 / 0.22);
+    --lol-score-link-glow: transparent;
+  }
+
+  :root[data-mode="light"] .lol-rift-row--linked-violet,
+  :root[data-mode="light"] .lol-score-player-name--linked-violet {
+    --lol-score-link-color: #6445C4;
+    --lol-score-link-soft: rgb(100 69 196 / 0.22);
+    --lol-score-link-glow: transparent;
+  }
+
+  :root[data-mode="light"] .lol-rift-row--linked-rose,
+  :root[data-mode="light"] .lol-score-player-name--linked-rose {
+    --lol-score-link-color: #B02E59;
+    --lol-score-link-soft: rgb(176 46 89 / 0.22);
+    --lol-score-link-glow: transparent;
+  }
+
+  :root[data-mode="light"] .lol-rift-row--linked-emerald,
+  :root[data-mode="light"] .lol-score-player-name--linked-emerald {
+    --lol-score-link-color: #0C7349;
+    --lol-score-link-soft: rgb(12 115 73 / 0.22);
+    --lol-score-link-glow: transparent;
+  }
+
+  /* 名字用同色（上面的通用浅色修正会把它盖成灰色，这里提高优先级），下面再加一道同色细线 */
+  :root[data-mode="light"] .lol-result-team .lol-rift-row--linked .lol-rift-player-name,
+  :root[data-mode="light"] .lol-result-team .lol-score-player-name--linked {
+    color: var(--lol-score-link-color);
+    font-weight: 800;
+    text-shadow: none;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--lol-score-link-color) 55%, transparent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+}

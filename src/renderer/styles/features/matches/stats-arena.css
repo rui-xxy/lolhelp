@@ -34,26 +34,26 @@
   }
   .match-roster--showcase .match-roster__team-name { display: grid; gap: 5px; writing-mode: horizontal-tb; letter-spacing: normal; font-size: 14px; font-weight: 600; text-align: center; }
   .match-roster--showcase .match-roster__team-name::before { display: none; }
-  .match-roster__team-name > small { font-size: 10px; font-weight: 400; opacity: .8; }
+  .match-roster__team-name > small { font-size: 11px; font-weight: 400; opacity: .8; }
   .match-roster--showcase .match-roster__players { gap: 4px; }
   .match-roster--showcase .match-roster__player { position: relative; padding: 9px 4px 7px; gap: 7px; border-radius: 8px 2px; }
   .match-roster--showcase .match-roster__portrait > img { border: 2px solid color-mix(in srgb, var(--roster-team) 60%, var(--analysis-panel)); padding: 1px; }
   .match-roster--showcase .match-roster__player.is-selected { border-color: var(--arena-gold); background: linear-gradient(145deg, color-mix(in srgb, var(--arena-gold) 15%, transparent), color-mix(in srgb, var(--arena-gold) 3%, transparent)); }
   .match-roster--showcase .is-selected .match-roster__portrait > img { border-color: var(--arena-gold); }
   .match-roster--showcase .match-roster__check { right: -5px; bottom: 12px; background: var(--arena-gold); }
-  .match-roster__level { position: absolute; bottom: -2px; right: -3px; min-width: 17px; padding: 0 2px; border: 1px solid var(--color-app-border-strong); border-radius: 4px; background: var(--analysis-bg); color: var(--color-app-text); font-size: 10px; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
-  .match-roster__status { color: var(--color-app-muted); font-size: 10px; line-height: 1; white-space: nowrap; }
+  .match-roster__level { position: absolute; bottom: -2px; right: -3px; min-width: 17px; padding: 0 2px; border: 1px solid var(--color-app-border-strong); border-radius: var(--radius-xs); background: var(--analysis-bg); color: var(--color-app-text); font-size: 11px; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+  .match-roster__status { color: var(--color-app-muted); font-size: 11px; line-height: 1; white-space: nowrap; }
   .match-roster--showcase .is-selected .match-roster__status { color: var(--arena-gold); }
-  .match-roster__versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--color-app-muted); font-size: 19px; font-family: Georgia, serif; font-style: italic; letter-spacing: .05em; }
+  .match-roster__versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--color-app-muted); font-size: 19px; font-family: var(--font-num); font-style: italic; letter-spacing: .05em; }
   .md-stats__workspace { grid-template-columns: 88px minmax(0, 1fr); }
   .md-stats__categories { padding: 16px 8px; gap: 4px; background: color-mix(in srgb, var(--analysis-panel) 72%, transparent); }
-  .md-stats__categories > button { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 61px; gap: 5px; padding: 7px 2px; border-radius: 5px; font-size: 10px; }
+  .md-stats__categories > button { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 61px; gap: 5px; padding: 7px 2px; border-radius: var(--radius-xs); font-size: 11px; }
   .md-stats__categories > button .lol-riot-art-icon { width: 22px; height: 22px; filter: grayscale(1); opacity: .65; }
   .md-stats__categories > button.is-active { background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 18%, transparent), color-mix(in srgb, var(--analysis-focus) 3%, transparent)); border: 1px solid color-mix(in srgb, var(--analysis-focus) 32%, transparent); color: var(--color-app-text); }
   .md-stats__categories > button.is-active .lol-riot-art-icon { filter: grayscale(.4); opacity: 1; }
   .md-stats__content { padding: 0 24px 24px; }
   .md-stats__overview-heading { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 18px; padding: 20px 0 15px; }
-  .md-stats__overview-heading > div > span { font-size: 9px; letter-spacing: .2em; color: var(--arena-gold); }
+  .md-stats__overview-heading > div > span { font-size: 11px; letter-spacing: .2em; color: var(--arena-gold); }
   .md-stats__overview-heading h2 { margin: 3px 0 0; color: var(--color-app-text); font-size: 22px; font-weight: 600; line-height: 1.2; }
   .md-stats__overview-heading p { margin: 0 0 2px; font-size: 12px; color: var(--color-app-muted); }
   .md-performance { display: grid; grid-template-columns: minmax(0, 1fr) 218px; gap: 14px; margin-bottom: 26px; }
@@ -65,7 +65,7 @@
   .md-performance__label svg { width: 22px; height: 22px; color: var(--arena-gold); stroke-width: 1.5; }
   .md-performance__metric.is-kda .md-stats__summary-context { color: var(--arena-gold); font-size: 13px; }
   .md-performance__standing { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 2px; }
-  .md-performance__standing > span { white-space: nowrap; font-size: 10px; }
+  .md-performance__standing > span { white-space: nowrap; font-size: 11px; }
   .md-performance__standing b { color: var(--arena-gold); font-size: 17px; font-weight: 500; }
   .md-performance__distribution { display: flex; flex: 0 1 65px; align-items: flex-end; gap: 3px; height: 22px; }
   .md-performance__distribution > i { flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--analysis-focus) 23%, transparent); }
@@ -73,12 +73,12 @@
   .md-duel { min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--analysis-focus) 16%, transparent); border-radius: 3px 10px; background: color-mix(in srgb, var(--analysis-panel) 78%, var(--analysis-bg)); }
   .md-duel__heading { display: flex; justify-content: space-between; align-items: center; }
   .md-duel__heading strong { font-size: 12px; font-weight: 600; }
-  .md-duel__heading button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; color: var(--color-app-muted); }
+  .md-duel__heading button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-xs); color: var(--color-app-muted); }
   .md-duel__heading button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
   .md-duel__heading svg { width: 13px; height: 13px; }
   .md-duel__players { display: grid; grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); align-items: center; gap: 5px; margin: 9px 0; }
   .md-duel__players > span { display: grid; justify-items: center; gap: 3px; min-width: 0; }
-  .md-duel__players small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--color-app-muted); }
+  .md-duel__players small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--color-app-muted); }
   .md-duel__players > b { font-size: 11px; color: var(--arena-gold); font-weight: 500; text-align: center; }
   .md-duel dl { display: grid; gap: 3px; margin: 0; }
   .md-duel dl > div { display: flex; justify-content: space-between; border-top: 1px solid var(--analysis-line); padding-top: 3px; font-size: 11px; }
@@ -89,11 +89,11 @@
   .md-duel__empty { display: grid; justify-items: center; align-content: center; gap: 9px; min-height: 140px; text-align: center; }
   .md-duel__empty > svg { width: 24px; height: 24px; color: var(--arena-gold); stroke-width: 1.3; }
   .md-duel__empty p { font-size: 12px; margin: 0; line-height: 1.8; }
-  .md-duel__empty p span { font-size: 10px; color: var(--color-app-muted); }
+  .md-duel__empty p span { font-size: 11px; color: var(--color-app-muted); }
   .md-stats__section-heading { border-left: 2px solid var(--arena-gold); padding-left: 10px; margin-bottom: 14px; }
   .md-stats__section h3 { font-size: 17px; font-weight: 600; }
   .md-stats__column-head { border-radius: 6px 6px 0 0; min-height: 48px; background: color-mix(in srgb, var(--analysis-surface) 72%, var(--analysis-bg)); }
-  .md-stat { margin-top: 4px; border: 1px solid var(--analysis-line); border-radius: 6px; background: color-mix(in srgb, var(--analysis-panel) 64%, transparent); }
+  .md-stat { margin-top: 4px; border: 1px solid var(--analysis-line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--analysis-panel) 64%, transparent); }
   .md-stat__row { min-height: 62px; border-left: 2px solid transparent; }
   .md-stat__row:hover, .md-stat.is-expanded > .md-stat__row { border-left-color: var(--analysis-focus); background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 10%, transparent), transparent); }
   .md-stat__label { display: flex; min-width: 0; align-items: center; gap: 12px; }
@@ -105,7 +105,7 @@
     .md-stats:not(.is-comparing) .md-stats__column-head, .md-stats:not(.is-comparing) .md-stat__row { grid-template-columns: minmax(145px, 1.1fr) minmax(90px, .65fr) 80px minmax(130px, 1fr) 16px; }
     .md-stat__rank, .md-stat__rank-heading { display: flex; align-items: baseline; gap: 5px; color: var(--color-app-muted); font-variant-numeric: tabular-nums; }
     .md-stat__rank b { color: var(--arena-gold); font-size: 17px; font-weight: 500; }
-    .md-stat__rank small { font-size: 10px; }
+    .md-stat__rank small { font-size: 11px; }
     .md-stat__label { font-size: 14px; }
     .md-stats__summary .md-performance__label { font-size: 14px; }
   }
@@ -167,18 +167,18 @@
     .md-stats__header .match-roster--showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
     .match-roster--showcase .match-roster__team { padding: 5px 3px; }
     .match-roster--showcase .match-roster__players { gap: 1px; }
-    .match-roster--showcase .match-roster__name { font-size: 10px; }
+    .match-roster--showcase .match-roster__name { font-size: 11px; }
     .md-stats__categories { padding-inline: 5px; }
-    .md-stats__categories > button { min-height: 58px; font-size: 9px; }
+    .md-stats__categories > button { min-height: 58px; font-size: 11px; }
     .md-stats__overview-heading h2 { font-size: 19px; }
-    .md-stats__overview-heading p { font-size: 10px; }
+    .md-stats__overview-heading p { font-size: 11px; }
     .md-stats__summary { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 0; }
     .md-stats__summary > div { gap: 8px; padding-inline: 8px; }
     .md-stats__summary > div:nth-child(3) { border-left: 1px solid var(--analysis-line); }
     .md-stats__summary strong { font-size: 18px; }
     .md-stats__summary .md-performance__label { font-size: 11px; gap: 5px; }
     .md-performance__label svg { width: 16px; height: 16px; }
-    .md-stats__summary-context, .md-performance__metric.is-kda .md-stats__summary-context { font-size: 10px; }
+    .md-stats__summary-context, .md-performance__metric.is-kda .md-stats__summary-context { font-size: 11px; }
     .md-performance__standing { margin: 0; }
     .md-performance { margin-bottom: 20px; }
     .md-duel { grid-template-columns: 1fr; gap: 6px; }

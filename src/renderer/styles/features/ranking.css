@@ -38,11 +38,11 @@
     align-items: center;
     justify-content: center;
     border: 1px solid rgba(213, 180, 105, 0.14);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     color: var(--color-app-primary);
     background:
       linear-gradient(145deg, rgba(213, 180, 105, 0.12), rgba(178, 213, 243, 0.06)),
-      #fff;
+      var(--color-app-surface);
     box-shadow: 0 5px 14px -10px rgba(213, 180, 105, 0.65);
   }
 
@@ -57,7 +57,7 @@
     max-width: 170px;
     overflow: hidden;
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 15px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -77,7 +77,7 @@
   .ranking-refresh {
     height: 32px;
     border: 1px solid var(--color-app-border-strong);
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     color: var(--color-app-body);
     background: var(--color-app-surface);
     transition:
@@ -105,8 +105,8 @@
   .ranking-filter-trigger--disabled:hover {
     cursor: default;
     border-color: var(--color-app-border);
-    color: rgba(247, 248, 248, 0.58);
-    background: rgba(247, 248, 248, 0.05);
+    color: color-mix(in srgb, var(--color-text-1) 58%, transparent);
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
     box-shadow: none;
   }
 
@@ -137,7 +137,7 @@
     width: 154px;
     overflow: hidden;
     border: 1px solid var(--color-app-border-strong);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 4px;
     background: var(--color-app-surface);
     box-shadow: var(--shadow-ui-popover);
@@ -157,7 +157,7 @@
     min-height: 34px;
     align-items: center;
     gap: 8px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 6px 7px;
     color: var(--color-app-body);
     transition: background-color 120ms ease;
@@ -177,8 +177,8 @@
     align-items: center;
     justify-content: center;
     border: 1px solid currentColor;
-    border-radius: 7px;
-    background: color-mix(in srgb, currentColor 7%, white);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, currentColor 10%, var(--color-app-surface));
   }
 
   .ranking-search {
@@ -227,7 +227,7 @@
     color: var(--color-app-danger);
     background: var(--color-app-surface);
     box-shadow: var(--shadow-ui-sm);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .ranking-workspace {
@@ -259,8 +259,8 @@
     border-bottom: 1px solid var(--color-app-border);
     padding: 0 13px;
     color: var(--color-app-subtle);
-    background: rgba(247, 248, 248, 0.05);
-    font-size: 9px;
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
+    font-size: 11px;
     font-weight: 650;
   }
 
@@ -274,7 +274,7 @@
     overflow-y: auto;
     padding: 3px 4px 10px 7px;
     scrollbar-width: auto;
-    scrollbar-color: rgba(247, 248, 248, 0.35) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-text-1) 35%, transparent) transparent;
   }
 
   .ranking-list-body::-webkit-scrollbar {
@@ -284,7 +284,7 @@
   .ranking-list-body::-webkit-scrollbar-track {
     margin-block: 5px;
     border-radius: 999px;
-    background: rgba(247, 248, 248, 0.045);
+    background: color-mix(in srgb, var(--color-text-1) 4.5%, transparent);
   }
 
   .ranking-list-body::-webkit-scrollbar-thumb {
@@ -292,11 +292,11 @@
     border: 2px solid transparent;
     border-radius: 999px;
     background-clip: padding-box;
-    background-color: rgba(247, 248, 248, 0.3);
+    background-color: color-mix(in srgb, var(--color-text-1) 30%, transparent);
   }
 
   .ranking-list-body::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(247, 248, 248, 0.45);
+    background-color: color-mix(in srgb, var(--color-text-1) 45%, transparent);
   }
 
   .ranking-row {
@@ -306,8 +306,8 @@
     min-height: 55px;
     overflow: hidden;
     border: 0;
-    border-bottom: 1px solid rgba(247, 248, 248, 0.055);
-    border-radius: 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-text-1) 5.5%, transparent);
+    border-radius: var(--radius-sm);
     padding: 0 6px;
     color: var(--color-app-body);
     background: transparent;
@@ -338,12 +338,12 @@
 
   .ranking-row:hover {
     color: var(--color-app-text);
-    background: color-mix(in srgb, var(--champion-tone) 5%, white);
+    background: color-mix(in srgb, var(--champion-tone) 6%, var(--color-app-surface));
   }
 
   .ranking-row--selected {
     color: var(--color-app-text);
-    background: color-mix(in srgb, var(--champion-tone) 7%, white);
+    background: color-mix(in srgb, var(--champion-tone) 10%, var(--color-app-elevated));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--champion-tone) 13%, transparent);
   }
 
@@ -353,8 +353,8 @@
   }
 
   .ranking-number {
-    color: rgba(247, 248, 248, 0.50);
-    font-family: Georgia, "Times New Roman", serif;
+    color: color-mix(in srgb, var(--color-text-1) 50%, transparent);
+    font-family: var(--font-num);
     font-size: 17px;
     font-variant-numeric: lining-nums tabular-nums;
     line-height: 1;
@@ -390,7 +390,7 @@
 
   .ranking-champion-cell small {
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
     line-height: 13px;
   }
 
@@ -428,7 +428,7 @@
     z-index: 1;
     width: 100%;
     height: 100%;
-    border: 1px solid color-mix(in srgb, var(--champion-tone) 44%, white);
+    border: 1px solid color-mix(in srgb, var(--champion-tone) 44%, var(--color-app-text));
     border-radius: inherit;
     object-fit: cover;
   }
@@ -459,7 +459,7 @@
     clip-path: polygon(50% 0, 92% 22%, 84% 76%, 50% 100%, 16% 76%, 8% 22%);
     color: #fff;
     background: #858b95;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 800;
   }
 
@@ -481,13 +481,13 @@
     justify-content: center;
     gap: 1px;
     justify-self: center;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 750;
   }
 
   .ranking-trend--up { color: #238265; }
   .ranking-trend--down { color: #c35065; }
-  .ranking-trend--flat { color: rgba(247, 248, 248, 0.42); }
+  .ranking-trend--flat { color: color-mix(in srgb, var(--color-text-1) 42%, transparent); }
 
   .ranking-row--skeleton {
     pointer-events: none;
@@ -498,7 +498,7 @@
     height: 9px;
     justify-self: center;
     border-radius: 999px;
-    background: #f0f0f0;
+    background: var(--color-app-surface-soft);
     animation: ranking-pulse 1.25s ease-in-out infinite alternate;
   }
 
@@ -530,7 +530,7 @@
     min-height: 0;
     flex-direction: column;
     overflow: hidden;
-    border-left: 1px solid rgba(247, 248, 248, 0.035);
+    border-left: 1px solid color-mix(in srgb, var(--color-text-1) 3.5%, transparent);
     background: var(--color-app-bg-soft);
   }
 
@@ -548,7 +548,7 @@
     height: 148px;
     flex: 0 0 148px;
     overflow: hidden;
-    background: #efeeeb;
+    background: var(--color-app-surface);
   }
 
   .ranking-detail-art > img {
@@ -564,7 +564,7 @@
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(180deg, rgba(247, 248, 248, 0.03) 18%, rgba(247, 248, 248, 0.06) 58%, var(--color-app-bg-soft) 100%),
+      linear-gradient(180deg, color-mix(in srgb, var(--color-text-1) 3%, transparent) 18%, color-mix(in srgb, var(--color-text-1) 6%, transparent) 58%, var(--color-app-bg-soft) 100%),
       linear-gradient(90deg, rgba(21, 22, 24, 0.13), transparent 72%);
   }
 
@@ -583,7 +583,7 @@
   }
 
   .ranking-detail-profile .ranking-avatar {
-    box-shadow: 0 0 0 3px var(--color-app-bg), 0 7px 18px -10px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 3px var(--color-app-bg), 0 7px 18px -10px color-mix(in srgb, var(--color-shadow) 45%, transparent);
   }
 
   .ranking-detail-profile .ranking-avatar--detail {
@@ -594,7 +594,7 @@
   .ranking-detail-profile p {
     overflow: hidden;
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 14px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -629,7 +629,7 @@
 
   .ranking-rank-story-number {
     color: color-mix(in srgb, var(--champion-tone) 76%, #222);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-num);
     font-size: 48px;
     font-variant-numeric: lining-nums tabular-nums;
     line-height: 1;
@@ -652,7 +652,7 @@
   .ranking-rank-story-copy small,
   .ranking-rank-story-percent small {
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .ranking-rank-story-percent {
@@ -675,7 +675,7 @@
 
   .ranking-signature-head strong {
     color: var(--color-app-text);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-num);
     font-size: 34px;
     font-weight: 500;
     font-variant-numeric: lining-nums tabular-nums;
@@ -693,7 +693,7 @@
     position: relative;
     height: 16px;
     margin-top: 15px;
-    border-top: 1px solid rgba(247, 248, 248, 0.17);
+    border-top: 1px solid color-mix(in srgb, var(--color-text-1) 17%, transparent);
   }
 
   .ranking-signature-scale::before,
@@ -704,7 +704,7 @@
     width: 1px;
     height: 6px;
     content: "";
-    background: rgba(247, 248, 248, 0.18);
+    background: color-mix(in srgb, var(--color-text-1) 18%, transparent);
   }
 
   .ranking-signature-scale::before { left: 0; }
@@ -727,9 +727,9 @@
     display: flex;
     justify-content: space-between;
     margin-top: -5px;
-    color: rgba(247, 248, 248, 0.46);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 9px;
+    color: color-mix(in srgb, var(--color-text-1) 46%, transparent);
+    font-family: var(--font-num);
+    font-size: 11px;
   }
 
   .ranking-signature-secondary {
@@ -766,7 +766,7 @@
 
   .ranking-signature-secondary small {
     color: var(--color-app-subtle);
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .ranking-signature-secondary strong {
@@ -793,7 +793,7 @@
 
   .ranking-detail-section-title small {
     color: var(--color-app-subtle);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
   }
 
@@ -824,7 +824,7 @@
     align-items: center;
     gap: 3px;
     color: var(--color-app-body);
-    font-size: 10px;
+    font-size: 11px;
     text-align: center;
   }
 
@@ -838,7 +838,7 @@
 
   .ranking-counter-portrait strong {
     color: color-mix(in srgb, var(--champion-tone) 64%, #222);
-    font-size: 10px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -853,7 +853,7 @@
     overflow: hidden;
     border: 2px solid var(--color-app-surface);
     background: var(--color-app-surface-soft);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--champion-tone) 18%, rgba(247, 248, 248, 0.14));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--champion-tone) 18%, color-mix(in srgb, var(--color-text-1) 14%, transparent));
   }
 
   .ranking-counter-avatar img {
@@ -866,11 +866,11 @@
     height: 34px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2px;
-    border: 1px solid rgba(247, 248, 248, 0.08);
-    border-radius: 7px;
+    border: 1px solid color-mix(in srgb, var(--color-text-1) 8%, transparent);
+    border-radius: var(--radius-sm);
     padding: 2px;
-    background: rgba(247, 248, 248, 0.05);
-    box-shadow: 0 1px 2px rgba(247, 248, 248, 0.055);
+    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text-1) 5.5%, transparent);
     -webkit-app-region: no-drag;
   }
 
@@ -881,7 +881,7 @@
     min-width: 0;
     grid-template-columns: 20px minmax(0, 1fr);
     align-items: center;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     padding: 0 7px;
     color: var(--color-app-muted);
     text-align: left;
@@ -897,20 +897,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 740;
     line-height: 28px;
   }
 
   .ranking-chapter-switch button:hover {
     color: var(--color-app-text);
-    background: rgba(247, 248, 248, 0.08);
+    background: color-mix(in srgb, var(--color-text-1) 8%, transparent);
   }
 
   .ranking-chapter-switch button.is-active {
     color: var(--color-app-text);
     background: var(--color-app-surface);
-    box-shadow: 0 3px 11px -8px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(247, 248, 248, 0.06);
+    box-shadow: 0 3px 11px -8px color-mix(in srgb, var(--color-shadow) 55%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--color-text-1) 6%, transparent);
   }
 
   .ranking-chapter-switch button:first-child.is-active > svg {

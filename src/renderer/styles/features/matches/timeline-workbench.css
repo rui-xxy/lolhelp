@@ -29,40 +29,40 @@
   .tl-workbench svg:not(.tl-plot > svg) { width: 16px; height: 16px; flex: 0 0 16px; stroke-width: 1.6; }
   .tl-toolbar { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--color-frost-line); }
   .tl-metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
-  .tl-metrics > button { display: flex; min-height: 34px; align-items: center; gap: 7px; border: 1px solid transparent; border-radius: 6px; padding: 5px 10px; background: transparent; color: var(--color-app-muted); font-size: 13px; white-space: nowrap; }
+  .tl-metrics > button { display: flex; min-height: 34px; align-items: center; gap: 7px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 5px 10px; background: transparent; color: var(--color-app-muted); font-size: 13px; white-space: nowrap; }
   .tl-metrics > button > img { width: 17px; height: 17px; object-fit: contain; }
   .tl-metrics > button.is-active { border-color: var(--color-frost-line-strong); background: var(--fill-frost-active); color: var(--color-app-text); box-shadow: var(--shadow-ui-sm); }
   .tl-metrics > button:hover:not(.is-active) { color: var(--color-app-text); background: var(--color-frost-fill-hover); }
-  .tl-segment { display: inline-flex; width: fit-content; min-width: 0; flex-wrap: wrap; gap: 2px; border-radius: 7px; padding: 3px; background: var(--color-frost-fill-faint); }
-  .tl-segment > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; border: 0; border-radius: 5px; padding: 4px 10px; background: transparent; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
+  .tl-segment { display: inline-flex; width: fit-content; min-width: 0; flex-wrap: wrap; gap: 2px; border-radius: var(--radius-sm); padding: 3px; background: var(--color-frost-fill-faint); }
+  .tl-segment > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; border: 0; border-radius: var(--radius-xs); padding: 4px 10px; background: transparent; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
   .tl-segment > button[aria-pressed="true"] { background: var(--color-frost-fill-active); color: var(--color-app-text); box-shadow: var(--shadow-ui-sm); }
   .tl-rosterbar { display: flex; flex: 0 0 auto; align-items: center; gap: 20px; border-bottom: 1px solid var(--color-frost-line); padding: 9px 20px; }
   .tl-scope { display: flex; flex-direction: column; gap: 2px; }
-  .tl-scope > button { display: flex; align-items: center; gap: 6px; min-height: 26px; border: 0; border-radius: 5px; padding: 3px 7px; background: transparent; color: var(--color-app-muted); font-size: 12px; }
+  .tl-scope > button { display: flex; align-items: center; gap: 6px; min-height: 26px; border: 0; border-radius: var(--radius-xs); padding: 3px 7px; background: transparent; color: var(--color-app-muted); font-size: 12px; }
   .tl-scope > button.is-active { color: var(--color-app-text); background: var(--color-frost-fill-soft); }
   .tl-roster { display: flex; min-width: 0; flex: 1; justify-content: center; gap: clamp(18px, 4cqw, 52px); }
   .tl-roster__team { display: flex; min-width: 0; align-items: center; gap: 9px; }
   .tl-roster__team-label { color: var(--color-app-muted); font-size: 12px; }
-  .tl-player { position: relative; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid transparent; border-radius: 9px; padding: 3px; background: transparent; }
+  .tl-player { position: relative; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid transparent; border-radius: var(--radius-lg); padding: 3px; background: transparent; }
   .tl-player > img { opacity: 0.82; }
   .tl-player.is-active { border-color: var(--tl-tone); background: color-mix(in srgb, var(--tl-tone) 10%, transparent); }
   .tl-player.is-active > img, .tl-player:hover > img { opacity: 1; }
   .tl-player:hover { background: var(--color-frost-fill-hover); }
-  .tl-player > b { position: absolute; right: -2px; bottom: -2px; display: grid; min-width: 16px; height: 16px; place-items: center; border-radius: 4px; background: var(--tl-tone); color: var(--color-app-primary-foreground); font-size: 11px; font-weight: 650; }
-  .tl-text-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; min-height: 28px; border: 0; border-radius: 5px; padding: 3px 5px; background: transparent; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
+  .tl-player > b { position: absolute; right: -2px; bottom: -2px; display: grid; min-width: 16px; height: 16px; place-items: center; border-radius: var(--radius-xs); background: var(--tl-tone); color: var(--color-app-primary-foreground); font-size: 11px; font-weight: 650; }
+  .tl-text-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; min-height: 28px; border: 0; border-radius: var(--radius-xs); padding: 3px 5px; background: transparent; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
   .tl-text-button:hover { color: var(--color-app-text); background: var(--color-frost-fill-soft); }
-  .tl-icon-button { display: inline-grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border: 0; border-radius: 5px; padding: 5px; background: transparent; color: var(--color-app-muted); }
+  .tl-icon-button { display: inline-grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border: 0; border-radius: var(--radius-xs); padding: 5px; background: transparent; color: var(--color-app-muted); }
   .tl-icon-button:hover { color: var(--color-app-text); background: var(--color-frost-fill-active); }
   .tl-body { min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: 12px 20px 24px; scrollbar-gutter: stable; }
   .tl-chart-controls { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
   .tl-baseline-control { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  .tl-baseline-tag { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--color-frost-line-strong); border-radius: 5px; padding: 4px 7px; background: var(--color-frost-fill-soft); font-size: 12px; }
+  .tl-baseline-tag { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--color-frost-line-strong); border-radius: var(--radius-xs); padding: 4px 7px; background: var(--color-frost-fill-soft); font-size: 12px; }
   .tl-analysis { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) 274px; align-items: start; gap: 20px; }
   .tl-analysis__main { min-width: 0; }
   .tl-chart { min-width: 0; }
   .tl-legend { display: flex; min-height: 30px; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; }
   .tl-legend > div { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 7px; }
-  .tl-series-key { display: inline-grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border-radius: 4px; background: color-mix(in srgb, var(--tl-tone) 13%, transparent); color: var(--tl-tone); font-size: 11px; font-weight: 600; }
+  .tl-series-key { display: inline-grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--tl-tone) 13%, transparent); color: var(--tl-tone); font-size: 11px; font-weight: 600; }
   .tl-legend__name { max-width: 170px; overflow: hidden; color: var(--color-app-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
   .tl-legend strong { color: var(--color-app-text); font-size: 16px; font-weight: 550; }
   .tl-chart__canvas { position: relative; min-width: 0; padding: 8px 0 28px 54px; }
@@ -86,7 +86,7 @@
   .tl-x-axis > span { position: absolute; color: var(--color-app-muted); font-size: 12px; line-height: 18px; transform: translateX(-50%); white-space: nowrap; }
   .tl-x-axis > span:first-child { transform: none; }
   .tl-x-axis > span:last-child { transform: translateX(-100%); }
-  .tl-chart-tooltip { position: absolute; z-index: 4; top: 12px; left: clamp(0px, calc(var(--tl-tip-x) + 14px), calc(100% - 238px)); width: min(238px, 100%); border: 1px solid var(--color-frost-line-strong); border-radius: 9px; padding: 10px 12px; background: color-mix(in srgb, var(--color-app-shell) 96%, transparent); box-shadow: var(--shadow-ui-shell); pointer-events: none; }
+  .tl-chart-tooltip { position: absolute; z-index: 4; top: 12px; left: clamp(0px, calc(var(--tl-tip-x) + 14px), calc(100% - 238px)); width: min(238px, 100%); border: 1px solid var(--color-frost-line-strong); border-radius: var(--radius-lg); padding: 10px 12px; background: color-mix(in srgb, var(--color-app-shell) 96%, transparent); box-shadow: var(--shadow-ui-shell); pointer-events: none; }
   .tl-chart-tooltip > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--color-app-muted); font-size: 12px; }
   .tl-chart-tooltip > header > time { color: var(--color-app-text); font-size: 15px; }
   .tl-chart-tooltip > div { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 3px 0; font-size: 12px; }
@@ -99,12 +99,12 @@
   .tl-event-rail > span { color: var(--color-app-muted); font-size: 12px; }
   .tl-event-rail > div { position: relative; height: 28px; }
   .tl-event-rail > div::before { position: absolute; top: 14px; right: 0; left: 0; height: 1px; background: var(--color-frost-line); content: ""; }
-  .tl-event-mark { position: absolute; top: 0; display: grid; width: 26px; height: 28px; place-items: center; border: 1px solid transparent; border-radius: 5px; padding: 4px; background: var(--color-app-bg); transform: translateX(-50%); }
+  .tl-event-mark { position: absolute; top: 0; display: grid; width: 26px; height: 28px; place-items: center; border: 1px solid transparent; border-radius: var(--radius-xs); padding: 4px; background: var(--color-app-bg); transform: translateX(-50%); }
   .tl-event-mark > img { width: 18px; height: 18px; object-fit: contain; }
-  .tl-event-mark > small { position: absolute; top: -4px; right: -3px; display: grid; min-width: 13px; height: 13px; place-items: center; border-radius: 4px; background: var(--color-app-surface-soft); color: var(--color-app-body); font-size: 10px; }
+  .tl-event-mark > small { position: absolute; top: -4px; right: -3px; display: grid; min-width: 13px; height: 13px; place-items: center; border-radius: var(--radius-xs); background: var(--color-app-surface-soft); color: var(--color-app-body); font-size: 11px; }
   .tl-event-mark:hover, .tl-event-mark:focus-visible { border-color: var(--color-frost-line-strong); background: var(--color-app-surface-soft); }
   .tl-moments { display: flex; flex-wrap: wrap; gap: 8px 18px; border-top: 1px solid var(--color-frost-line); margin-top: 14px; padding-top: 10px; }
-  .tl-moments > button { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 8px; border: 0; border-radius: 4px; padding: 3px 0; background: transparent; font-size: 12px; text-align: left; }
+  .tl-moments > button { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 8px; border: 0; border-radius: var(--radius-xs); padding: 3px 0; background: transparent; font-size: 12px; text-align: left; }
   .tl-moments > button span { color: var(--color-app-muted); }
   .tl-moments > button b { color: var(--color-app-body); font-weight: 550; }
   .tl-moments > button time { color: var(--color-app-muted); }
@@ -131,7 +131,7 @@
   .tl-workbench .tl-compare-table .is-negative { color: var(--tl-comparison-b, var(--color-app-team-enemy)); }
   .tl-near-events { margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--color-frost-line); }
   .tl-near-events > header { display: flex; min-height: 25px; align-items: center; justify-content: space-between; gap: 8px; color: var(--color-app-muted); font-size: 12px; }
-  .tl-near-event { display: flex; width: 100%; min-width: 0; min-height: 32px; align-items: center; gap: 5px; border: 0; border-radius: 4px; padding: 4px 0; background: transparent; }
+  .tl-near-event { display: flex; width: 100%; min-width: 0; min-height: 32px; align-items: center; gap: 5px; border: 0; border-radius: var(--radius-xs); padding: 4px 0; background: transparent; }
   .tl-near-event > time { flex: 0 0 auto; color: var(--color-app-muted); font-size: 11px; }
   .tl-near-event > img { width: 22px; height: 22px; flex: 0 0 22px; object-fit: contain; }
   .tl-near-event > span { min-width: 0; overflow: hidden; color: var(--color-app-body); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -140,7 +140,7 @@
   .tl-near-events summary { color: var(--color-app-muted); font-size: 12px; cursor: pointer; }
   .tl-muted { margin: 5px 0; color: var(--color-app-muted); font-size: 12px; line-height: 1.5; }
   .tl-sample-nav { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 10px; color: var(--color-app-muted); font-size: 12px; }
-  .tl-sample-nav > button { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--color-frost-line); border-radius: 5px; background: transparent; }
+  .tl-sample-nav > button { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--color-frost-line); border-radius: var(--radius-xs); background: transparent; }
   .tl-snapshot { margin-top: 18px; border-top: 1px solid var(--color-frost-line); }
   .tl-section-head { display: flex; min-width: 0; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0 8px; }
   .tl-section-head > h3 { margin: 0; color: var(--color-app-body); font-size: 14px; font-weight: 550; }

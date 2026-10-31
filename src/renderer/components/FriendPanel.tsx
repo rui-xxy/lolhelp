@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bell, Clock, Eye, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Bell, ChevronRight, Clock, Eye, MailPlus, MoreHorizontal, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { FriendInfo } from '../../shared/api';
 import { ProfileIcon } from './ProfileIcon';
 import type { CSSProperties } from 'react';
@@ -11,17 +11,18 @@ import {
 interface FriendPanelProps {
   onFriendClick: (riotId: string) => void;
   onFriendFollow?: (riotId: string) => void;
+  onOpenFriendRequests?: () => void;
   active?: boolean;
 }
 
 const AVAILABILITY_COLOR: Record<string, string> = {
-  online: 'bg-green-500',
-  chat: 'bg-green-500',
-  dnd: 'bg-red-500',
-  away: 'bg-yellow-500',
-  mobile: 'bg-blue-500',
-  invisible: 'bg-gray-400',
-  offline: 'bg-gray-400',
+  online: 'bg-ok',
+  chat: 'bg-ok',
+  dnd: 'bg-ally',
+  away: 'bg-warn',
+  mobile: 'bg-text-3',
+  invisible: 'bg-text-4',
+  offline: 'bg-text-4',
 };
 
 const FRIEND_REFRESH_INTERVAL_MS = 10_000;
@@ -135,7 +136,7 @@ function FriendGameDuration({
   return duration ? <span className="friend-row-timer tabular-nums">{duration}</span> : null;
 }
 
-export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: FriendPanelProps) {
+export function FriendPanel({ onFriendClick, onFriendFollow, onOpenFriendRequests, active = true }: FriendPanelProps) {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -312,16 +313,29 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
   };
 
   return (
-    <div className="flex h-full flex-col bg-app-surface">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface px-3">
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app-text">
-          好友 {onlineCount}/{friends.length}
+    <div className="flex h-full flex-col bg-ink-0">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-1 px-3">
+        <span className="min-w-0 flex-1 truncate text-body font-semibold text-text-1">
+          好友 <span className="num font-medium text-text-3">{onlineCount}/{friends.length}</span>
         </span>
+        {onOpenFriendRequests && (
+          <button
+            type="button"
+            onClick={onOpenFriendRequests}
+            className="grid size-7 place-items-center rounded-sm text-text-3 transition-colors hover:bg-app-nav-hover hover:text-text-1"
+            title="好友申请"
+            aria-label="好友申请"
+          >
+            <MailPlus className="size-3.5" />
+          </button>
+        )}
         <button
+          type="button"
           onClick={() => loadFriends(true)}
           disabled={loading}
-          className="rounded-xs p-1 text-app-subtle transition-colors [-webkit-app-region:no-drag] hover:bg-app-surface-soft hover:text-app-text"
+          className="grid size-7 place-items-center rounded-sm text-text-3 transition-colors hover:bg-app-nav-hover hover:text-text-1"
           title="刷新"
+          aria-label="刷新好友"
         >
           <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -360,11 +374,11 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
               <div key={groupName} className="relative mb-1">
                 <button
                   onClick={() => toggleGroup(groupName)}
-                  className="flex w-full items-center gap-1 px-1 py-1 pr-7 text-[11px] font-medium text-app-muted hover:text-app-text"
+                  className="flex w-full items-center gap-1 px-1 py-1.5 pr-7 text-meta font-medium text-text-3 hover:text-text-1"
                 >
-                  <span className="text-app-subtle">{collapsed ? '▶' : '▼'}</span>
+                  <ChevronRight className={`size-3.5 text-text-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
                   <span>{displayName}</span>
-                  <span className="text-app-subtle">（{groupOnline}/{list.length}）</span>
+                  <span className="num text-text-4">{groupOnline}/{list.length}</span>
                 </button>
                 <button
                   type="button"
@@ -387,7 +401,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
                     {list.map((friend) => {
                       const isOffline = friend.availability === 'offline';
                       const status = getFriendStatusDisplay(friend);
-                      const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-gray-400';
+                      const statusColor = AVAILABILITY_COLOR[friend.availability] ?? 'bg-text-4';
                       const championSplashUrls = friend.lol?.championSplashUrls?.length
                         ? friend.lol.championSplashUrls
                         : friend.lol?.championSplashUrl
@@ -428,12 +442,11 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
                                 srcs={friend.iconUrls}
                                 alt={friend.note || friend.gameName}
                                 size={32}
-                                className="border border-app-border"
                               />
-                              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border border-app-surface ${statusColor}`} />
+                              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-ink-0 ${statusColor}`} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-xs font-medium text-app-text">
+                              <div className="truncate text-body font-medium text-text-1">
                                 {friend.note || friend.gameName}
                               </div>
                               <span className={`friend-status ${FRIEND_STATUS_CLASS[status.kind]}`}>
@@ -495,7 +508,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow, active = true }: Fr
                               <button
                                 type="button"
                                 onClick={() => void handleDeleteFriend(friend)}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-danger hover:bg-red-50"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-app-danger hover:bg-enemy-soft"
                               >
                                 <Trash2 className="size-3.5" />
                                 删除好友

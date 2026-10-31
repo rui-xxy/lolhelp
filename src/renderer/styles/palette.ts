@@ -1,42 +1,47 @@
+// 分类色板：给需要在 JS 里区分多个对象的场景（开黑小队、折线、模式）。
+// 全部在 OKLCH 里放进同一亮度带（L ≈ 0.68–0.80，色度 ≈ 0.10–0.12），
+// 和 tokens.css 的语义色同属一家，不再使用出厂饱和色。
+
 export const LIVE_PARTY_COLORS = [
-  '#4fd1c5',
-  '#d5b469',
-  '#55c58a',
-  '#a892d4',
-  '#d88b66',
-  '#78aef2',
+  '#49C7C0',
+  '#D6A95B',
+  '#7CC58C',
+  '#BCA1ED',
+  '#ED997B',
+  '#72B8F2',
 ] as const;
 
 export const RANKING_MODE_TONES = {
-  ranked: '#2f8f6b',
-  aram: '#4f86c6',
-  arena: '#b46a50',
-  hextech: '#8b68bd',
+  ranked: '#5CB28F',
+  aram: '#6DA3DA',
+  arena: '#D28A69',
+  hextech: '#A890D4',
 } as const;
 
 export const RANKING_HERO_TONES = [
-  '#d85d6f',
-  '#2f8f78',
-  '#4d7fc1',
-  '#9a68b4',
-  '#d28a3f',
-  '#477f91',
+  '#D77787',
+  '#32B08D',
+  '#639BE1',
+  '#AF82D0',
+  '#CE8545',
+  '#01AAC6',
 ] as const;
 
 export const MATCH_TIMELINE_COLORS = [
-  '#ef5f83',
-  '#3da8ea',
-  '#f1c94d',
-  '#49c7bc',
-  '#9a6ce8',
-  '#f39ac0',
-  '#9fcb56',
-  '#f18c54',
-  '#64b7ef',
-  '#d99be8',
+  '#E88AA8',
+  '#6FC8FF',
+  '#C8A747',
+  '#52D7C1',
+  '#AA9DF1',
+  '#E9A1E3',
+  '#92BA66',
+  '#FEA47C',
+  '#31BDDA',
+  '#DBA6F3',
 ] as const;
 
+// 与 tokens.css 的 --color-ally / --color-enemy 一致：蓝 = 我方/胜，红 = 敌方/负。
 export const MATCH_TEAM_COLORS = {
-  blue: '#278fe5',
-  red: '#ef4c62',
+  blue: '#6DA9EB',
+  red: '#E17177',
 } as const;

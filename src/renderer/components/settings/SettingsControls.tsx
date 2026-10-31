@@ -1,6 +1,10 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Volume2, VolumeX } from 'lucide-react';
 import type { LolClientConfigValues } from '../../../shared/api';
+import { ProfileIcon } from '../ProfileIcon';
+import type { Option } from './configFields';
+
+// 设置页的基础积木。样式在 styles/features/settings.css（st- 前缀）。
 
 export function useSettingsScrollSpy<TSection extends string>(
   prefix: string,
@@ -61,34 +65,34 @@ export function useSettingsScrollSpy<TSection extends string>(
   }, [prefix, sections, setActiveSection]);
 }
 
-export function SectionDot({
+export function scrollToSettingsSection(prefix: string, key: string) {
+  document.getElementById(`${prefix}-section-${key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+// 顶部的分区目录：一排胶囊，跟着滚动高亮当前看到的分区，点一下跳过去。
+export function SectionTabs<TSection extends string>({
+  sections,
   active,
-  label,
-  onClick,
+  onSelect,
 }: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
+  sections: { key: TSection; label: string }[];
+  active: TSection;
+  onSelect: (section: TSection) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="group relative flex size-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-app-primary/25"
-    >
-      <span
-        className={`rounded-full transition-all ${
-          active
-            ? 'size-2.5 bg-app-primary shadow-ui-switch-thumb'
-            : 'size-1.5 bg-app-border-strong/70 group-hover:size-2 group-hover:bg-app-primary/45'
-        }`}
-      />
-      <span className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-sm bg-app-text px-2 py-1 text-xs font-medium text-app-surface opacity-0 shadow-sm transition-opacity group-hover:opacity-100 xl:block">
-        {label}
-      </span>
-    </button>
+    <nav className="st-tabs" aria-label="分区">
+      {sections.map((section) => (
+        <button
+          key={section.key}
+          type="button"
+          className="st-tab"
+          aria-current={active === section.key ? 'true' : undefined}
+          onClick={() => onSelect(section.key)}
+        >
+          {section.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -96,16 +100,21 @@ export function SettingsSection<TSection extends string>({
   prefix,
   id,
   title,
+  description,
   children,
 }: {
   prefix: string;
   id: TSection;
   title: string;
+  description?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section id={`${prefix}-section-${id}`} className="scroll-mt-5 space-y-3">
-      <h3 className="text-[15px] font-semibold text-app-text">{title}</h3>
+    <section id={`${prefix}-section-${id}`} className="st-section">
+      <header className="st-section__head">
+        <h3>{title}</h3>
+        {description && <p>{description}</p>}
+      </header>
       {children}
     </section>
   );
@@ -113,88 +122,59 @@ export function SettingsSection<TSection extends string>({
 
 export function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="max-w-[680px]">
-      {title && <h4 className="mb-2 text-xs font-semibold text-app-muted">{title}</h4>}
-      <div className="divide-y divide-app-border/60 overflow-hidden rounded-md border border-app-border/80 bg-app-bg-soft/45 px-4">
-        {children}
-      </div>
+    <div className="st-group-wrap">
+      {title && <h4 className="st-group__title">{title}</h4>}
+      <div className="st-group">{children}</div>
     </div>
   );
 }
 
-export function ReadonlyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid min-h-10 grid-cols-[1fr_auto] items-center gap-3 py-2">
-      <span className="text-sm text-app-body">{label}</span>
-      <span className="max-w-[220px] truncate text-right text-xs text-app-muted">{value}</span>
-    </div>
-  );
-}
-
-export function BlockedPlayersList({
-  players,
+// 一行设置：左边名字（可带一句说明），右边控件。
+export function SettingRow({
+  label,
+  hint,
+  children,
+  wide = false,
 }: {
-  players?: LolClientConfigValues['blockedPlayers'];
+  label: string;
+  hint?: ReactNode;
+  children: ReactNode;
+  wide?: boolean;
 }) {
-  const safePlayers = Array.isArray(players) ? players : [];
-
-  if (safePlayers.length === 0) {
-    return (
-      <div className="rounded-sm bg-app-bg-soft px-3 py-8 text-center text-sm text-app-muted">
-        暂无聊天黑名单
-      </div>
-    );
-  }
-
   return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {safePlayers.map((player, index) => {
-        const gameName = player.gameName || '-';
-        const fallbackKey = player.id || player.puuid || `${gameName}-${index}`;
-        return (
-          <div
-            key={fallbackKey}
-            className="flex min-w-0 items-center gap-3 rounded-sm bg-app-bg-soft px-3 py-2"
-          >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-xs font-semibold text-app-muted">
-              {player.icon > -1 ? player.icon : gameName.slice(0, 1)}
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-app-text">{gameName}</div>
-              <div className="truncate text-xs text-app-muted">
-                {player.gameTag ? `#${player.gameTag}` : player.puuid}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="st-row" data-wide={wide ? 'true' : undefined}>
+      <div className="st-row__label">
+        <b>{label}</b>
+        {hint && <span>{hint}</span>}
+      </div>
+      <div className="st-row__control">{children}</div>
     </div>
   );
 }
 
-export function Panel({ title, children }: { title: string; children: ReactNode }) {
+export function ReadonlyRow({ label, value, hint }: { label: string; value: string; hint?: ReactNode }) {
   return (
-    <section>
-      <h3 className="mb-3 text-[15px] font-semibold text-app-text">{title}</h3>
-      <div className="rounded-md border border-app-border/80 bg-app-bg-soft/45 p-4">{children}</div>
-    </section>
+    <SettingRow label={label} hint={hint}>
+      <span className="st-readonly" title={value}>{value}</span>
+    </SettingRow>
   );
 }
 
 export function CheckboxRow({
   label,
+  hint,
   checked,
   onChange,
 }: {
   label: string;
+  hint?: ReactNode;
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="grid min-h-10 cursor-pointer grid-cols-[1fr_auto] items-center gap-3 py-2">
-      <span className="text-sm text-app-body">{label}</span>
+    <SettingRow label={label} hint={hint}>
       <SwitchControl checked={checked} onChange={onChange} />
-    </label>
+    </SettingRow>
   );
 }
 
@@ -234,74 +214,149 @@ export function SwitchControl({
   );
 }
 
-function percentLabel(value: number): string {
-  return `${Math.round(value)}`;
+function safeNumber(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+export function RangeInput({
+  value,
+  min,
+  max,
+  onChange,
+  disabled = false,
+  label,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const current = safeNumber(value, min);
+  return (
+    <span className="st-range" data-disabled={disabled ? 'true' : undefined}>
+      <input
+        className="settings-range"
+        type="range"
+        min={min}
+        max={max}
+        value={current}
+        aria-label={label}
+        style={{
+          '--settings-range-fill': `${((current - min) / Math.max(1, max - min)) * 100}%`,
+        } as CSSProperties}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <output>{Math.round(current)}</output>
+    </span>
+  );
 }
 
 export function SliderRow({
   label,
+  hint,
   value,
   min,
   max,
   onChange,
 }: {
   label: string;
+  hint?: ReactNode;
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="grid min-h-11 grid-cols-[minmax(150px,1fr)_220px_42px] items-center gap-3 py-2">
-      <span className="text-sm text-app-body">{label}</span>
-      <input
-        className="settings-range"
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        style={{
-          '--settings-range-fill': `${((value - min) / Math.max(1, max - min)) * 100}%`,
-        } as CSSProperties}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-      <span className="text-right text-xs font-medium text-app-muted">{percentLabel(value)}</span>
-    </div>
+    <SettingRow label={label} hint={hint}>
+      <RangeInput label={label} value={value} min={min} max={max} onChange={onChange} />
+    </SettingRow>
+  );
+}
+
+// 几个互斥选项排成一排，一眼看出选的是哪个。选项多或者字长时用下拉。
+export function Segmented<T extends string | number>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: Option<T>[];
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <span className="st-seg" role="radiogroup" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={String(option.value)}
+          type="button"
+          role="radio"
+          aria-checked={String(value) === String(option.value)}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+export function Dropdown<T extends string | number>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: Option<T>[];
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <span className="st-select">
+      <select
+        value={String(value)}
+        aria-label={label}
+        onChange={(event) => {
+          const selected = options.find((option) => String(option.value) === event.target.value);
+          if (selected) onChange(selected.value);
+        }}
+      >
+        {options.map((option) => (
+          <option key={String(option.value)} value={String(option.value)}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown aria-hidden="true" />
+    </span>
   );
 }
 
 export function SelectRow<T extends string | number>({
   label,
+  hint,
   value,
   options,
   onChange,
+  segmented = false,
 }: {
   label: string;
+  hint?: ReactNode;
   value: T;
-  options: { value: T; label: string }[];
+  options: Option<T>[];
   onChange: (value: T) => void;
+  segmented?: boolean;
 }) {
   return (
-    <label className="grid min-h-11 grid-cols-[minmax(180px,1fr)_220px] items-center gap-3 py-2">
-      <span className="text-sm text-app-body">{label}</span>
-      <span className="relative block">
-        <select
-          value={value}
-          onChange={(event) => {
-            const selected = options.find((option) => String(option.value) === event.target.value);
-            if (selected) onChange(selected.value);
-          }}
-          className="h-8 w-full appearance-none rounded-sm border border-app-border bg-app-surface pr-8 pl-2.5 text-sm text-app-text outline-none transition-colors hover:border-app-border-strong focus:border-app-primary"
-        >
-          {options.map((option) => (
-            <option key={String(option.value)} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-app-subtle" />
-      </span>
-    </label>
+    <SettingRow label={label} hint={hint}>
+      {segmented
+        ? <Segmented label={label} value={value} options={options} onChange={onChange} />
+        : <Dropdown label={label} value={value} options={options} onChange={onChange} />}
+    </SettingRow>
   );
 }
 
@@ -319,22 +374,50 @@ export function VolumeRow({
   onMuted: (value: boolean) => void;
 }) {
   return (
-    <div className="grid min-h-11 grid-cols-[92px_1fr_42px_58px] items-center gap-3 py-2">
-      <span className="text-sm text-app-body">{label}</span>
-      <input
-        className="settings-range"
-        type="range"
-        min={0}
-        max={100}
-        value={volume}
-        style={{ '--settings-range-fill': `${volume}%` } as CSSProperties}
-        onChange={(event) => onVolume(Number(event.target.value))}
-      />
-      <span className="text-right text-xs font-medium text-app-muted">{percentLabel(volume)}</span>
-      <label className="flex items-center justify-end gap-2 text-xs text-app-muted">
-        <span>静音</span>
-        <SwitchControl checked={muted} onChange={onMuted} size="sm" />
-      </label>
+    <SettingRow label={label}>
+      <span className="st-volume">
+        <button
+          type="button"
+          className="st-mute"
+          aria-pressed={muted}
+          title={muted ? '取消静音' : '静音'}
+          aria-label={muted ? `取消${label}静音` : `${label}静音`}
+          onClick={() => onMuted(!muted)}
+        >
+          {muted ? <VolumeX /> : <Volume2 />}
+        </button>
+        <RangeInput label={label} value={volume} min={0} max={100} onChange={onVolume} disabled={muted} />
+      </span>
+    </SettingRow>
+  );
+}
+
+export function BlockedPlayersList({
+  players,
+}: {
+  players?: LolClientConfigValues['blockedPlayers'];
+}) {
+  const safePlayers = Array.isArray(players) ? players : [];
+
+  if (safePlayers.length === 0) {
+    return <div className="st-empty">聊天黑名单是空的。在客户端里屏蔽的玩家会出现在这里。</div>;
+  }
+
+  return (
+    <div className="st-blocked">
+      {safePlayers.map((player, index) => {
+        const gameName = player.gameName || '未知玩家';
+        const fallbackKey = player.id || player.puuid || `${gameName}-${index}`;
+        return (
+          <div key={fallbackKey} className="st-blocked__item">
+            <ProfileIcon iconId={player.icon > 0 ? player.icon : undefined} alt={gameName} size={32} />
+            <div>
+              <b>{gameName}</b>
+              {player.gameTag && <span>#{player.gameTag}</span>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Archive, Gem, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatUpdatedAt } from '../../lib/utils';
 import type {
   MayhemAugmentRarity,
   MayhemAugmentRankingResult,
@@ -77,7 +78,7 @@ export function MayhemAugmentRanking() {
           <span>LIVE</span>
           <strong>{visibleEntries.length}</strong>
           <small>个强化符文</small>
-          <p>{result?.meta.updatedAt ? `${result.meta.updatedAt} 更新` : '真实榜单数据'}</p>
+          <p>{result?.meta.updatedAt ? `${formatUpdatedAt(result.meta.updatedAt)} 更新` : '真实榜单数据'}</p>
         </div>
 
         <div className="mayhem-augment-controls">
