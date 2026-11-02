@@ -24,18 +24,26 @@ const CLIENT_SECTIONS: { key: ClientSectionKey; label: string }[] = [
   { key: 'blocked', label: '聊天黑名单' },
 ];
 
+const NO_SECTIONS: { key: ClientSectionKey; label: string }[] = [];
+
 export function ClientSettings({
   values,
   onChange,
+  showNav = true,
+  showBlocked = true,
 }: {
   values: LolClientConfigValues;
   onChange: <K extends keyof LolClientConfigValues>(
     key: K,
     value: LolClientConfigValues[K],
   ) => void;
+  /** 嵌进别的页面时不要自己的分区目录。 */
+  showNav?: boolean;
+  /** 聊天黑名单是账号自己的，方案里没有。 */
+  showBlocked?: boolean;
 }) {
   const [activeSection, setActiveSection] = useState<ClientSectionKey>('general');
-  useSettingsScrollSpy<ClientSectionKey>('client', CLIENT_SECTIONS, setActiveSection);
+  useSettingsScrollSpy<ClientSectionKey>('client', showNav ? CLIENT_SECTIONS : NO_SECTIONS, setActiveSection);
 
   const goToSection = useCallback((section: ClientSectionKey) => {
     setActiveSection(section);
@@ -44,7 +52,7 @@ export function ClientSettings({
 
   return (
     <>
-      <SectionTabs sections={CLIENT_SECTIONS} active={activeSection} onSelect={goToSection} />
+      {showNav && <SectionTabs sections={CLIENT_SECTIONS} active={activeSection} onSelect={goToSection} />}
       <div className="st-sections">
         <SettingsSection prefix="client" id="general" title="综合" description="客户端本身的表现：卡不卡、吵不吵。">
           <SettingsGroup>
@@ -134,6 +142,7 @@ export function ClientSettings({
           </SettingsGroup>
         </SettingsSection>
 
+        {showBlocked && (
         <SettingsSection
           prefix="client"
           id="blocked"
@@ -142,6 +151,7 @@ export function ClientSettings({
         >
           <BlockedPlayersList players={values.blockedPlayers} />
         </SettingsSection>
+        )}
       </div>
     </>
   );

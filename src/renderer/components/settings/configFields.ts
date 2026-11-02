@@ -315,3 +315,93 @@ export function countConfigChanges(draft: LolConfigValues, saved: LolConfigValue
   }
   return count + hotkeyDiffCount(draft.hotkeys, saved.hotkeys);
 }
+
+// ---------- 比较两套设置：按块数差异、逐行对照 ----------
+
+/** 每一块（客户端、画面、操作…热键）里有几处不一样。 */
+export function countPartDiffs(a: LolConfigValues, b: LolConfigValues): Record<LolConfigPart, number> {
+  const stats = {} as Record<LolConfigPart, number>;
+  for (const section of GAME_LAYOUT) {
+    stats[section.part] = section.groups
+      .flatMap((group) => group.keys)
+      .filter((key) => GAME_FIELDS[key].format(a.game[key], a.game) !== GAME_FIELDS[key].format(b.game[key], b.game))
+      .length;
+  }
+  stats.client = CLIENT_LAYOUT
+    .flatMap((section) => section.groups.flatMap((group) => group.keys))
+    .filter((key) => !IGNORED_CLIENT_KEYS.has(key) && key !== 'hideAllPlayerNamesForMe')
+    .filter((key) => CLIENT_FIELDS[key].format(a.client[key], a.client) !== CLIENT_FIELDS[key].format(b.client[key], b.client))
+    .length;
+  stats.hotkeys = hotkeyDiffCount(a.hotkeys, b.hotkeys);
+  return stats;
+}
+
+/**
+ * 逐行对照：values 里和 baseline 不一样的每一行，记下 baseline 那边显示成什么。
+ * 用设置页那一行的名字当钥匙，设置页的每一行凭名字就能找到自己的对照值。
+ */
+export function buildFieldBaseline(values: LolConfigValues, baseline: LolConfigValues): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const key of Object.keys(GAME_FIELDS) as Array<keyof LolGameConfigValues>) {
+    const meta = GAME_FIELDS[key];
+    if (meta.hidden) continue;
+    const before = meta.format(baseline.game[key], baseline.game);
+    if (meta.format(values.game[key], values.game) !== before) map.set(meta.label, before);
+  }
+  for (const key of Object.keys(CLIENT_FIELDS) as Array<keyof LolClientConfigValues>) {
+    const meta = CLIENT_FIELDS[key];
+    if (meta.hidden || key === 'blockedPlayers') continue;
+    const before = meta.format(baseline.client[key], baseline.client);
+    if (meta.format(values.client[key], values.client) !== before) map.set(meta.label, before);
+  }
+  return map;
+}
+
+/** 热键逐个对照：「section.key」→ baseline 里的原始值（没有这个键时为空串）。 */
+export function buildHotkeyBaseline(values: LolHotkeyValues, baseline: LolHotkeyValues): Map<string, string> {
+  const map = new Map<string, string>();
+  const sections = new Set([...Object.keys(values), ...Object.keys(baseline)]);
+  for (const section of sections) {
+    const keys = new Set([...Object.keys(values[section] ?? {}), ...Object.keys(baseline[section] ?? {})]);
+    for (const key of keys) {
+      if (!sameHotkey(values[section]?.[key], baseline[section]?.[key])) {
+        map.set(`${section}.${key}`, baseline[section]?.[key] ?? '');
+      }
+    }
+  }
+  return map;
+}
+
+// ---------- 改一项设置（设置页和方案编辑共用） ----------
+
+export function withClientValue<K extends keyof LolClientConfigValues>(
+  values: LolConfigValues,
+  key: K,
+  value: LolClientConfigValues[K],
+): LolConfigValues {
+  return {
+    ...values,
+    client: { ...values.client, [key]: value },
+    // 「隐藏玩家名字」客户端和游戏内是同一个开关。
+    game: key === 'hideAllPlayerNamesForMe' ? { ...values.game, hidePlayerNames: Boolean(value) } : values.game,
+  };
+}
+
+export function withGameValue<K extends keyof LolGameConfigValues>(
+  values: LolConfigValues,
+  key: K,
+  value: LolGameConfigValues[K],
+): LolConfigValues {
+  return {
+    ...values,
+    game: { ...values.game, [key]: value },
+    client: key === 'hidePlayerNames' ? { ...values.client, hideAllPlayerNamesForMe: Boolean(value) } : values.client,
+  };
+}
+
+export function withHotkeyValue(values: LolConfigValues, section: string, key: string, value: string): LolConfigValues {
+  return {
+    ...values,
+    hotkeys: { ...values.hotkeys, [section]: { ...(values.hotkeys[section] ?? {}), [key]: value } },
+  };
+}

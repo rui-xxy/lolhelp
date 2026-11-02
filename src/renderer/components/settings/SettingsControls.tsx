@@ -1,10 +1,40 @@
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown, Volume2, VolumeX } from 'lucide-react';
 import type { LolClientConfigValues } from '../../../shared/api';
 import { ProfileIcon } from '../ProfileIcon';
 import type { Option } from './configFields';
 
 // 设置页的基础积木。样式在 styles/features/settings.css（st- 前缀）。
+
+/**
+ * 对照：正在看的这套设置和另一套（一般是「这个号现在」）比。
+ * fields 用设置页那一行的名字当钥匙，hotkeys 用「section.key」，值是对照那边显示的样子。
+ * 只有不一样的行才在表里，行自己凭名字查，查到就标出来。
+ */
+export interface SettingsCompare {
+  /** 对照那边叫什么，例如「小猫猫拳 现在」。 */
+  label: string;
+  fields: Map<string, string>;
+  hotkeys: Map<string, string>;
+}
+
+export const SettingsCompareContext = createContext<SettingsCompare | null>(null);
+
+export function useSettingsCompare() {
+  return useContext(SettingsCompareContext);
+}
+
+/** 行尾的小注：对照那边是什么。 */
+export function CompareNote({ value }: { value: string }) {
+  const compare = useSettingsCompare();
+  if (!compare) return null;
+  return (
+    <span className="st-was">
+      <i />
+      {compare.label}：<b>{value}</b>
+    </span>
+  );
+}
 
 export function useSettingsScrollSpy<TSection extends string>(
   prefix: string,
@@ -141,11 +171,14 @@ export function SettingRow({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const compare = useSettingsCompare();
+  const was = compare?.fields.get(label);
   return (
-    <div className="st-row" data-wide={wide ? 'true' : undefined}>
+    <div className="st-row" data-wide={wide ? 'true' : undefined} data-diff={was !== undefined ? 'true' : undefined}>
       <div className="st-row__label">
         <b>{label}</b>
         {hint && <span>{hint}</span>}
+        {was !== undefined && <CompareNote value={was} />}
       </div>
       <div className="st-row__control">{children}</div>
     </div>
