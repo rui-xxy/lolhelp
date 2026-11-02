@@ -87,7 +87,7 @@ export function HotkeySettings({
   if (allBindings.length === 0) {
     return (
       <div className="st-empty st-empty--page">
-        没读到热键配置（input.ini）。检查一下右上角的游戏目录对不对，或者先进一次游戏让它生成。
+        未读取到热键配置（input.ini）
       </div>
     );
   }
@@ -100,7 +100,6 @@ export function HotkeySettings({
           <section id="hotkeys-section-hero" className="st-section">
             <header className="st-section__head">
               <h3>英雄热键</h3>
-              <p>点键帽改键。下面的「快捷」亮着表示按下就放，不用再点鼠标确认。</p>
             </header>
             <HeroHotkeys values={values} onChange={onChange} onCapture={openCapture} />
           </section>
@@ -108,7 +107,6 @@ export function HotkeySettings({
         <section className="st-section">
           <header className="st-section__head">
             <h3>其他热键</h3>
-            <p>按用途分好了组，点开一组再改。</p>
           </header>
           <div className="st-folds">
             {categories.filter((category) => category.key !== 'hero').map((category) => (
@@ -385,7 +383,7 @@ function HotkeyCaptureDialog({
           className="st-capture__pad"
         >
           <b>{displayHotkeyValue(captured)}</b>
-          <span>直接按键盘或鼠标按键，可以带 Ctrl / Alt / Shift</span>
+          <span>按下新按键</span>
         </div>
         <footer>
           <button type="button" className="as-btn as-btn--ghost" onClick={() => setCaptured(UNBOUND)}>

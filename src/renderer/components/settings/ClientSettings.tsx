@@ -46,7 +46,7 @@ export function ClientSettings({
     <>
       <SectionTabs sections={CLIENT_SECTIONS} active={activeSection} onSelect={goToSection} />
       <div className="st-sections">
-        <SettingsSection prefix="client" id="general" title="综合" description="客户端本身的表现：卡不卡、吵不吵。">
+        <SettingsSection prefix="client" id="general" title="综合">
           <SettingsGroup>
             <CheckboxRow
               label={CLIENT_FIELDS.lowSpecMode.label}
@@ -67,7 +67,7 @@ export function ClientSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="privacy" title="隐私与主播模式" description="直播或不想被认出来时用。">
+        <SettingsSection prefix="client" id="privacy" title="隐私与主播模式">
           <SettingsGroup>
             <CheckboxRow
               label={CLIENT_FIELDS.careerPrivate.label}
@@ -105,7 +105,7 @@ export function ClientSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="client" id="voice" title="语音" description="组队开黑时的队伍语音。">
+        <SettingsSection prefix="client" id="voice" title="语音">
           <SettingsGroup>
             <CheckboxRow label={CLIENT_FIELDS.teamVoiceEnabled.label} checked={values.teamVoiceEnabled} onChange={(value) => onChange('teamVoiceEnabled', value)} />
             <CheckboxRow label={CLIENT_FIELDS.autoJoinTeamVoice.label} checked={values.autoJoinTeamVoice} onChange={(value) => onChange('autoJoinTeamVoice', value)} />
@@ -138,7 +138,6 @@ export function ClientSettings({
           prefix="client"
           id="blocked"
           title="聊天黑名单"
-          description="客户端里屏蔽的玩家，只能查看。要解除屏蔽请在客户端好友列表里操作。"
         >
           <BlockedPlayersList players={values.blockedPlayers} />
         </SettingsSection>

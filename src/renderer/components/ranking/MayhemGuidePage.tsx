@@ -179,7 +179,6 @@ function AugmentColumns({ build }: { build: MayhemChampionBuild }) {
           <span className="mayhem-section-kicker">AUGMENT SIGNAL</span>
           <h2>强化推荐</h2>
         </div>
-        <p>按稀有度展示当前英雄胜率更高的选择</p>
       </div>
       <div className="mayhem-augment-columns">
         {(['prismatic', 'gold', 'silver'] as const).map((rarity) => {
@@ -486,7 +485,6 @@ export function MayhemGuidePage() {
                 <span>PATCH {result?.meta.patch || '—'}</span>
                 <strong>{visibleEntries.length}</strong>
                 <small>位英雄</small>
-                <p>按强化符文环境下的综合强度分层</p>
                 {result?.meta.updatedAt && <time>{formatUpdatedAt(result.meta.updatedAt)} 更新</time>}
               </div>
               <div className="mayhem-toolbar-controls">

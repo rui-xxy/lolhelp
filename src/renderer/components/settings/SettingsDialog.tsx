@@ -103,7 +103,7 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
       rootPathRef.current = next.rootPath;
       setState(next);
       if (!keep) setDraft(next.values);
-      if (!next.found) setNotice({ type: 'error', text: '没有找到英雄联盟的配置目录，去「关于与游戏目录」里选一下' });
+      if (!next.found) setNotice({ type: 'error', text: '未找到游戏配置目录' });
       return next;
     } catch (err) {
       setNotice({ type: 'error', text: errorText(err, '读取游戏设置失败') });
@@ -186,7 +186,7 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
     try {
       const roots = await window.lolHelper.config.detectRoots();
       if (roots.length === 0) {
-        setNotice({ type: 'error', text: '没有自动找到英雄联盟目录，点「选择文件夹」手动指定一下。' });
+        setNotice({ type: 'error', text: '未找到英雄联盟目录，请手动选择' });
         return;
       }
       const next = await refresh(roots[0]);
@@ -226,8 +226,8 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
       setNotice({
         type: result.lcuSynced ? 'success' : 'error',
         text: result.lcuSynced
-          ? '已应用到游戏，并同步给了当前登录的号'
-          : `已写进游戏文件，但没同步到客户端${result.lcuError ? `：${result.lcuError}` : '（客户端没登录）'}`,
+          ? '已应用'
+          : `已写入游戏文件，未同步到客户端${result.lcuError ? `：${result.lcuError}` : ''}`,
       });
     } catch (err) {
       setNotice({ type: 'error', text: errorText(err, '应用失败') });
@@ -262,8 +262,8 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
       setNotice({
         type: result.lcuSynced ? 'success' : 'error',
         text: result.lcuSynced
-          ? `方案已应用${account ? `到「${account}」` : ''}，下次进游戏就是这套设置`
-          : `方案已写进游戏文件，但没同步给账号${result.lcuError ? `：${result.lcuError}` : '（客户端没登录）'}`,
+          ? `方案已应用${account ? `到「${account}」` : ''}`
+          : `方案已写入游戏文件，未同步到账号${result.lcuError ? `：${result.lcuError}` : ''}`,
       });
     } catch (err) {
       setNotice({ type: 'error', text: errorText(err, '应用方案失败') });
@@ -312,7 +312,6 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
       <div className="as-empty st-empty--page">
         {busy === 'read' ? <LoaderCircle className="as-spin" /> : <AlertCircle />}
         <b>{busy === 'read' ? '正在读取游戏设置…' : '游戏设置读不出来'}</b>
-        {busy !== 'read' && <span>去「关于与游戏目录」确认一下英雄联盟装在哪。</span>}
       </div>
     );
   } else if (tab === 'client') {
@@ -364,11 +363,6 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
             </div>
           ))}
         </nav>
-        <div className="as-nav__foot">
-          {tab === 'appearance'
-            ? '外观改动立即生效，只影响助手自己。'
-            : '游戏设置改完后，点右上角「应用到游戏」才会写进游戏。'}
-        </div>
       </aside>
 
       <section className="st-main">
@@ -467,8 +461,8 @@ function ConfigBar({
         <b>{client?.connected ? (client.summonerName || '已登录') : '客户端没登录'}</b>
         <span>
           {client?.connected
-            ? blocked ? `${blocked} · 能存方案，改设置要等打完` : (CLIENT_PHASE_LABELS[client.phase] ?? '在线')
-            : '只能改这台电脑的文件'}
+            ? blocked || (CLIENT_PHASE_LABELS[client.phase] ?? '在线')
+            : '仅本机文件'}
         </span>
       </button>
 
@@ -490,7 +484,7 @@ function ConfigBar({
             <b>游戏目录</b>
             <p title={state?.rootPath}>{state?.rootPath || '还没有目录'}</p>
             <span data-missing={state && !state.found ? 'true' : undefined}>
-              {state?.found ? '已找到配置文件' : '这里没有英雄联盟的配置文件'}
+              {state?.found ? '已找到配置文件' : '未找到配置文件'}
             </span>
             <div>
               <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onDetect(); }}>

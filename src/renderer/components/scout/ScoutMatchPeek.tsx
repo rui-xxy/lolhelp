@@ -171,7 +171,7 @@ function PeekBody({
   };
 
   const loading = result === null;
-  const form = [...matches].reverse();
+  const form = matches;
 
   return (
     <>
@@ -187,7 +187,7 @@ function PeekBody({
           <dt>KDA</dt>
           <dd>{loading || summary.games === 0 ? '--' : summary.kda.toFixed(1)}</dd>
         </dl>
-        <div className="scout-peek__form" aria-label="胜负走势（左旧右新）">
+        <div className="scout-peek__form" aria-label="胜负走势（左新右旧）">
           {loading
             ? Array.from({ length: 20 }, (_, index) => <i key={index} />)
             : form.map((match, index) => (
@@ -338,7 +338,7 @@ export function ScoutMatchPeek({ hit, index, region, onClose, onOpenHistory }: S
       <header className="scout-peek__head">
         <div className="scout-peek__kicker">
           <span>战绩速览</span>
-          <em>PEEK · {String(index + 1).padStart(2, '0')}</em>
+          <em>{String(index + 1).padStart(2, '0')}</em>
           <button type="button" className="scout-peek__close" onClick={onClose} aria-label="关闭速览" title="关闭（Esc）">
             <X className="size-4" />
           </button>

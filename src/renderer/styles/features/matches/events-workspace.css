@@ -1,769 +1,1067 @@
 @layer components {
-  .lol-postgame-content:has(.lol-event-analyzer) {
+  /* =========================================================================
+     战绩详情 ·「事件」（MatchEventsView，mev- 前缀；小地图 rift- 前缀）
+     上：局势图。左：按对线期 / 中期 / 后期串起来的故事线。右：视角、小地图、详情。
+     ========================================================================= */
+  .lol-postgame-content:has(.mev) {
     overflow: hidden;
     padding: 0;
     background: var(--color-app-bg);
+    container-type: inline-size;
   }
-  .lol-event-analyzer {
-    --event-blue: var(--color-app-team-mine);
-    --event-red: var(--color-app-team-enemy);
-    --event-gold: var(--lol-gold);
-    --event-muted: var(--color-app-muted);
+
+  .mev,
+  .mev-empty {
+    --mev-blue: var(--color-app-team-mine);
+    --mev-red: var(--color-app-team-enemy);
+    --mev-gold: var(--color-gold);
+    --mev-gold-text: var(--color-gold-text);
+    --mev-gold-soft: var(--color-gold-soft);
+    --mev-gold-line: var(--color-gold-line);
+    --mev-line: var(--color-frost-line);
+    --mev-line-faint: var(--color-frost-line-faint);
+    --mev-line-strong: var(--color-frost-line-strong);
+    --mev-bg: var(--color-app-bg);
+    --mev-tone: var(--color-app-muted);
+    --mev-spine-x: 53px;
+  }
+  .mev {
     display: grid;
     height: 100%;
-    width: 100%;
     min-width: 0;
     min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    background: var(--color-app-bg);
-  }
-  .lol-event-analyzer__overview {
-    min-width: 0;
-    padding: 14px 20px 8px;
-    border-bottom: 1px solid var(--analysis-line);
-    background: transparent;
-  }
-  .lol-event-analyzer__layout {
-    display: grid;
-    min-width: 0;
-    min-height: 0;
-    grid-template-columns: minmax(0, 1fr) 248px;
-  }
-  .lol-event-analyzer__stream {
-    min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 14px 18px 28px;
-    scrollbar-gutter: stable;
-    background: transparent;
-  }
-  .lol-event-analyzer__boundary {
-    display: grid;
-    min-height: 36px;
-    grid-template-columns: 46px 24px minmax(0, 1fr);
-    gap: 10px;
-    align-items: center;
-    color: var(--color-app-muted);
-    font-size: 11px;
-  }
-  .lol-event-analyzer__boundary > time {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-  .lol-event-analyzer__boundary > span {
-    display: grid;
-    place-items: center;
-  }
-  .lol-event-analyzer__boundary svg {
-    width: 14px;
-    height: 14px;
-  }
-  .lol-event-analyzer__boundary > strong {
-    font-weight: 500;
-  }
-  .lol-event-analyzer__boundary--end {
-    margin-top: 14px;
-  }
-  .lol-event-gap--tight {
-    margin-top: 4px;
-  }
-  .lol-event-gap--near {
-    margin-top: 8px;
-  }
-  .lol-event-gap--far {
-    margin-top: 16px;
-  }
-  .lol-event-analyzer__event {
-    --event-accent: var(--event-muted);
-    display: grid;
-    grid-template-columns: 46px 24px minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
-    min-height: 68px;
-    padding: 9px 12px 9px 3px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-  }
-  .lol-event-analyzer__event--blue {
-    --event-accent: var(--event-blue);
-  }
-  .lol-event-analyzer__event--red {
-    --event-accent: var(--event-red);
-  }
-  .lol-event-analyzer__event--gold {
-    --event-accent: var(--event-gold);
-  }
-  .lol-event-analyzer__event:hover {
-    background: var(--color-frost-fill-hover);
-  }
-  .lol-event-analyzer__event.is-selected {
-    background: color-mix(in srgb, var(--event-accent) 8%, var(--analysis-panel));
-    border-color: color-mix(in srgb, var(--event-accent) 40%, transparent);
-  }
-  .lol-event-analyzer__event:focus-visible {
-    outline: 2px solid var(--analysis-focus);
-    outline-offset: -2px;
-  }
-  .lol-event-analyzer__event > time {
-    color: var(--color-app-muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-  .lol-event-analyzer__node {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 26px;
-    color: var(--event-accent);
-  }
-  .md-event-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--event-accent);
-  }
-  .lol-event-type-mark {
-    display: grid;
-    width: 24px;
-    height: 24px;
-    place-items: center;
-    font-size: 12px;
-  }
-  .lol-event-type-mark img {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-  }
-  .lol-event-analyzer__event-body {
-    display: grid;
-    min-width: 0;
-    gap: 5px;
-  }
-  .lol-event-analyzer__kill-flow {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
-  }
-  .lol-event-analyzer__combatant {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: 9px;
-  }
-  .lol-event-analyzer__combatant > img {
-    flex-shrink: 0;
-    border: 1px solid var(--analysis-line);
-  }
-  .md-event-identity {
-    display: grid;
-    min-width: 0;
-    gap: 3px;
-  }
-  .md-event-identity b {
-    color: var(--color-app-text);
-    font-size: 12px;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .md-event-identity small {
-    color: var(--color-app-muted);
-    font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .md-event-action {
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    color: var(--color-app-muted);
-  }
-  .md-event-action img {
-    width: 16px;
-    height: 16px;
-    object-fit: contain;
-  }
-  .md-event-action small {
-    font-size: 11px;
-  }
-  .lol-event-analyzer__unknown-avatar {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    flex-shrink: 0;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--analysis-surface);
-  }
-  .lol-event-analyzer__unknown-avatar svg {
-    width: 16px;
-    height: 16px;
-  }
-  .lol-event-analyzer__kill-meta, .lol-event-analyzer__objective-head {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--event-accent);
-    font-size: 11px;
-  }
-  .lol-event-analyzer__kind {
-    font-weight: 600;
-  }
-  .lol-event-analyzer__kill-meta > em {
-    color: var(--event-gold);
-    font-style: normal;
-  }
-  .lol-event-analyzer__assists {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--color-app-muted);
-    font-size: 11px;
-  }
-  .lol-event-analyzer__assists > div {
-    display: flex;
-    gap: 3px;
-  }
-  .lol-event-analyzer__assists img {
-    border: 1px solid var(--analysis-line);
-  }
-  .lol-event-analyzer__objective-copy {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 10px;
-  }
-  .lol-event-analyzer__objective-copy > div {
-    min-width: 0;
-  }
-  .lol-event-analyzer__objective-copy strong {
-    display: block;
-    color: var(--color-app-text);
-    font-size: 13px;
-    font-weight: 550;
-    overflow-wrap: anywhere;
-  }
-  .lol-fight-window {
-    border: 1px solid var(--analysis-line);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: var(--analysis-panel);
-  }
-  .lol-fight-window__head {
-    display: flex;
-    min-height: 40px;
-    justify-content: space-between;
-    align-items: center;
-    gap: 14px;
-    padding: 7px 14px;
-    border-bottom: 1px solid var(--analysis-line);
-    background: color-mix(in srgb, var(--analysis-focus) 5%, var(--analysis-panel));
-  }
-  .md-fight-period { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-  .md-fight-period time { color: var(--color-app-text); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .md-fight-period > span { font-size: 11px; color: var(--color-app-muted); }
-  .md-fight-period .md-fight-label { color: var(--analysis-focus); font-weight: 600; }
-  .md-fight-score { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; font-size: 11px; }
-  .md-fight-score span { display: flex; align-items: baseline; gap: 7px; }
-  .md-fight-score b { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .md-fight-score i { color: var(--color-app-muted); }
-  .lol-fight-window .is-blue { color: var(--event-blue); }
-  .lol-fight-window .is-red { color: var(--event-red); }
-  .lol-fight-window__events { padding: 3px 8px 5px; }
-  .lol-fight-window__events > .md-event-entry + .md-event-entry { border-top: 1px solid var(--analysis-line); }
-  .lol-event-analyzer__node-wrap { border-bottom: 1px solid var(--analysis-line); padding: 2px 8px; }
-  .lol-event-analyzer__empty {
-    min-height: 180px;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 10px;
-    color: var(--color-app-muted);
-  }
-  .lol-event-analyzer__empty svg {
-    width: 24px;
-    height: 24px;
-  }
-  /* The right rail never switches into a different mode on event selection. */
-  .lol-event-inspector {
-    min-height: 0;
-    overflow-y: auto;
-    border-left: 1px solid var(--analysis-line);
-    background: color-mix(in srgb, var(--analysis-panel) 82%, var(--color-app-bg));
-  }
-  .lol-event-inspector__controls {
-    padding: 14px 12px 20px;
-  }
-  .lol-event-control-head {
-    display: flex;
-    min-height: 32px;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  .lol-event-control-head > strong {
+    background: var(--mev-bg);
     color: var(--color-app-body);
+    font-family: var(--font-sans);
     font-size: 13px;
-    font-weight: 600;
+    line-height: 1.4;
   }
-  .lol-event-control-head > button {
+  .mev :where(button) {
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  .mev button:focus-visible {
+    outline: 2px solid var(--mev-gold-line);
+    outline-offset: 1px;
+  }
+  .mev .is-blue { --mev-tone: var(--mev-blue); }
+  .mev .is-red { --mev-tone: var(--mev-red); }
+
+  /* ── 顶部：局势 ───────────────────────────────────────────────────── */
+  .mev-top {
     display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border-radius: var(--radius-sm);
-    color: var(--color-app-muted);
-  }
-  .lol-event-control-head > button:hover:not(:disabled) {
-    background: var(--analysis-surface);
-  }
-  .lol-event-control-head > button:disabled {
-    opacity: .35;
-  }
-  .lol-event-control-head svg {
-    width: 14px;
-    height: 14px;
-  }
-  .lol-event-control-types {
-    display: grid;
-    gap: 4px;
-  }
-  .lol-event-control-types > button {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-    min-height: 40px;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
-    gap: 10px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    padding: 6px 9px;
-    background: transparent;
-    color: var(--color-app-muted);
-    text-align: left;
-    font-size: 12px;
+    gap: 8px 16px;
+    padding: 9px 18px 7px;
+    border-bottom: 1px solid var(--mev-line);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-app-surface) 55%, transparent), transparent);
   }
-  .lol-event-control-types > button:hover {
-    background: var(--color-frost-fill-hover);
-  }
-  .lol-event-control-types > button.is-active {
-    background: color-mix(in srgb, var(--analysis-focus) 10%, transparent);
-    border-color: transparent;
-    color: var(--analysis-focus);
-  }
-  .lol-event-control-types > button small {
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-app-muted);
-    min-width: 26px;
-    padding: 1px 5px;
-    border-radius: var(--radius-xs);
-    background: var(--color-frost-fill-soft);
-    text-align: center;
-  }
-  .md-event-scope-heading { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--analysis-line); }
-  .md-event-scope-heading strong { font-size: 12px; font-weight: 500; }
-  .md-event-scope-heading > span { font-size: 11px; color: var(--color-app-muted); }
-  .lol-event-filter-art {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-  }
-  .lol-event-filter-art > img {
-    width: 23px;
-    height: 23px;
-    object-fit: contain;
-  }
-  .lol-event-filter-art > svg {
-    width: 18px;
-    height: 18px;
-  }
-  .lol-event-filter-art > b {
-    position: absolute;
-    right: -4px;
-    bottom: -2px;
-    font-size: 11px;
-    line-height: 12px;
-    font-weight: 600;
-    background: var(--analysis-panel);
-    border-radius: var(--radius-xs);
-    padding: 0 2px;
-  }
-  .lol-event-player-scope {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 3px;
-    padding: 3px;
-    margin: 10px 0 14px;
-    border: 1px solid var(--analysis-line);
-    border-radius: var(--radius-sm);
-  }
-  .lol-event-player-scope > button {
-    min-height: 29px;
-    border-radius: var(--radius-xs);
-    color: var(--color-app-muted);
-    font-size: 12px;
-  }
-  .lol-event-player-scope > button.is-active {
-    background: var(--analysis-surface);
-    color: var(--color-app-text);
-  }
-  /* Context stays next to the selected event; damage is grouped by champion. */
-  .lol-event-inspector__selected {
-    margin: 6px 10px 16px 68px;
-    padding: 16px;
-    border: 1px solid var(--color-app-border);
-    border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--analysis-panel) 78%, var(--color-app-bg));
-  }
-  .lol-event-inspector__head {
+  .mev-top.has-map { grid-template-columns: minmax(0, 1fr) 150px; }
+  .mev-top__main { min-width: 0; }
+  .mev-top__head {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .lol-event-inspector__head > button {
-    order: 3;
-    margin-left: auto;
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border-radius: var(--radius-sm);
-    background: var(--analysis-surface);
-    color: var(--color-app-muted);
-  }
-  .lol-event-inspector__head > button svg {
-    width: 14px;
-    height: 14px;
-  }
-  .lol-event-inspector__head > div {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-  .lol-event-inspector__head strong {
-    color: var(--color-app-text);
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .lol-event-inspector__head small {
-    color: var(--color-app-muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-  .lol-event-inspector__event-icon {
-    display: none;
-  }
-  .lol-event-inspector__combat {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+    min-width: 0;
+    grid-column: 1 / -1;
     align-items: center;
     gap: 12px;
   }
-  .lol-event-inspector__combat > div {
-    min-width: 0;
+  .mev-top__head > strong {
+    flex: 0 0 auto;
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .06em;
+  }
+
+  /* 关键节点：一排小卡片，放不下就换行，每一张都能点、点了会在局势图上插旗。 */
+  .mev-facts {
     display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .lol-event-inspector__combat > div > span {
-    display: grid;
-    gap: 3px;
     min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px;
   }
-  .lol-event-inspector__combat strong {
-    font-size: 12px;
-    font-weight: 550;
+  .mev-fact {
+    position: relative;
+    display: grid;
+    min-width: 72px;
+    gap: 0;
+    padding: 4px 10px 5px;
     overflow: hidden;
+    border: 1px solid var(--mev-line);
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--mev-tone) 11%, transparent), transparent 85%),
+      color-mix(in srgb, var(--color-app-surface) 55%, transparent);
+    box-shadow: inset 0 2px color-mix(in srgb, var(--mev-tone) 75%, transparent);
+    text-align: left;
+    transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  }
+  .mev-fact.is-neutral { --mev-tone: var(--mev-gold); }
+  .mev-fact:hover {
+    border-color: color-mix(in srgb, var(--mev-tone) 45%, transparent);
+    transform: translateY(-1px);
+  }
+  .mev-fact__label {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    line-height: 1.3;
     white-space: nowrap;
+  }
+  .mev-fact__value {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .mev-fact__value b {
+    overflow: hidden;
+    max-width: 120px;
+    color: var(--mev-tone);
+    font-size: 13px;
+    font-weight: 700;
     text-overflow: ellipsis;
   }
-  .lol-event-inspector__combat small {
+  .mev-fact.is-neutral .mev-fact__value b { color: var(--color-app-text); }
+  .mev-fact__value small {
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
     font-size: 11px;
-    color: var(--color-app-muted);
   }
-  .lol-event-inspector__combat-arrow {
-    width: 16px;
-    height: 16px;
-    object-fit: contain;
+  .mev-fact.is-active {
+    border-color: var(--mev-gold-line);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--mev-gold) 20%, transparent), transparent 90%),
+      color-mix(in srgb, var(--color-app-surface) 55%, transparent);
+    box-shadow: inset 0 2px var(--mev-gold), 0 0 0 1px var(--mev-gold-line);
   }
-  .lol-event-inspector__section {
-    margin-top: 16px;
+  .mev-fact.is-active .mev-fact__value small { color: var(--mev-gold-text); }
+
+  /* ── 主体：故事线 + 侧栏 ─────────────────────────────────────────── */
+  .mev-body {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) 300px;
   }
-  .lol-event-inspector__section-title {
+  .mev-story {
+    min-width: 0;
+    min-height: 0;
+    padding: 0 16px 24px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .mev-filter {
+    position: sticky;
+    top: 0;
+    z-index: 3;
     display: flex;
-    min-height: 32px;
+    align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    align-items: center;
-    color: var(--color-app-body);
-    font-size: 12px;
-    font-weight: 550;
+    gap: 10px;
+    padding: 10px 0 8px calc(var(--mev-spine-x) + 10px);
+    background: var(--mev-bg);
   }
-  .lol-event-inspector__section-title small {
+  .mev-filter__types {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid var(--mev-line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-surface) 60%, transparent);
+  }
+  .mev-filter__types > button {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    gap: 5px;
+    padding: 0 11px;
+    border-radius: 999px;
     color: var(--color-app-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    transition: color 140ms ease, background-color 140ms ease;
+  }
+  .mev-filter__types > button small {
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
     font-size: 11px;
-    font-weight: 400;
   }
-  .lol-event-inspector__assist-grid {
+  .mev-filter__types > button:hover { color: var(--color-app-text); }
+  .mev-filter__types > button[aria-pressed='true'] {
+    background: var(--mev-gold-soft);
+    color: var(--mev-gold-text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--mev-gold-line);
+  }
+  .mev-filter__types > button[aria-pressed='true'] small { color: var(--mev-gold-text); }
+  .mev-filter__focus {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    height: 30px;
+    gap: 6px;
+    padding: 0 11px 0 5px;
+    border: 1px solid var(--mev-line);
+    border-radius: 999px;
+    color: var(--color-app-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  }
+  .mev-filter__focus:hover { color: var(--color-app-text); border-color: var(--mev-line-strong); }
+  .mev-filter__focus[aria-pressed='true'] {
+    border-color: var(--mev-gold-line);
+    background: var(--mev-gold-soft);
+    color: var(--mev-gold-text);
+    font-weight: 600;
+  }
+
+  /* 故事线左侧的时间轴：每一项自己画一段竖线，拼起来是一根完整的轴。 */
+  .mev-boundary,
+  .mev-phase,
+  .mev-moment,
+  .mev-quiet {
+    position: relative;
+  }
+  .mev-boundary::before,
+  .mev-phase::before,
+  .mev-moment::before,
+  .mev-quiet::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--mev-spine-x);
+    width: 2px;
+    margin-left: -1px;
+    background: var(--mev-line-strong);
+  }
+  .mev-boundary {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: 44px 18px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0;
+    padding: 6px 0;
+    color: var(--color-app-muted);
+    font-size: 12px;
   }
-  .lol-event-inspector__assist-grid > div {
+  .mev-boundary > time {
+    padding-right: 10px;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 12px;
+    text-align: right;
+  }
+  .mev-boundary > span { grid-column: 3; padding-left: 10px; }
+  .mev-boundary::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: var(--mev-spine-x);
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--color-app-muted);
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .mev-boundary:first-of-type::before { top: 50%; }
+  .mev-boundary.is-end::before { bottom: 50%; }
+  .mev-boundary.is-end b { color: var(--mev-tone); font-weight: 700; }
+  .mev-boundary.is-end::after { background: var(--mev-tone); }
+
+  .mev-phase {
     display: flex;
-    min-width: 0;
     align-items: center;
-    gap: 7px;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    padding: 14px 4px 8px calc(var(--mev-spine-x) + 18px);
   }
-  .lol-event-inspector__assist-grid span {
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .mev-phase::after {
+    content: '';
+    position: absolute;
+    top: calc(50% + 3px);
+    left: var(--mev-spine-x);
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--mev-gold);
+    border-radius: var(--radius-xs);
+    background: var(--mev-bg);
+    transform: translate(-50%, -50%) rotate(45deg);
   }
-  .lol-event-damage-groups {
-    display: grid;
-    gap: 7px;
-  }
-  .lol-event-damage-group {
-    border: 1px solid var(--analysis-line);
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--analysis-surface) 72%, var(--color-app-bg));
-  }
-  .lol-event-damage-group__head {
-    display: grid;
-    grid-template-columns: 36px minmax(70px, 1fr) minmax(35px, .65fr) auto 36px;
-    align-items: center;
+  .mev-phase__name {
+    display: flex;
+    align-items: baseline;
     gap: 8px;
-    padding: 10px;
-    cursor: pointer;
-    list-style: none;
   }
-  .lol-event-damage-group__head::-webkit-details-marker {
-    display: none;
+  .mev-phase__name strong {
+    color: var(--mev-gold-text);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .06em;
   }
-  .lol-event-damage-group__head > span {
-    display: grid;
+  .mev-phase__name span {
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 11px;
+  }
+  .mev-phase__score {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 12px;
+  }
+  .mev-score {
+    display: inline-flex;
+    align-items: baseline;
     gap: 3px;
-    min-width: 0;
+    font-family: var(--font-num);
   }
-  .lol-event-damage-group__head strong {
+  .mev-score small {
+    margin-right: 3px;
+    color: var(--color-app-subtle);
+    font-family: var(--font-sans);
+    font-size: 11px;
+  }
+  .mev-score b { color: var(--mev-tone); font-size: 13px; font-weight: 500; opacity: .8; }
+  .mev-score b.is-ahead { font-weight: 800; opacity: 1; }
+  .mev-score i { color: var(--color-app-subtle); font-style: normal; }
+
+  .mev-quiet {
+    margin: 0;
+    padding: 6px 0 8px calc(var(--mev-spine-x) + 18px);
+    color: var(--color-app-subtle);
+    font-size: 12px;
+  }
+
+  /* ── 一个时刻 ───────────────────────────────────────────────────── */
+  .mev-moment {
+    display: grid;
+    grid-template-columns: 44px 18px minmax(0, 1fr);
+    align-items: start;
+    padding: 4px 0;
+    /* 从局势图、地图跳过来时停在筛选条下面，不被它挡住。 */
+    scroll-margin-top: 58px;
+  }
+  .mev-moment__time {
+    padding: 10px 10px 0 0;
+    color: var(--color-app-muted);
+    font-family: var(--font-num);
+    font-size: 12px;
+    text-align: right;
+  }
+  .mev-moment__node {
+    position: relative;
+    z-index: 1;
+    justify-self: center;
+    width: 9px;
+    height: 9px;
+    margin-top: 14px;
+    border-radius: 50%;
+    background: var(--mev-tone);
+    box-shadow: 0 0 0 3px var(--mev-bg);
+  }
+  .mev-moment.is-big .mev-moment__node { width: 13px; height: 13px; margin-top: 12px; box-shadow: 0 0 0 3px var(--mev-bg), 0 0 10px color-mix(in srgb, var(--mev-tone) 60%, transparent); }
+  .mev-moment.is-involved .mev-moment__node { box-shadow: 0 0 0 3px var(--mev-bg), 0 0 0 5px var(--mev-gold-line); }
+  .mev-moment__card {
+    min-width: 0;
+    margin-left: 10px;
+    border-radius: var(--radius-lg);
+  }
+  .mev-moment.is-big .mev-moment__card {
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    border: 1px solid var(--mev-line);
+    background: color-mix(in srgb, var(--color-app-surface) 55%, transparent);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+  }
+  .mev-moment.is-selected .mev-moment__card {
+    border-color: var(--mev-gold-line);
+    box-shadow: 0 0 0 1px var(--mev-gold-line), 0 8px 22px color-mix(in srgb, var(--color-shadow) 60%, transparent);
+  }
+  .mev-moment__head {
+    display: grid;
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 10px;
+    padding: 9px 12px 8px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mev-tone) 15%, transparent), transparent 70%);
+    text-align: left;
+  }
+  .mev-moment__head:hover { background: linear-gradient(90deg, color-mix(in srgb, var(--mev-tone) 22%, transparent), transparent 75%); }
+  .mev-moment__badge {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mev-tone) 20%, transparent);
+    color: var(--mev-tone);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .mev-moment.is-ace .mev-moment__badge {
+    background: var(--mev-tone);
+    color: var(--mev-bg);
+  }
+  .mev-moment.is-neutral .mev-moment__badge { color: var(--color-app-body); }
+  .mev-moment__head > strong {
+    overflow: hidden;
     color: var(--color-app-text);
     font-size: 13px;
     font-weight: 600;
-  }
-  .lol-event-damage-group__head small {
-    font-size: 11px;
-    color: var(--color-app-muted);
-    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .lol-event-damage-group__head > em {
-    color: var(--color-app-text);
-    font-size: 14px;
-    font-weight: 600;
-    font-style: normal;
-    font-variant-numeric: tabular-nums;
+  .mev-moment__score {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    font-family: var(--font-num);
+    font-size: 16px;
+    font-weight: 700;
   }
-  .lol-event-damage-group__head > b {
-    color: var(--color-app-muted);
-    font-weight: 500;
+  .mev-moment__score b.is-blue { color: var(--mev-blue); }
+  .mev-moment__score b.is-red { color: var(--mev-red); }
+  .mev-moment__score i { color: var(--color-app-subtle); font-style: normal; font-weight: 400; }
+  .mev-moment__head > small {
+    grid-column: 2 / -1;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
     font-size: 11px;
-    text-align: right;
   }
-  .lol-event-damage-group__head > div, .lol-event-damage-source > div {
-    height: 4px;
-    border-radius: var(--radius-xs);
-    background: var(--color-frost-fill-active);
-    overflow: hidden;
-  }
-  .lol-event-damage-group__head > div > i, .lol-event-damage-source > div > i {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--analysis-focus);
-  }
-  .lol-event-damage-group__unknown {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-  }
-  .lol-event-damage-group__unknown svg {
-    width: 18px;
-    height: 18px;
-  }
-  .lol-event-damage-sources {
-    display: grid;
-    gap: 2px;
-    padding: 4px 10px 9px;
-    border-top: 1px solid var(--analysis-line);
-  }
-  .lol-event-damage-source {
-    display: grid;
-    grid-template-columns: 26px minmax(75px, 1fr) minmax(40px, .65fr) auto 36px;
+  .mev-moment.is-big .mev-moment__rows { padding: 2px 0 4px; }
+
+  /* ── 一行事件 ───────────────────────────────────────────────────── */
+  .mev-row {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
     align-items: center;
     gap: 8px;
-    min-height: 37px;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    transition: background-color 120ms ease;
   }
-  .lol-event-damage-source > span {
-    color: var(--color-app-body);
-    font-size: 12px;
+  .mev-moment.is-big .mev-row { border-radius: 0; }
+  .mev-moment.is-big .mev-row + .mev-row { box-shadow: inset 0 1px var(--mev-line-faint); }
+  .mev-row:hover { background-color: var(--color-frost-fill-hover); }
+  .mev-row.is-selected {
+    background-color: var(--mev-gold-soft);
+    box-shadow: inset 2px 0 var(--mev-gold);
+  }
+  .mev-moment.is-big .mev-row.is-selected + .mev-row { box-shadow: none; }
+  .mev-row.is-focus-kill:not(.is-selected) { box-shadow: inset 2px 0 var(--mev-gold-line); }
+  .mev-row.is-focus-death:not(.is-selected) { box-shadow: inset 2px 0 color-mix(in srgb, var(--color-app-loss) 70%, transparent); }
+  .mev-row > time {
+    flex: 0 0 34px;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 11px;
+  }
+  .mev-row__actor,
+  .mev-row__victim {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+  }
+  .mev-row__actor { flex: 0 1 auto; }
+  .mev-row__victim { flex: 0 1 auto; }
+  .mev-row b {
     overflow: hidden;
+    max-width: 118px;
+    color: var(--color-app-body);
+    font-size: 12.5px;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .lol-event-damage-source > em {
-    color: var(--color-app-text);
-    font-style: normal;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
+  .mev-row__victim b { color: var(--color-app-muted); }
+  .mev-row.is-focus-death .mev-row__victim b { color: var(--color-app-loss); }
+  .mev-row__verb {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    opacity: .7;
   }
-  .lol-event-damage-source > small {
-    color: var(--color-app-muted);
-    text-align: right;
-    font-size: 11px;
+  .mev-row__verb img { width: 12px; height: 12px; }
+  .mev-row__extra {
+    display: inline-flex;
+    min-width: 0;
+    flex: 1 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
   }
-  .lol-event-damage-source__icon {
+  .mev-row__assists { display: inline-flex; padding-left: 4px; }
+  .mev-row__assists > .mev-avatar + .mev-avatar { margin-left: -4px; }
+  .mev-row__assists .mev-avatar { box-shadow: 0 0 0 2px var(--mev-bg); }
+  .mev-row__art {
+    display: grid;
     width: 26px;
     height: 26px;
-    border-radius: var(--radius-xs);
-    object-fit: cover;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--mev-tone) 12%, var(--mev-bg));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--mev-tone) 45%, transparent);
   }
-  .lol-event-damage-source__fallback {
+  .mev-row__art img { width: 20px; height: 20px; object-fit: contain; }
+  .mev-row.is-building .mev-row__art img { width: 14px; height: 14px; }
+  .mev-row__what {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mev-row__what > b { margin-right: 4px; color: var(--mev-tone); font-weight: 700; }
+
+  .mev-tag {
+    display: inline-flex;
+    height: 19px;
+    align-items: center;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--color-frost-fill-hover);
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-style: normal;
+    white-space: nowrap;
+  }
+  .mev-tag.is-multi {
+    background: var(--mev-gold-soft);
+    color: var(--mev-gold-text);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px var(--mev-gold-line);
+  }
+  .mev-tag.is-bounty {
+    background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+    color: var(--color-warn);
+  }
+
+  .mev-avatar {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-self: center;
+    height: max-content;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--mev-tone) 70%, transparent);
+  }
+  .mev-avatar.is-focus { box-shadow: 0 0 0 2px var(--mev-gold), 0 0 8px color-mix(in srgb, var(--mev-gold) 50%, transparent); }
+  .mev-avatar.is-unknown {
     display: grid;
     width: 26px;
     height: 26px;
     place-items: center;
-    background: var(--analysis-panel);
-    border-radius: var(--radius-xs);
+    background: var(--color-app-surface);
+    box-shadow: inset 0 0 0 1px var(--mev-line-strong);
+    color: var(--color-app-muted);
+  }
+  .mev-avatar.is-unknown svg { width: 60%; height: 60%; }
+
+  /* ── 侧栏：视角、小地图、详情 ─────────────────────────────────────── */
+  .mev-side {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 14px 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-left: 1px solid var(--mev-line);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-app-surface) 40%, transparent), transparent 60%);
+  }
+  .mev-who {
+    display: grid;
+    gap: 6px;
+  }
+  .mev-who__teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .mev-who > span {
+    flex: 0 0 auto;
     color: var(--color-app-muted);
     font-size: 11px;
-    font-style: normal;
+    white-space: nowrap;
   }
-  .lol-event-damage-empty {
-    padding: 14px 0 0;
+  .mev-who__team {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mev-tone) 10%, transparent);
+  }
+  .mev-who__team > button {
+    display: inline-flex;
+    padding: 0;
+    border-radius: 50%;
+    opacity: .5;
+    transition: opacity 140ms ease, box-shadow 140ms ease;
+  }
+  .mev-who__team > button:hover { opacity: 1; }
+  .mev-who__team > button[aria-pressed='true'] {
+    opacity: 1;
+    box-shadow: 0 0 0 2px var(--mev-gold), 0 0 8px color-mix(in srgb, var(--mev-gold) 45%, transparent);
+  }
+
+  .mev-map { display: grid; gap: 5px; padding-top: 2px; }
+  .mev-map__legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px 10px;
     color: var(--color-app-muted);
-    font-size: 12px;
+    font-size: 11px;
+    white-space: nowrap;
   }
-  .lol-event-location {
-    border-top: 1px solid var(--analysis-line);
-  }
-  .lol-event-location > summary {
-    cursor: pointer;
-  }
-  .lol-event-location > summary::after {
-    content: '+';
-    margin-left: auto;
-    font-size: 16px;
-    color: var(--color-app-muted);
-  }
-  .lol-event-location[open] > summary::after {
-    content: '−';
-  }
-  .lol-event-map {
-    position: relative;
-    width: min(260px, 100%);
-    aspect-ratio: 1;
-    margin-top: 8px;
-    overflow: hidden;
-    border-radius: var(--radius-sm);
-    background: var(--analysis-surface);
-  }
-  .lol-event-map > img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-  .lol-event-map__dot {
-    position: absolute;
+  .mev-map__legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .mev-map__legend i {
+    display: inline-block;
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    border: 2px solid var(--color-app-text);
-    background: var(--event-red);
-    transform: translate(-50%, 50%);
+    background: var(--mev-tone);
   }
-  .lol-event-map__dot--blue {
-    background: var(--event-blue);
+  .mev-map__legend i.is-focus-death {
+    width: 9px;
+    height: 9px;
+    border-radius: 0;
+    background:
+      linear-gradient(45deg, transparent 40%, var(--color-app-loss) 40%, var(--color-app-loss) 60%, transparent 60%),
+      linear-gradient(-45deg, transparent 40%, var(--color-app-loss) 40%, var(--color-app-loss) 60%, transparent 60%);
   }
-  .lol-event-map > small {
+
+  .rift {
+    --rift-tone: var(--color-app-muted);
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 0 0 1px var(--mev-line);
+  }
+  .rift .is-blue { --rift-tone: var(--mev-blue); }
+  .rift .is-red { --rift-tone: var(--mev-red); }
+  .rift-ground {
     position: absolute;
-    bottom: 6px;
-    left: 6px;
-    background: var(--analysis-panel);
-    padding: 3px 5px;
-    border-radius: var(--radius-xs);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .rift-bg { fill: color-mix(in srgb, var(--color-ok) 9%, var(--color-app-surface)); }
+  .rift-jungle { fill: color-mix(in srgb, var(--color-ok) 16%, transparent); }
+  .rift-river {
+    fill: none;
+    stroke: color-mix(in srgb, var(--mev-blue) 20%, transparent);
+    stroke-width: 7;
+    stroke-linecap: round;
+  }
+  .rift-pit {
+    fill: color-mix(in srgb, var(--mev-blue) 14%, var(--color-app-surface));
+    stroke: color-mix(in srgb, var(--color-app-text) 14%, transparent);
+    stroke-width: .5;
+  }
+  .rift-lane {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-app-text) 10%, transparent);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .rift-lane.is-wide { stroke-width: 16; stroke: color-mix(in srgb, var(--color-app-text) 7%, transparent); }
+  .rift-lane-core {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-app-text) 14%, transparent);
+    stroke-width: 3.4;
+    stroke-linecap: round;
+  }
+  .rift-base.is-blue { fill: color-mix(in srgb, var(--mev-blue) 26%, transparent); }
+  .rift-base.is-red { fill: color-mix(in srgb, var(--mev-red) 26%, transparent); }
+
+  .rift-point {
+    position: absolute;
+    display: grid;
+    width: 14px;
+    height: 14px;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform 140ms ease, opacity 140ms ease;
+  }
+  .rift-point > i {
+    position: relative;
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rift-tone);
+    box-shadow: 0 0 0 1.5px var(--mev-bg);
+  }
+  .rift-point:hover { z-index: 3; transform: translate(-50%, -50%) scale(1.35); }
+  .rift-point.is-focus-kill > i {
+    width: 9px;
+    height: 9px;
+    background: var(--mev-gold);
+    box-shadow: 0 0 0 1.5px var(--mev-bg), 0 0 0 3px var(--mev-gold-line);
+  }
+  .rift-point.is-focus-death > i {
+    width: 12px;
+    height: 12px;
+    border-radius: 0;
+    background:
+      linear-gradient(45deg, transparent 38%, var(--color-app-loss) 38%, var(--color-app-loss) 62%, transparent 62%),
+      linear-gradient(-45deg, transparent 38%, var(--color-app-loss) 38%, var(--color-app-loss) 62%, transparent 62%);
+    box-shadow: none;
+    filter: drop-shadow(0 0 1px var(--mev-bg)) drop-shadow(0 0 1px var(--mev-bg));
+  }
+  .rift-point.is-objective {
+    width: 22px;
+    height: 22px;
+    background: var(--mev-bg);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--rift-tone) 55%, transparent);
+  }
+  .rift-point.is-objective img { width: 18px; height: 18px; object-fit: contain; }
+  .rift-point.is-dim { opacity: .2; }
+  .rift-point.is-active { z-index: 2; transform: translate(-50%, -50%) scale(1.45); }
+  .rift-point.is-active::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1.5px solid var(--mev-gold);
+    border-radius: 50%;
+    animation: rift-pulse 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes rift-pulse {
+    0% { opacity: .95; transform: scale(.8); }
+    100% { opacity: 0; transform: scale(1.8); }
+  }
+
+  /* 虚空巢虫 / 阿塔坎：精灵图里的一格。 */
+  .obj-sprite {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background-position: 0 -80px;
+    background-repeat: no-repeat;
+    background-size: 16px 112px;
+  }
+  .obj-sprite.is-other { background-position: 0 -96px; }
+  .mo-landmark .obj-sprite { width: 14px; height: 14px; background-size: 14px 98px; background-position: 0 -70px; }
+  .mo-landmark .obj-sprite.is-other { background-position: 0 -84px; }
+
+  /* ── 详情卡片 ───────────────────────────────────────────────────── */
+  .mev-detail {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--mev-line);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-app-surface) 60%, transparent);
+  }
+  .mev-detail__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .mev-detail__head > div { display: grid; min-width: 0; gap: 2px; }
+  .mev-detail__head small { color: var(--color-app-muted); font-size: 11px; }
+  .mev-detail__head strong { color: var(--color-app-text); font-size: 13.5px; font-weight: 700; line-height: 1.35; }
+  .mev-detail__head > button {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--color-app-muted);
+  }
+  .mev-detail__head > button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
+  .mev-detail__head > button svg { width: 14px; height: 14px; }
+
+  .mev-duel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mev-tone) 14%, transparent), transparent 55%, color-mix(in srgb, var(--color-app-loss) 8%, transparent));
+  }
+  .mev-duel__side {
+    display: grid;
+    min-width: 0;
+    justify-items: center;
+    gap: 4px;
+    text-align: center;
+  }
+  .mev-duel__side b {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mev-duel__side small { color: var(--color-app-muted); font-size: 11px; }
+  .mev-duel__side.is-victim .mev-avatar img { filter: grayscale(.75) brightness(.85); }
+  .mev-duel__side.is-victim b { color: var(--color-app-muted); }
+  .mev-duel__mark { display: grid; place-items: center; color: var(--mev-gold); }
+  .mev-duel__mark svg { width: 18px; height: 18px; }
+
+  .mev-detail__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mev-detail__tags:empty { display: none; }
+  .mev-detail__block { display: grid; gap: 7px; }
+  .mev-detail__block h4 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .mev-detail__block h4 small { color: var(--color-app-muted); font-family: var(--font-num); font-size: 11px; font-weight: 400; }
+  .mev-detail__avatars { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+  .mev-detail__mate { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .mev-detail__hint { margin: 0; color: var(--color-app-subtle); font-size: 12px; line-height: 1.5; }
+
+  .mev-dmg-strip {
+    display: flex;
+    height: 8px;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 999px;
+  }
+  .mev-dmg-strip > i { min-width: 3px; background: var(--mev-tone); }
+  .mev-dmg-strip > i:nth-child(even) { opacity: .7; }
+  .mev-dmg { display: grid; gap: 2px; }
+  .mev-dmg__dealer > summary {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) 56px auto 32px;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    list-style: none;
+  }
+  .mev-dmg__dealer > summary::-webkit-details-marker { display: none; }
+  .mev-dmg__dealer > summary:hover { background: var(--color-frost-fill-hover); }
+  .mev-dmg__dealer > summary b {
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 12px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mev-dmg__dealer > summary em {
+    color: var(--color-app-text);
+    font-family: var(--font-num);
+    font-size: 12px;
+    font-style: normal;
+    text-align: right;
+  }
+  .mev-dmg__dealer > summary small {
+    color: var(--color-app-muted);
+    font-family: var(--font-num);
     font-size: 11px;
+    text-align: right;
   }
-  @container (max-width: 900px) {
-    .lol-event-analyzer__layout {
-      grid-template-columns: minmax(0, 1fr) 222px;
-    }
-    .lol-event-analyzer__stream {
-      padding-inline: 10px;
-    }
-    .lol-event-analyzer__event {
-      grid-template-columns: 40px 22px minmax(0, 1fr);
-      gap: 7px;
-    }
-    .lol-event-inspector__selected {
-      margin-left: 54px;
-      padding: 12px;
-    }
-    .lol-event-analyzer__kill-flow {
-      gap: 6px;
-    }
+  .mev-dmg__bar {
+    display: block;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-frost-fill-hover);
   }
-  @container (max-width: 650px) {
-    .lol-event-analyzer__layout {
-      grid-template-columns: minmax(0, 1fr) 174px;
-    }
-    .lol-event-analyzer__overview { padding-inline: 12px; }
-    .lol-fight-window__head { padding: 10px; gap: 8px; }
-    .md-fight-period { gap: 4px 8px; }
-    .md-fight-period > time { flex-basis: 100%; order: -1; }
-    .md-fight-score { gap: 5px; }
-    .lol-event-analyzer__event {
-      grid-template-columns: 36px minmax(0, 1fr);
-    }
-    .lol-event-analyzer__node {
-      display: none;
-    }
-    .lol-event-inspector__selected {
-      margin-left: 0;
-    }
-    .lol-event-analyzer__combatant {
-      gap: 5px;
-    }
-    .md-event-identity small {
-      display: none;
-    }
-    .lol-event-control-types > button {
-      gap: 6px;
-      padding-inline: 5px;
-    }
-    .lol-event-inspector__controls {
-      padding-inline: 7px;
-    }
-    .lol-event-damage-source > div, .lol-event-damage-group__head > div {
-      display: none;
-    }
-    .lol-event-damage-source, .lol-event-damage-group__head {
-      grid-template-columns: 26px minmax(60px, 1fr) auto 30px;
-      gap: 6px;
-    }
+  .mev-dmg__bar > i { display: block; height: 100%; border-radius: 999px; background: var(--mev-tone); }
+  .mev-dmg__bar.is-thin { height: 3px; }
+  .mev-dmg__sources { display: grid; gap: 3px; padding: 2px 4px 6px 38px; }
+  .mev-dmg__source {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 48px auto;
+    align-items: center;
+    gap: 7px;
+    color: var(--color-app-muted);
+    font-size: 11.5px;
+  }
+  .mev-dmg__source > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mev-dmg__source em { color: var(--color-app-body); font-family: var(--font-num); font-size: 11px; font-style: normal; text-align: right; }
+  .mev-ability {
+    display: block;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
+  }
+  .mev-ability.is-text {
+    display: grid;
+    place-items: center;
+    background: var(--color-frost-fill-hover);
+    color: var(--color-app-body);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .mev-objective {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mev-tone) 14%, transparent), transparent);
+  }
+  .mev-objective__art {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mev-bg);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--mev-tone) 50%, transparent);
+  }
+  .mev-objective__art img { width: 34px; height: 34px; object-fit: contain; }
+  .mev-objective > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mev-objective b { color: var(--color-app-text); font-size: 12.5px; }
+  .mev-objective small { color: var(--color-app-muted); font-size: 11px; }
+
+  .mev-detail__teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mev-detail__team {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--mev-tone) 9%, transparent);
+  }
+  .mev-detail__team > span { color: var(--color-app-muted); font-size: 12px; }
+  .mev-detail__team > span b { color: var(--mev-tone); font-family: var(--font-num); font-size: 15px; }
+  .mev-detail__team > div { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 5px; }
+  .mev-detail__next {
+    height: 30px;
+    border: 1px solid var(--mev-gold-line);
+    border-radius: 999px;
+    background: var(--mev-gold-soft);
+    color: var(--mev-gold-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .mev-detail__next:hover { background: color-mix(in srgb, var(--mev-gold) 24%, transparent); }
+
+  .mev-focus__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mev-focus__head > div { display: grid; min-width: 0; gap: 3px; }
+  .mev-focus__head strong { color: var(--color-app-text); font-size: 14px; font-weight: 700; }
+  .mev-focus__head span { color: var(--color-app-muted); font-size: 12px; }
+  .mev-focus__head span b { color: var(--color-app-text); font-family: var(--font-num); }
+  .mev-focus__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding: 8px 0;
+    border-top: 1px solid var(--mev-line);
+    border-bottom: 1px solid var(--mev-line);
+  }
+  .mev-focus__stats > div {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+    text-align: center;
+  }
+  .mev-focus__stats > div + div { box-shadow: inset 1px 0 var(--mev-line); }
+  .mev-focus__stats dt {
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mev-focus__stats dd {
+    margin: 0;
+    color: var(--color-app-text);
+    font-family: var(--font-num);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .mev-focus__stats dd small { color: var(--color-app-subtle); font-size: 11px; font-weight: 400; }
+  .mev-people { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .mev-people > li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 2px;
+  }
+  .mev-people span {
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mev-people span small { margin-left: 6px; color: var(--color-app-subtle); font-size: 11px; }
+  .mev-people b { color: var(--mev-gold-text); font-family: var(--font-num); font-size: 13px; }
+  .mev-people.is-danger b { color: var(--color-app-loss); }
+
+  .mev-empty {
+    display: grid;
+    height: 100%;
+    min-height: 220px;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    color: var(--color-app-muted);
+    text-align: center;
+  }
+  .mev-empty > svg { width: 24px; height: 24px; color: var(--mev-gold); }
+  .mev-empty > strong { color: var(--color-app-text); font-size: 14px; }
+  .mev-empty > span { font-size: 12px; }
+  .mev-spin { animation: mev-spin 1s linear infinite; }
+  @keyframes mev-spin { to { transform: rotate(360deg); } }
+
+  /* ── 窄窗口：侧栏先变窄，再不够就上下排、整页一起滚 ───────────────── */
+  @container (max-width: 880px) {
+    .mev-body { grid-template-columns: minmax(0, 1fr) 252px; }
+    .mev-side { padding-inline: 10px; }
+    .mev-row b { max-width: 92px; }
+    .mev-who__teams { flex-wrap: wrap; justify-content: flex-start; }
+    .mev-filter { flex-wrap: wrap; row-gap: 6px; }
+    .mev-moment { scroll-margin-top: 96px; }
+  }
+  @container (max-width: 640px) {
+    .mev { display: block; height: 100%; overflow-y: auto; }
+    .mev-body { display: block; }
+    .mev-story, .mev-side { overflow: visible; }
+    .mev-side { border-top: 1px solid var(--mev-line); border-left: 0; }
+    .mev-top.has-map { grid-template-columns: minmax(0, 1fr); }
+    .mev-map { width: 100%; max-width: 240px; margin: 0 auto; }
+    .mev-filter { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rift-point.is-active::after, .mev-spin { animation: none; }
   }
 }

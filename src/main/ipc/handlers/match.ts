@@ -2,6 +2,8 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/channels';
 import { fetchMatchBriefsByPuuid, fetchPlayerRanksByPuuid, searchPlayer } from '../../match/matchService';
 import { getAllHeroes } from '../../lcu/heroData';
+import { fetchPlayerDossier } from '../../match/playerDossier';
+import { fetchActiveGame } from '../../match/activeGame';
 import { downloadReplay, getReplayAvailability, watchReplay } from '../../match/replayService';
 import { getMatchTimeline } from '../../match/timelineService';
 import {
@@ -21,6 +23,8 @@ import type {
   ChampionSummary,
   PlayerLookupRequest,
   PlayerLookupResult,
+  PlayerActiveGame,
+  PlayerDossier,
   PlayerMatchBriefResult,
   PlayerRankSummary,
 } from '../../../shared/api';
@@ -51,6 +55,18 @@ export function registerMatchHandlers(): void {
     async (_event, puuid: string, region?: string): Promise<PlayerRankSummary[]> => {
       return fetchPlayerRanksByPuuid(String(puuid ?? ''), typeof region === 'string' ? region : undefined);
     },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MATCH_GET_PLAYER_DOSSIER,
+    async (_event, puuid: string, region?: string): Promise<PlayerDossier> => {
+      return fetchPlayerDossier(String(puuid ?? ''), typeof region === 'string' ? region : undefined);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MATCH_GET_ACTIVE_GAME,
+    async (_event, puuid: string): Promise<PlayerActiveGame> => fetchActiveGame(String(puuid ?? '')),
   );
 
   ipcMain.handle(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_SUMMARY, async () => {

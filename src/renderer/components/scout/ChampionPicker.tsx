@@ -149,7 +149,6 @@ export function ChampionPicker({
         <div className="rounded-xs border border-app-border bg-app-surface-soft px-2 py-2">
           <div className="mb-1.5 flex items-center justify-between text-[11px] text-app-subtle">
             <span>已保存方案</span>
-            <span>点击直接套用</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {championPresets.map((preset) => {

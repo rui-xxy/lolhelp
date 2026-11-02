@@ -2,8 +2,9 @@ export const DEFAULT_LOL_ROOT_PATH = 'D:\\WeGameApps\\英雄联盟';
 
 export const APP_LAYOUT = {
   // 流式布局：窗口可自由缩放，默认尺寸会按屏幕可用区域收缩，并记住上次尺寸。
-  defaultWindowWidth: 1440,
-  defaultWindowHeight: 880,
+  // 默认尺寸刚好放下实时对局的 5 组对位；其他页面在这个尺寸下也要能完整看到（放不下的地方自己滚动）。
+  defaultWindowWidth: 1320,
+  defaultWindowHeight: 760,
   minWindowWidth: 1200,
   minWindowHeight: 720,
   topbarHeight: 48,

@@ -1,0 +1,1102 @@
+/* 玩家档案（components/hub/PlayerProfileView.tsx）
+   想知道的就三件事：在玩什么、和谁玩、打得怎么样。
+   基础信息一行 → 「现在」卡片 → 按时段分组的最近动态；右栏：战绩 / 在玩 / 一起玩 / 资产。
+   「现在」卡片压在英雄原画上，深浅色模式下都用浅色字 + 深色遮罩。 */
+@layer components {
+  .pv {
+    --pv-ink: var(--color-app-on-danger);
+    --pv-ink-soft: color-mix(in srgb, var(--color-app-on-danger) 74%, transparent);
+    --pv-glass: color-mix(in srgb, var(--color-shadow) 42%, transparent);
+    --pv-glass-strong: color-mix(in srgb, var(--color-shadow) 58%, transparent);
+    --pv-glass-line: color-mix(in srgb, var(--color-app-on-danger) 18%, transparent);
+    --mode-0: var(--color-ally);
+    --mode-1: var(--color-gold);
+    --mode-2: var(--color-party-teal);
+    --mode-3: var(--color-party-violet);
+  }
+
+  /* ---------- 基础信息 ---------- */
+  .pv-head {
+    position: relative;
+    display: flex;
+    min-height: 92px;
+    align-items: center;
+    gap: 14px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--color-line-1);
+    padding: 12px 20px;
+  }
+
+  .pv-head__art {
+    position: absolute;
+    inset: 0 0 0 35%;
+    pointer-events: none;
+  }
+
+  .pv-head__splash {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 60% 22%;
+    opacity: 0.32;
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 60%);
+    mask-image: linear-gradient(90deg, transparent, black 60%);
+  }
+
+  .pv-head > :not(.pv-head__art) {
+    position: relative;
+  }
+
+  .pv-avatar {
+    position: relative;
+    display: grid;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    place-items: center;
+  }
+
+  .pv-ring {
+    position: absolute;
+    inset: 0;
+  }
+
+  .pv-ring__track {
+    stroke: var(--color-line-2);
+  }
+
+  .pv-ring__value {
+    stroke: var(--color-gold);
+  }
+
+  .pv-avatar__img {
+    border-radius: 999px;
+  }
+
+  .pv-avatar__level {
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 2px solid var(--color-ink-1);
+    border-radius: 999px;
+    padding: 0 6px;
+    color: var(--color-text-1);
+    background: var(--color-ink-4);
+    font: 700 var(--text-cap) / 15px var(--font-num);
+  }
+
+  .pv-head__id {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 6px;
+  }
+
+  .pv-head__name {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pv-head__name h3 {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 5px;
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 26px;
+    white-space: nowrap;
+  }
+
+  .pv-head__name h3 small {
+    color: var(--color-text-4);
+    font: 500 var(--text-meta) var(--font-num);
+  }
+
+  .pv-head__facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+  }
+
+  .pv-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+  }
+
+  .pv-fact > svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .pv-fact b {
+    color: var(--color-text-1);
+    font-weight: 650;
+  }
+
+  .pv-fact em {
+    color: var(--color-text-3);
+    font: 500 var(--text-meta) var(--font-num);
+    font-style: normal;
+  }
+
+  .pv-fact[data-empty="true"] b {
+    color: var(--color-text-4);
+    font-weight: 500;
+  }
+
+  .pv-fact[data-tone="warn"],
+  .pv-fact[data-tone="warn"] b {
+    color: var(--color-warn);
+  }
+
+  .pv-fact__blank {
+    width: 14px;
+    height: 14px;
+    margin: 0 4px;
+    border: 1px dashed var(--color-line-3);
+    border-radius: 999px;
+  }
+
+  .pv-chip {
+    display: inline-flex;
+    height: 22px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--color-line-2);
+    border-radius: 999px;
+    padding: 0 8px;
+    color: var(--color-text-2);
+    background: var(--color-ink-2);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pv-chip svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .pv-chip[data-tone="gold"] {
+    border-color: var(--color-gold-line);
+    color: var(--color-gold-text);
+    background: var(--color-gold-soft);
+  }
+
+  .pv-chip[data-tone="ally"] {
+    border-color: var(--color-ally-line);
+    color: var(--color-ally);
+    background: var(--color-ally-soft);
+  }
+
+  .pv-chip[data-tone="ok"] {
+    border-color: color-mix(in srgb, var(--color-ok) 40%, transparent);
+    color: var(--color-ok);
+    background: var(--color-ok-soft);
+  }
+
+  .pv-chip[data-tone="warn"] {
+    border-color: color-mix(in srgb, var(--color-warn) 40%, transparent);
+    color: var(--color-warn);
+    background: var(--color-warn-soft);
+  }
+
+  .pv-note {
+    max-width: 420px;
+    justify-self: start;
+    overflow: hidden;
+    border: 1px solid var(--color-line-2);
+    border-radius: 4px 12px 12px 12px;
+    padding: 3px 10px;
+    color: var(--color-text-1);
+    background: var(--color-ink-2);
+    font-size: var(--text-body);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-head__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pv-head__actions .hub-btn,
+  .pv-head__actions .hub-select {
+    height: 30px;
+  }
+
+  .pv-head__actions .hub-select {
+    padding-left: 4px;
+  }
+
+  .pv-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 48px;
+    color: var(--color-text-3);
+    font-size: var(--text-body);
+  }
+
+  .pv-loading svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ---------- 主体：左边近况，右边概况 ---------- */
+  .pv-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 236px;
+    align-items: start;
+    gap: 14px;
+    padding: 14px 20px 20px;
+  }
+
+  .pv-main {
+    display: grid;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  /* 现在：正在打的这局 / 上一局 */
+  .pv-now {
+    position: relative;
+    min-height: 136px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--color-ink-4);
+  }
+
+  .pv-now[data-empty="true"] {
+    display: grid;
+    min-height: 80px;
+    place-items: center;
+    background: var(--color-ink-2);
+  }
+
+  .pv-now__art {
+    position: absolute;
+    inset: 0;
+  }
+
+  .pv-now__splash {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 60% 20%;
+  }
+
+  .pv-now__art::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background:
+      linear-gradient(90deg,
+        color-mix(in srgb, var(--color-shadow) 82%, transparent) 0%,
+        color-mix(in srgb, var(--color-shadow) 55%, transparent) 50%,
+        color-mix(in srgb, var(--color-shadow) 10%, transparent) 100%);
+  }
+
+  .pv-now[data-win="true"] .pv-now__art::before,
+  .pv-now[data-win="false"] .pv-now__art::before,
+  .pv-now[data-live="true"] .pv-now__art::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 3px;
+    content: "";
+    background: var(--color-ally);
+  }
+
+  .pv-now[data-win="false"] .pv-now__art::before {
+    background: var(--color-enemy);
+  }
+
+  .pv-now[data-live="true"] .pv-now__art::before {
+    background: var(--color-ok);
+  }
+
+  .pv-now__body {
+    position: relative;
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px 14px 18px;
+    color: var(--pv-ink);
+  }
+
+  .pv-now[data-empty="true"] .pv-now__body {
+    color: var(--color-text-4);
+  }
+
+  .pv-now__status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pv-now__label {
+    color: var(--pv-ink-soft);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: var(--tracking-label);
+  }
+
+  .pv-now[data-empty="true"] .pv-now__label {
+    color: var(--color-text-4);
+  }
+
+  .pv-now__clock {
+    color: var(--pv-ink-soft);
+    font: 600 var(--text-meta) var(--font-num);
+  }
+
+  .pv-now[data-live="true"] .pv-now__clock {
+    color: var(--pv-ink);
+    font-size: var(--text-list);
+  }
+
+  .pv-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 2px 9px 2px 7px;
+    color: var(--pv-ink);
+    background: color-mix(in srgb, var(--color-ok) 70%, transparent);
+    font-size: var(--text-meta);
+    font-weight: 700;
+  }
+
+  .pv-live i {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--pv-ink);
+    animation: pv-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pv-pulse {
+    50% {
+      opacity: 0.35;
+      transform: scale(0.7);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pv-live i {
+      animation: none;
+    }
+  }
+
+  .pv-now__title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pv-now__title img {
+    box-shadow: 0 0 0 2px var(--pv-glass-line);
+  }
+
+  .pv-now__title > div {
+    display: grid;
+    min-width: 0;
+  }
+
+  .pv-now__title b {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--pv-ink);
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 26px;
+    text-shadow: 0 1px 10px var(--color-shadow);
+  }
+
+  .pv-now__result {
+    color: color-mix(in srgb, var(--color-ally) 55%, var(--color-app-on-danger));
+    font-size: var(--text-list);
+  }
+
+  .pv-now[data-win="false"] .pv-now__result {
+    color: color-mix(in srgb, var(--color-enemy) 55%, var(--color-app-on-danger));
+  }
+
+  .pv-now__title span {
+    color: var(--pv-ink-soft);
+    font-size: var(--text-meta);
+  }
+
+  .pv-now__title .pv-now__kda {
+    margin-left: auto;
+    color: var(--pv-ink);
+    font: 750 24px/28px var(--font-num);
+    text-shadow: 0 1px 10px var(--color-shadow);
+  }
+
+  .pv-now__kda i {
+    margin: 0 3px;
+    color: var(--pv-ink-soft);
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .pv-now__kda em {
+    color: color-mix(in srgb, var(--color-enemy) 60%, var(--color-app-on-danger));
+    font-style: normal;
+  }
+
+  .pv-now__team {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pv-now__team-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--pv-ink-soft);
+  }
+
+  .pv-person {
+    display: inline-flex;
+    height: 28px;
+    max-width: 180px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--pv-glass-line);
+    border-radius: 999px;
+    padding: 0 8px 0 3px;
+    color: var(--pv-ink);
+    background: var(--pv-glass);
+    backdrop-filter: blur(8px);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pv-person:hover:not(:disabled) {
+    background: var(--pv-glass-strong);
+  }
+
+  .pv-person:disabled {
+    cursor: default;
+  }
+
+  .pv-person > img,
+  .pv-person > span:first-child {
+    flex-shrink: 0;
+    border-radius: 999px;
+  }
+
+  .pv-person > span:nth-of-type(1) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-person__tag {
+    display: grid;
+    width: 18px;
+    height: 18px;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-shadow);
+    background: var(--color-tier-gold);
+  }
+
+  .pv-person__tag svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .pv-now__actions {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pv-now__actions .hub-btn[data-variant="primary"] {
+    height: 30px;
+    color: var(--color-shadow);
+    background: var(--pv-ink);
+  }
+
+  .pv-now__hint {
+    color: var(--pv-ink-soft);
+    font-size: var(--text-meta);
+  }
+
+  /* 最近动态：一段一段连着打的 */
+  .pv-sessions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pv-session {
+    overflow: hidden;
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-lg);
+    background: var(--color-ink-2);
+  }
+
+  .pv-session__head {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 92px auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 12px 6px;
+    text-align: left;
+  }
+
+  .pv-session__head:hover {
+    background: var(--color-app-nav-hover);
+  }
+
+  .pv-session__when {
+    display: grid;
+  }
+
+  .pv-session__when b {
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 650;
+  }
+
+  .pv-session__when small {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+  }
+
+  .pv-session__record {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+  }
+
+  .pv-session__record b {
+    color: var(--color-text-1);
+    font: 750 var(--text-section) var(--font-num);
+  }
+
+  .pv-session__record em {
+    font: 650 var(--text-meta) var(--font-num);
+    font-style: normal;
+  }
+
+  .pv-session__record em[data-tone="win"],
+  .pv-pool__row em[data-tone="win"],
+  .pv-mate em[data-tone="win"] {
+    color: var(--color-ally);
+  }
+
+  .pv-session__record em[data-tone="loss"],
+  .pv-pool__row em[data-tone="loss"],
+  .pv-mate em[data-tone="loss"] {
+    color: var(--color-enemy);
+  }
+
+  .pv-session__queues {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+  }
+
+  .pv-session__queues em {
+    margin-left: 2px;
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+    font-style: normal;
+  }
+
+  .pv-session__mates {
+    display: flex;
+    align-items: center;
+  }
+
+  .pv-session__mates > img,
+  .pv-session__mates > span {
+    margin-left: -5px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 2px var(--color-ink-2);
+  }
+
+  .pv-session__mates small {
+    color: var(--color-text-4);
+    font-size: var(--text-cap);
+  }
+
+  .pv-session__games {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 12px 10px;
+  }
+
+  .pv-pill {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 1px;
+    padding-bottom: 3px;
+  }
+
+  .pv-pill::after {
+    position: absolute;
+    right: 3px;
+    bottom: 0;
+    left: 3px;
+    height: 2px;
+    border-radius: 2px;
+    content: "";
+    background: var(--color-ally);
+  }
+
+  .pv-pill[data-win="false"]::after {
+    background: var(--color-enemy);
+  }
+
+  .pv-pill small {
+    color: var(--color-text-3);
+    font: 500 var(--text-cap) / 13px var(--font-num);
+  }
+
+  .pv-session__rows {
+    display: grid;
+    border-top: 1px solid var(--color-line-1);
+    padding: 4px 6px 6px;
+  }
+
+  .pv-row {
+    display: grid;
+    min-height: 30px;
+    grid-template-columns: 24px 16px minmax(60px, 100px) 70px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px;
+    font-size: var(--text-meta);
+  }
+
+  .pv-row b {
+    color: var(--color-ally);
+    font-weight: 700;
+  }
+
+  .pv-row[data-win="false"] b {
+    color: var(--color-enemy);
+  }
+
+  .pv-row__champ {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-row__kda {
+    color: var(--color-text-1);
+    font: 650 var(--text-meta) var(--font-num);
+  }
+
+  .pv-row__kda i {
+    margin: 0 2px;
+    color: var(--color-text-4);
+    font-style: normal;
+  }
+
+  .pv-row__kda em {
+    color: var(--color-enemy);
+    font-style: normal;
+  }
+
+  .pv-row__queue {
+    overflow: hidden;
+    color: var(--color-text-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-row__mates {
+    display: flex;
+    gap: 2px;
+  }
+
+  .pv-row__mates > img,
+  .pv-row__mates > span {
+    border-radius: 999px;
+  }
+
+  .pv-row time {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+    white-space: nowrap;
+  }
+
+  /* ---------- 右栏 ---------- */
+  .pv-side {
+    display: grid;
+    gap: 14px;
+  }
+
+  .pv-block {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pv-block + .pv-block {
+    border-top: 1px solid var(--color-line-1);
+    padding-top: 12px;
+  }
+
+  .pv-block h4 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: var(--tracking-label);
+  }
+
+  .pv-block h4 small {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+    letter-spacing: 0;
+  }
+
+  .pv-empty {
+    color: var(--color-text-4);
+    font-size: var(--text-meta);
+  }
+
+  .pv-score {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .pv-score > b {
+    font: 750 30px/32px var(--font-num);
+  }
+
+  .pv-score > b small {
+    font-size: 15px;
+  }
+
+  .pv-score > b[data-tone="win"] {
+    color: var(--color-ally);
+  }
+
+  .pv-score > b[data-tone="loss"] {
+    color: var(--color-enemy);
+  }
+
+  .pv-score > span {
+    display: grid;
+  }
+
+  .pv-score > span b {
+    color: var(--color-text-1);
+    font: 700 var(--text-list) var(--font-num);
+  }
+
+  .pv-score > span small {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+  }
+
+  .pv-streak {
+    margin-left: auto;
+    border-radius: 999px;
+    padding: 1px 8px;
+    color: var(--color-app-on-danger);
+    background: var(--color-ally);
+    font-size: var(--text-cap);
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .pv-streak[data-tone="loss"] {
+    background: var(--color-enemy);
+  }
+
+  .pv-dots {
+    display: flex;
+    gap: 2px;
+  }
+
+  .pv-dots i {
+    height: 5px;
+    flex: 1;
+    border-radius: 1px;
+    background: var(--color-enemy);
+    opacity: 0.85;
+  }
+
+  .pv-dots i[data-win="true"] {
+    background: var(--color-ally);
+  }
+
+  .pv-pool {
+    display: grid;
+    gap: 3px;
+  }
+
+  .pv-pool__row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto 34px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pv-pool__row b {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-pool__row small {
+    color: var(--color-text-4);
+    font: 500 var(--text-meta) var(--font-num);
+  }
+
+  .pv-pool__row em,
+  .pv-mate em {
+    font: 650 var(--text-meta) var(--font-num);
+    font-style: normal;
+    text-align: right;
+  }
+
+  .pv-modes {
+    display: flex;
+    height: 6px;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 999px;
+  }
+
+  .pv-modes i {
+    min-width: 4px;
+    background: var(--mode);
+  }
+
+  .pv-modes__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
+  .pv-modes__legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-text-3);
+    font-size: var(--text-cap);
+  }
+
+  .pv-modes__legend i {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--mode);
+  }
+
+  .pv-modes__legend em {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+    font-style: normal;
+  }
+
+  .pv-mates {
+    display: grid;
+    gap: 1px;
+  }
+
+  .pv-mate {
+    display: grid;
+    min-height: 30px;
+    grid-template-columns: 24px minmax(0, 1fr) auto 34px;
+    align-items: center;
+    gap: 8px;
+    margin: 0 -4px;
+    border-radius: var(--radius-sm);
+    padding: 2px 4px;
+    text-align: left;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pv-mate:hover:not(:disabled) {
+    background: var(--color-app-nav-hover);
+  }
+
+  .pv-mate > img,
+  .pv-mate > span:first-child {
+    border-radius: 999px;
+  }
+
+  .pv-mate b {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-mate small {
+    color: var(--color-text-4);
+    font: 500 var(--text-meta) var(--font-num);
+  }
+
+  .pv-retry {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    place-items: center;
+    border-radius: var(--radius-xs);
+    color: var(--color-text-4);
+  }
+
+  .pv-retry:hover {
+    color: var(--color-text-1);
+    background: var(--color-app-nav-hover);
+  }
+
+  .pv-retry svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .pv-assets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .pv-assets span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+  }
+
+  .pv-assets b {
+    color: var(--color-text-1);
+    font: 700 var(--text-list) var(--font-num);
+  }
+
+  .pv-assets__none {
+    color: var(--color-text-4);
+  }
+
+  .pv-challenge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+  }
+
+  .pv-challenge > i {
+    width: 9px;
+    height: 9px;
+    margin-right: 2px;
+    transform: rotate(45deg);
+    border-radius: 2px;
+    background: var(--tier, var(--color-text-4));
+  }
+
+  .pv-challenge b {
+    color: var(--color-text-1);
+    font-weight: 650;
+  }
+
+  .pv-challenge small {
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+  }
+
+  .pv-challenge img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+  }
+
+  .pv-challenge img:first-of-type {
+    margin-left: auto;
+  }
+
+  .pv-skin {
+    overflow: hidden;
+    color: var(--color-text-4);
+    font-size: var(--text-cap);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-saved {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    color: var(--color-text-2);
+    background: var(--color-ink-2);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pv-saved:hover:not(:disabled) {
+    background: var(--color-ink-3);
+  }
+
+  .pv-saved svg {
+    width: 14px;
+    height: 14px;
+    color: var(--color-text-3);
+  }
+
+  .pv-saved em {
+    margin-left: auto;
+    color: var(--color-text-4);
+    font: 600 var(--text-meta) var(--font-num);
+    font-style: normal;
+  }
+}

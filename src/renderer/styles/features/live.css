@@ -121,31 +121,35 @@
     font-size: 13px;
   }
 
+  /* 对阵区按窗口大小自己缩放，永远一屏放得下：不出现滚动条，也就不会因为滚动条一会儿出现
+     一会儿消失把整页挤来挤去（之前偶尔「抖一下」就是这个原因）。 */
   .live-page-body--battle,
   .live-page-body--lobby {
     align-items: flex-start;
     justify-content: flex-start;
-    overflow: auto;
+    overflow: hidden;
     padding-right: 2px;
     padding-left: 2px;
+    container-type: size;
   }
 
   /* ===========================================================================
      对局 · 对位镜像
      两队面对面：一行一组对位，左蓝右红，中间一道光缝；
-     英雄原画从两侧外沿透进来，越往中间越淡。一起排的人在外侧用一根线串起来。
+     英雄原画从两侧外沿透进来，越往中间越淡。一起排的人名字是同一套流光色。
      =========================================================================== */
 
   .live-duel {
-    --duel-row-h: 118px;
+    /* 行高 = (对阵区高度 - 顶上队伍栏 - 行间距) / 5，在 84～124px 之间 */
+    --duel-row-h: clamp(84px, calc((100cqh - 36px - 4 * var(--duel-row-gap)) / 5), 124px);
     --duel-row-gap: 8px;
     --duel-pitch: calc(var(--duel-row-h) + var(--duel-row-gap));
-    --duel-gutter: 14px;
+    --duel-gutter: 6px;
     --duel-spine: 112px;
     --duel-window: 112px;
     display: flex;
-    width: 1216px;
-    min-width: 1216px;
+    width: min(1216px, 100%);
+    min-width: 0;
     flex-direction: column;
     gap: 6px;
     margin: 0 auto;
@@ -280,29 +284,6 @@
   .live-team-metric--win b { color: var(--color-ally); }
   .live-team-metric--loss b { color: var(--color-enemy); }
 
-  .live-team-party {
-    display: inline-flex;
-    height: 18px;
-    align-items: center;
-    gap: 5px;
-    border-radius: 999px;
-    padding: 0 8px 0 6px;
-    color: var(--color-text-2);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live-party-color) 45%, transparent);
-    font-family: var(--font-num);
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .live-team-party i {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--live-party-color);
-    box-shadow: 0 0 6px var(--live-party-color);
-  }
-
   /* ---------- 面板 ---------- */
   .live-duel-slot {
     position: relative;
@@ -436,46 +417,6 @@
     transform: scale(1.4);
   }
 
-  .live-duel-window__tabs {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .live-duel-panel--red .live-duel-window__tabs {
-    right: 8px;
-    left: auto;
-    align-items: flex-end;
-  }
-
-  .live-duel-tab {
-    height: 19px;
-    border-radius: 999px;
-    padding: 0 8px;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 19px;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-
-  .live-duel-tab--party {
-    color: color-mix(in srgb, var(--color-shadow) 84%, var(--live-party-color));
-    background: var(--live-party-color);
-    box-shadow: 0 2px 12px color-mix(in srgb, var(--live-party-color) 60%, transparent);
-  }
-
-  .live-duel-tab--self {
-    color: color-mix(in srgb, var(--color-shadow) 84%, var(--color-glow));
-    background: var(--color-glow);
-    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-glow) 55%, transparent);
-  }
-
   .live-duel-window__level {
     position: absolute;
     bottom: 7px;
@@ -579,16 +520,70 @@
     color: var(--color-text-1);
   }
 
-  .live-duel-tag {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--color-text-4);
-    font-family: var(--font-num);
-    font-size: 11px;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* 一起排的人：游戏名做成「流光溢彩」的字——像游戏里发光的按钮那样：
+     每组一套颜色（主色 + 辅色 + 一点提亮），字面上方有一层玻璃质感的亮面，外面透一圈同色的光；
+     颜色在字里缓慢地来回流动，不是一道亮线扫过去。同组的人名字一个样，不同组颜色不同。 */
+  .live-duel-panel.is-party .live-duel-name__btn {
+    --flow-a: var(--live-party-color);
+    --flow-b: var(--live-party-accent, var(--live-party-color));
+    --flow-lift: color-mix(in srgb, var(--live-party-color) 55%, var(--color-app-on-danger));
+    --flow-gloss: color-mix(in srgb, var(--color-app-on-danger) 42%, transparent);
+    padding-right: 1px;
+    background-image:
+      linear-gradient(180deg, var(--flow-gloss) 0%, transparent 52%),
+      linear-gradient(
+        96deg,
+        var(--flow-a) 0%,
+        var(--flow-lift) 22%,
+        var(--flow-b) 45%,
+        var(--flow-a) 68%,
+        var(--flow-lift) 86%,
+        var(--flow-b) 100%
+      );
+    background-size: 100% 100%, 300% 100%;
+    background-position: 0 0, 0% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    filter:
+      drop-shadow(0 0 1px color-mix(in srgb, var(--live-party-color) 70%, transparent))
+      drop-shadow(0 0 7px color-mix(in srgb, var(--live-party-color) 50%, transparent));
+    animation: live-name-iridesce 7s ease-in-out infinite alternate;
+  }
+
+  .live-duel-panel.is-party .live-duel-name__btn:hover,
+  .live-duel-panel.is-party .live-duel-name__btn:focus-visible {
+    filter:
+      drop-shadow(0 0 1px color-mix(in srgb, var(--live-party-color) 85%, transparent))
+      drop-shadow(0 0 11px color-mix(in srgb, var(--live-party-color) 70%, transparent));
+  }
+
+  /* 浅色底上：颜色压深一档保证看得清，亮面和光晕都收一点 */
+  :root[data-mode='light'] .live-duel-panel.is-party .live-duel-name__btn {
+    --flow-a: color-mix(in srgb, var(--live-party-color) 62%, var(--color-text-1));
+    --flow-b: color-mix(in srgb, var(--live-party-accent, var(--live-party-color)) 66%, var(--color-text-1));
+    --flow-lift: var(--live-party-color);
+    --flow-gloss: color-mix(in srgb, var(--color-app-on-danger) 28%, transparent);
+    filter:
+      drop-shadow(0 0 1px color-mix(in srgb, var(--live-party-color) 45%, transparent))
+      drop-shadow(0 1px 5px color-mix(in srgb, var(--live-party-color) 34%, transparent));
+  }
+
+  @keyframes live-name-iridesce {
+    from {
+      background-position: 0 0, 0% 0;
+    }
+    to {
+      background-position: 0 0, 100% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-duel-panel.is-party .live-duel-name__btn {
+      animation: none;
+    }
   }
 
   .live-duel-meta {
@@ -753,10 +748,6 @@
     gap: 3px;
   }
 
-  .live-duel-panel--red .live-duel-form__cells {
-    direction: rtl;
-  }
-
   .live-duel-form__cells i {
     border-radius: 2px;
     background: var(--color-line-1);
@@ -802,8 +793,9 @@
   }
 
   /* ---------- 悬浮展开：战绩表像抽屉一样从卡片朝中缝的那条边拉出来，紧贴卡片，高度固定 ---------- */
+  /* 战绩表比卡片高一层：底色略亮、顶上带一点本方的色调、边框和阴影都很轻，看得出是浮在上面的，但不抢眼 */
   .live-duel-sheet {
-    --sheet-ring: color-mix(in srgb, var(--color-glow) 40%, transparent);
+    --sheet-tone: var(--color-app-team-mine);
     position: absolute;
     z-index: 2;
     display: flex;
@@ -811,17 +803,15 @@
     flex-direction: column;
     overflow: hidden;
     border-radius: var(--radius-lg);
-    background: var(--color-app-surface);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--sheet-tone) 8%, var(--color-app-elevated)),
+        var(--color-app-elevated) 96px
+      );
     box-shadow:
-      inset 0 0 0 1px var(--sheet-ring),
-      0 26px 60px -24px color-mix(in srgb, var(--color-shadow) 65%, transparent);
-  }
-
-  .live-duel-slot.is-party .live-duel-sheet {
-    --sheet-ring: color-mix(in srgb, var(--live-party-color) 78%, transparent);
-    box-shadow:
-      inset 0 0 0 1.5px var(--sheet-ring),
-      0 26px 60px -24px color-mix(in srgb, var(--color-shadow) 65%, transparent);
+      inset 0 0 0 1px color-mix(in srgb, var(--sheet-tone) 32%, var(--color-line-2)),
+      0 16px 40px -18px color-mix(in srgb, var(--color-shadow) 50%, transparent);
   }
 
   .live-duel-sheet--blue {
@@ -829,6 +819,7 @@
   }
 
   .live-duel-sheet--red {
+    --sheet-tone: var(--color-app-team-enemy);
     right: calc(100% - 1px);
   }
 
@@ -852,7 +843,7 @@
     display: flex;
     align-items: baseline;
     gap: 14px;
-    border-bottom: 1px solid var(--color-line-1);
+    border-bottom: 1px solid color-mix(in srgb, var(--sheet-tone) 22%, var(--color-line-1));
     padding: 11px 16px 9px;
     color: var(--color-text-3);
     font-size: 11px;
@@ -928,40 +919,43 @@
     scrollbar-width: thin;
   }
 
+  /* 每一局：左边一条实色边 + 实心「胜/负」块，整行从左往右淡出一层胜负色，扫一眼就分得清 */
   .live-sheet-row {
+    --row-tone: var(--color-ally);
     position: relative;
     width: 100%;
-    height: 30px;
+    height: 32px;
+    overflow: hidden;
     border: 0;
     border-radius: var(--radius-sm);
     padding: 0 10px;
     color: inherit;
-    background: transparent;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--row-tone) 11%, transparent), transparent 46%);
     cursor: pointer;
     font-family: inherit;
     text-align: left;
     transition: background-color 120ms ease;
   }
 
-  .live-sheet-row::before {
-    position: absolute;
-    top: 9px;
-    bottom: 9px;
-    left: 3px;
-    width: 2px;
-    border-radius: 2px;
-    content: "";
-    background: var(--color-ally);
+  .live-sheet-row[data-result='loss'] {
+    --row-tone: var(--color-enemy);
   }
 
-  .live-sheet-row[data-result='loss']::before {
-    background: var(--color-enemy);
+  .live-sheet-row::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    content: "";
+    background: var(--row-tone);
   }
 
   .live-sheet-row:hover,
   .live-sheet-row:focus-visible {
     outline: none;
-    background: color-mix(in srgb, var(--color-text-1) 6%, transparent);
+    background-color: color-mix(in srgb, var(--color-text-1) 6%, transparent);
   }
 
   .live-sheet-row[aria-disabled='true'] {
@@ -976,13 +970,16 @@
   }
 
   .live-sheet-row__result {
-    color: var(--color-ally);
-    font-size: 12px;
-    font-weight: 650;
-  }
-
-  .live-sheet-row[data-result='loss'] .live-sheet-row__result {
-    color: var(--color-enemy);
+    display: grid;
+    width: 22px;
+    height: 20px;
+    place-items: center;
+    border-radius: var(--radius-xs);
+    color: var(--color-app-bg);
+    background: var(--row-tone);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
   }
 
   .live-sheet-row__mode {
@@ -1137,69 +1134,6 @@
 
   .live-duel-adv[data-lead='blue'] { color: var(--color-app-team-mine); }
   .live-duel-adv[data-lead='red'] { color: var(--color-app-team-enemy); }
-
-  /* ---------- 外侧串线：一起排的人 ---------- */
-  .live-duel-thread {
-    --lane: 0;
-    position: absolute;
-    top: calc(var(--from) * var(--duel-pitch) + var(--duel-row-h) / 2);
-    z-index: 2;
-    width: 3px;
-    height: calc((var(--to) - var(--from)) * var(--duel-pitch));
-    border-radius: 999px;
-    background: var(--live-party-color);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--live-party-color) 60%, transparent);
-    pointer-events: none;
-  }
-
-  .live-duel-thread--blue {
-    left: calc(5px - var(--lane) * 5px);
-  }
-
-  .live-duel-thread--red {
-    right: calc(5px - var(--lane) * 5px);
-  }
-
-  .live-duel-thread i {
-    position: absolute;
-    top: calc(var(--at) * var(--duel-pitch));
-    left: 50%;
-    width: 10px;
-    height: 10px;
-    margin: -5px 0 0 -5px;
-    border-radius: 999px;
-    background: var(--live-party-color);
-    box-shadow:
-      0 0 0 2px var(--color-app-bg),
-      0 0 10px var(--live-party-color);
-  }
-
-  /* 节点到面板外沿的短横线 */
-  .live-duel-thread i::after {
-    position: absolute;
-    top: 4px;
-    left: 10px;
-    width: calc(var(--duel-gutter) - 10px + var(--lane) * 5px);
-    height: 2px;
-    content: "";
-    background: var(--live-party-color);
-  }
-
-  .live-duel-thread--red i::after {
-    right: 10px;
-    left: auto;
-  }
-
-  .live-duel-thread b {
-    position: absolute;
-    top: -24px;
-    left: 50%;
-    color: var(--live-party-color);
-    font-family: var(--font-num);
-    font-size: 11px;
-    font-weight: 650;
-    transform: translateX(-50%);
-  }
 
   /* ===========================================================================
      浮层：段位表（portal 到 body）

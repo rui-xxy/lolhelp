@@ -89,7 +89,7 @@ export function FriendsSection({
 
   return (
     <>
-      <Panel title="我的在线状态" description="决定好友列表里别人看到你是什么状态，以及你的个人签名。">
+      <Panel title="我的在线状态">
         <PanelBody>
           <div className="as-fields">
             <Field label="显示为" hint={presence.hint} wide>
@@ -122,7 +122,7 @@ export function FriendsSection({
             </Field>
           </div>
         </PanelBody>
-        <PanelFoot note="选择会自动记住；点「应用」之后，客户端里才会改过来。">
+        <PanelFoot>
           <Btn
             tone="primary"
             busy={applying}
@@ -140,7 +140,6 @@ export function FriendsSection({
       <Panel
         title="好友"
         count={friends.length}
-        description="游戏中的好友可以直接观战；不常联系的可以勾选后一起删除。"
         extra={(
           <Btn
             size="sm"
@@ -254,7 +253,7 @@ export function FriendsSection({
               全选当前列表
             </label>
             <p>
-              {selectedFriendIds.size > 0 ? <>已选<b>{selectedFriendIds.size}</b>位好友</> : '勾选好友后可以一起删除'}
+              {selectedFriendIds.size > 0 && <>已选<b>{selectedFriendIds.size}</b>位好友</>}
             </p>
             {selectedFriendIds.size > 0 && (
               <Btn tone="ghost" onClick={() => setSelectedFriendIds(() => new Set())}>取消选择</Btn>

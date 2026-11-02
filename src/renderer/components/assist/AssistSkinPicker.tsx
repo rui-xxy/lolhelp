@@ -105,7 +105,7 @@ export function AssistSkinPicker({
           <header className="cp-head">
             <div>
               <Dialog.Title className="cp-title">选一张生涯背景</Dialog.Title>
-              <Dialog.Description className="cp-subtitle">先在左边挑英雄，再点一张皮肤原画</Dialog.Description>
+              <Dialog.Description className="sr-only">选一张生涯背景</Dialog.Description>
             </div>
             <Dialog.Close className="cp-close" aria-label="关闭"><X /></Dialog.Close>
           </header>

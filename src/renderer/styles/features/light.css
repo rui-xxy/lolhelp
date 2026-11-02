@@ -22,13 +22,6 @@
   :root[data-mode="light"] .player-detail-name--premade-violet { color: #7653AB; }
   :root[data-mode="light"] .player-detail-name--premade-rose { color: #A34364; }
   :root[data-mode="light"] .player-detail-name--premade-emerald { color: #00814F; }
-  /* features/scout.css */
-  :root[data-mode="light"] .scout-network-count b { color: #3B7281; }
-  :root[data-mode="light"] .scout-network-tooltip > span { color: #386F95; }
-  :root[data-mode="light"] .scout-network-feed { background: var(--color-app-elevated); }
-  :root[data-mode="light"] .scout-network-feed__header b { color: #4A6F7D; }
-  :root[data-mode="light"] .scout-network-feed__waiting svg { color: #3B5B65; }
-  :root[data-mode="light"] .scout-network-feed__item.is-checking .scout-network-feed__state { color: #3A7187; }
   /* features/matches/detail.css */
   :root[data-mode="light"] .lol-score-player-name { color: #534C3F; }
   :root[data-mode="light"] .lol-score-player-copy span { color: rgb(82 76 66 / 0.72); }

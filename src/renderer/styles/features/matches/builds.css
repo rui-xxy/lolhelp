@@ -1,256 +1,889 @@
-/* Build workbench: inline context, equipment dock, and a shared QWER point matrix. */
+/* 战绩详情 ·「构建」（MatchBuildView / BuildSkillMatrix，bd- 前缀）
+   从上到下：选人 → 这个人是谁 → 装备成型（和对位比快慢）→ 技能 + 符文 → 每次回家买了什么。 */
 @layer components {
-  .lol-postgame-content:has(.lol-builds) { overflow: hidden; padding: 0; background: var(--color-app-bg); }
-  .lol-builds {
-    position: relative;
-    display: grid;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    grid-template-rows: auto minmax(0, 1fr);
+  .lol-postgame-content:has(.bd) {
     overflow: hidden;
+    padding: 0;
     background: var(--color-app-bg);
-    container: build / inline-size;
+    container-type: inline-size;
   }
-  .lol-build-roster {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
-    align-items: center;
-    gap: 16px;
-    border-bottom: 1px solid var(--color-frost-line);
-    padding: 10px 24px;
-    background: var(--color-frost-fill-faint);
-  }
-  .lol-build-roster > b { color: var(--color-app-muted); font-size: 12px; font-weight: 500; text-align: center; }
-  .lol-build-roster__team { display: flex; min-width: 0; align-items: center; gap: 12px; }
-  .lol-build-roster__team.is-blue { --build-team: var(--color-app-team-mine); }
-  .lol-build-roster__team.is-red { --build-team: var(--color-app-team-enemy); }
-  .lol-build-roster__team > span { flex: 0 0 auto; color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
-  .lol-build-roster__team > div { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 4px; }
-  .lol-build-roster__team button {
-    position: relative;
-    display: grid;
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
-    place-items: center;
-    border: 1px solid transparent;
-    border-radius: var(--radius-lg);
-    padding: 3px;
-    background: transparent;
-    cursor: pointer;
-    transition: border-color 140ms ease, background-color 140ms ease;
-  }
-  .lol-build-roster__team button > img { opacity: 0.8; }
-  .lol-build-roster__team button:hover { background: var(--color-frost-fill-hover); }
-  .lol-build-roster__team button:hover > img,
-  .lol-build-roster__team button.is-active > img { opacity: 1; }
-  .lol-build-roster__team button.is-active { border-color: color-mix(in srgb, var(--build-team) 68%, transparent); background: color-mix(in srgb, var(--build-team) 10%, transparent); }
-  .lol-build-roster__team button > small {
-    position: absolute;
-    right: 0;
-    bottom: -1px;
-    min-width: 20px;
-    border: 1px solid var(--color-frost-line);
-    border-radius: var(--radius-xs);
-    padding: 0 3px;
-    background: var(--color-app-bg);
+
+  .bd {
+    --bd-blue: var(--color-app-team-mine);
+    --bd-red: var(--color-app-team-enemy);
+    --bd-gold: var(--color-gold);
+    --bd-gold-text: var(--color-gold-text);
+    --bd-gold-soft: var(--color-gold-soft);
+    --bd-gold-line: var(--color-gold-line);
+    --bd-line: var(--color-frost-line);
+    --bd-line-strong: var(--color-frost-line-strong);
+    --bd-bg: var(--color-app-bg);
+    --bd-tone: var(--color-app-muted);
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 18px 22px;
+    background: var(--bd-bg);
     color: var(--color-app-body);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .bd :where(button) { cursor: pointer; font: inherit; color: inherit; }
+  .bd button:focus-visible, .bd [tabindex]:focus-visible { outline: 2px solid var(--bd-gold-line); outline-offset: 2px; }
+  .bd .is-blue { --bd-tone: var(--bd-blue); }
+  .bd .is-red { --bd-tone: var(--bd-red); }
+
+  .bd-empty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 2px;
+    color: var(--color-app-subtle);
+    font-size: 12px;
+  }
+  .bd-empty.is-page { justify-content: center; padding: 60px 0; }
+  .bd-spin { width: 14px; height: 14px; animation: bd-spin 1s linear infinite; }
+  @keyframes bd-spin { to { transform: rotate(360deg); } }
+
+  /* ── 选人 ──────────────────────────────────────────────────────────── */
+  .bd-roster {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin: 0 -18px;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--bd-line);
+    background: var(--bd-bg);
+  }
+  .bd-roster__team {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .bd-roster__team > span {
+    margin-right: 2px;
+    color: var(--bd-tone);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+  }
+  .bd-roster__team.is-red { flex-direction: row-reverse; }
+  .bd-roster__team.is-red > span { margin: 0 0 0 2px; }
+  .bd-roster__vs {
+    order: 99;
+    margin-left: 8px;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 12px;
+    font-style: italic;
+    letter-spacing: .1em;
+  }
+  .bd-roster__team.is-red .bd-roster__vs { display: none; }
+  .bd-roster button {
+    position: relative;
+    display: inline-flex;
+    padding: 0;
+    border-radius: 50%;
+    opacity: .55;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--bd-tone) 50%, transparent);
+    transition: opacity 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  }
+  .bd-roster button:hover { opacity: 1; transform: translateY(-1px); }
+  .bd-roster button.is-rival { opacity: .85; box-shadow: 0 0 0 1.5px var(--bd-bg), 0 0 0 3px color-mix(in srgb, var(--color-app-text) 30%, transparent); }
+  .bd-roster button[aria-pressed='true'] {
+    opacity: 1;
+    box-shadow: 0 0 0 2px var(--bd-bg), 0 0 0 4px var(--bd-gold), 0 0 12px color-mix(in srgb, var(--bd-gold) 45%, transparent);
+  }
+
+  /* ── 这个人 ────────────────────────────────────────────────────────── */
+  .bd-hero {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 12px 0;
+    padding: 14px 18px;
+    overflow: hidden;
+    border: 1px solid var(--bd-line);
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(ellipse 50% 150% at 0% 0%, color-mix(in srgb, var(--bd-tone) 16%, transparent), transparent 70%),
+      color-mix(in srgb, var(--color-app-surface) 55%, transparent);
+  }
+  .bd-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: -1;
+    width: 60%;
+    background: var(--bd-splash, none) center 22% / cover no-repeat;
+    opacity: .22;
+    -webkit-mask-image: linear-gradient(270deg, black 10%, transparent 90%);
+    mask-image: linear-gradient(270deg, black 10%, transparent 90%);
+  }
+  :root[data-mode='light'] .bd-hero::before { opacity: .16; }
+  .bd-hero__avatar {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding: 2px;
+    border-radius: 50%;
+    background: conic-gradient(from 200deg, var(--bd-gold), color-mix(in srgb, var(--bd-tone) 85%, transparent), var(--bd-gold));
+  }
+  .bd-hero__avatar img { border: 2px solid var(--bd-bg); }
+  .bd-hero__avatar > small {
+    position: absolute;
+    right: -4px;
+    bottom: -2px;
+    min-width: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--bd-line-strong);
+    border-radius: 999px;
+    background: var(--bd-bg);
+    color: var(--color-app-text);
+    font-family: var(--font-num);
     font-size: 11px;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
+    font-weight: 700;
     line-height: 16px;
     text-align: center;
   }
-  .lol-build-profile {
-    min-width: 0;
-    min-height: 0;
-    overflow: auto;
-    padding: 8px 24px 24px;
-    scrollbar-gutter: stable;
-    overscroll-behavior: contain;
-  }
-  .lol-build-context {
-    display: flex;
-    min-width: 0;
-    min-height: 38px;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 6px 18px;
-    border-bottom: 1px solid var(--color-frost-line);
-    padding: 6px 0 12px;
-    line-height: 20px;
-  }
-  .lol-build-context__name {
-    max-width: min(34ch, 100%);
+  .bd-hero__who { display: grid; min-width: 0; flex: 1 1 auto; gap: 4px; }
+  .bd-hero__who strong {
     overflow: hidden;
     color: var(--color-app-text);
-    font-size: 14px;
+    font-size: 17px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bd-hero__who strong small { margin-left: 3px; color: var(--color-app-subtle); font-size: 12px; font-weight: 400; }
+  .bd-hero__who > span { color: var(--color-app-muted); font-size: 12px; }
+  .bd-hero__who em { color: var(--bd-tone); font-style: normal; font-weight: 700; }
+  .bd-hero__who b.is-win { color: var(--color-app-win); }
+  .bd-hero__who b.is-loss { color: var(--color-app-loss); }
+  .bd-hero__build {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border: 1px solid var(--bd-line);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bd-bg) 55%, transparent);
+  }
+  .bd-hero__slot {
+    position: relative;
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-xs);
+    box-shadow: 0 0 0 1px var(--bd-line-strong);
+  }
+  .bd-hero__slot img { border-radius: var(--radius-xs); }
+  .bd-hero__slot.is-empty { background: var(--color-frost-fill-hover); }
+  .bd-hero__slot.is-core { box-shadow: 0 0 0 1.5px var(--bd-gold-line); }
+  .bd-hero__slot.is-trinket { width: 24px; height: 24px; margin-left: 4px; border-radius: 50%; }
+  .bd-hero__slot.is-trinket img { border-radius: 50%; }
+  .bd-hero__slot > b {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 15px;
+    height: 15px;
+    border-radius: 999px;
+    background: var(--bd-gold);
+    color: var(--bd-bg);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 15px;
+    text-align: center;
+  }
+  .bd-hero__stats {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 22px;
+    margin: 0;
+  }
+  .bd-hero__stats > div { display: grid; gap: 2px; text-align: right; }
+  .bd-hero__stats dt { color: var(--color-app-muted); font-size: 11px; }
+  .bd-hero__stats dd {
+    margin: 0;
+    color: var(--color-app-text);
+    font-family: var(--font-num);
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .bd-hero__stats dd i { margin: 0 2px; color: var(--color-app-subtle); font-style: normal; font-weight: 400; }
+  .bd-hero__stats dd em { color: var(--color-app-loss); font-style: normal; }
+
+  /* ── 卡片骨架 ──────────────────────────────────────────────────────── */
+  .bd-card {
+    min-width: 0;
+    margin-top: 12px;
+    padding: 12px 16px 14px;
+    border: 1px solid var(--bd-line);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-app-surface) 45%, transparent);
+  }
+  .bd-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 14px;
+    margin-bottom: 10px;
+  }
+  .bd-card__head h3 {
+    margin: 0;
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .06em;
+  }
+  .bd-card__head h3::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 12px;
+    margin-right: 8px;
+    border-radius: 2px;
+    background: var(--bd-gold);
+    vertical-align: -1px;
+  }
+  .bd-card__head p { flex: 1 1 auto; margin: 0; color: var(--color-app-subtle); font-size: 12px; text-align: right; }
+  .bd-card__head p > span { display: block; color: var(--color-app-subtle); font-size: 11px; opacity: .85; }
+  .bd-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .bd-pair > .bd-card { margin-top: 12px; }
+
+  /* ── 装备成型（赛跑） ───────────────────────────────────────────────── */
+  /* 上面一条泳道是自己，中间一根时间线，下面是对位；最底下一行是刻度。 */
+  .bd-race {
+    --bd-lane: 62px;
+    --bd-rival: 58px;
+    --bd-ticks: 18px;
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 0 12px;
+  }
+  .bd-race__names {
+    display: grid;
+    grid-template-rows: var(--bd-lane) var(--bd-ticks);
+    align-items: end;
+  }
+  .bd-race.has-rival .bd-race__names { grid-template-rows: var(--bd-lane) var(--bd-rival) var(--bd-ticks); }
+  .bd-race__who {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 10px;
+  }
+  .bd-race__who.is-rival { align-self: start; padding: 12px 0 0; }
+  .bd-race__who b {
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 12px;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .lol-build-context__meta { color: var(--color-app-muted); font-size: 12px; white-space: nowrap; }
-  .lol-build-context__stats { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; }
-  .lol-build-context__stats > div { display: flex; align-items: baseline; gap: 7px; }
-  .lol-build-context__stats dt { color: var(--color-app-muted); font-size: 12px; }
-  .lol-build-context__stats dd { margin: 0; color: var(--color-app-body); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .lol-build-context__stats i { margin: 0 3px; color: var(--color-app-subtle); font-style: normal; font-weight: 400; }
+  .bd-race__who.is-focus b { color: var(--bd-gold-text); }
+  .bd-race__who.is-focus img { box-shadow: 0 0 0 2px var(--bd-gold); }
+  .bd-race__who.is-rival b { color: var(--color-app-muted); font-weight: 500; }
 
-  .lol-build-blueprint {
-    display: grid;
+  .bd-race__track {
+    position: relative;
     min-width: 0;
-    grid-template-columns: 236px minmax(0, 1fr);
-    align-items: start;
-    gap: 24px;
-    border-bottom: 1px solid var(--color-frost-line);
-    padding: 18px 0 20px;
+    height: calc(var(--bd-lane) + var(--bd-ticks));
   }
-  .lol-build-final,
-  .lol-build-skills { min-width: 0; }
-  .lol-build-final__items {
-    display: grid;
-    width: fit-content;
-    min-width: 0;
-    grid-template-columns: repeat(3, 44px) 50px;
-    grid-template-rows: repeat(2, 44px);
-    gap: 8px;
-    border: 1px solid var(--color-frost-line);
-    border-radius: var(--radius-lg);
-    padding: 12px;
-    background: color-mix(in srgb, var(--color-app-sidebar) 22%, transparent);
-    box-shadow: inset 0 1px 4px var(--color-frost-shadow-soft);
+  .bd-race.has-rival .bd-race__track { height: calc(var(--bd-lane) + var(--bd-rival) + var(--bd-ticks)); }
+  /* 中间的时间线 */
+  .bd-race__track::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--bd-lane);
+    height: 2px;
+    margin-top: -1px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--bd-gold) 60%, transparent), var(--bd-line-strong) 70%);
   }
-  .lol-build-final__items > span {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    place-items: center;
-    overflow: hidden;
-    border: 1px solid var(--color-frost-line-strong);
+  .bd-race__axis {
+    position: absolute;
+    inset: 0;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 11px;
+    pointer-events: none;
+  }
+  .bd-race__axis > span {
+    position: absolute;
+    bottom: 0;
+    line-height: 14px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  /* 每个刻度一根很淡的竖线，贯穿两条泳道 */
+  .bd-race__axis > span::before {
+    content: '';
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    height: calc(var(--bd-lane) + var(--bd-rival));
+    border-left: 1px dashed var(--color-frost-line);
+  }
+  .bd-race:not(.has-rival) .bd-race__axis > span::before { height: var(--bd-lane); }
+  .bd-race__axis > span.is-first { transform: none; }
+  .bd-race__axis > span.is-first::before { left: 0; }
+  .bd-race__axis > span.is-last { transform: translateX(-100%); }
+  .bd-race__axis > span.is-last::before { left: auto; right: 0; }
+
+  .bd-race__lane { position: absolute; left: 0; right: 0; }
+  .bd-race__lane.is-focus { top: 0; height: var(--bd-lane); }
+  .bd-race__lane.is-rival { top: var(--bd-lane); height: var(--bd-rival); }
+  .bd-race__item { position: absolute; inset: 0; pointer-events: none; }
+  /* 真实时间点：时间线上的小圆点（自己金色实心，对位空心） */
+  .bd-race__dot {
+    position: absolute;
+    left: var(--x);
+    z-index: 1;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+  }
+  .bd-race__lane.is-focus .bd-race__dot { bottom: -4px; background: var(--bd-gold); box-shadow: 0 0 0 2px var(--bd-bg); }
+  .bd-race__lane.is-rival .bd-race__dot { top: -4px; background: var(--bd-bg); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-app-text) 55%, transparent); }
+  /* 图标被挤开时，用细线连回真实时间点 */
+  .bd-race__stem {
+    position: absolute;
+    left: min(var(--x), var(--px));
+    width: max(1px, calc(max(var(--x), var(--px)) - min(var(--x), var(--px))));
+    height: 10px;
+    border: 0 solid var(--bd-line-strong);
+  }
+  .bd-race__item.is-right .bd-race__stem { border-left-width: 1px; }
+  .bd-race__item.is-left .bd-race__stem { border-right-width: 1px; }
+  .bd-race__lane.is-focus .bd-race__stem { bottom: 0; }
+  .bd-race__lane.is-focus .bd-race__item.is-shifted .bd-race__stem { border-top-width: 1px; }
+  .bd-race__lane.is-rival .bd-race__stem { top: 0; }
+  .bd-race__lane.is-rival .bd-race__item.is-shifted .bd-race__stem { border-bottom-width: 1px; }
+  .bd-race__icon {
+    position: absolute;
+    left: var(--px);
+    display: inline-flex;
+    margin-left: -16px;
     border-radius: var(--radius-sm);
-    background: var(--color-frost-fill-faint);
+    pointer-events: auto;
+    transition: transform 140ms ease;
   }
-  .lol-build-final__items > [data-slot="0"] { grid-area: 1 / 1; }
-  .lol-build-final__items > [data-slot="1"] { grid-area: 1 / 2; }
-  .lol-build-final__items > [data-slot="2"] { grid-area: 1 / 3; }
-  .lol-build-final__items > [data-slot="3"] { grid-area: 2 / 1; }
-  .lol-build-final__items > [data-slot="4"] { grid-area: 2 / 2; }
-  .lol-build-final__items > [data-slot="5"] { grid-area: 2 / 3; }
-  .lol-build-final__items > .is-trinket { grid-area: 1 / 4 / span 2; align-self: center; justify-self: end; }
-  .lol-build-final__items > .is-empty { border-color: var(--color-frost-line); }
-  .lol-build-final__items img { width: 100%; height: 100%; object-fit: cover; }
-  .lol-build-final__items i { width: 10px; height: 1px; background: var(--color-app-subtle); }
-  .lol-build-final__items > span:not(.is-empty):hover { border-color: var(--color-app-focus); }
-  .lol-build-section-title { margin: 0 0 12px; color: var(--color-app-body); font-size: 14px; font-weight: 550; line-height: 20px; }
-  .lol-build-shopping { padding-top: 18px; }
+  .bd-race__lane.is-focus .bd-race__icon { bottom: 10px; box-shadow: 0 0 0 1.5px var(--bd-gold), 0 4px 12px color-mix(in srgb, var(--bd-gold) 25%, transparent); }
+  .bd-race__lane.is-rival .bd-race__icon { top: 10px; box-shadow: 0 0 0 1px var(--bd-line-strong); opacity: .85; }
+  .bd-race__icon:hover { z-index: 2; opacity: 1; transform: scale(1.15); }
+  .bd-race__icon img { border-radius: var(--radius-sm); }
+  .bd-race__icon > b {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--bd-gold);
+    color: var(--bd-bg);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+  }
+  .bd-race__lane.is-rival .bd-race__icon > b { background: color-mix(in srgb, var(--color-app-text) 60%, var(--bd-bg)); }
+  .bd-race__item time {
+    position: absolute;
+    left: var(--px);
+    color: var(--color-app-muted);
+    font-family: var(--font-num);
+    font-size: 11px;
+    line-height: 14px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .bd-race__lane.is-focus time { top: 2px; color: var(--bd-gold-text); font-weight: 600; }
+  .bd-race__lane.is-rival time { top: 44px; }
+  .bd-race__item.is-boots .bd-race__icon { opacity: .9; }
 
-  .lol-build-matrix { display: grid; min-width: 0; gap: 16px; }
-  .lol-build-matrix__table { width: 100%; table-layout: fixed; border-collapse: collapse; }
-  .lol-build-matrix__label-col { width: 68px; }
-  .lol-build-matrix__table th,
-  .lol-build-matrix__table td { padding: 0; border: 0; text-align: center; }
-  .lol-build-matrix__table thead th { height: 22px; color: var(--color-app-muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; vertical-align: top; }
-  .lol-build-matrix__table thead th:first-child { text-align: left; }
-  .lol-build-matrix__table thead .is-pending { color: var(--color-app-subtle); }
-  .lol-build-matrix__table tbody tr { height: 40px; }
-  .lol-build-matrix__table tbody tr:hover { background: var(--color-frost-fill-faint); }
-  .lol-build-matrix__skill { display: flex; align-items: center; gap: 8px; }
-  .lol-build-matrix__skill > img { flex: 0 0 34px; border-radius: var(--radius-xs); }
-  .lol-build-matrix__skill > b { color: var(--color-app-body); font-size: 16px; font-weight: 550; }
-  .lol-build-matrix__art-empty { width: 34px; height: 34px; flex: 0 0 34px; border-radius: var(--radius-xs); background: var(--color-frost-fill-soft); }
-  .lol-build-matrix__cell > span { display: grid; width: min(24px, 100%); height: 26px; margin: auto; place-items: center; border-radius: var(--radius-xs); }
-  .lol-build-matrix__cell i { width: 2px; height: 2px; border-radius: 50%; background: var(--color-app-muted); opacity: 0.4; }
-  .lol-build-matrix__cell.is-pending i { opacity: 0.18; }
-  .lol-build-matrix__cell.is-active > span {
-    background: color-mix(in srgb, var(--color-app-body) 86%, var(--color-app-bg));
-    color: var(--color-app-primary-foreground);
-    box-shadow: inset 0 1px 0 var(--color-frost-highlight), var(--shadow-ui-neutral-sm);
-  }
-  .lol-build-matrix__cell b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
-  .lol-build-matrix__table .is-ultimate .is-active > span { background: color-mix(in srgb, var(--color-analysis-gold) 84%, var(--color-app-body)); }
-  .lol-build-matrix__cell.is-active:hover > span,
-  .lol-build-matrix__cell.is-active > span:focus-visible { background: var(--color-app-text); }
-  .lol-build-evolves { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .lol-build-evolves > span { display: flex; align-items: center; gap: 8px; border-radius: var(--radius-sm); padding: 4px 8px 4px 4px; background: var(--color-frost-fill-soft); }
-  .lol-build-evolves img,
-  .lol-build-evolves b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: var(--radius-xs); }
-  .lol-build-evolves em { color: var(--color-app-body); font-size: 12px; font-style: normal; }
-  .lol-build-evolves time { color: var(--color-app-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .lol-build-shopping__track {
+  .bd-verdict {
     display: flex;
-    min-width: 0;
     flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 22px 18px;
+    gap: 6px;
+    margin: 10px 0 0 116px;
+  }
+  .bd-verdict__chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--bd-line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-surface) 60%, transparent);
+    font-size: 12px;
+  }
+  .bd-verdict__chip small { color: var(--color-app-muted); font-size: 11px; }
+  .bd-verdict__chip b { font-family: var(--font-num); font-weight: 700; }
+  .bd-verdict__chip.is-ahead { border-color: color-mix(in srgb, var(--color-app-win) 40%, transparent); }
+  .bd-verdict__chip.is-ahead b { color: var(--color-app-win); }
+  .bd-verdict__chip.is-behind { border-color: color-mix(in srgb, var(--color-app-loss) 40%, transparent); }
+  .bd-verdict__chip.is-behind b { color: var(--color-app-loss); }
+  .bd-verdict__chip.is-even b { color: var(--color-app-body); }
+
+  .bd-final { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .bd-final__item { position: relative; display: inline-flex; border-radius: var(--radius-sm); box-shadow: 0 0 0 1.5px var(--bd-gold-line); }
+  .bd-final__item img { border-radius: var(--radius-sm); }
+  .bd-final__item.is-trinket { margin-left: 8px; border-radius: 50%; box-shadow: 0 0 0 1px var(--bd-line-strong); }
+  .bd-final__item.is-trinket img { border-radius: 50%; }
+  .bd-final__item > b {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--bd-gold);
+    color: var(--bd-bg);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  /* ── 对线（和对位逐分钟比） ───────────────────────────────────────── */
+  .ld {
+    --ld-ahead: var(--color-app-win);
+    --ld-behind: var(--color-app-loss);
+    display: grid;
+    gap: 12px;
+  }
+  .ld .is-ahead { --ld-tone: var(--ld-ahead); }
+  .ld .is-behind { --ld-tone: var(--ld-behind); }
+  .ld .is-even { --ld-tone: var(--color-app-muted); }
+  .ld-verdict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--ld-tone) 16%, transparent), transparent 80%);
+    box-shadow: inset 3px 0 var(--ld-tone);
+  }
+  .ld-verdict b { color: var(--ld-tone); font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+  .ld-verdict.is-even b { color: var(--color-app-text); }
+  .ld-verdict span { color: var(--color-app-body); font-size: 12px; }
+  .ld-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 18px;
+  }
+  .ld-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .ld-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ld-table th {
+    padding: 0 12px 6px 0;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .ld-table thead th { color: var(--color-app-subtle); text-align: center; }
+  .ld-table tbody th { padding-top: 6px; color: var(--color-app-body); font-size: 12px; }
+  .ld-table td {
+    min-width: 82px;
+    padding: 5px 10px;
+    border-top: 1px solid var(--bd-line);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .ld-table td b { display: block; color: var(--ld-tone); font-family: var(--font-num); font-size: 15px; font-weight: 700; line-height: 1.2; }
+  .ld-table td small { color: var(--color-app-subtle); font-family: var(--font-num); font-size: 11px; }
+
+  .ld-chart { display: grid; min-width: 0; gap: 6px; }
+  .ld-tabs {
+    display: inline-flex;
+    justify-self: end;
+    padding: 2px;
+    border: 1px solid var(--bd-line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-surface) 60%, transparent);
+  }
+  .ld-tabs button {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    color: var(--color-app-muted);
+    font-size: 12px;
+  }
+  .ld-tabs button:hover { color: var(--color-app-text); }
+  .ld-tabs button[aria-pressed='true'] {
+    background: var(--bd-gold-soft);
+    color: var(--bd-gold-text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--bd-gold-line);
+  }
+  .ld-plot {
+    position: relative;
+    height: 104px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bd-bg) 50%, transparent);
+    box-shadow: inset 0 0 0 1px var(--bd-line);
+    cursor: crosshair;
+  }
+  .ld-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .ld-zero { stroke: var(--bd-line-strong); vector-effect: non-scaling-stroke; }
+  .ld-mark { stroke: var(--bd-gold-line); stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+  .ld-area.is-ahead { fill: color-mix(in srgb, var(--ld-ahead) 26%, transparent); }
+  .ld-area.is-behind { fill: color-mix(in srgb, var(--ld-behind) 26%, transparent); }
+  .ld-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .ld-line.is-ahead { stroke: var(--ld-ahead); }
+  .ld-line.is-behind { stroke: var(--ld-behind); }
+  .ld-label {
+    position: absolute;
+    left: 8px;
+    color: var(--ld-tone);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+  }
+  .ld-label.is-ahead { top: 7px; }
+  .ld-label.is-behind { bottom: 7px; }
+  .ld-label b { font-family: var(--font-num); font-weight: 500; opacity: .85; }
+  .ld-cursor {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+    width: 1px;
+    background: color-mix(in srgb, var(--color-app-text) 40%, transparent);
+    pointer-events: none;
+  }
+  .ld-tip {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    display: grid;
+    width: max-content;
+    gap: 1px;
+    padding: 6px 10px;
+    border: 1px solid var(--bd-line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-app-elevated);
+    box-shadow: var(--shadow-ui-popover);
+    font-size: 12px;
+  }
+  .ld-tip.is-left { right: 8px; left: auto; }
+  .ld-tip b { color: var(--color-app-text); font-family: var(--font-num); }
+  .ld-tip em { color: var(--ld-tone, var(--color-app-muted)); font-family: var(--font-num); font-style: normal; font-weight: 600; }
+  .ld-axis {
+    position: relative;
+    height: 14px;
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 11px;
+  }
+  .ld-axis > span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .ld-axis > span.is-first { transform: none; }
+  .ld-axis > span.is-last { transform: translateX(-100%); }
+
+  /* ── 技能 ──────────────────────────────────────────────────────────── */
+  .bd-skills {
+    --bd-main: var(--bd-gold);
+    --bd-second: var(--color-analysis-accent);
+    --bd-third: color-mix(in srgb, var(--color-app-text) 45%, transparent);
+    --bd-ult: var(--color-party-violet);
+    display: grid;
+    gap: 12px;
+  }
+  .bd-skills .is-main { --bd-skill: var(--bd-main); }
+  .bd-skills .is-second { --bd-skill: var(--bd-second); }
+  .bd-skills .is-third, .bd-skills .is-other { --bd-skill: var(--bd-third); }
+  .bd-skills .is-ult { --bd-skill: var(--bd-ult); }
+  .bd-skills__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+  .bd-skills__priority { display: flex; align-items: center; gap: 4px; }
+  .bd-skill-chip { display: inline-flex; align-items: center; gap: 6px; }
+  .bd-skills__gt { margin: 0 4px; color: var(--color-app-subtle); font-size: 16px; font-style: normal; }
+  .bd-skill-chip__icon {
+    position: relative;
+    display: inline-grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bd-skill) 18%, transparent);
+    box-shadow: 0 0 0 1.5px var(--bd-skill);
+  }
+  .bd-skill-chip__icon img { width: 26px; height: 26px; border-radius: var(--radius-xs); }
+  .bd-skill-chip__icon > b { color: var(--bd-skill); font-family: var(--font-num); font-size: 14px; }
+  .bd-skill-chip__icon > em {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    min-width: 15px;
+    height: 15px;
+    border-radius: var(--radius-xs);
+    background: var(--bd-skill);
+    color: var(--bd-bg);
+    font-family: var(--font-num);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: 15px;
+    text-align: center;
+  }
+  .bd-skill-chip > small { color: var(--bd-skill); font-size: 11px; font-weight: 600; }
+  .bd-skill-chip.is-third > small { color: var(--color-app-muted); }
+  .bd-skills__facts { display: flex; gap: 14px; margin: 0; }
+  .bd-skills__facts > div { display: flex; align-items: baseline; gap: 6px; }
+  .bd-skills__facts dt { color: var(--color-app-muted); font-size: 11px; }
+  .bd-skills__facts dd { margin: 0; color: var(--color-app-text); font-family: var(--font-num); font-size: 13px; font-weight: 600; }
+
+  .bd-grid { display: grid; gap: 3px; overflow-x: auto; }
+  .bd-grid__row {
+    display: grid;
+    grid-template-columns: 46px repeat(var(--bd-cols, 18), minmax(18px, 1fr));
+    align-items: center;
+    gap: 3px;
+  }
+  .bd-grid__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .bd-grid__label img { border-radius: var(--radius-xs); box-shadow: 0 0 0 1px color-mix(in srgb, var(--bd-skill, var(--bd-line-strong)) 70%, transparent); }
+  .bd-grid__label b { color: var(--bd-skill, var(--color-app-text)); font-family: var(--font-num); font-size: 12px; }
+  .bd-grid__noicon { width: 22px; height: 22px; border-radius: var(--radius-xs); background: var(--color-frost-fill-hover); }
+  .bd-grid__num {
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 11px;
+    text-align: center;
+  }
+  .bd-grid__num.is-pending { opacity: .45; }
+  .bd-grid__cell {
+    display: grid;
+    height: 22px;
+    place-items: center;
+    border-radius: var(--radius-xs);
+  }
+  .bd-grid__cell > i {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--bd-line-strong);
+  }
+  .bd-grid__cell.is-on {
+    background: color-mix(in srgb, var(--bd-skill) 85%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--bd-skill) 30%, transparent);
+  }
+  .bd-grid__cell.is-on > b { color: var(--bd-bg); font-family: var(--font-num); font-size: 11px; font-weight: 800; }
+  .bd-grid__row.is-third .bd-grid__cell.is-on > b, .bd-grid__row.is-other .bd-grid__cell.is-on > b { color: var(--color-app-text); }
+
+  /* ── 符文与召唤师技能 ───────────────────────────────────────────────── */
+  .bd-runes { display: grid; gap: 12px; }
+  .bd-runes__tree { --bd-rune: var(--color-app-muted); display: flex; align-items: center; gap: 12px; }
+  .bd-runes__tree.is-precision { --bd-rune: var(--color-party-amber); }
+  .bd-runes__tree.is-domination { --bd-rune: var(--color-party-coral); }
+  .bd-runes__tree.is-sorcery { --bd-rune: var(--color-party-violet); }
+  .bd-runes__tree.is-inspiration { --bd-rune: var(--color-party-teal); }
+  .bd-runes__tree.is-resolve { --bd-rune: var(--color-party-green); }
+  .bd-runes__tree > div { display: grid; min-width: 0; gap: 4px; }
+  .bd-runes__keystone {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding: 3px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--bd-rune) 30%, transparent), transparent 70%);
+    box-shadow: 0 0 0 1.5px var(--bd-rune), 0 0 14px color-mix(in srgb, var(--bd-rune) 35%, transparent);
+  }
+  .bd-runes__tag {
+    justify-self: start;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bd-rune) 18%, transparent);
+    color: color-mix(in srgb, var(--bd-rune) 70%, var(--color-app-text));
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+  }
+  .bd-runes__tree strong {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bd-runes__tree .bd-runes__minor { display: flex; gap: 6px; }
+  .bd-runes__minor > span { display: inline-flex; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--bd-rune) 55%, transparent); }
+  .bd-runes__tree.is-secondary { padding-left: 4px; }
+  .bd-runes__label { flex: 0 0 auto; color: var(--color-app-muted); font-size: 11px; }
+  .bd-runes__spells {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--bd-line);
+  }
+  .bd-spell { display: inline-flex; align-items: center; gap: 6px; }
+  .bd-spell img { border-radius: var(--radius-xs); }
+  .bd-spell em, .bd-augment em { color: var(--color-app-body); font-size: 12px; font-style: normal; }
+  .bd-runes__augments { display: grid; gap: 6px; }
+  .bd-runes__augments > div { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  .bd-augment { display: inline-flex; align-items: center; gap: 6px; }
+  .bd-augment img { box-shadow: 0 0 0 1.5px var(--color-rarity-silver); }
+  .bd-augment.is-gold img, .bd-augment.is-kGold img { box-shadow: 0 0 0 1.5px var(--color-rarity-gold); }
+  .bd-augment.is-prismatic img, .bd-augment.is-kPrismatic img { box-shadow: 0 0 0 1.5px var(--color-rarity-prismatic); }
+
+  /* ── 每次回家买了什么 ───────────────────────────────────────────────── */
+  .bd-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .bd-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .bd-legend i { display: inline-block; width: 11px; height: 11px; border-radius: var(--radius-xs); background: var(--color-frost-fill-hover); }
+  .bd-legend i.is-final { box-shadow: inset 0 0 0 1.5px var(--bd-gold); }
+  .bd-legend i.is-combined { box-shadow: inset 0 0 0 1px var(--bd-line-strong); }
+  .bd-legend i.is-consumed { opacity: .5; box-shadow: inset 0 0 0 1px var(--bd-line-strong); }
+  .bd-legend i.is-sold { background: linear-gradient(135deg, transparent 44%, var(--color-app-loss) 44%, var(--color-app-loss) 56%, transparent 56%), var(--color-frost-fill-hover); }
+
+  .bd-trips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 8px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .lol-build-trip { display: grid; min-width: 68px; max-width: 100%; gap: 8px; }
-  .lol-build-trip > time {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--color-app-muted);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    line-height: 18px;
-  }
-  .lol-build-trip > time::before { width: 3px; height: 3px; flex: 0 0 3px; border-radius: 50%; background: var(--color-app-muted); content: ""; }
-  .lol-build-trip > time::after { height: 1px; min-width: 8px; flex: 1; background: var(--color-frost-line-strong); content: ""; }
-  .lol-build-trip > div { display: flex; min-width: 0; flex-wrap: wrap; gap: 6px; }
-  .lol-build-trip > div > span {
+  .bd-trip {
+    position: relative;
     display: grid;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
-    place-items: center;
-    overflow: hidden;
-    border: 1px solid var(--color-frost-line-strong);
+    gap: 6px;
+    padding: 7px 10px 9px;
+    border: 1px solid var(--bd-line);
     border-radius: var(--radius-sm);
-    background: var(--color-frost-fill-soft);
+    background: color-mix(in srgb, var(--bd-bg) 55%, transparent);
   }
-  .lol-build-trip > div > .is-final { border-color: color-mix(in srgb, var(--color-analysis-gold) 50%, transparent); }
-  .lol-build-trip img { width: 100%; height: 100%; object-fit: cover; }
-  .lol-build-trip b { color: var(--color-app-body); font-size: 11px; }
-  .lol-build-trip:hover > time { color: var(--color-app-text); }
-  .lol-build-empty { margin: 0; color: var(--color-app-muted); font-size: 13px; line-height: 1.5; }
-  .lol-builds :is(button, [tabindex="0"]):focus-visible { outline: 2px solid var(--color-app-focus); outline-offset: 3px; }
-  @container build (max-width: 879px) {
-    .lol-build-blueprint { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-    .lol-build-final { display: flex; align-items: center; gap: 18px; }
-    .lol-build-final h3 { margin: 0; white-space: nowrap; }
-    .lol-build-final__items { grid-template-columns: repeat(6, 44px) 50px; grid-template-rows: 44px; padding: 8px 10px; }
-    .lol-build-final__items > [data-slot] { grid-area: auto; }
-    .lol-build-final__items > .is-trinket { justify-self: end; }
+  .bd-trip + .bd-trip::before {
+    content: '›';
+    position: absolute;
+    top: 50%;
+    left: -8px;
+    color: var(--color-app-subtle);
+    font-size: 14px;
+    transform: translate(-50%, -50%);
   }
-  @container build (max-width: 720px) {
-    .lol-build-roster { gap: 10px; padding-inline: 16px; }
-    .lol-build-roster__team { display: grid; gap: 5px; }
-    .lol-build-profile { padding-inline: 16px; }
+  .bd-trip > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .bd-trip > header b { color: var(--color-app-body); font-size: 12px; font-weight: 600; }
+  .bd-trip:first-child > header b { color: var(--bd-gold-text); }
+  .bd-trip > header time { color: var(--color-app-subtle); font-family: var(--font-num); font-size: 11px; }
+  .bd-trip__items { display: flex; flex-wrap: wrap; gap: 5px; }
+
+  .bd-item {
+    position: relative;
+    display: inline-flex;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 0 1px var(--bd-line-strong);
+    transition: transform 140ms ease;
   }
-  @container build (max-width: 560px) {
-    .lol-build-roster { grid-template-columns: 1fr; gap: 8px; }
-    .lol-build-roster > b { display: none; }
-    .lol-build-roster__team { grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 8px; }
-    .lol-build-roster__team > div { justify-content: space-between; }
-    .lol-build-context { column-gap: 12px; }
-    .lol-build-final { display: block; }
-    .lol-build-final h3 { margin-bottom: 12px; }
-    .lol-build-final__items { grid-template-columns: repeat(3, 44px) 50px; grid-template-rows: repeat(2, 44px); padding: 12px; }
-    .lol-build-final__items > [data-slot="0"] { grid-area: 1 / 1; }
-    .lol-build-final__items > [data-slot="1"] { grid-area: 1 / 2; }
-    .lol-build-final__items > [data-slot="2"] { grid-area: 1 / 3; }
-    .lol-build-final__items > [data-slot="3"] { grid-area: 2 / 1; }
-    .lol-build-final__items > [data-slot="4"] { grid-area: 2 / 2; }
-    .lol-build-final__items > [data-slot="5"] { grid-area: 2 / 3; }
-    .lol-build-final__items > .is-trinket { grid-area: 1 / 4 / span 2; }
+  .bd-item img { border-radius: var(--radius-sm); }
+  .bd-item:hover { z-index: 1; transform: translateY(-2px); }
+  .bd-item.is-final { box-shadow: 0 0 0 1.5px var(--bd-gold), 0 0 8px color-mix(in srgb, var(--bd-gold) 35%, transparent); }
+  .bd-item.is-combined { opacity: .8; }
+  .bd-item.is-consumed { opacity: .45; }
+  .bd-item.is-sold { opacity: .55; }
+  .bd-item.is-sale { opacity: .7; }
+  .bd-item.is-sale::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, transparent 46%, var(--color-app-loss) 46%, var(--color-app-loss) 54%, transparent 54%);
   }
+  .bd-item.is-sale > em {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    z-index: 1;
+    padding: 0 3px;
+    border-radius: var(--radius-xs);
+    background: var(--color-app-loss);
+    color: var(--bd-bg);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 14px;
+  }
+  .bd-item__blank {
+    display: inline-block;
+    border-radius: var(--radius-sm);
+    background: var(--color-frost-fill-hover);
+  }
+  .bd-item__blank.is-round { border-radius: 50%; }
+
+  /* ── 窄窗口 ────────────────────────────────────────────────────────── */
+  @container (max-width: 760px) {
+    .bd { padding-inline: 12px; }
+    .bd-roster { margin-inline: -12px; gap: 8px; padding-inline: 12px; }
+    .bd-pair { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .bd-hero { flex-wrap: wrap; }
+    .bd-hero__build { order: 3; }
+    .bd-hero__stats { width: 100%; justify-content: flex-start; }
+    .bd-hero__stats > div { text-align: left; }
+    .bd-race { grid-template-columns: 72px minmax(0, 1fr); }
+    .bd-verdict { margin-left: 0; }
+    .ld-body { grid-template-columns: minmax(0, 1fr); }
+    .ld-table { justify-self: start; }
+    .bd-card__head p { text-align: left; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .lol-build-roster__team button { transition: none; }
+    .bd-spin { animation: none; }
+    .bd-roster button, .bd-item, .bd-race__icon { transition: none; }
   }
 }

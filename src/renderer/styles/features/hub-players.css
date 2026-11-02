@@ -1,0 +1,521 @@
+/* 「我的玩家」：左栏玩家列表、关注动态、玩家档案（components/hub/PlayersHub.tsx） */
+@layer components {
+  /* ---------- 分组筛选 ---------- */
+  .pl-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid var(--color-line-1);
+    padding: 10px 12px 8px;
+  }
+
+  .pl-chip {
+    display: inline-flex;
+    height: 26px;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid var(--color-line-1);
+    border-radius: 999px;
+    color: var(--color-text-3);
+    background: transparent;
+    font-size: var(--text-meta);
+    font-weight: 550;
+    transition: background-color var(--duration-ui-fast) ease, color var(--duration-ui-fast) ease;
+  }
+
+  .pl-chip > button,
+  .pl-chip--add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+  }
+
+  .pl-chip svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .pl-chip em {
+    color: var(--color-text-4);
+    font: 600 var(--text-cap) var(--font-num);
+    font-style: normal;
+  }
+
+  .pl-chip:hover {
+    color: var(--color-text-1);
+    background: var(--color-app-nav-hover);
+  }
+
+  .pl-chip[aria-selected="true"] {
+    border-color: transparent;
+    color: var(--color-app-primary-foreground);
+    background: var(--color-app-primary);
+  }
+
+  .pl-chip[aria-selected="true"] em {
+    color: inherit;
+    opacity: 0.65;
+  }
+
+  .pl-chip__remove {
+    display: grid;
+    width: 24px;
+    place-items: center;
+    border-left: 1px solid color-mix(in srgb, var(--color-app-primary-foreground) 20%, transparent);
+    opacity: 0.75;
+  }
+
+  .pl-chip__remove:hover {
+    opacity: 1;
+  }
+
+  .pl-chip--add {
+    height: 26px;
+    border-style: dashed;
+  }
+
+  .pl-chip-input {
+    width: 130px;
+    height: 26px;
+    border: 1px solid var(--color-line-3);
+    border-radius: 999px;
+    padding: 0 10px;
+    background: var(--color-ink-2);
+    color: var(--color-text-1);
+    font-size: var(--text-meta);
+    outline: none;
+  }
+
+  /* ---------- 玩家列表 ---------- */
+  .pl-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    text-align: left;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pl-row:hover {
+    background: var(--color-app-nav-hover);
+  }
+
+  .pl-row[aria-current="true"] {
+    background: var(--color-ink-3);
+    box-shadow: var(--shadow-ui-inset-line);
+  }
+
+  .pl-row__body {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .pl-row__name {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 3px;
+  }
+
+  .pl-row__name b {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-row__name small,
+  .pl-card__who small,
+  .pl-hero__id small,
+  .msg-row__top small,
+  .msg-chat__who small,
+  .fr-name small {
+    flex-shrink: 0;
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+  }
+
+  .pl-row__meta {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+  }
+
+  .pl-row__meta [data-win] {
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  .pl-row__meta [data-win="true"],
+  .pl-match[data-win="true"] .pl-match__result {
+    color: var(--color-ally);
+  }
+
+  .pl-row__meta [data-win="false"],
+  .pl-match[data-win="false"] .pl-match__result {
+    color: var(--color-enemy);
+  }
+
+  .pl-row__sep {
+    color: var(--color-text-4);
+  }
+
+  .pl-dots {
+    display: flex;
+    flex-shrink: 0;
+    gap: 3px;
+  }
+
+  .pl-dots i {
+    width: 6px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--color-enemy);
+    opacity: 0.85;
+  }
+
+  .pl-dots i[data-win="true"] {
+    background: var(--color-ally);
+  }
+
+  /* ---------- 关注动态 ---------- */
+  .pl-feed {
+    padding: 14px 26px 40px;
+  }
+
+  .pl-watch {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin: 0 -4px 6px;
+    padding: 4px 4px 10px;
+  }
+
+  .pl-watch__item {
+    display: flex;
+    width: 68px;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--radius-sm);
+    padding: 8px 4px 6px;
+    color: var(--color-text-2);
+    font-size: var(--text-meta);
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pl-watch__item > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-watch__item:hover {
+    background: var(--color-app-nav-hover);
+  }
+
+  .pl-watch__item .hub-avatar > img {
+    box-shadow: 0 0 0 2px var(--color-ink-1), 0 0 0 3.5px var(--color-gold-line);
+  }
+
+  .pl-watch__plus {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border: 1px dashed var(--color-line-3);
+    border-radius: 999px;
+    color: var(--color-text-3);
+  }
+
+  .pl-watch__plus svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .pl-day__cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .pl-card {
+    position: relative;
+    display: grid;
+    min-height: 88px;
+    grid-template-columns: 150px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 16px;
+    overflow: hidden;
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-lg);
+    padding-right: 14px;
+    background: var(--color-ink-2);
+    transition: border-color var(--duration-ui-fast) ease, transform var(--duration-ui-fast) ease;
+  }
+
+  .pl-card:hover {
+    border-color: var(--color-line-3);
+  }
+
+  .pl-card__art {
+    position: relative;
+    align-self: stretch;
+    overflow: hidden;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--color-ally) 22%, transparent), transparent 70%),
+      var(--color-ink-3);
+  }
+
+  .pl-card[data-win="false"] .pl-card__art {
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--color-enemy) 22%, transparent), transparent 70%),
+      var(--color-ink-3);
+  }
+
+  .pl-card__splash {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 62% 22%;
+    transition: transform 400ms ease;
+  }
+
+  .pl-card:hover .pl-card__splash {
+    transform: scale(1.05);
+  }
+
+  .pl-card__art::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background: linear-gradient(90deg, transparent 55%, var(--color-ink-2));
+  }
+
+  .pl-card__result {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    border-radius: var(--radius-xs);
+    padding: 1px 7px;
+    color: var(--color-app-on-danger);
+    background: var(--color-ally);
+    font-size: var(--text-cap);
+    font-weight: 700;
+    line-height: 18px;
+  }
+
+  .pl-card[data-win="false"] .pl-card__result {
+    background: var(--color-enemy);
+  }
+
+  .pl-card__champ {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 1;
+    box-shadow: 0 0 0 2px var(--color-ink-2);
+  }
+
+  .pl-card__body {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+    padding: 12px 0;
+  }
+
+  .pl-card__who {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pl-card__who img,
+  .pl-card__who > span:first-child {
+    border-radius: 999px;
+  }
+
+  .pl-card__who b {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-list);
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-card__line {
+    overflow: hidden;
+    color: var(--color-text-2);
+    font-size: var(--text-body);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-card__line b {
+    color: var(--color-text-1);
+    font-weight: 650;
+  }
+
+  .pl-card__meta {
+    color: var(--color-text-4);
+    font-size: var(--text-meta);
+  }
+
+  .pl-card__stats {
+    display: grid;
+    justify-items: end;
+    gap: 1px;
+  }
+
+  .pl-card__stats small {
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+  }
+
+  .pl-kda {
+    color: var(--color-text-1);
+    font: 700 18px/24px var(--font-num);
+    white-space: nowrap;
+  }
+
+  .pl-kda i {
+    margin: 0 3px;
+    color: var(--color-text-4);
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .pl-kda em {
+    color: var(--color-enemy);
+    font-style: normal;
+  }
+
+  .pl-card__go {
+    opacity: 0.7;
+  }
+
+  .pl-card:hover .pl-card__go {
+    opacity: 1;
+  }
+
+  /* ---------- 玩家档案 ---------- */
+  .pl-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 26px 0;
+  }
+
+  .pl-actions__fill {
+    flex: 1;
+  }
+
+  .pl-matches {
+    padding: 22px 26px 32px;
+  }
+
+  .pl-match-list {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-lg);
+    background: var(--color-ink-2);
+  }
+
+  .pl-match {
+    position: relative;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 110px 72px 56px;
+    align-items: center;
+    gap: 14px;
+    border-top: 1px solid var(--color-line-1);
+    padding: 10px 16px 10px 18px;
+    text-align: left;
+    transition: background-color var(--duration-ui-fast) ease;
+  }
+
+  .pl-match:first-child {
+    border-top: 0;
+  }
+
+  .pl-match::before {
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 0;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    content: "";
+    background: var(--color-ally);
+  }
+
+  .pl-match[data-win="false"]::before {
+    background: var(--color-enemy);
+  }
+
+  .pl-match:hover:not(:disabled) {
+    background: var(--color-ink-3);
+  }
+
+  .pl-match__main {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .pl-match__main b {
+    display: flex;
+    gap: 8px;
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pl-match__result {
+    font-weight: 700;
+  }
+
+  .pl-match__main small,
+  .pl-match__num small {
+    overflow: hidden;
+    color: var(--color-text-3);
+    font-size: var(--text-meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-match__num {
+    display: grid;
+    justify-items: end;
+  }
+
+  .pl-match__num b {
+    color: var(--color-text-1);
+    font: 650 var(--text-list) var(--font-num);
+  }
+
+  .pl-match__num .pl-kda {
+    font-size: var(--text-list);
+    line-height: 20px;
+  }
+}

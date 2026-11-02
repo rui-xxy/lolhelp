@@ -18,10 +18,7 @@
     "check": "npm run lint && npm run typecheck && npm run check:styles && npm test"
   },
   "keywords": [],
-  "author": {
-    "name": "wgr",
-    "email": "970185572@qq.com"
-  },
+  "author": "wgr",
   "license": "MIT",
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",

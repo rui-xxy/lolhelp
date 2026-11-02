@@ -7,14 +7,12 @@ import { SwitchControl } from '../settings/SettingsControls';
 export function Panel({
   title,
   count,
-  description,
   extra,
   muted = false,
   children,
 }: {
   title: string;
   count?: number;
-  description?: ReactNode;
   extra?: ReactNode;
   muted?: boolean;
   children: ReactNode;
@@ -27,7 +25,6 @@ export function Panel({
             {title}
             {count !== undefined && <small>{count}</small>}
           </h3>
-          {description && <p className="as-panel__desc">{description}</p>}
         </div>
         {extra && <div className="as-panel__extra">{extra}</div>}
       </header>
@@ -40,27 +37,25 @@ export function PanelBody({ children }: { children: ReactNode }) {
   return <div className="as-panel__body">{children}</div>;
 }
 
-export function PanelFoot({ note, children }: { note?: ReactNode; children: ReactNode }) {
+export function PanelFoot({ children }: { children: ReactNode }) {
   return (
     <footer className="as-panel__foot">
-      <p>{note}</p>
+      <p />
       {children}
     </footer>
   );
 }
 
-// 一个功能：图标 + 名字 + 一句话说明它替你做什么 + 开关。打开后才展开它的细节。
+// 一个功能：图标 + 名字 + 开关。打开后才展开它的细节。
 export function Feature({
   icon,
   title,
-  description,
   checked,
   onChange,
   children,
 }: {
   icon: ReactNode;
   title: string;
-  description: ReactNode;
   checked?: boolean;
   onChange?: (value: boolean) => void;
   children?: ReactNode;
@@ -72,7 +67,6 @@ export function Feature({
       <span className="as-feature__icon" aria-hidden="true">{icon}</span>
       <div>
         <div className="as-feature__title">{title}</div>
-        <div className="as-feature__desc">{description}</div>
       </div>
       {hasSwitch ? <SwitchControl checked={Boolean(checked)} onChange={onChange} /> : <span />}
       {showOptions && <div className="as-feature__options">{children}</div>}
@@ -89,7 +83,7 @@ export function Choices<T extends string>({
   label,
 }: {
   value: T;
-  options: Array<{ value: T; title: string; description?: string }>;
+  options: Array<{ value: T; title: string }>;
   onChange: (value: T) => void;
   columns?: number;
   label: string;
@@ -111,7 +105,6 @@ export function Choices<T extends string>({
           onClick={() => onChange(option.value)}
         >
           <span className="as-choice__title">{option.title}</span>
-          {option.description && <span className="as-choice__desc">{option.description}</span>}
         </button>
       ))}
     </div>
@@ -158,18 +151,18 @@ export function Field({
 }: {
   label: string;
   optional?: boolean;
-  hint?: ReactNode;
+  /** 补充说明只放在悬停提示里。 */
+  hint?: string;
   wide?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className={`as-field ${wide ? 'as-field--wide' : ''}`}>
-      <span className="as-field__label">
+      <span className="as-field__label" title={hint}>
         {label}
         {optional && <em>选填</em>}
       </span>
       {children}
-      {hint && <span className="as-field__hint">{hint}</span>}
     </div>
   );
 }

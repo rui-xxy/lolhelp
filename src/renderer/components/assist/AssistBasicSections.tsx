@@ -111,7 +111,7 @@ function HonorTarget({ assist, updateAssist }: { assist: AssistSettings; updateA
       <div className="as-honor__room">
         <div className="as-honor__room-head">
           <b>{where ? `${where}的队友` : '房间里的队友'}</b>
-          <span>点一下就选他</span>
+          <span />
           <Btn size="sm" tone="ghost" busy={loading} onClick={() => void load()} title="重新读取房间里的玩家">
             {!loading && <RefreshCw />}
             刷新
@@ -119,7 +119,7 @@ function HonorTarget({ assist, updateAssist }: { assist: AssistSettings; updateA
         </div>
         {players.length === 0 ? (
           <p className="as-honor__none">
-            {loading ? '正在读取…' : '现在不在房间里。进了组队房间或对局后点「刷新」，队友会出现在这里。'}
+            {loading ? '正在读取…' : '不在房间中'}
           </p>
         ) : (
           <div className="as-mates">
@@ -166,13 +166,10 @@ export function AutomationSection({
   const delayIsPreset = DELAY_PRESETS.includes(String(assist.autoAcceptDelayMs) as typeof DELAY_PRESETS[number]);
   return (
     <>
-      <Panel title="排队的时候" description="匹配成功弹出的确认框，替你点「接受」。">
+      <Panel title="排队的时候">
         <Feature
           icon={<CheckCheck />}
           title="自动接受对局"
-          description={assist.autoAccept
-            ? `匹配成功后${assist.autoAcceptDelayMs > 0 ? `等 ${delayLabel(assist.autoAcceptDelayMs)}再` : '马上'}点接受。离开电脑也不会错过对局。`
-            : '关闭时需要你自己点接受。'}
           checked={assist.autoAccept}
           onChange={(value) => updateBoolean('autoAccept', value)}
         >
@@ -195,12 +192,11 @@ export function AutomationSection({
         </Feature>
       </Panel>
 
-      <Panel title="一局打完以后" description="结算界面出来后，助手可以帮你做这些事。">
+      <Panel title="一局打完以后">
         <div className="as-feature">
           <span className="as-feature__icon" aria-hidden="true"><RotateCcw /></span>
           <div>
             <div className="as-feature__title">结算后去哪</div>
-            <div className="as-feature__desc">三选一。「再来一局」会回到房间并直接开始排队。</div>
           </div>
           <span />
           <div className="as-feature__options">
@@ -208,9 +204,9 @@ export function AutomationSection({
               label="结算后去哪"
               value={afterGameValue(assist)}
               options={[
-                { value: 'none', title: '停在结算页', description: '什么都不做，自己看完数据再走' },
-                { value: 'lobby', title: '回到房间', description: '自动关掉结算，回到组队房间' },
-                { value: 'again', title: '再来一局', description: '回到房间并马上开始匹配' },
+                { value: 'none', title: '停在结算页' },
+                { value: 'lobby', title: '回到房间' },
+                { value: 'again', title: '再来一局' },
               ]}
               onChange={(value) => updateAssist((next) => ({
                 ...next,
@@ -223,9 +219,6 @@ export function AutomationSection({
         <Feature
           icon={<Heart />}
           title="自动点赞队友"
-          description={assist.autoHonorSummonerName || assist.autoHonorSummonerId
-            ? '只给你指定的那位玩家点赞；他不在这局就不点。'
-            : '结算时给能点的队友都点上赞。'}
           checked={assist.autoHonorTeammates}
           onChange={(value) => updateBoolean('autoHonorTeammates', value)}
         >

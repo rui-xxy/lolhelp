@@ -1,13 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity,
-  Bell,
   BookmarkCheck,
   Bot,
   ChartNoAxesColumnIncreasing,
   History,
   Home,
-  MailPlus,
   MessageCircleMore,
   ScanSearch,
   Settings,
@@ -44,16 +42,16 @@ export interface ShellConnection {
   label: string;
 }
 
-// 顶栏右侧的快捷入口：和改版前一样，每个功能一个按钮，一键直达。
+// 顶栏右侧的两个窗口：我的玩家（保存的账号 + 关注动态）、消息（聊天 + 好友申请）。
 export interface ShellActions {
-  savedOpen: boolean;
-  onOpenSaved: () => void;
-  followOpen: boolean;
-  followCount: number;
-  onOpenFollow: () => void;
-  friendRequestsOpen: boolean;
-  friendRequestCount: number;
-  onOpenFriendRequests: () => void;
+  playersOpen: boolean;
+  /** 关注动态里还没看过的新对局。 */
+  playersCount: number;
+  onOpenPlayers: () => void;
+  messagesOpen: boolean;
+  /** 待处理的好友申请 + 刚通过的好友。 */
+  messagesCount: number;
+  onOpenMessages: () => void;
 }
 
 interface AppShellProps {
@@ -65,8 +63,6 @@ interface AppShellProps {
   search?: ReactNode;
   connection: ShellConnection;
   actions: ShellActions;
-  chatOpen?: boolean;
-  onOpenChat?: () => void;
   friendDrawerOpen: boolean;
   onToggleFriendDrawer: () => void;
   onCloseFriendDrawer: () => void;
@@ -134,8 +130,6 @@ export function AppShell({
   search,
   connection,
   actions,
-  chatOpen = false,
-  onOpenChat,
   friendDrawerOpen,
   onToggleFriendDrawer,
   onCloseFriendDrawer,
@@ -210,46 +204,24 @@ export function AppShell({
             <button
               type="button"
               className="shell-icon-btn"
-              data-active={actions.savedOpen ? 'true' : 'false'}
-              onClick={actions.onOpenSaved}
-              title="保存的战绩"
-              aria-label="保存的战绩"
+              data-active={actions.playersOpen ? 'true' : 'false'}
+              onClick={actions.onOpenPlayers}
+              title={actions.playersCount > 0 ? `我的玩家 · ${actions.playersCount} 条新动态` : '我的玩家：保存的账号与关注动态'}
+              aria-label={actions.playersCount > 0 ? `我的玩家，${actions.playersCount} 条新动态` : '我的玩家'}
             >
               <BookmarkCheck />
+              <AlertBadge count={actions.playersCount} />
             </button>
             <button
               type="button"
               className="shell-icon-btn"
-              data-active={actions.followOpen ? 'true' : 'false'}
-              onClick={actions.onOpenFollow}
-              title="关注账号"
-              aria-label={actions.followCount > 0 ? `关注账号，${actions.followCount} 条新对局` : '关注账号'}
+              data-active={actions.messagesOpen ? 'true' : 'false'}
+              onClick={actions.onOpenMessages}
+              title={actions.messagesCount > 0 ? `消息 · ${actions.messagesCount} 条好友提醒` : '消息：聊天记录与好友申请'}
+              aria-label={actions.messagesCount > 0 ? `消息，${actions.messagesCount} 条好友提醒` : '消息'}
             >
-              <Bell />
-              <AlertBadge count={actions.followCount} />
-            </button>
-            {onOpenChat && (
-              <button
-                type="button"
-                className="shell-icon-btn"
-                data-active={chatOpen ? 'true' : 'false'}
-                onClick={onOpenChat}
-                title="会话管理"
-                aria-label="会话管理"
-              >
-                <MessageCircleMore />
-              </button>
-            )}
-            <button
-              type="button"
-              className="shell-icon-btn"
-              data-active={actions.friendRequestsOpen ? 'true' : 'false'}
-              onClick={actions.onOpenFriendRequests}
-              title="好友申请"
-              aria-label={actions.friendRequestCount > 0 ? `好友申请，${actions.friendRequestCount} 条未读` : '好友申请'}
-            >
-              <MailPlus />
-              <AlertBadge count={actions.friendRequestCount} />
+              <MessageCircleMore />
+              <AlertBadge count={actions.messagesCount} />
             </button>
             {friendPanel && (
               <button

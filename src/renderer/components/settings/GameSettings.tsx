@@ -101,7 +101,7 @@ export function GameSettings({
     <>
       <SectionTabs sections={GAME_SECTIONS} active={activeSection} onSelect={goToSection} />
       <div className="st-sections">
-        <SettingsSection prefix="game" id="video" title="画面" description="分辨率和画质。改完下次进游戏生效。">
+        <SettingsSection prefix="game" id="video" title="画面">
           <SettingsGroup>
             <SelectRow label={GAME_FIELDS.windowMode.label} value={values.windowMode} options={WINDOW_MODES} segmented onChange={(value) => onChange('windowMode', value)} />
             <SettingRow label={GAME_FIELDS.width.label} hint="一般选和显示器一样的" wide>
@@ -183,7 +183,7 @@ export function GameSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="audio" title="声音" description="点左边的喇叭可以单独静音。">
+        <SettingsSection prefix="game" id="audio" title="声音">
           <SettingsGroup>
             <CheckboxRow label={GAME_FIELDS.enableAudio.label} hint="关掉后游戏里完全没有声音" checked={values.enableAudio} onChange={(value) => onChange('enableAudio', value)} />
             <VolumeRow label={GAME_FIELDS.masterVolume.label} volume={values.masterVolume} muted={values.masterMute} onVolume={(value) => onChange('masterVolume', value)} onMuted={(value) => onChange('masterMute', value)} />

@@ -168,6 +168,86 @@ export interface LcuApi {
   ) => Promise<FriendActionResult>;
   spectateFriend: (puuid: string) => Promise<FriendActionResult>;
   deleteFriend: (friendId: string) => Promise<FriendActionResult>;
+  // 自己的收藏：全部英雄与皮肤（标出拥有）、守卫、表情、头像、小小英雄、钱包
+  getMyCollection: (force?: boolean) => Promise<MyCollection>;
+}
+
+// ============================================================================
+// 我的收藏（只读自己：本地客户端）
+// ============================================================================
+
+export type CollectionRarity = 'none' | 'epic' | 'legendary' | 'mythic' | 'ultimate' | 'transcendent' | 'exalted';
+
+export interface CollectionChroma {
+  id: number;
+  name: string;
+  // 游戏数据里的色值（#rrggbb），画小色点用
+  colors: string[];
+  image: string;
+  imageFallback: string;
+  owned: boolean;
+}
+
+export interface CollectionSkin {
+  id: number;
+  championId: number;
+  name: string;
+  isBase: boolean;
+  rarity: CollectionRarity;
+  legacy: boolean;
+  owned: boolean;
+  acquiredAt?: number;
+  // 竖版加载图 / 横版原画 / 小方图
+  portrait: string;
+  portraitFallback: string;
+  splash: string;
+  splashFallback: string;
+  chromas: CollectionChroma[];
+}
+
+export interface CollectionChampion {
+  id: number;
+  name: string;
+  title: string;
+  avatar: string;
+  owned: boolean;
+  masteryLevel?: number;
+  masteryPoints?: number;
+  lastPlayed?: number;
+}
+
+export interface CollectionItem {
+  id: number;
+  name: string;
+  image: string;
+  imageFallback?: string;
+  acquiredAt?: number;
+}
+
+export type CollectionShelf = 'wards' | 'emotes' | 'icons' | 'companions';
+
+export interface CollectionWallet {
+  rp?: number;
+  blueEssence?: number;
+  orangeEssence?: number;
+  mythicEssence?: number;
+  chests?: number;
+  keys?: number;
+  keyFragments?: number;
+}
+
+export interface MyCollection {
+  puuid: string;
+  riotId: string;
+  fetchedAt: number;
+  champions: CollectionChampion[];
+  // 全部皮肤（含没有的），owned 标出拥有；炫彩挂在皮肤下面
+  skins: CollectionSkin[];
+  // 守卫 / 表情 / 头像 / 小小英雄：只列拥有的；total 是游戏里一共有多少（读不到时为 0）
+  shelves: Record<CollectionShelf, { items: CollectionItem[]; total: number; ok: boolean }>;
+  wallet: CollectionWallet;
+  // 哪些部分没读到、为什么
+  diagnostics: string[];
 }
 
 // 占位接口：后续阶段接入本地数据时填充
@@ -1254,11 +1334,96 @@ export interface ReplayAvailabilityRequest {
   gameType?: string;
 }
 
+// ============================================================================
+// 玩家档案：战绩之外能查到的一切（任意玩家）
+// 来源：SGP challenges-client（收藏数 / 挑战等级 / 展示徽章）、SGP summoner-ledge（等级经验 / 最后游戏时间 / 隐私）、
+//      LCU summoner-profile（生涯背景皮肤）。每一项都可能缺失（国服接口不稳定或对方隐藏），前端按有就显示处理。
+// ============================================================================
+
+export interface PlayerChallengeLevel {
+  /** IRON … CHALLENGER；NONE 表示还没有等级。 */
+  level: string;
+  current: number;
+  max: number;
+  /** 全服百分位，0.021 = 前 2.1%；没有时为 null。 */
+  percentile: number | null;
+}
+
+export interface PlayerChallengeCategory extends PlayerChallengeLevel {
+  /** IMAGINATION / EXPERTISE / TEAMWORK / VETERANCY / COLLECTION */
+  key: string;
+  label: string;
+}
+
+export interface PlayerChallengeToken {
+  id: number;
+  name: string;
+  description: string;
+  level: string;
+  iconUrl: string;
+}
+
+export interface PlayerCollectionCounts {
+  champions: number | null;
+  skins: number | null;
+  chromas: number | null;
+  icons: number | null;
+  emotes: number | null;
+  wards: number | null;
+}
+
+export interface PlayerDossier {
+  puuid: string;
+  level: number | null;
+  expPoints: number | null;
+  expToNextLevel: number | null;
+  /** 最后一局游戏的时间（毫秒）。 */
+  lastGameDate: number | null;
+  /** PUBLIC / PRIVATE */
+  privacy: string | null;
+  /** 生涯背景皮肤 id（英雄 id × 1000 + 皮肤序号）。 */
+  backgroundSkinId: number | null;
+  collection: PlayerCollectionCounts;
+  challengePoints: PlayerChallengeLevel | null;
+  categories: PlayerChallengeCategory[];
+  /** 玩家在生涯页展示的挑战徽章（最多 3 个）。 */
+  tokens: PlayerChallengeToken[];
+  error?: string;
+  /** 哪些来源没拿到、为什么（只用于悬停提示和排查）。 */
+  diagnostics?: string[];
+}
+
+export interface PlayerActiveGamePlayer {
+  puuid: string;
+  riotId: string;
+  championId: number;
+  profileIconId: number;
+  /** 100 蓝方 / 200 红方；不知道时为 0。 */
+  teamId: number;
+}
+
+/** 当前对局（观战接口）。不在游戏中时 inGame = false。 */
+export interface PlayerActiveGame {
+  inGame: boolean;
+  gameId?: number;
+  queueId?: number;
+  queueName?: string;
+  gameMode?: string;
+  /** 开局时间（毫秒）；还在读条时没有。 */
+  startTime?: number;
+  championId?: number;
+  teamId?: number;
+  players: PlayerActiveGamePlayer[];
+  error?: string;
+}
+
 // match 域 API 契约
 export interface MatchApi {
   search: (req: PlayerLookupRequest) => Promise<PlayerLookupResult>;
   getMatchBriefs: (req: PlayerMatchBriefRequest) => Promise<PlayerMatchBriefResult>;
   getPlayerRanks: (puuid: string, region?: string) => Promise<PlayerRankSummary[]>;
+  getPlayerDossier: (puuid: string, region?: string) => Promise<PlayerDossier>;
+  getActiveGame: (puuid: string) => Promise<PlayerActiveGame>;
   getSavedMatchesSummary: () => Promise<SavedMatchesSummary>;
   getSavedMatchesCatalog: () => Promise<SavedMatchesCatalog>;
   getSavedMatchAccount: (accountId: string) => Promise<SavedMatchAccount | null>;

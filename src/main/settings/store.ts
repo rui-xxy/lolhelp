@@ -7,6 +7,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppSettings } from '../../shared/api';
+import { normalizeInstallRoot } from '../config/installRoot';
 import {
   DEFAULT_ASSIST_SETTINGS,
   normalizeAssistBlacklist,

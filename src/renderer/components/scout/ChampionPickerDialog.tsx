@@ -1,4 +1,5 @@
 import { Dialog } from 'radix-ui';
+import { Star } from 'lucide-react';
 import { ChampionPicker } from './ChampionPicker';
 import type { ChampionPreset, ChampionSummary } from '../../../shared/api';
 
@@ -14,6 +15,7 @@ interface ChampionPickerDialogProps {
   onSavePreset?: () => void;
   onApplyPreset?: (ids: number[]) => void;
   onDeletePreset?: (id: string) => void;
+  onUseFavorites?: () => void;
 }
 
 export function ChampionPickerDialog({
@@ -28,6 +30,7 @@ export function ChampionPickerDialog({
   onSavePreset,
   onApplyPreset,
   onDeletePreset,
+  onUseFavorites,
 }: ChampionPickerDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -58,7 +61,7 @@ export function ChampionPickerDialog({
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {champions.length === 0 ? (
               <div className="flex h-40 items-center justify-center text-xs text-app-subtle">
-                英雄列表加载中…若长时间无反应请重启应用
+                英雄列表加载中…
               </div>
             ) : (
               <ChampionPicker
@@ -76,7 +79,18 @@ export function ChampionPickerDialog({
           </div>
 
           <div className="flex items-center justify-between border-t border-app-border bg-app-surface-soft px-5 py-3">
-            <span className="text-[11px] text-app-subtle">点方案可一键套用，点格子选/取消</span>
+            {onUseFavorites && favoriteIds.length > 0 ? (
+              <button
+                type="button"
+                onClick={onUseFavorites}
+                className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs text-app-subtle transition-colors hover:bg-app-surface hover:text-app-text"
+              >
+                <Star className="size-3 fill-current text-gold" aria-hidden="true" />
+                用收藏的 {favoriteIds.length} 个
+              </button>
+            ) : (
+              <span />
+            )}
             <Dialog.Close className="rounded-sm bg-app-primary px-5 py-1.5 text-xs font-semibold text-app-primary-foreground transition-colors hover:bg-app-primary-hover">
               确定（{selectedIds.length}）
             </Dialog.Close>

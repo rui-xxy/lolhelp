@@ -63,7 +63,6 @@ export function AboutSettings({
       <section className="st-section">
         <header className="st-section__head">
           <h3>英雄联盟客户端</h3>
-          <p>助手通过正在运行的客户端读取战绩、同步设置。</p>
         </header>
         <div className="st-group">
           <div className="st-row">
@@ -91,7 +90,6 @@ export function AboutSettings({
       <section className="st-section">
         <header className="st-section__head">
           <h3>游戏目录</h3>
-          <p>游戏设置读写的就是这个目录里的配置文件。一般会自动找到，找错了再手动选。</p>
         </header>
         <div className="st-group">
           <div className="st-row" data-wide="true">
@@ -99,7 +97,7 @@ export function AboutSettings({
               <i data-on={state?.found ? 'true' : undefined} data-tone={state && !state.found ? 'bad' : undefined} />
               <div>
                 <b className="st-path">{state?.rootPath || '还没有目录'}</b>
-                <span>{state?.found ? '已找到配置文件' : '这个目录里没有找到英雄联盟的配置文件'}</span>
+                <span>{state?.found ? '已找到配置文件' : '未找到配置文件'}</span>
               </div>
             </div>
             <div className="st-row__control st-row__control--actions">

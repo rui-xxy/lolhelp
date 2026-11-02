@@ -248,7 +248,6 @@ function PlayerProfilePanel({
       <section className="rounded-md border border-app-border bg-app-surface p-4">
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <div className="text-sm font-semibold text-app-text">常玩英雄</div>
-          <div className="text-[11px] text-app-subtle">按当前已加载战绩统计</div>
         </div>
         {commonChampions.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-1.5">
@@ -1539,8 +1538,7 @@ export function MatchHistoryPage({
               <EmptyState
                 className="h-full"
                 icon={<HistoryIcon />}
-                title={activeTab ? '这个筛选下没有对局' : '还没有查询'}
-                description={activeTab ? '换一个模式筛选试试。' : '在顶部搜索框输入「名字#编号」，或按 Ctrl K。'}
+                title={activeTab ? '暂无对局' : '输入 名字#编号 查询'}
               />
             )}
             {activeTab?.pageLoading && (
@@ -1582,7 +1580,6 @@ export function MatchHistoryPage({
               className="h-full"
               icon={<MousePointerClick />}
               title="选择一场对局"
-              description="点左侧列表里的任意一场，这里会显示计分板、伤害和时间线。"
             />
           )}
         </div>

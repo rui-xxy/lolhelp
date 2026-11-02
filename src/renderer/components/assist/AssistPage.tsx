@@ -64,22 +64,20 @@ type SectionKey =
   | 'blacklist';
 
 // 侧栏按用途分组：先是对局里自动发生的事，再是选人出装，最后是账号和社交。
-// description 是右侧标题下那句话：用大白话说清楚这一页能替你做什么。
 const sections: Array<{
   key: SectionKey;
   label: string;
-  description: string;
   group: string;
   icon: typeof Sparkles;
 }> = [
-  { key: 'automation', group: '对局', label: '自动操作', description: '排队、结算这些重复的点击，交给助手来点', icon: Bot },
-  { key: 'champions', group: '选人', label: '自动选禁', description: '轮到你时，自动选好想玩的英雄、禁掉讨厌的英雄', icon: WandSparkles },
-  { key: 'builds', group: '选人', label: '符文出装', description: '锁定英雄后，自动配好符文页和推荐出装', icon: Sparkles },
-  { key: 'account', group: '账号', label: '账号展示', description: '换头像、生涯背景，以及好友看到的段位', icon: UserRoundCog },
-  { key: 'rewards', group: '账号', label: '领取奖励', description: '客户端里没领的奖励，在这里一次领完', icon: Gift },
-  { key: 'loot', group: '账号', label: '碎片分解', description: '把用不上的英雄碎片分解成精粹', icon: PackageOpen },
-  { key: 'friends', group: '社交', label: '好友', description: '设置自己的在线状态，整理好友列表', icon: Users },
-  { key: 'blacklist', group: '社交', label: '黑名单', description: '记下坑过你的玩家，随时翻出来查他的战绩', icon: ShieldAlert },
+  { key: 'automation', group: '对局', label: '自动操作', icon: Bot },
+  { key: 'champions', group: '选人', label: '自动选禁', icon: WandSparkles },
+  { key: 'builds', group: '选人', label: '符文出装', icon: Sparkles },
+  { key: 'account', group: '账号', label: '账号展示', icon: UserRoundCog },
+  { key: 'rewards', group: '账号', label: '领取奖励', icon: Gift },
+  { key: 'loot', group: '账号', label: '碎片分解', icon: PackageOpen },
+  { key: 'friends', group: '社交', label: '好友', icon: Users },
+  { key: 'blacklist', group: '社交', label: '黑名单', icon: ShieldAlert },
 ];
 
 const sectionGroups = sections.reduce<Array<{ group: string; items: typeof sections }>>((groups, section) => {
@@ -253,7 +251,7 @@ export function AssistPage({
   const addBlacklistEntry = () => {
     const riotId = blacklistDraft.riotId.trim();
     if (!riotId) {
-      setOperationState('请先填写玩家，格式是「游戏名#编号」');
+      setOperationState('请输入 名字#编号');
       return;
     }
     const now = Date.now();
@@ -389,7 +387,6 @@ export function AssistPage({
             </div>
           ))}
         </nav>
-        <div className="as-nav__foot">所有改动都会自动保存，不需要手动点保存。</div>
       </aside>
 
       <section className="as-main">
@@ -399,7 +396,6 @@ export function AssistPage({
               <span className="as-head__icon" aria-hidden="true"><ActiveIcon /></span>
               <div style={{ minWidth: 0 }}>
                 <h2>{activeSectionMeta.label}</h2>
-                <p>{activeSectionMeta.description}</p>
               </div>
               <span
                 className="as-save"
@@ -539,7 +535,6 @@ export function AssistPage({
             <div className="as-modal__head">
               <div style={{ minWidth: 0, flex: 1 }}>
                 <b>选择召唤师头像</b>
-                <span>点一下就选中，记得回去点「应用到客户端」</span>
               </div>
               <div className="as-search">
                 <Search />
@@ -583,7 +578,7 @@ export function AssistPage({
       <ConfirmDialog
         open={friendDeleteConfirmOpen}
         title="删除选中的好友"
-        description={`会从客户端好友列表里删掉 ${selectedFriendIds.size} 位好友，删了需要重新加好友才能恢复。`}
+        description={`从好友列表删除 ${selectedFriendIds.size} 位好友`}
         confirmLabel="删除好友"
         destructive
         busy={deletingFriends}

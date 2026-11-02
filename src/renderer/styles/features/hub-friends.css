@@ -1,0 +1,230 @@
+/* 「消息」里的加好友页（components/hub/AddFriendPanel.tsx） */
+@layer components {
+  /* ---------- 加好友 ---------- */
+  .af {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 22px 26px 40px;
+  }
+
+  .af-hero {
+    position: relative;
+    display: flex;
+    height: 60px;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+    border: 1px solid var(--color-ally-line);
+    border-radius: var(--radius-lg);
+    padding: 0 10px 0 12px;
+    background:
+      radial-gradient(120% 220% at 0% 0%, var(--color-ally-soft), transparent 60%),
+      var(--color-ink-2);
+    box-shadow: 0 12px 30px -24px var(--color-frost-shadow-deep);
+    transition: box-shadow var(--duration-ui-fast) ease;
+  }
+
+  .af-hero:focus-within {
+    box-shadow: 0 0 0 3px var(--color-ally-soft), 0 12px 30px -24px var(--color-frost-shadow-deep);
+  }
+
+  .af-hero__icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-app-on-danger);
+    background: var(--color-ally);
+  }
+
+  .af-hero__icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .af-hero input {
+    min-width: 0;
+    flex: 1;
+    background: transparent;
+    color: var(--color-text-1);
+    font-size: var(--text-section);
+    font-weight: 550;
+    outline: none;
+  }
+
+  .af-hero input::placeholder {
+    color: var(--color-text-4);
+    font-weight: 400;
+  }
+
+  .af-hero .hub-btn {
+    height: 38px;
+    padding: 0 16px;
+  }
+
+  .af-section {
+    margin-top: 26px;
+  }
+
+  .af-section__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .af-section__head h4,
+  .af-history-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--color-text-2);
+    font-size: var(--text-body);
+    font-weight: 650;
+  }
+
+  .af-section__head em,
+  .af-history-toggle em {
+    min-width: 20px;
+    border-radius: 999px;
+    padding: 0 6px;
+    color: var(--color-text-2);
+    background: var(--color-ink-4);
+    font: 700 var(--text-cap) / 18px var(--font-num);
+    font-style: normal;
+    text-align: center;
+  }
+
+  .af-history-toggle {
+    border-radius: var(--radius-sm);
+    margin-left: -6px;
+    padding: 4px 6px;
+  }
+
+  .af-history-toggle:hover {
+    color: var(--color-text-1);
+    background: var(--color-app-nav-hover);
+  }
+
+  .af-history-toggle svg {
+    width: 14px;
+    height: 14px;
+    transition: transform var(--duration-ui-fast) ease;
+  }
+
+  .af-history-toggle svg[data-open="true"] {
+    transform: rotate(180deg);
+  }
+
+  /* 等待通过：一排可撤回的小胶囊 */
+  .af-pending {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .af-chip {
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--color-line-1);
+    border-radius: 999px;
+    padding: 0 4px 0 4px;
+    background: var(--color-ink-2);
+  }
+
+  .af-chip > img,
+  .af-chip > span:first-child {
+    border-radius: 999px;
+  }
+
+  .af-chip b {
+    max-width: 120px;
+    overflow: hidden;
+    color: var(--color-text-2);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .af-chip button {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-text-4);
+  }
+
+  .af-chip button:hover:not(:disabled) {
+    color: var(--color-enemy);
+    background: var(--color-enemy-soft);
+  }
+
+  .af-chip button svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .af-chip--more {
+    padding: 0 12px;
+    color: var(--color-text-3);
+    font: 600 var(--text-meta) var(--font-num);
+  }
+
+  .af-chip--more:hover {
+    color: var(--color-text-1);
+    background: var(--color-ink-3);
+  }
+
+  .af-history {
+    display: grid;
+    margin-top: 8px;
+    overflow: hidden;
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-lg);
+    background: var(--color-ink-2);
+  }
+
+  .af-history__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--color-line-1);
+    padding: 6px 8px 6px 12px;
+  }
+
+  .af-history__row:first-child {
+    border-top: 0;
+  }
+
+  .af-history__row > img,
+  .af-history__row > span:first-child {
+    border-radius: 999px;
+  }
+
+  .af-history__row b {
+    overflow: hidden;
+    color: var(--color-text-1);
+    font-size: var(--text-body);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .af-history__row small {
+    flex-shrink: 0;
+    color: var(--color-text-4);
+    font: 500 var(--text-cap) var(--font-num);
+  }
+
+  .af-history__row time {
+    margin-left: auto;
+    color: var(--color-text-4);
+    font-size: var(--text-meta);
+  }
+}

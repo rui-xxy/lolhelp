@@ -12,7 +12,9 @@ interface ScoutHitCardProps {
   index: number;
   region?: string;
   active?: boolean;
+  glow?: boolean;
   onPeek: (hit: ScoutHit) => void;
+  onHover?: (key: string | null) => void;
   onPlayerClick: (riotId: string, region?: string) => void;
 }
 
@@ -47,7 +49,7 @@ function splitRiotId(riotId: string): [string, string] {
   return [riotId.slice(0, at), riotId.slice(at)];
 }
 
-export function ScoutHitCard({ hit, index, region, active = false, onPeek, onPlayerClick }: ScoutHitCardProps) {
+export function ScoutHitCard({ hit, index, region, active = false, glow = false, onPeek, onHover, onPlayerClick }: ScoutHitCardProps) {
   const { profile, qualifyingMatches } = hit;
   const riotId = profile.riotId || '未知玩家';
   const [gameName, tagLine] = splitRiotId(riotId);
@@ -76,8 +78,15 @@ export function ScoutHitCard({ hit, index, region, active = false, onPeek, onPla
     <div
       className="scout-hit"
       data-active={active ? 'true' : undefined}
-      onMouseEnter={schedulePrefetch}
-      onMouseLeave={cancelPrefetch}
+      data-glow={glow ? 'true' : undefined}
+      onMouseEnter={() => {
+        schedulePrefetch();
+        onHover?.(profile.puuid || profile.riotId);
+      }}
+      onMouseLeave={() => {
+        cancelPrefetch();
+        onHover?.(null);
+      }}
       onClick={() => onPeek(hit)}
     >
       {/* 点卡片任意位置：打开 / 收起战绩速览（这个铺满的按钮负责键盘焦点）；

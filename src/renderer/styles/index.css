@@ -8,7 +8,7 @@
 @import "./features/live.css";
 @import "./features/matches/history.css";
 @import "./features/scout.css";
-@import "./features/scout-network.css";
+@import "./features/scout-stage.css";
 @import "./features/scout-peek.css";
 @import "./features/scout-friend.css";
 @import "./features/settings.css";
@@ -24,9 +24,14 @@
 @import "./features/matches/history-glow.css";
 @import "./features/matches/analytics.css";
 @import "./features/matches/builds.css";
-@import "./features/matches/timeline-workbench.css";
 @import "./features/matches/events-workspace.css";
 @import "./features/matches/stats-workspace.css";
 @import "./features/matches/event-timeline.css";
 @import "./features/matches/stats-arena.css";
+@import "./features/hub.css";
+@import "./features/hub-players.css";
+@import "./features/hub-messages.css";
+@import "./features/hub-friends.css";
+@import "./features/hub-profile.css";
+@import "./features/home.css";
 @import "./features/light.css";

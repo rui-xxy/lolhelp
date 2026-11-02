@@ -78,12 +78,10 @@ function useSkinName(skinId: number): string {
 
 function SwitchLine({
   title,
-  description,
   checked,
   onChange,
 }: {
   title: string;
-  description: string;
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
@@ -91,7 +89,6 @@ function SwitchLine({
     <div className="as-switch-line">
       <div>
         <b>{title}</b>
-        <span>{description}</span>
       </div>
       <SwitchControl checked={checked} onChange={onChange} />
     </div>
@@ -132,7 +129,6 @@ export function AccountSection({
   return (
     <Panel
       title="别人看到的你"
-      description="左边是好友打开你资料时大致会看到的样子。这里只改展示，不会改动真实段位和战绩。"
     >
       <div className="as-profile">
         <div
@@ -155,7 +151,6 @@ export function AccountSection({
           <section>
             <SwitchLine
               title="展示一个段位"
-              description="好友列表和资料卡上显示你选的段位"
               checked={assist.spoofRankEnabled}
               onChange={(value) => updateBoolean('spoofRankEnabled', value)}
             />
@@ -228,20 +223,18 @@ export function AccountSection({
             <h4>装饰</h4>
             <SwitchLine
               title="卸下所有徽章"
-              description="生涯页上不显示任何徽章"
               checked={assist.removeTokens}
               onChange={(value) => updateBoolean('removeTokens', value)}
             />
             <SwitchLine
               title="卸下至尊头像框"
-              description="头像外圈不显示至尊边框"
               checked={assist.removePrestigeCrest}
               onChange={(value) => updateBoolean('removePrestigeCrest', value)}
             />
           </section>
         </div>
       </div>
-      <PanelFoot note="上面的选择会自动记住；点「应用到客户端」之后，客户端里才会真的变过来。">
+      <PanelFoot>
         <Btn
           tone="primary"
           busy={applying}
@@ -324,7 +317,6 @@ export function BlacklistSection({
     <>
       <Panel
         title={editing ? `修改「${editing.riotId}」` : '记下一个玩家'}
-        description="碰到坑过你的人就记一笔：贴上标签、写下发生了什么，以后想查他，点「查战绩」就行。"
       >
         <PanelBody>
           <div className="as-fields">
@@ -376,7 +368,7 @@ export function BlacklistSection({
             </Field>
           </div>
         </PanelBody>
-        <PanelFoot note={editing ? '改完点保存，原来的记录会被更新。' : '保存后会出现在下面的列表里。'}>
+        <PanelFoot>
           {editing && <Btn tone="ghost" onClick={cancelEdit}>取消修改</Btn>}
           <Btn tone="primary" onClick={addBlacklistEntry} disabled={!blacklistDraft.riotId.trim()}>
             {editing ? '保存修改' : '加入黑名单'}
@@ -419,9 +411,7 @@ export function BlacklistSection({
           </div>
         )}
         {settings.blacklist.length === 0 ? (
-          <Empty icon={<ShieldAlert />} title="黑名单还是空的">
-            在上面记下第一个玩家。
-          </Empty>
+          <Empty icon={<ShieldAlert />} title="暂无记录" />
         ) : visible.length === 0 ? (
           <Empty icon={<Search />} title="没有找到">换个关键词试试。</Empty>
         ) : (
@@ -477,7 +467,7 @@ export function BlacklistSection({
       <ConfirmDialog
         open={clearOpen}
         title="清空黑名单"
-        description={`会删掉全部 ${settings.blacklist.length} 条记录，删了就找不回来了。建议先「导出」备份一份。`}
+        description={`删除全部 ${settings.blacklist.length} 条记录后无法恢复`}
         confirmLabel="全部删除"
         destructive
         onOpenChange={setClearOpen}

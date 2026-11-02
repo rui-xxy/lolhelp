@@ -363,7 +363,7 @@ export function FriendPanel({ onFriendClick, onFriendFollow, onOpenFriendRequest
           <div className="flex h-20 items-center justify-center text-xs text-app-subtle">加载中...</div>
         ) : friends.length === 0 ? (
           <div className="flex h-20 items-center justify-center text-xs text-app-subtle">
-            无好友数据（客户端未启动？）
+            无好友数据
           </div>
         ) : (
           Array.from(groups.entries()).map(([groupName, list]) => {

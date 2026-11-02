@@ -11,6 +11,17 @@ export const LIVE_PARTY_COLORS = [
   '#72B8F2',
 ] as const;
 
+// 和上面一一对应的第二种颜色：一起排的人，游戏名做成从主色流到这个颜色的流光字。
+// 每组的两种颜色挨得近（青→蓝、金→橙、绿→黄绿…），看起来像一种「光」，不同组之间又一眼能分开。
+export const LIVE_PARTY_ACCENTS = [
+  '#6FB4F2',
+  '#EE8F5A',
+  '#C3D96A',
+  '#E79AD2',
+  '#E9C46E',
+  '#9A97F0',
+] as const;
+
 export const RANKING_MODE_TONES = {
   ranked: '#5CB28F',
   aram: '#6DA3DA',

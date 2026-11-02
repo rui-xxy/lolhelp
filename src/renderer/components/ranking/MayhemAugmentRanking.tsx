@@ -78,7 +78,7 @@ export function MayhemAugmentRanking() {
           <span>LIVE</span>
           <strong>{visibleEntries.length}</strong>
           <small>个强化符文</small>
-          <p>{result?.meta.updatedAt ? `${formatUpdatedAt(result.meta.updatedAt)} 更新` : '真实榜单数据'}</p>
+          {result?.meta.updatedAt && <p>{formatUpdatedAt(result.meta.updatedAt)} 更新</p>}
         </div>
 
         <div className="mayhem-augment-controls">

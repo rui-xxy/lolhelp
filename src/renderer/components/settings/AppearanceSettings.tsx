@@ -19,11 +19,10 @@ const MODE_ICONS: Record<AppearanceMode, typeof Sun> = {
   system: Monitor,
 };
 
-function SectionTitle({ title, hint }: { title: string; hint?: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
     <div className="mb-3">
       <h3 className="text-section font-semibold text-text-1">{title}</h3>
-      {hint && <p className="mt-0.5 text-meta text-text-3">{hint}</p>}
     </div>
   );
 }
@@ -76,7 +75,7 @@ export function AppearanceSettings() {
   return (
     <div className="grid max-w-[760px] gap-8">
       <section>
-        <SectionTitle title="模式" hint="跟随系统时，会随 Windows 的深色 / 浅色设置自动切换。" />
+        <SectionTitle title="模式" />
         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="外观模式">
           {APPEARANCE_MODES.map((mode) => {
             const Icon = MODE_ICONS[mode.value];
@@ -104,7 +103,7 @@ export function AppearanceSettings() {
       </section>
 
       <section>
-        <SectionTitle title="配色" hint="只改界面的底色和文字色调，胜负颜色、段位颜色不变。" />
+        <SectionTitle title="配色" />
         <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-3" role="radiogroup" aria-label="配色方案">
           {APPEARANCE_PALETTES.map((palette) => {
             const active = appearance.palette === palette.value;
@@ -152,7 +151,7 @@ export function AppearanceSettings() {
       </section>
 
       <section>
-        <SectionTitle title="战绩列表微光" hint="战绩页左侧列表里，正在看的那一天会亮起来。光的颜色跟着配色走。" />
+        <SectionTitle title="战绩列表微光" />
         <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="战绩列表微光">
           {HISTORY_GLOWS.map((glow) => {
             const active = appearance.glow === glow.value;

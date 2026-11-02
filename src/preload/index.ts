@@ -51,6 +51,8 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.LCU_SPECTATE_FRIEND, puuid),
     deleteFriend: (friendId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.LCU_DELETE_FRIEND, friendId),
+    getMyCollection: (force?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.LCU_GET_MY_COLLECTION, force),
   },
   match: {
     search: (req: PlayerLookupRequest) =>
@@ -59,6 +61,10 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_BRIEFS, req),
     getPlayerRanks: (puuid: string, region?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_RANKS, puuid, region),
+    getPlayerDossier: (puuid: string, region?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_PLAYER_DOSSIER, puuid, region),
+    getActiveGame: (puuid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_ACTIVE_GAME, puuid),
     getSavedMatchesSummary: () =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_GET_SAVED_MATCHES_SUMMARY),
     getSavedMatchesCatalog: () =>

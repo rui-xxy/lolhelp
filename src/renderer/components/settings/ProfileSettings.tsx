@@ -128,11 +128,11 @@ export function ProfileSettings({
     setDetailError('');
     const load = typeof window.lolHelper.config.getProfile === 'function'
       ? window.lolHelper.config.getProfile(selected.id)
-      : Promise.reject(new Error('需要重启一下助手才能查看方案内容'));
+      : Promise.reject(new Error('请重启助手'));
     load
       .then((loaded) => {
         if (cancelled) return;
-        if (!loaded) setDetailError('这个方案读不出来了，可能已经被删掉');
+        if (!loaded) setDetailError('方案不存在');
         else setDetails((map) => new Map(map).set(detailKey, loaded));
       })
       .catch((error) => {
@@ -140,7 +140,7 @@ export function ProfileSettings({
         const text = error instanceof Error ? error.message : String(error);
         // 助手更新后后台没重启时，新接口还不存在。
         setDetailError(/No handler registered/i.test(text)
-          ? '助手刚更新过，后台还是旧的。完全关掉助手再重新打开一次，就能看到方案内容了。'
+          ? '请重启助手'
           : text);
       });
     return () => {
@@ -196,14 +196,6 @@ export function ProfileSettings({
     <div className="pf">
       <section className="pf-intro">
         <div className="pf-intro__text">
-          <h3>存一套自己的设置，换号一键用上</h3>
-          <ol>
-            <li><i>1</i>在常用的号上把设置调顺手，存成方案</li>
-            <li><i>2</i>换号：在客户端登录另一个号，停在主页或房间</li>
-            <li><i>3</i>选中方案，点「应用到这个号」</li>
-          </ol>
-          <p>应用后设置会跟着那个号走，以后在别的电脑登录也还在。方案存在这台电脑的助手里，不会丢。</p>
-          <p>打游戏的时候也能存方案；只有「应用」要等这局打完，因为游戏正在用这些设置。</p>
           {profiles.length > 0 && (
             <button type="button" className="as-btn as-btn--primary pf-intro__save" disabled={Boolean(busy)} onClick={() => setCreating(true)}>
               <Save />
@@ -212,19 +204,18 @@ export function ProfileSettings({
           )}
         </div>
         <div className="pf-target" data-state={!client?.connected ? 'off' : blockedReason ? 'busy' : 'ok'}>
-          <span className="pf-target__label">现在会应用到</span>
+          <span className="pf-target__label">应用到</span>
           {client?.connected ? (
             <>
               <b>{target}</b>
               <span>
                 <i />
-                {blockedReason ? `${blockedReason}：现在可以存方案，应用要等打完` : `客户端已登录 · ${CLIENT_PHASE_LABELS[client.phase] ?? '在线'}`}
+                {blockedReason || (CLIENT_PHASE_LABELS[client.phase] ?? '在线')}
               </span>
             </>
           ) : (
             <>
-              <b>客户端没登录</b>
-              <span><i />先登录要用这套设置的号</span>
+              <b>客户端未登录</b>
             </>
           )}
         </div>
@@ -233,8 +224,7 @@ export function ProfileSettings({
       {profiles.length === 0 ? (
         <section className="pf-empty">
           <Save />
-          <b>还没有方案</b>
-          <p>设置里「客户端」「游戏内」「热键」三页的全部设置，可以整套存下来，起个名字就行。</p>
+          <b>暂无方案</b>
           <div className="pf-new pf-new--inline">
             <input
               className="as-input"
@@ -291,7 +281,7 @@ export function ProfileSettings({
                     保存
                   </button>
                 </div>
-                <p>存的是现在面板里的设置{pendingChanges > 0 ? `，包括还没应用的 ${pendingChanges} 项改动` : ''}。</p>
+                {pendingChanges > 0 && <p>含 {pendingChanges} 项未应用的改动</p>}
               </div>
             ) : (
               <button type="button" className="pf-add" onClick={() => setCreating(true)}>
@@ -320,11 +310,6 @@ export function ProfileSettings({
                 </button>
               </header>
             )}
-
-            <div className="pf-detail__sub">
-              <b>方案里存的就是设置页这三页的内容</b>
-              <span>和设置页一样的排法，一行一行对得上。标黄的是和现在不一样的，划线的是你现在的值。前面的勾去掉，应用时就不带那一块（比如换了显示器，就别带「画面」）。聊天黑名单是账号自己的，不存。</span>
-            </div>
 
             {detailError ? (
               <div className="as-empty"><CircleAlert /><b>看不了方案内容</b><span>{detailError}</span></div>
@@ -381,7 +366,6 @@ export function ProfileSettings({
                   {page === 'client' && (
                     <ProfileSection
                       title="客户端"
-                      note="这一页作为一整块应用"
                       checked={parts.has('client')}
                       diff={partStats.client}
                       onToggle={() => togglePart('client')}
@@ -400,7 +384,6 @@ export function ProfileSettings({
                   {page === 'hotkeys' && (
                     <ProfileSection
                       title="热键"
-                      note="这一页作为一整块应用"
                       checked={parts.has('hotkeys')}
                       diff={partStats.hotkeys}
                       onToggle={() => togglePart('hotkeys')}
@@ -422,10 +405,10 @@ export function ProfileSettings({
                   </b>
                   <span>
                     {blockedReason
-                      ? `${blockedReason}，现在改设置可能让游戏配置出错`
+                      ? blockedReason
                       : partStats
-                        ? (totalDiff > 0 ? `会改动 ${totalDiff} 项设置` : '和现在的设置一样，应用了也不会有变化')
-                        : detailError ? '看到方案内容以后才能应用' : '正在读取方案…'}
+                        ? (totalDiff > 0 ? `改动 ${totalDiff} 项` : '无改动')
+                        : detailError ? '' : '读取中…'}
                   </span>
                 </div>
                 <button
@@ -446,7 +429,7 @@ export function ProfileSettings({
       <ConfirmDialog
         open={confirm === 'overwrite'}
         title="用现在的设置更新这个方案"
-        description={`「${selected?.name ?? ''}」里原来存的内容会被现在面板里的设置替换${pendingChanges > 0 ? `（包括还没应用的 ${pendingChanges} 项改动）` : ''}。`}
+        description={`用当前设置覆盖「${selected?.name ?? ''}」${pendingChanges > 0 ? `（含 ${pendingChanges} 项未应用的改动）` : ''}`}
         confirmLabel="更新方案"
         busy={busy === 'save-profile'}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
@@ -457,7 +440,7 @@ export function ProfileSettings({
       <ConfirmDialog
         open={confirm === 'delete'}
         title="删除这个方案"
-        description={`会删掉「${selected?.name ?? ''}」。不影响游戏里现在的设置，但删了就找不回来了。`}
+        description={`删除「${selected?.name ?? ''}」后无法恢复`}
         confirmLabel="删除方案"
         destructive
         busy={busy === 'delete-profile'}
@@ -469,7 +452,7 @@ export function ProfileSettings({
       <ConfirmDialog
         open={confirm === 'offline'}
         title="客户端没登录，确定现在应用吗？"
-        description="现在只能把设置写进这台电脑的游戏文件。登录时客户端会下载那个号自己的设置，把这些改动盖掉。建议先登录要用的号，再回来点应用。"
+        description="只会写入本机游戏文件，登录后可能被账号设置覆盖"
         confirmLabel="仍然写入文件"
         busy={applying}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
@@ -549,7 +532,7 @@ function HotkeyContents({ saved, now }: { saved: LolConfigValues; now: LolConfig
   const categories = buildHotkeyCategories(flattenHotkeys(saved.hotkeys)).filter((category) => category.key !== 'hero');
 
   if (heroGroups.length === 0 && categories.length === 0) {
-    return <p className="pf-note">这个方案里没有热键。</p>;
+    return <p className="pf-note">无热键</p>;
   }
 
   return (

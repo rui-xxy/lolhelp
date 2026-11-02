@@ -53,7 +53,7 @@ export function MatchPerformanceSummary({ participants, focus, compare, onCompar
           const delta = (focus[key] || 0) - (opponent[key] || 0);
           return <div key={key}><dt>{label}差值</dt><dd className={delta > 0 ? 'is-positive' : delta < 0 ? 'is-negative' : ''}>{signed(delta)}</dd></div>;
         })}</dl>
-      </> : <div className="md-duel__empty"><Swords aria-hidden="true" /><p>选择一位玩家<br /><span>比较经济、输出与战斗表现</span></p><button type="button" className="md-control" onClick={onCompare}>选择对比玩家</button></div>}
+      </> : <div className="md-duel__empty"><Swords aria-hidden="true" /><p>选择一位玩家</p><button type="button" className="md-control" onClick={onCompare}>选择对比玩家</button></div>}
     </aside>
   </div>;
 }

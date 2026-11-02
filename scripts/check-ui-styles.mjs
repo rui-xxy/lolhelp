@@ -44,8 +44,8 @@ const importantCount = cssFiles.reduce(
   (total, file) => total + count(fs.readFileSync(file, 'utf8'), /!important\b/g),
   0,
 );
-if (importantCount > 35) {
-  errors.push(`!important 数量从基线 35 增长到 ${importantCount}。`);
+if (importantCount > 26) {
+  errors.push(`!important 数量从基线 26 增长到 ${importantCount}。`);
 }
 
 // tokens.css / themes.css 是颜色定义本身；light.css 是浅色模式对老样式的颜色修正表，三者都不计入。
@@ -60,7 +60,7 @@ const legacyCssColorCount = cssFiles
     0,
   );
 // 2026-10 改版后的基线：每迁移一页就把这个数调低，只许减少。
-const LEGACY_CSS_COLOR_BUDGET = 439;
+const LEGACY_CSS_COLOR_BUDGET = 395;
 if (legacyCssColorCount > LEGACY_CSS_COLOR_BUDGET) {
   errors.push(`CSS 硬编码颜色数量从基线 ${LEGACY_CSS_COLOR_BUDGET} 增长到 ${legacyCssColorCount}。`);
 }
@@ -87,8 +87,6 @@ for (const file of cssFiles) {
 const tsxFiles = walk(rendererRoot, ['.tsx']);
 const allowedColorFiles = new Set([
   'src/renderer/components/match/DamageEnergyBar.tsx',
-  'src/renderer/components/scout/ScoutEnergyCore.tsx',
-  'src/renderer/components/scout/ScoutSearchVisualizer.tsx',
 ]);
 
 for (const file of tsxFiles) {

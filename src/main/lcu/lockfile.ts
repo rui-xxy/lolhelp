@@ -1,5 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  getKnownInstallRoots,
+  getProcessLcuCredentials,
+  getProcessRiotClientCredentials,
+} from './discover';
 
 export interface LcuCredentials {
   pid: string;
@@ -115,8 +120,12 @@ function tryResolveFromDir(clientDir: string): LcuCredentials | null {
 }
 
 function resolveClientDirs(): string[] {
-  const drives = ['C:', 'D:', 'E:', 'F:', 'G:'];
   const dirs: string[] = [];
+  // 发现中心给出的安装根（手动指定 / 运行中客户端的 --install-directory）优先。
+  for (const root of getKnownInstallRoots()) {
+    dirs.push(path.join(root, 'LeagueClient'));
+  }
+  const drives = ['C:', 'D:', 'E:', 'F:', 'G:'];
   for (const drive of drives) {
     for (const candidate of CANDIDATE_CLIENT_DIRS) {
       const full = path.join(drive, candidate);
@@ -140,6 +149,12 @@ function logCredentialsResolved(sourcePath: string, creds: LcuCredentials): void
 }
 
 export function readLockfile(): LcuCredentials | null {
+  // 运行中客户端的命令行自带凭据，比读 lockfile/日志更直接（客户端未完全启动时也有效）。
+  const processCreds = getProcessLcuCredentials();
+  if (processCreds) {
+    logCredentialsResolved('process:LeagueClientUx', processCreds);
+    return processCreds;
+  }
   for (const dir of resolveClientDirs()) {
     const creds = tryResolveFromDir(dir);
     if (creds) {
@@ -151,6 +166,8 @@ export function readLockfile(): LcuCredentials | null {
 }
 
 export function readRiotClientCredentials(): RiotClientCredentials | null {
+  const processCreds = getProcessRiotClientCredentials();
+  if (processCreds) return processCreds;
   for (const dir of resolveClientDirs()) {
     const creds = readRiotClientFromUxLog(dir);
     if (creds) return creds;
@@ -170,7 +187,7 @@ export function readCredentialsForInstallRoot(rootPath?: string): LcuCredentials
   return readLockfile();
 }
 
-const CREDS_CACHE_TTL = 30_000;
+const CREDS_CACHE_TTL = 15_000;
 let cachedCreds: LcuCredentials | null = null;
 let cachedCredsAt = 0;
 let cachedRiotClientCreds: RiotClientCredentials | null = null;

@@ -100,20 +100,17 @@ export function SettingsSection<TSection extends string>({
   prefix,
   id,
   title,
-  description,
   children,
 }: {
   prefix: string;
   id: TSection;
   title: string;
-  description?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section id={`${prefix}-section-${id}`} className="st-section">
       <header className="st-section__head">
         <h3>{title}</h3>
-        {description && <p>{description}</p>}
       </header>
       {children}
     </section>
@@ -129,7 +126,7 @@ export function SettingsGroup({ title, children }: { title?: string; children: R
   );
 }
 
-// 一行设置：左边名字（可带一句说明），右边控件。
+// 一行设置：左边名字，右边控件。补充说明（hint）只放在悬停提示里，不占版面。
 export function SettingRow({
   label,
   hint,
@@ -137,22 +134,21 @@ export function SettingRow({
   wide = false,
 }: {
   label: string;
-  hint?: ReactNode;
+  hint?: string;
   children: ReactNode;
   wide?: boolean;
 }) {
   return (
     <div className="st-row" data-wide={wide ? 'true' : undefined}>
-      <div className="st-row__label">
+      <div className="st-row__label" title={hint}>
         <b>{label}</b>
-        {hint && <span>{hint}</span>}
       </div>
       <div className="st-row__control">{children}</div>
     </div>
   );
 }
 
-export function ReadonlyRow({ label, value, hint }: { label: string; value: string; hint?: ReactNode }) {
+export function ReadonlyRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <SettingRow label={label} hint={hint}>
       <span className="st-readonly" title={value}>{value}</span>
@@ -167,7 +163,7 @@ export function CheckboxRow({
   onChange,
 }: {
   label: string;
-  hint?: ReactNode;
+  hint?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
@@ -262,7 +258,7 @@ export function SliderRow({
   onChange,
 }: {
   label: string;
-  hint?: ReactNode;
+  hint?: string;
   value: number;
   min: number;
   max: number;
@@ -345,7 +341,7 @@ export function SelectRow<T extends string | number>({
   segmented = false,
 }: {
   label: string;
-  hint?: ReactNode;
+  hint?: string;
   value: T;
   options: Option<T>[];
   onChange: (value: T) => void;
@@ -400,7 +396,7 @@ export function BlockedPlayersList({
   const safePlayers = Array.isArray(players) ? players : [];
 
   if (safePlayers.length === 0) {
-    return <div className="st-empty">聊天黑名单是空的。在客户端里屏蔽的玩家会出现在这里。</div>;
+    return <div className="st-empty">暂无屏蔽的玩家</div>;
   }
 
   return (

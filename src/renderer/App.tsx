@@ -4,8 +4,12 @@ import { AppShell, type ScoutSidebarStatus, type View } from './components/AppSh
 import { HomePage } from './components/HomePage';
 import { MatchHistoryPage } from './components/match/MatchHistoryPage';
 import { type MatchRegionOption } from './components/match/MatchRegionPicker';
-import { FollowAccountsDialog, type FollowAccountRequest } from './components/match/FollowAccountsDialog';
-import { SavedMatchPickerDialog } from './components/match/SavedMatchPickerDialog';
+import {
+  PlayersHub,
+  type FollowAccountRequest,
+  type PlayersHubView,
+} from './components/hub/PlayersHub';
+import { MessagesHub, type MessagesHubSection } from './components/hub/MessagesHub';
 import {
   loadSavedMatchesSummary,
   SAVED_MATCHES_CHANGED_EVENT,
@@ -17,8 +21,6 @@ import { ChampionRankingPage, type RankingChapter } from './components/ranking/C
 import { FriendPanel } from './components/FriendPanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { AssistPage } from './components/assist/AssistPage';
-import { ChatSessionDialog } from './components/chat/ChatSessionDialog';
-import { FriendManagerDialog } from './components/friends/FriendManagerDialog';
 import { GlobalSearch, type GlobalSearchHandle } from './components/shell/GlobalSearch';
 import { Segmented } from './components/ui/kit';
 import {
@@ -158,10 +160,13 @@ export function App() {
   const [clientConnected, setClientConnected] = useState(false);
   const [clientSessionId, setClientSessionId] = useState('');
   const [friendDrawerOpen, setFriendDrawerOpen] = useState(loadFriendDrawerOpen);
-  const [chatSessionsOpen, setChatSessionsOpen] = useState(false);
-  const [savedPickerOpen, setSavedPickerOpen] = useState(false);
-  const [followAccountsOpen, setFollowAccountsOpen] = useState(false);
-  const [friendManagerOpen, setFriendManagerOpen] = useState(false);
+  // 顶栏的两个窗口：我的玩家（保存 + 关注）、消息（聊天 + 好友申请）。
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [playersView, setPlayersView] = useState<PlayersHubView>('feed');
+  const [playersSeenAlertIds, setPlayersSeenAlertIds] = useState<Set<string>>(() => new Set());
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [messagesSection, setMessagesSection] = useState<MessagesHubSection>('chats');
+  const [incomingFriendRequestCount, setIncomingFriendRequestCount] = useState(0);
   const [friendAcceptedAlerts, setFriendAcceptedAlerts] = useState(loadFriendAcceptedAlerts);
   const [followAlertCount, setFollowAlertCount] = useState(0);
   const [followAccountRequest, setFollowAccountRequest] = useState<FollowAccountRequest | null>(null);
@@ -170,7 +175,6 @@ export function App() {
     nonce: number;
   } | null>(null);
   const [scoutSidebarStatus, setScoutSidebarStatus] = useState<ScoutSidebarStatus | null>(null);
-  const [scoutPanelMinimized, setScoutPanelMinimized] = useState(false);
   const [rankingChapter, setRankingChapter] = useState<RankingChapter>(
     initialSession.rankingChapter ?? 'mayhem',
   );
@@ -293,6 +297,7 @@ export function App() {
         if (!status.connected || cancelled) return;
         const requests = await window.lolHelper.lcu.getFriendRequests();
         if (cancelled) return;
+        setIncomingFriendRequestCount(requests.filter((request) => request.direction !== 'out').length);
         const outgoing = requests.filter((request) => request.direction === 'out');
         const outgoingPuuids = new Set(outgoing.map((request) => request.puuid));
         const removed = trackedOutgoingRequestsRef.current.filter(
@@ -340,6 +345,15 @@ export function App() {
     };
   }, []);
 
+  const markFriendAcceptedAlertRead = useCallback((id: string) => {
+    setFriendAcceptedAlerts((current) => {
+      if (!current.some((alert) => alert.id === id && !alert.read)) return current;
+      const next = current.map((alert) => (alert.id === id ? { ...alert, read: true } : alert));
+      saveFriendAcceptedAlerts(next);
+      return next;
+    });
+  }, []);
+
   const markFriendAcceptedAlertsRead = useCallback(() => {
     setFriendAcceptedAlerts((current) => {
       if (current.every((alert) => alert.read)) return current;
@@ -352,10 +366,8 @@ export function App() {
   const regions: MatchRegionOption[] = [{ key: '', name: currentRegionName }, ...LOL_REGIONS];
 
   const closeDialogs = useCallback(() => {
-    setSavedPickerOpen(false);
-    setChatSessionsOpen(false);
-    setFollowAccountsOpen(false);
-    setFriendManagerOpen(false);
+    setPlayersOpen(false);
+    setMessagesOpen(false);
   }, []);
 
   // 查人：所有入口（顶栏、好友、对局、雷达、首页）都走这里，结果在战绩页打开。
@@ -375,20 +387,6 @@ export function App() {
     handlePlayerSearch(riotId, currentRegionKey);
   }, [currentRegionKey, handlePlayerSearch]);
 
-  const handleScoutPanelMinimize = useCallback(() => {
-    setScoutPanelMinimized(true);
-  }, []);
-
-  const handleScoutPanelRestore = useCallback(() => {
-    setScoutPanelMinimized(false);
-  }, []);
-
-  const handleFollowAccount = useCallback((riotId: string, region?: string) => {
-    closeDialogs();
-    setFollowAccountsOpen(true);
-    setFollowAccountRequest({ riotId, region, nonce: Date.now() });
-  }, [closeDialogs]);
-
   const markCurrentFollowAlertsRead = useCallback(async () => {
     try {
       const summary = await loadSavedMatchesSummary();
@@ -402,7 +400,7 @@ export function App() {
   const refreshFollowAlertCount = useCallback(async () => {
     try {
       const { followAlertIds: alertIds } = await loadSavedMatchesSummary();
-      if (followAccountsOpen) {
+      if (playersOpen) {
         saveReadFollowAlertIds(new Set(alertIds));
         setFollowAlertCount(0);
         return;
@@ -418,7 +416,7 @@ export function App() {
     } catch {
       setFollowAlertCount(0);
     }
-  }, [followAccountsOpen]);
+  }, [playersOpen]);
 
   useEffect(() => {
     void refreshFollowAlertCount();
@@ -434,8 +432,8 @@ export function App() {
   }, [refreshFollowAlertCount]);
 
   useEffect(() => {
-    if (followAccountsOpen) void markCurrentFollowAlertsRead();
-  }, [followAccountsOpen, markCurrentFollowAlertsRead]);
+    if (playersOpen) void markCurrentFollowAlertsRead();
+  }, [playersOpen, markCurrentFollowAlertsRead]);
 
   const toggleFriendDrawer = useCallback(() => {
     setFriendDrawerOpen((open) => {
@@ -449,24 +447,39 @@ export function App() {
     saveFriendDrawerOpen(false);
   }, []);
 
-  const openSavedMatches = useCallback(() => {
+  const openPlayers = useCallback((view: PlayersHubView) => {
     closeDialogs();
-    setSavedPickerOpen(true);
-  }, [closeDialogs]);
-
-  const openFollowAccounts = useCallback(() => {
-    closeDialogs();
-    setFollowAccountsOpen(true);
+    // 先记下打开前已经看过的动态，窗口里给新动态打「新」标记，然后整体标为已读。
+    setPlayersSeenAlertIds(loadReadFollowAlertIds());
+    setPlayersView(view);
+    setPlayersOpen(true);
     void markCurrentFollowAlertsRead();
   }, [closeDialogs, markCurrentFollowAlertsRead]);
 
-  const openFriendManager = useCallback(() => {
-    closeDialogs();
-    setFriendManagerOpen(true);
-    markFriendAcceptedAlertsRead();
-  }, [closeDialogs, markFriendAcceptedAlertsRead]);
+  const openFollowAccounts = useCallback(() => openPlayers('feed'), [openPlayers]);
 
-  const scoutPanelActuallyMinimized = scoutPanelMinimized && scoutSidebarStatus !== null;
+  const handleFollowAccount = useCallback((riotId: string, region?: string) => {
+    openPlayers('players');
+    setFollowAccountRequest({ riotId, region, nonce: Date.now() });
+  }, [openPlayers]);
+
+  const openMessages = useCallback((section: MessagesHubSection) => {
+    closeDialogs();
+    setMessagesSection(section);
+    setMessagesOpen(true);
+  }, [closeDialogs]);
+
+  const openFriendManager = useCallback(
+    () => openMessages(incomingFriendRequestCount > 0 ? 'requests' : 'add'),
+    [incomingFriendRequestCount, openMessages],
+  );
+
+  // 「新朋友」的提醒在窗口关闭时才标为已读，窗口里能看到哪些是新的。
+  const closeMessages = useCallback(() => {
+    setMessagesOpen(false);
+    markFriendAcceptedAlertsRead();
+  }, [markFriendAcceptedAlertsRead]);
+
   const unreadFriendAccepted = friendAcceptedAlerts.filter((alert) => !alert.read).length;
 
   // 页面自己的切换控件放在顶栏标题旁边。
@@ -509,28 +522,18 @@ export function App() {
         label: clientConnected ? currentRegionName : '未连接客户端',
       }}
       actions={{
-        savedOpen: savedPickerOpen,
-        onOpenSaved: openSavedMatches,
-        followOpen: followAccountsOpen,
-        followCount: followAlertCount,
-        onOpenFollow: openFollowAccounts,
-        friendRequestsOpen: friendManagerOpen,
-        friendRequestCount: unreadFriendAccepted,
-        onOpenFriendRequests: openFriendManager,
-      }}
-      chatOpen={chatSessionsOpen}
-      onOpenChat={() => {
-        closeDialogs();
-        setChatSessionsOpen(true);
+        playersOpen,
+        playersCount: followAlertCount,
+        onOpenPlayers: () => openPlayers(followAlertCount > 0 ? 'feed' : 'players'),
+        messagesOpen,
+        messagesCount: incomingFriendRequestCount + unreadFriendAccepted,
+        onOpenMessages: () => openMessages(incomingFriendRequestCount + unreadFriendAccepted > 0 ? 'requests' : 'chats'),
       }}
       friendDrawerOpen={friendDrawerOpen}
       onToggleFriendDrawer={toggleFriendDrawer}
       onCloseFriendDrawer={closeFriendDrawer}
-      scoutStatus={scoutPanelActuallyMinimized ? scoutSidebarStatus : null}
-      onScoutStatusClick={() => {
-        setActiveView('scout');
-        setScoutPanelMinimized(false);
-      }}
+      scoutStatus={activeView === 'scout' ? null : scoutSidebarStatus}
+      onScoutStatusClick={() => setActiveView('scout')}
       friendPanel={
         <StableFriendPanel
           onFriendClick={handleFriendClick}
@@ -583,9 +586,6 @@ export function App() {
             currentRegionName={currentRegionName}
             onPlayerSearch={handlePlayerSearch}
             onStatusChange={setScoutSidebarStatus}
-            configPanelMinimized={scoutPanelActuallyMinimized}
-            onConfigPanelMinimize={handleScoutPanelMinimize}
-            onConfigPanelRestore={handleScoutPanelRestore}
           />
         </div>
       </Activity>
@@ -598,33 +598,30 @@ export function App() {
       <Activity name="settings" mode={activeView === 'settings' ? 'visible' : 'hidden'}>
         <div className="h-full"><SettingsDialog open embedded onClose={() => setActiveView('home')} /></div>
       </Activity>
-      {chatSessionsOpen && (
-        <ChatSessionDialog open onClose={() => setChatSessionsOpen(false)} />
-      )}
-      {savedPickerOpen && (
-        <SavedMatchPickerDialog
+      {playersOpen && (
+        <PlayersHub
           open
-          onClose={() => setSavedPickerOpen(false)}
-          onSelect={(account) => {
+          onClose={() => setPlayersOpen(false)}
+          currentRegionKey={currentRegionKey}
+          currentRegionName={currentRegionName}
+          initialView={playersView}
+          followRequest={followAccountRequest}
+          seenAlertIds={playersSeenAlertIds}
+          onOpenArchive={(account) => {
             setActiveView('matches');
             setSavedAccountRequest({ account, nonce: Date.now() });
           }}
+          onViewPlayer={(riotId, region) => handlePlayerSearch(riotId, region ?? '')}
         />
       )}
-      {followAccountsOpen && (
-        <FollowAccountsDialog
+      {messagesOpen && (
+        <MessagesHub
           open
-          onClose={() => setFollowAccountsOpen(false)}
-          currentRegionKey={currentRegionKey}
-          currentRegionName={currentRegionName}
-          request={followAccountRequest}
-        />
-      )}
-      {friendManagerOpen && (
-        <FriendManagerDialog
-          open
-          onClose={() => setFriendManagerOpen(false)}
+          onClose={closeMessages}
+          initialSection={messagesSection}
           acceptedAlerts={friendAcceptedAlerts}
+          onAcceptedRead={markFriendAcceptedAlertRead}
+          onViewPlayer={handleFriendClick}
         />
       )}
     </AppShell>

@@ -1208,7 +1208,27 @@
 
   .lol-postgame { display: flex; height: 100%; min-height: 0; flex-direction: column; }
   .lol-postgame-tabs { flex: 0 0 auto; }
-  .lol-postgame-content { min-height: 0; flex: 1 1 auto; }
+  /* 内容放不下时在这里滚动，不再被外框裁掉（窗口矮时最下面那个人之前看不到） */
+  .lol-postgame-content { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+
+  /* 窗口不高时（默认尺寸就是刚好放下实时对局的大小）：记分板每行收紧一点，10 个人一屏放得下 */
+  @media (max-height: 820px) {
+    .lol-result-team .lol-rift-row,
+    .lol-result-team .lol-score-row {
+      min-height: 46px;
+      padding-block: 2px;
+    }
+
+    .lol-result-team + .lol-result-team {
+      margin-top: 12px;
+    }
+
+    .lol-postgame-content:has(.lol-rift-scoreboard),
+    .lol-postgame-content:has(.lol-scoreboard) {
+      padding-top: 4px;
+      padding-bottom: 6px;
+    }
+  }
 
   @media (max-width: 850px) {
     .lol-events { grid-template-columns: minmax(0, 1fr) 160px; }

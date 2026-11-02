@@ -16,6 +16,7 @@ export const IPC_CHANNELS = {
   LCU_SEND_CHAT_MESSAGE: 'lcu:send-chat-message',
   LCU_SPECTATE_FRIEND: 'lcu:spectate-friend',
   LCU_DELETE_FRIEND: 'lcu:delete-friend',
+  LCU_GET_MY_COLLECTION: 'lcu:get-my-collection',
   // db 域：本地数据/设置（后续阶段填充真实实现）
   DB_GET_SETTINGS: 'db:get-settings',
   DB_SAVE_SETTINGS: 'db:save-settings',
@@ -47,6 +48,8 @@ export const IPC_CHANNELS = {
   MATCH_SEARCH: 'match:search',
   MATCH_GET_BRIEFS: 'match:get-briefs',
   MATCH_GET_PLAYER_RANKS: 'match:get-player-ranks',
+  MATCH_GET_PLAYER_DOSSIER: 'match:get-player-dossier',
+  MATCH_GET_ACTIVE_GAME: 'match:get-active-game',
   MATCH_GET_SAVED_MATCHES_SUMMARY: 'match:get-saved-matches-summary',
   MATCH_GET_SAVED_MATCHES_CATALOG: 'match:get-saved-matches-catalog',
   MATCH_GET_SAVED_MATCH_ACCOUNT: 'match:get-saved-match-account',

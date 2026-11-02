@@ -14,10 +14,12 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    // Squirrel 安装器在中文项目路径下必失败（rcedit 不支持非 ASCII 路径），
+    // 如需生成 Setup.exe，把项目放到纯英文路径后恢复此行：
+    // new MakerSquirrel({}),
+    new MakerZIP({}, ['win32', 'darwin']),
+    // new MakerRpm({}),
+    // new MakerDeb({}),
   ],
   plugins: [
     new VitePlugin({

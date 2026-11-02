@@ -146,9 +146,7 @@ export function AssistChampionPicker({
           <header className="cp-head">
             <div>
               <Dialog.Title className="cp-title">{request.title}</Dialog.Title>
-              <Dialog.Description className="cp-subtitle">
-                {request.hint ?? (single ? '点一下就选好' : '按点选的先后排优先级，右边可以调整顺序')}
-              </Dialog.Description>
+              <Dialog.Description className="sr-only">{request.title}</Dialog.Description>
             </div>
             <Dialog.Close className="cp-close" aria-label="关闭"><X /></Dialog.Close>
           </header>
@@ -218,10 +216,9 @@ export function AssistChampionPicker({
               <aside className="cp-side">
                 <div className="cp-side__head">
                   <b>已选 {selected.length}</b>
-                  <span>越靠上越优先</span>
                 </div>
                 {selected.length === 0 ? (
-                  <div className="cp-side__empty">还没选。点左边的头像加进来。</div>
+                  <div className="cp-side__empty">未选择</div>
                 ) : (
                   <ol className="cp-side__list">
                     {selected.map((id, index) => {
@@ -245,7 +242,7 @@ export function AssistChampionPicker({
           </div>
 
           <footer className="cp-foot">
-            <p>{notice || (single ? (ban ? '选好后，轮到你禁人时会自动禁掉它' : '') : `已选 ${selected.length}/${request.max}`)}</p>
+            <p>{notice || (single ? '' : `已选 ${selected.length}/${request.max}`)}</p>
             {(single ? request.ids.length > 0 : selected.length > 0) && (
               <button type="button" className="as-btn as-btn--ghost" onClick={() => (single ? finish([]) : setSelected([]))}>
                 {single ? (ban ? '不禁了' : '清除') : '全部清空'}

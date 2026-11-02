@@ -23,6 +23,7 @@ import {
 } from '../../lcu/chatSessions';
 import { readChatArchiveForDisplay } from '../../lcu/chatArchive';
 import { splitRiotId } from '../../riot/playerAccount';
+import { getMyCollection } from '../../collection/myCollection';
 
 const ACTIVE_GAME_CHAMPION_CACHE_TTL_MS = 30_000;
 const ACTIVE_GAME_MISS_CACHE_TTL_MS = 8_000;
@@ -640,6 +641,11 @@ export function registerLcuHandlers(): void {
       }
       return sendChatMessage(new LcuClient(creds), conversationId, body);
     },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.LCU_GET_MY_COLLECTION,
+    (_event, force?: boolean) => getMyCollection(force === true),
   );
 
   ipcMain.handle(

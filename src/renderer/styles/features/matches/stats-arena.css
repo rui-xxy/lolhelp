@@ -1,188 +1,691 @@
 @layer components {
-  /* Match-only art direction. Data, filters and player controls stay native. */
-  .md-stats {
-    --arena-gold: var(--color-analysis-gold);
-    background: var(--analysis-bg);
+  /* =========================================================================
+     战绩详情 ·「详尽表格」（DetailedStatsView，dst- 前缀）
+     十个人一字排开、一行一项数据。整块自己滚动：顶部总结随内容滚走，
+     分区导航和玩家表头吸在顶上，行名列吸在左边，横向放不下时也不会丢。
+     ========================================================================= */
+  .lol-postgame-content:has(.dst) {
+    overflow: hidden;
+    padding: 0;
+    background: var(--color-app-bg);
   }
-  .lol-postgame:has(.md-stats) .lol-postgame-tabs {
-    background: transparent;
-    border-bottom-color: transparent;
-  }
-  .lol-postgame:has(.md-stats) .lol-postgame-tab--active {
-    background: linear-gradient(0deg, color-mix(in srgb, var(--color-analysis-accent) 15%, transparent), transparent);
-    box-shadow: inset 0 -2px var(--color-analysis-accent);
-  }
-  .md-stats__header {
+
+  .dst {
+    --dst-blue: var(--color-app-team-mine);
+    --dst-red: var(--color-app-team-enemy);
+    --dst-gold: var(--color-gold);
+    --dst-gold-text: var(--color-gold-text);
+    --dst-gold-soft: var(--color-gold-soft);
+    --dst-gold-line: var(--color-gold-line);
+    --dst-line: var(--color-frost-line);
+    --dst-line-faint: var(--color-frost-line-faint);
+    --dst-line-strong: var(--color-frost-line-strong);
+    --dst-bg: var(--color-app-bg);
+    --dst-head-bg: color-mix(in srgb, var(--color-app-surface) 55%, var(--color-app-bg));
+    --dst-team-h: 26px;
+    --dst-tone: var(--color-app-muted);
     position: relative;
-    padding: 20px 24px 18px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-bg) 98%, transparent) 0%, color-mix(in srgb, var(--analysis-bg) 92%, transparent) 52%, color-mix(in srgb, var(--analysis-bg) 78%, transparent) 100%), url('../../../assets/match-atmosphere/wind-swordsman.png') center 38% / cover;
-    border-bottom: 1px solid color-mix(in srgb, var(--arena-gold) 24%, transparent);
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    container-type: inline-size;
+    background: var(--dst-bg);
+    color: var(--color-app-body);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
   }
-  .md-stats__toolbar { min-height: 60px; margin-bottom: 18px; }
-  .md-stats__identity { gap: 14px; }
-  .md-stats__identity > img { border: 2px solid var(--arena-gold); padding: 2px; }
-  .md-stats__identity strong { font-size: 18px; letter-spacing: .015em; }
-  .md-stats__identity small { font-size: 12px; margin-top: 3px; }
-  .md-stats__toolbar .md-control, .md-stats__toolbar .md-search { background: color-mix(in srgb, var(--analysis-bg) 80%, transparent); }
-  .match-roster--showcase { position: relative; gap: 56px; }
-  .match-roster--showcase .match-roster__team {
-    padding: 10px 12px;
+  .dst :where(button) {
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  .dst button:focus-visible {
+    outline: 2px solid var(--dst-gold-line);
+    outline-offset: 1px;
+  }
+  .dst .is-blue { --dst-tone: var(--dst-blue); }
+  .dst .is-red { --dst-tone: var(--dst-red); }
+
+  /* ── 顶部：正在看的这个人 ─────────────────────────────────────────────── */
+  .dst-hero {
+    position: sticky;
+    left: 0;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(176px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px 26px;
+    padding: 16px 18px 14px 20px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--dst-line);
+    background:
+      radial-gradient(ellipse 52% 140% at 0% 0%, color-mix(in srgb, var(--dst-tone) 15%, transparent), transparent 72%),
+      linear-gradient(180deg, color-mix(in srgb, var(--color-app-surface) 70%, transparent), transparent);
+  }
+  /* 这局用的英雄原画，淡淡铺在名字后面。 */
+  .dst-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: -1;
+    width: min(460px, 52%);
+    background: var(--dst-splash, none) center 22% / cover no-repeat;
+    opacity: .2;
+    filter: saturate(.8);
+    -webkit-mask-image: linear-gradient(90deg, black 15%, transparent 92%);
+    mask-image: linear-gradient(90deg, black 15%, transparent 92%);
+    pointer-events: none;
+  }
+  :root[data-mode='light'] .dst-hero::before { opacity: .14; }
+
+  .dst-hero__who {
+    display: flex;
+    min-width: 0;
+    align-items: center;
     gap: 12px;
-    border: 1px solid color-mix(in srgb, var(--roster-team) 40%, transparent);
-    border-radius: 12px 4px 12px 4px;
-    background: linear-gradient(120deg, color-mix(in srgb, var(--roster-team) 14%, var(--analysis-bg)), color-mix(in srgb, var(--analysis-bg) 86%, transparent));
   }
-  .match-roster--showcase .match-roster__team-name { display: grid; gap: 5px; writing-mode: horizontal-tb; letter-spacing: normal; font-size: 14px; font-weight: 600; text-align: center; }
-  .match-roster--showcase .match-roster__team-name::before { display: none; }
-  .match-roster__team-name > small { font-size: 11px; font-weight: 400; opacity: .8; }
-  .match-roster--showcase .match-roster__players { gap: 4px; }
-  .match-roster--showcase .match-roster__player { position: relative; padding: 9px 4px 7px; gap: 7px; border-radius: 8px 2px; }
-  .match-roster--showcase .match-roster__portrait > img { border: 2px solid color-mix(in srgb, var(--roster-team) 60%, var(--analysis-panel)); padding: 1px; }
-  .match-roster--showcase .match-roster__player.is-selected { border-color: var(--arena-gold); background: linear-gradient(145deg, color-mix(in srgb, var(--arena-gold) 15%, transparent), color-mix(in srgb, var(--arena-gold) 3%, transparent)); }
-  .match-roster--showcase .is-selected .match-roster__portrait > img { border-color: var(--arena-gold); }
-  .match-roster--showcase .match-roster__check { right: -5px; bottom: 12px; background: var(--arena-gold); }
-  .match-roster__level { position: absolute; bottom: -2px; right: -3px; min-width: 17px; padding: 0 2px; border: 1px solid var(--color-app-border-strong); border-radius: var(--radius-xs); background: var(--analysis-bg); color: var(--color-app-text); font-size: 11px; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
-  .match-roster__status { color: var(--color-app-muted); font-size: 11px; line-height: 1; white-space: nowrap; }
-  .match-roster--showcase .is-selected .match-roster__status { color: var(--arena-gold); }
-  .match-roster__versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--color-app-muted); font-size: 19px; font-family: var(--font-num); font-style: italic; letter-spacing: .05em; }
-  .md-stats__workspace { grid-template-columns: 88px minmax(0, 1fr); }
-  .md-stats__categories { padding: 16px 8px; gap: 4px; background: color-mix(in srgb, var(--analysis-panel) 72%, transparent); }
-  .md-stats__categories > button { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 61px; gap: 5px; padding: 7px 2px; border-radius: var(--radius-xs); font-size: 11px; }
-  .md-stats__categories > button .lol-riot-art-icon { width: 22px; height: 22px; filter: grayscale(1); opacity: .65; }
-  .md-stats__categories > button.is-active { background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 18%, transparent), color-mix(in srgb, var(--analysis-focus) 3%, transparent)); border: 1px solid color-mix(in srgb, var(--analysis-focus) 32%, transparent); color: var(--color-app-text); }
-  .md-stats__categories > button.is-active .lol-riot-art-icon { filter: grayscale(.4); opacity: 1; }
-  .md-stats__content { padding: 0 24px 24px; }
-  .md-stats__overview-heading { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 18px; padding: 20px 0 15px; }
-  .md-stats__overview-heading > div > span { font-size: 11px; letter-spacing: .2em; color: var(--arena-gold); }
-  .md-stats__overview-heading h2 { margin: 3px 0 0; color: var(--color-app-text); font-size: 22px; font-weight: 600; line-height: 1.2; }
-  .md-stats__overview-heading p { margin: 0 0 2px; font-size: 12px; color: var(--color-app-muted); }
-  .md-performance { display: grid; grid-template-columns: minmax(0, 1fr) 218px; gap: 14px; margin-bottom: 26px; }
-  .md-stats__summary { margin: 0; padding: 20px 0; align-items: center; border: 1px solid color-mix(in srgb, var(--arena-gold) 14%, var(--analysis-line)); border-radius: 10px 3px; background: linear-gradient(130deg, var(--analysis-panel), color-mix(in srgb, var(--analysis-surface) 36%, var(--analysis-bg))); }
-  .md-stats__summary > div { padding-inline: 18px; gap: 12px; }
-  .md-stats__summary strong { font-size: clamp(21px, 2.2cqi, 34px); font-weight: 600; letter-spacing: -.04em; }
-  .md-stats__summary > div:first-child strong { color: var(--color-app-text); }
-  .md-stats__summary .md-performance__label { display: flex; align-items: center; gap: 9px; color: var(--color-app-body); font-size: 12px; white-space: nowrap; }
-  .md-performance__label svg { width: 22px; height: 22px; color: var(--arena-gold); stroke-width: 1.5; }
-  .md-performance__metric.is-kda .md-stats__summary-context { color: var(--arena-gold); font-size: 13px; }
-  .md-performance__standing { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 2px; }
-  .md-performance__standing > span { white-space: nowrap; font-size: 11px; }
-  .md-performance__standing b { color: var(--arena-gold); font-size: 17px; font-weight: 500; }
-  .md-performance__distribution { display: flex; flex: 0 1 65px; align-items: flex-end; gap: 3px; height: 22px; }
-  .md-performance__distribution > i { flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--analysis-focus) 23%, transparent); }
-  .md-performance__distribution > i.is-focus { background: var(--analysis-focus); }
-  .md-duel { min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--analysis-focus) 16%, transparent); border-radius: 3px 10px; background: color-mix(in srgb, var(--analysis-panel) 78%, var(--analysis-bg)); }
-  .md-duel__heading { display: flex; justify-content: space-between; align-items: center; }
-  .md-duel__heading strong { font-size: 12px; font-weight: 600; }
-  .md-duel__heading button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-xs); color: var(--color-app-muted); }
-  .md-duel__heading button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
-  .md-duel__heading svg { width: 13px; height: 13px; }
-  .md-duel__players { display: grid; grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); align-items: center; gap: 5px; margin: 9px 0; }
-  .md-duel__players > span { display: grid; justify-items: center; gap: 3px; min-width: 0; }
-  .md-duel__players small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--color-app-muted); }
-  .md-duel__players > b { font-size: 11px; color: var(--arena-gold); font-weight: 500; text-align: center; }
-  .md-duel dl { display: grid; gap: 3px; margin: 0; }
-  .md-duel dl > div { display: flex; justify-content: space-between; border-top: 1px solid var(--analysis-line); padding-top: 3px; font-size: 11px; }
-  .md-duel dt { color: var(--color-app-muted); }
-  .md-duel dd { margin: 0; font-variant-numeric: tabular-nums; }
-  .md-duel .is-positive { color: var(--color-app-success); }
-  .md-duel .is-negative { color: var(--analysis-red); }
-  .md-duel__empty { display: grid; justify-items: center; align-content: center; gap: 9px; min-height: 140px; text-align: center; }
-  .md-duel__empty > svg { width: 24px; height: 24px; color: var(--arena-gold); stroke-width: 1.3; }
-  .md-duel__empty p { font-size: 12px; margin: 0; line-height: 1.8; }
-  .md-duel__empty p span { font-size: 11px; color: var(--color-app-muted); }
-  .md-stats__section-heading { border-left: 2px solid var(--arena-gold); padding-left: 10px; margin-bottom: 14px; }
-  .md-stats__section h3 { font-size: 17px; font-weight: 600; }
-  .md-stats__column-head { border-radius: 6px 6px 0 0; min-height: 48px; background: color-mix(in srgb, var(--analysis-surface) 72%, var(--analysis-bg)); }
-  .md-stat { margin-top: 4px; border: 1px solid var(--analysis-line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--analysis-panel) 64%, transparent); }
-  .md-stat__row { min-height: 62px; border-left: 2px solid transparent; }
-  .md-stat__row:hover, .md-stat.is-expanded > .md-stat__row { border-left-color: var(--analysis-focus); background: linear-gradient(90deg, color-mix(in srgb, var(--analysis-focus) 10%, transparent), transparent); }
-  .md-stat__label { display: flex; min-width: 0; align-items: center; gap: 12px; }
-  .md-stat__emblem { display: grid; flex: 0 0 27px; place-items: center; color: var(--arena-gold); }
-  .md-stat__emblem .lol-riot-art-icon { width: 25px; height: 25px; filter: saturate(.45); }
-  .md-stat__emblem > svg { width: 22px; height: 22px; }
-  .md-stat__rank, .md-stat__rank-heading { display: none; }
-  @container (min-width: 1000px) {
-    .md-stats:not(.is-comparing) .md-stats__column-head, .md-stats:not(.is-comparing) .md-stat__row { grid-template-columns: minmax(145px, 1.1fr) minmax(90px, .65fr) 80px minmax(130px, 1fr) 16px; }
-    .md-stat__rank, .md-stat__rank-heading { display: flex; align-items: baseline; gap: 5px; color: var(--color-app-muted); font-variant-numeric: tabular-nums; }
-    .md-stat__rank b { color: var(--arena-gold); font-size: 17px; font-weight: 500; }
-    .md-stat__rank small { font-size: 11px; }
-    .md-stat__label { font-size: 14px; }
-    .md-stats__summary .md-performance__label { font-size: 14px; }
+  .dst-hero__avatar {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding: 2px;
+    border-radius: 50%;
+    background: conic-gradient(from 210deg, var(--dst-gold), color-mix(in srgb, var(--dst-tone) 80%, transparent), var(--dst-gold));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--dst-bg) 70%, transparent), 0 6px 18px color-mix(in srgb, var(--dst-tone) 22%, transparent);
   }
-  .md-meter { height: 6px; border: 1px solid var(--analysis-line); background: color-mix(in srgb, var(--analysis-focus) 10%, transparent); }
-  .md-meter > i { background: linear-gradient(90deg, var(--analysis-blue), var(--analysis-focus)); }
-  .md-meter.is-compare > i { background: var(--arena-gold); }
-  @container (max-width: 1100px) {
-    .md-stats__header { padding: 14px 18px; }
-    .match-roster--showcase { gap: 36px; }
-    .match-roster--showcase .match-roster__team { padding: 7px; gap: 6px; }
-    .match-roster--showcase .match-roster__team-name { font-size: 12px; }
-    .match-roster--showcase .match-roster__status { display: none; }
-    .md-performance { grid-template-columns: minmax(0, 1fr); }
-    .md-stats__summary { padding-block: 14px; }
-    .md-stats__summary > div { gap: 8px; }
-    .md-stats__summary strong { font-size: 25px; }
-    .md-duel { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 14px; }
-    .md-duel:has(.md-duel__players) { grid-template-columns: 90px 160px minmax(0, 1fr); }
-    .md-duel__players { margin: 0; }
-    .md-duel dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
-    .md-duel__empty { display: flex; justify-content: flex-end; gap: 12px; min-height: 0; text-align: left; }
-    .md-duel__empty > svg { display: none; }
-    .md-duel__empty p { font-size: 11px; }
-    .md-duel__empty p br, .md-duel__empty p span { display: none; }
+  .dst-hero__avatar img { border: 2px solid var(--dst-bg); }
+  .dst-hero__who > div {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
   }
-  @container (min-width: 801px) and (max-width: 1100px) {
-    .md-performance { grid-template-columns: minmax(0, 1fr) 180px; }
-    .md-stats__summary > div { padding-inline: 12px; }
-    .md-stats__summary strong { font-size: 21px; }
-    .md-performance__label svg { width: 18px; height: 18px; }
-    .md-performance__distribution { flex-basis: 40px; gap: 2px; }
-    .md-duel, .md-duel:has(.md-duel__players) { display: block; padding: 10px 12px; }
-    .md-duel__players { margin: 7px 0; }
-    .md-duel dl { grid-template-columns: 1fr; gap: 2px; }
-    .md-duel__empty { display: grid; justify-content: center; justify-items: center; min-height: 120px; text-align: center; }
-    .md-duel__empty > svg { display: block; }
+  .dst-hero__who strong {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  @container (max-width: 800px) {
-    .md-stats__workspace { grid-template-columns: 72px minmax(0, 1fr); }
-    .md-stats__content { padding-inline: 14px; }
-    .md-stats__identity strong { font-size: 15px; }
-    .match-roster--showcase { gap: 24px; }
-    .match-roster--showcase .match-roster__team { display: block; padding: 6px; }
-    .match-roster--showcase .match-roster__team-name { display: flex; gap: 7px; align-items: center; padding: 0 4px 3px; }
-    .match-roster__versus { font-size: 13px; }
-    .match-roster--showcase .match-roster__status { display: none; }
-    .match-roster--showcase .match-roster__player { padding: 6px 1px; }
-    .md-stats__summary > div { padding-inline: 12px; }
-    .md-stats__summary strong { font-size: 21px; }
-    .md-performance__distribution { display: none; }
-    .md-duel:has(.md-duel__players) { grid-template-columns: 1fr 1fr; }
-    .md-duel:has(.md-duel__players) .md-duel__heading { grid-column: 1 / -1; }
-    .md-duel:has(.md-duel__empty) { display: none; }
-    .md-stat__label { gap: 7px; font-size: 12px; }
+  .dst-hero__who strong small {
+    margin-left: 3px;
+    color: var(--color-app-subtle);
+    font-size: 12px;
+    font-weight: 400;
   }
-  @container (max-width: 650px) {
-    .md-stats__header { padding: 12px; }
-    .md-stats__toolbar { margin-bottom: 12px; }
-    .md-stats__header .match-roster--showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
-    .match-roster--showcase .match-roster__team { padding: 5px 3px; }
-    .match-roster--showcase .match-roster__players { gap: 1px; }
-    .match-roster--showcase .match-roster__name { font-size: 11px; }
-    .md-stats__categories { padding-inline: 5px; }
-    .md-stats__categories > button { min-height: 58px; font-size: 11px; }
-    .md-stats__overview-heading h2 { font-size: 19px; }
-    .md-stats__overview-heading p { font-size: 11px; }
-    .md-stats__summary { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 0; }
-    .md-stats__summary > div { gap: 8px; padding-inline: 8px; }
-    .md-stats__summary > div:nth-child(3) { border-left: 1px solid var(--analysis-line); }
-    .md-stats__summary strong { font-size: 18px; }
-    .md-stats__summary .md-performance__label { font-size: 11px; gap: 5px; }
-    .md-performance__label svg { width: 16px; height: 16px; }
-    .md-stats__summary-context, .md-performance__metric.is-kda .md-stats__summary-context { font-size: 11px; }
-    .md-performance__standing { margin: 0; }
-    .md-performance { margin-bottom: 20px; }
-    .md-duel { grid-template-columns: 1fr; gap: 6px; }
-    .md-duel__empty { justify-content: space-between; }
-    .md-stat__emblem { display: none; }
+  .dst-hero__who span {
+    overflow: hidden;
+    color: var(--color-app-muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dst-hero__who em { font-style: normal; font-weight: 600; }
+  .dst-hero__who em.is-win { color: var(--color-app-win); }
+  .dst-hero__who em.is-loss { color: var(--color-app-loss); }
+
+  .dst-hero__standings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 6px;
+  }
+  .dst-standing {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+    padding: 7px 10px 6px;
+    border: 1px solid var(--dst-line);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-app-surface) 62%, transparent);
+    text-align: left;
+    transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+  }
+  .dst-standing:hover {
+    border-color: var(--dst-line-strong);
+    background: var(--color-app-surface);
+    transform: translateY(-1px);
+  }
+  .dst-standing > span {
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .dst-standing > strong {
+    overflow: hidden;
+    color: var(--color-app-text);
+    font-family: var(--font-num);
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dst-standing > small {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--color-app-subtle);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .dst-standing > small b {
+    color: var(--color-app-body);
+    font-family: var(--font-num);
+    font-weight: 600;
+  }
+  .dst-standing > small svg { width: 12px; height: 12px; }
+  .dst-standing.is-top {
+    border-color: var(--dst-gold-line);
+    background:
+      linear-gradient(150deg, color-mix(in srgb, var(--dst-gold) 16%, transparent), transparent 70%),
+      color-mix(in srgb, var(--color-app-surface) 62%, transparent);
+  }
+  .dst-standing.is-top > small { color: var(--dst-gold-text); font-weight: 600; }
+
+  .dst-hero__marks {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .dst-hero__marks-title {
+    margin-right: 4px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+  .dst-mark {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    gap: 6px;
+    padding: 0 11px 0 10px;
+    border: 1px solid var(--dst-gold-line);
+    border-radius: 999px;
+    background: var(--dst-gold-soft);
+    color: var(--color-app-text);
+    font-size: 12px;
+    transition: background-color 140ms ease;
+  }
+  .dst-mark:hover { background: color-mix(in srgb, var(--dst-gold) 22%, transparent); }
+  .dst-mark em {
+    color: var(--dst-gold-text);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+  }
+  .dst-mark b {
+    color: var(--dst-gold-text);
+    font-family: var(--font-num);
+    font-weight: 600;
+  }
+  .dst-mark.is-team {
+    border-color: color-mix(in srgb, var(--dst-tone) 34%, transparent);
+    background: color-mix(in srgb, var(--dst-tone) 10%, transparent);
+  }
+  .dst-hero.is-blue .dst-mark.is-team { --dst-tone: var(--dst-blue); }
+  .dst-hero.is-red .dst-mark.is-team { --dst-tone: var(--dst-red); }
+  .dst-mark.is-team em, .dst-mark.is-team b { color: var(--dst-tone); }
+
+  /* ── 吸顶工具条：分区导航 + 搜索 ─────────────────────────────────────── */
+  .dst-bar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px 8px 12px;
+    border-bottom: 1px solid var(--dst-line);
+    background: var(--dst-bg);
+  }
+  .dst-nav {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .dst-nav::-webkit-scrollbar { display: none; }
+  .dst-nav > button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    height: 28px;
+    gap: 5px;
+    padding: 0 11px;
+    border-radius: 999px;
+    color: var(--color-app-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    transition: color 140ms ease, background-color 140ms ease;
+  }
+  .dst-nav > button svg { width: 13px; height: 13px; }
+  .dst-nav > button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
+  .dst-nav > button[aria-current='true'] {
+    background: var(--dst-gold-soft);
+    color: var(--dst-gold-text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--dst-gold-line);
+  }
+  .dst-search {
+    display: flex;
+    flex: 0 1 210px;
+    min-width: 140px;
+    height: 30px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 8px 0 11px;
+    border: 1px solid var(--dst-line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-app-surface) 70%, transparent);
+    color: var(--color-app-muted);
+    transition: border-color 140ms ease;
+  }
+  .dst-search:focus-within { border-color: var(--dst-gold-line); }
+  .dst-search > svg { width: 14px; height: 14px; flex: 0 0 auto; }
+  .dst-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--color-app-text);
+    font-size: 12px;
+  }
+  .dst-search input::placeholder { color: var(--color-app-subtle); }
+  .dst-search button {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+  }
+  .dst-search button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
+  .dst-search button svg { width: 12px; height: 12px; }
+
+  /* ── 表格骨架 ──────────────────────────────────────────────────────── */
+  .dst-table {
+    --dst-label-w: 150px;
+    width: 100%;
+    min-width: calc(var(--dst-label-w) + var(--dst-cols, 10) * 58px);
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-variant-numeric: tabular-nums;
+  }
+  .dst-col-label { width: var(--dst-label-w); }
+  /* 列的底色画在 <col> 上：正在看的人一整列淡金，对位的人淡淡一层，鼠标所在列微亮。 */
+  .dst-table col.is-focus { background: color-mix(in srgb, var(--dst-gold) 8%, transparent); }
+  .dst-table col.is-rival { background: color-mix(in srgb, var(--color-app-text) 3%, transparent); }
+  .dst-table col.is-hover { background: color-mix(in srgb, var(--color-app-text) 4.5%, transparent); }
+  .dst-table col.is-focus.is-hover { background: color-mix(in srgb, var(--dst-gold) 12%, transparent); }
+
+  .dst-table thead th {
+    position: sticky;
+    z-index: 3;
+    padding: 0;
+    background: var(--dst-head-bg);
+    font-weight: 400;
+  }
+  .dst-teams > th { top: var(--dst-bar-h, 47px); height: var(--dst-team-h); }
+  .dst-players > th { top: calc(var(--dst-bar-h, 47px) + var(--dst-team-h)); }
+
+  .dst-table thead th.dst-corner {
+    left: 0;
+    z-index: 5;
+    padding: 0 10px 8px 16px;
+    border-right: 1px solid var(--dst-line);
+    border-bottom: 1px solid var(--dst-line-strong);
+    text-align: left;
+    vertical-align: bottom;
+  }
+  .dst-corner > span {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--color-app-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .dst-corner > small {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-app-subtle);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .dst-corner__legend > i {
+    display: inline-block;
+    width: 22px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--dst-blue) 55%, var(--dst-red) 55%);
+  }
+
+  .dst-table thead th.dst-team {
+    padding: 0 10px;
+    border-top: 2px solid var(--dst-tone);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--dst-tone) 13%, transparent), transparent),
+      var(--dst-head-bg);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .dst-team + .dst-team { border-left: 1px solid var(--dst-line-strong); }
+  .dst-team > span {
+    color: var(--dst-tone);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+  }
+  .dst-team > small {
+    margin-left: 6px;
+    color: var(--color-app-muted);
+    font-size: 11px;
+  }
+  .dst-team.is-win > small { color: var(--dst-tone); }
+
+  .dst-table thead th.dst-player {
+    padding: 4px 2px 6px;
+    border-bottom: 1px solid var(--dst-line-strong);
+  }
+  .dst-table thead th.dst-player.is-focus {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--dst-gold) 16%, transparent), color-mix(in srgb, var(--dst-gold) 8%, transparent)),
+      var(--dst-head-bg);
+    box-shadow: inset 0 -2px var(--dst-gold);
+  }
+  .dst-player > button {
+    display: grid;
+    width: 100%;
+    justify-items: center;
+    gap: 3px;
+    padding: 5px 2px 2px;
+    border-radius: var(--radius-sm);
+    color: var(--color-app-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+  .dst-player > button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
+  .dst-player__avatar {
+    position: relative;
+    display: inline-flex;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--dst-tone) 70%, transparent);
+  }
+  .dst-player__avatar > small {
+    position: absolute;
+    right: -7px;
+    bottom: -3px;
+    min-width: 17px;
+    height: 15px;
+    padding: 0 2px;
+    border: 1px solid var(--dst-line-strong);
+    border-radius: var(--radius-xs);
+    background: var(--dst-bg);
+    color: var(--color-app-body);
+    font-family: var(--font-num);
+    font-size: 11px;
+    line-height: 13px;
+    text-align: center;
+  }
+  .dst-player__name {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    color: var(--color-app-body);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dst-player__pos {
+    color: var(--color-app-subtle);
+    font-size: 11px;
+    line-height: 13px;
+  }
+  .dst-player.is-focus .dst-player__avatar { box-shadow: 0 0 0 2px var(--dst-gold), 0 0 10px color-mix(in srgb, var(--dst-gold) 45%, transparent); }
+  .dst-player.is-focus .dst-player__name { color: var(--dst-gold-text); font-weight: 700; }
+  .dst-player.is-focus .dst-player__pos { color: var(--dst-gold-text); }
+  .dst-player.is-rival .dst-player__pos { color: var(--dst-tone); font-weight: 600; }
+
+  .dst-table .is-group-start { border-left: 1px solid var(--dst-line-strong); }
+
+  /* ── 分区标题与「再看更多」 ─────────────────────────────────────────── */
+  .dst-section > th {
+    padding: 18px 0 7px;
+    border-bottom: 1px solid var(--dst-line);
+    background: var(--dst-bg);
+    text-align: left;
+    font-weight: 400;
+  }
+  .dst-section:first-child > th { padding-top: 12px; }
+  .dst-section__title {
+    position: sticky;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    color: var(--color-app-text);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .dst-section__title > i {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-sm);
+    background: var(--dst-gold-soft);
+    box-shadow: inset 0 0 0 1px var(--dst-gold-line);
+    color: var(--dst-gold-text);
+  }
+  .dst-section__title svg { width: 13px; height: 13px; }
+
+  .dst-more > td {
+    padding: 5px 0 2px;
+    background: var(--dst-bg);
+  }
+  .dst-more button {
+    position: sticky;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    gap: 6px;
+    margin-left: 10px;
+    padding: 0 12px 0 8px;
+    border-radius: 999px;
+    color: var(--color-app-muted);
+    font-size: 12px;
+    transition: color 140ms ease, background-color 140ms ease;
+  }
+  .dst-more button:hover { background: var(--color-frost-fill-hover); color: var(--color-app-text); }
+  .dst-more button svg { width: 14px; height: 14px; transition: transform 160ms ease; }
+  .dst-more button[aria-expanded='true'] svg { transform: rotate(180deg); }
+
+  /* ── 数据行 ────────────────────────────────────────────────────────── */
+  .dst-row > th,
+  .dst-row > td {
+    height: 38px;
+    border-bottom: 1px solid var(--dst-line-faint);
+  }
+  .dst-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    padding: 0 10px 0 16px;
+    border-right: 1px solid var(--dst-line);
+    background: var(--dst-bg);
+    color: var(--color-app-body);
+    font-size: 13px;
+    font-weight: 400;
+    text-align: left;
+  }
+  .dst-label > span:first-child {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* 两队合计占比：蓝色占多少就是蓝方这一项拿了全场的多少。 */
+  .dst-split {
+    display: block;
+    width: 64px;
+    height: 3px;
+    margin-top: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--dst-red) 75%, transparent);
+  }
+  .dst-split > i {
+    display: block;
+    height: 100%;
+    background: var(--dst-blue);
+    box-shadow: 1px 0 0 var(--dst-bg);
+  }
+  .dst-row:hover > th,
+  .dst-row:hover > td { background-image: linear-gradient(color-mix(in srgb, var(--color-app-text) 4.5%, transparent), color-mix(in srgb, var(--color-app-text) 4.5%, transparent)); }
+  .dst-row:hover > .dst-label { color: var(--color-app-text); }
+
+  .dst-cell {
+    position: relative;
+    padding: 0 4px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .dst-v {
+    position: relative;
+    color: var(--color-app-body);
+    font-family: var(--font-num);
+    font-size: 13px;
+  }
+  .dst-v.is-none { color: var(--color-app-subtle); }
+  .dst-cell.is-focus .dst-v { color: var(--color-app-text); font-weight: 600; }
+  /* 数字下面那根细线就是它在这一行里的大小，一排看过去就是一张小柱状图。 */
+  .dst-meter {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    width: calc(var(--dst-w, 0%) * .74);
+    height: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--dst-tone) 42%, transparent);
+    transform: translateX(-50%);
+  }
+  .dst-cell.is-focus .dst-meter { background: color-mix(in srgb, var(--dst-tone) 85%, transparent); }
+  /* 全场最高：金色数字 + 一圈很淡的光。 */
+  .dst-cell.is-lead::before {
+    content: '';
+    position: absolute;
+    inset: 6px 7px;
+    border-radius: var(--radius-sm);
+    background: radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--dst-gold) 20%, transparent), transparent 72%);
+    pointer-events: none;
+  }
+  :root[data-mode='light'] .dst-cell.is-lead::before {
+    background: radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--dst-gold) 11%, transparent), transparent 72%);
+  }
+  .dst-cell.is-lead .dst-v { color: var(--dst-gold-text); font-weight: 700; }
+  .dst-cell.is-lead .dst-meter {
+    background: var(--dst-gold);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--dst-gold) 70%, transparent);
+  }
+
+  .dst-kda {
+    color: var(--color-app-subtle);
+    font-family: var(--font-num);
+    font-size: 13px;
+  }
+  .dst-kda b { color: var(--color-app-body); font-weight: 500; }
+  .dst-kda em { color: var(--color-app-loss); font-style: normal; font-weight: 500; }
+  .dst-cell.is-focus .dst-kda b { color: var(--color-app-text); font-weight: 700; }
+
+  .dst-mix {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+  }
+  .dst-mix__bar {
+    display: flex;
+    width: 78%;
+    height: 5px;
+    gap: 1px;
+    overflow: hidden;
+    border-radius: var(--radius-xs);
+  }
+  .dst-mix__bar > i { min-width: 2px; }
+  .dst-mix__bar > .is-0 { background: color-mix(in srgb, var(--color-warn) 85%, transparent); }
+  .dst-mix__bar > .is-1 { background: color-mix(in srgb, var(--color-party-sky) 85%, transparent); }
+  .dst-mix__bar > .is-2 { background: color-mix(in srgb, var(--color-app-text) 60%, transparent); }
+  .dst-mix > small {
+    color: var(--color-app-muted);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* 从顶部点过来的那一行闪一下金色，告诉你「就是这行」。 */
+  .dst-row.is-flash > th,
+  .dst-row.is-flash > td { animation: dst-flash 1.5s ease-out; }
+  @keyframes dst-flash {
+    0%, 30% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--dst-gold) 20%, transparent); }
+    100% { box-shadow: inset 0 0 0 999px transparent; }
+  }
+
+  .dst-empty {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 56px 16px;
+    color: var(--color-app-muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  .dst-empty > button {
+    height: 30px;
+    padding: 0 14px;
+    border: 1px solid var(--dst-line-strong);
+    border-radius: 999px;
+    color: var(--color-app-text);
+    font-size: 12px;
+  }
+  .dst-empty > button:hover { background: var(--color-frost-fill-hover); }
+  .dst-footnote {
+    position: sticky;
+    left: 0;
+    margin: 0;
+    padding: 14px 16px 20px;
+    color: var(--color-app-subtle);
+    font-size: 11px;
+  }
+
+  /* ── 窄窗口 ────────────────────────────────────────────────────────── */
+  @container (max-width: 820px) {
+    .dst-hero { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 14px 12px 16px; }
+    .dst-hero__standings { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+    .dst-table { --dst-label-w: 124px; }
+    .dst-nav { flex-wrap: wrap; row-gap: 4px; }
+    .dst-label { padding-left: 12px; font-size: 12px; }
+    .dst-table thead th.dst-corner { padding-left: 12px; }
+    .dst-corner > small:last-child { display: none; }
+  }
+  @container (max-width: 620px) {
+    .dst-bar { flex-wrap: wrap; }
+    .dst-search { flex: 1 1 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dst-standing, .dst-standing:hover { transition: none; transform: none; }
+    .dst-row.is-flash > th, .dst-row.is-flash > td { animation: none; }
   }
 }

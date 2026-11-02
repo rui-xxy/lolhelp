@@ -117,7 +117,6 @@ export function ChampionsSection({
         <Feature
           icon={<WandSparkles />}
           title="自动选英雄、禁英雄"
-          description="轮到你选人或禁人时，按下面的顺序自动操作；前一个被选走或被禁了，就试下一个。只在轮到你时动手，不会抢在你前面。"
           checked={assist.autoChampionEnabled}
           onChange={(value) => updateBoolean('autoChampionEnabled', value)}
         />
@@ -125,25 +124,23 @@ export function ChampionsSection({
 
       <Panel
         title="按模式选英雄"
-        description="排在前面的优先。点一下可以增减英雄、调整顺序。"
         muted={off}
       >
         {off && (
           <div className="as-notice">
             <TriangleAlert />
-            总开关关着，下面的设置先存着，暂时不会生效。
+            总开关已关闭
           </div>
         )}
         <div className="as-rows">
           {([
-            ['normal', '匹配 / 排位', '没给位置单独设英雄时，用这里的顺序'],
-            ['aram', '大乱斗', '能换英雄时，按顺序把想玩的换到手里'],
-            ['arena', '斗魂竞技场', '斗魂模式里优先选这些'],
-          ] as const).map(([key, label, hint]) => (
+            ['normal', '匹配 / 排位'],
+            ['aram', '大乱斗'],
+            ['arena', '斗魂竞技场'],
+          ] as const).map(([key, label]) => (
             <div key={key} className="as-row">
               <div className="as-row__label">
                 <b>{label}</b>
-                <span>{hint}</span>
               </div>
               <ChampionStrip
                 label={label}
@@ -163,13 +160,12 @@ export function ChampionsSection({
 
       <Panel
         title="按位置选英雄、禁英雄"
-        description="排位里分到哪个位置，就用那一行的设置。每个位置可以禁一个英雄。"
         muted={off}
       >
         <div className="as-lanes">
           <div className="as-lane-row as-lane-row--head">
             <span>位置</span>
-            <span>想玩的英雄（按顺序尝试）</span>
+            <span>想玩的英雄</span>
             <span>要禁的英雄</span>
           </div>
           {ROLES.map(({ role, label }) => (
@@ -197,7 +193,6 @@ export function ChampionsSection({
                 championMap={championMap}
                 onClick={() => openPicker({
                   title: `${label}：要禁的英雄`,
-                  hint: '只能禁一个。点一下就选好',
                   mode: 'ban',
                   ids: assist.champions.bans[role] ? [assist.champions.bans[role]] : [],
                   max: 1,
@@ -211,7 +206,6 @@ export function ChampionsSection({
               <Swords />
               斗魂
             </span>
-            <span className="as-field__hint">斗魂竞技场只有禁用阶段按位置区分</span>
             <ChampionStrip
               label="斗魂要禁的英雄"
               ids={assist.champions.bans.arena ? [assist.champions.bans.arena] : []}
@@ -220,7 +214,6 @@ export function ChampionsSection({
               championMap={championMap}
               onClick={() => openPicker({
                 title: '斗魂竞技场：要禁的英雄',
-                hint: '只能禁一个。点一下就选好',
                 mode: 'ban',
                 ids: assist.champions.bans.arena ? [assist.champions.bans.arena] : [],
                 max: 1,
@@ -231,7 +224,7 @@ export function ChampionsSection({
         </div>
       </Panel>
 
-      <Panel title="快速游戏的位置" description="开快速游戏时，帮你提前选好两个想去的位置。">
+      <Panel title="快速游戏的位置">
         <div className="as-panel__body">
           <div className="as-lane-picks">
             {([
@@ -268,10 +261,10 @@ export function ChampionsSection({
 
 type Strategy = 'off' | 'winRate' | 'pickRate';
 
-const STRATEGY_OPTIONS: Array<{ value: Strategy; title: string; description: string }> = [
-  { value: 'off', title: '不自动', description: '自己配，或者用客户端自带的推荐' },
-  { value: 'winRate', title: '胜率最高', description: '用当前版本赢得最多的方案' },
-  { value: 'pickRate', title: '最多人用', description: '用当前版本最常见、最稳的方案' },
+const STRATEGY_OPTIONS: Array<{ value: Strategy; title: string }> = [
+  { value: 'off', title: '不自动' },
+  { value: 'winRate', title: '胜率最高' },
+  { value: 'pickRate', title: '最多人用' },
 ];
 
 export function BuildsSection({
@@ -291,12 +284,11 @@ export function BuildsSection({
   const runeStrategy: Strategy = assist.autoWinRateRunes ? 'winRate' : assist.autoPickRateRunes ? 'pickRate' : 'off';
   return (
     <>
-      <Panel title="符文页" description="锁定英雄后，自动按选择的方案生成一页符文并启用。">
+      <Panel title="符文页">
         <div className="as-feature">
           <span className="as-feature__icon" aria-hidden="true"><Sparkles /></span>
           <div>
             <div className="as-feature__title">符文用哪套</div>
-            <div className="as-feature__desc">选「不自动」就不会动你的符文页。</div>
           </div>
           <span />
           <div className="as-feature__options">
@@ -315,18 +307,16 @@ export function BuildsSection({
         <Feature
           icon={<MessageSquareText />}
           title="把符文方案发到选人聊天"
-          description="队友能看到你带的是什么符文。"
           checked={assist.sendRunesMessage}
           onChange={(value) => updateBoolean('sendRunesMessage', value)}
         />
       </Panel>
 
-      <Panel title="出装" description="锁定英雄后，自动把推荐出装写进游戏里的「推荐物品」。">
+      <Panel title="出装">
         <div className="as-feature">
           <span className="as-feature__icon" aria-hidden="true"><Coins /></span>
           <div>
             <div className="as-feature__title">出装用哪套</div>
-            <div className="as-feature__desc">选「不自动」就保留客户端默认的推荐物品。</div>
           </div>
           <span />
           <div className="as-feature__options">
@@ -345,11 +335,10 @@ export function BuildsSection({
         <Feature
           icon={<MessageSquareText />}
           title="把出装方案发到选人聊天"
-          description="队友能看到你准备怎么出装。"
           checked={assist.sendItemsMessage}
           onChange={(value) => updateBoolean('sendItemsMessage', value)}
         />
-        <PanelFoot note="已经选好英雄了？点一下，马上按上面的方案写入符文和出装。">
+        <PanelFoot>
           <Btn
             tone="primary"
             onClick={() => void runOperation(() =>

@@ -2,6 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { LolConfigFileStatus } from '../../shared/api';
 import { DEFAULT_LOL_ROOT_PATH } from '../../shared/constants';
+import { getKnownInstallRoots } from '../lcu/discover';
+import { normalizeInstallRoot, rootLooksValid } from './installRoot';
+
+export { normalizeInstallRoot, rootLooksValid };
 
 export interface ConfigPaths {
   gameCfg: string;
@@ -47,31 +51,6 @@ const INSTALL_ROOT_SUFFIXES = [
   ['Riot Games', 'League of Legends (PBE)'],
 ];
 
-function cleanRootPath(rootPath: string): string {
-  return rootPath.trim().replace(/^["']|["']$/g, '');
-}
-
-export function normalizeInstallRoot(rootPath: string): string {
-  const cleaned = cleanRootPath(rootPath);
-  if (!cleaned) return '';
-
-  const normalized = path.normalize(cleaned);
-  const baseName = path.basename(normalized).toLowerCase();
-  if (baseName === 'game' || baseName === 'leagueclient') {
-    return path.dirname(normalized);
-  }
-
-  if (baseName === 'config') {
-    const parentPath = path.dirname(normalized);
-    const parentName = path.basename(parentPath).toLowerCase();
-    if (parentName === 'game' || parentName === 'leagueclient') {
-      return path.dirname(parentPath);
-    }
-  }
-
-  return normalized;
-}
-
 function uniqueRoots(roots: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -87,22 +66,14 @@ function uniqueRoots(roots: string[]): string[] {
 }
 
 function getCandidateRootPaths(extraRoots: string[] = []): string[] {
-  const candidates = [...extraRoots, DEFAULT_LOL_ROOT_PATH];
+  // extraRoots（调用方显式指定）> 发现中心（手动设置/运行中客户端）> 常见默认路径。
+  const candidates = [...extraRoots, ...getKnownInstallRoots(), DEFAULT_LOL_ROOT_PATH];
   for (const drive of INSTALL_DRIVES) {
     for (const suffix of INSTALL_ROOT_SUFFIXES) {
       candidates.push(path.join(drive, ...suffix));
     }
   }
   return uniqueRoots(candidates);
-}
-
-export function rootLooksValid(rootPath: string): boolean {
-  const normalized = normalizeInstallRoot(rootPath);
-  if (!normalized) return false;
-  return (
-    fs.existsSync(path.join(normalized, 'Game', 'Config')) ||
-    fs.existsSync(path.join(normalized, 'LeagueClient', 'Config'))
-  );
 }
 
 export function detectLeagueInstallRoots(extraRoots: string[] = []): string[] {

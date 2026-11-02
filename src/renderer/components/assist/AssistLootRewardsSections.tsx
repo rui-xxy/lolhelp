@@ -136,7 +136,6 @@ export function LootDisenchantSection({
       <Panel
         title="英雄碎片"
         count={loot.shards.length}
-        description="点卡片选中，选好后在底部一起分解。头像角上的数字是这种碎片有几个。"
         extra={(
           <>
             {loot.shards.length > 0 && (
@@ -152,9 +151,7 @@ export function LootDisenchantSection({
         )}
       >
         {loot.shards.length === 0 ? (
-          <Empty icon={<PackageOpen />} title={loading || !loaded ? '正在读取战利品…' : '没有可以分解的英雄碎片'}>
-            {loading || !loaded ? null : '打开海克斯宝箱得到的英雄碎片会出现在这里。'}
-          </Empty>
+          <Empty icon={<PackageOpen />} title={loading || !loaded ? '正在读取战利品…' : '暂无英雄碎片'} />
         ) : (
           <PanelBody>
             <div className="as-shards">
@@ -298,7 +295,6 @@ export function RewardsClaimSection({
     <Panel
       title="可以领取的奖励"
       count={claimableRewards.length}
-      description="活动、通行证、等级奖励等，客户端里待领取的东西都在这里，一键领完。"
       extra={(
         <>
           <Btn size="sm" onClick={() => void refresh()} busy={loading && !busyRewardId}>
@@ -314,9 +310,7 @@ export function RewardsClaimSection({
       )}
     >
       {rewards.length === 0 ? (
-        <Empty icon={<Gift />} title={loading || !loaded ? '正在读取奖励…' : '现在没有可以领取的奖励'}>
-          {loading || !loaded ? null : '有新奖励时点一下右上角的刷新就能看到。'}
-        </Empty>
+        <Empty icon={<Gift />} title={loading || !loaded ? '正在读取奖励…' : '暂无可领取的奖励'} />
       ) : (
         <div className="as-list">
           {claimableRewards.map(renderReward)}
