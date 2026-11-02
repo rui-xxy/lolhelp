@@ -170,19 +170,24 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
     }
   }, [draft, refresh]);
 
-  const saveProfile = useCallback(async (name: string, values: LolConfigValues): Promise<string | null> => {
-    setBusy('save-profile');
+  // quiet：方案里改一项就自动存，不转圈、不弹提示。
+  const saveProfile = useCallback(async (
+    name: string,
+    values: LolConfigValues,
+    options: { quiet?: boolean } = {},
+  ): Promise<string | null> => {
+    if (!options.quiet) setBusy('save-profile');
     try {
       const trimmed = name.trim();
       const nextProfiles = await window.lolHelper.config.saveProfile({ name: trimmed, rootPath: rootPathRef.current, values });
       setState((current) => (current ? { ...current, profiles: nextProfiles } : current));
-      setNotice({ type: 'success', text: `方案「${trimmed}」已保存` });
+      if (!options.quiet) setNotice({ type: 'success', text: `方案「${trimmed}」已保存` });
       return nextProfiles.find((profile) => profile.name === trimmed)?.id ?? null;
     } catch (err) {
       setNotice({ type: 'error', text: errorText(err, '保存方案失败') });
       return null;
     } finally {
-      setBusy(null);
+      if (!options.quiet) setBusy(null);
     }
   }, []);
 
@@ -309,7 +314,7 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
           {tab === 'appearance'
             ? '外观改动立即生效，只影响助手自己。'
             : tab === 'config'
-              ? '每个号的设置是分开存的。存一套方案，换号以后点一下就能用上。'
+              ? '存一套方案，换号一键同步。'
               : '游戏目录找对了，游戏设置才读得出来。'}
         </div>
       </aside>

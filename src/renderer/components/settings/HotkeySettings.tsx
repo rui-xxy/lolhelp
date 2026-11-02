@@ -1,38 +1,23 @@
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
 import type { LolHotkeyValues } from '../../../shared/api';
-import {
-  CompareNote,
-  SectionTabs,
-  SwitchControl,
-  scrollToSettingsSection,
-  useSettingsCompare,
-  useSettingsScrollSpy,
-} from './SettingsControls';
+import { useSettingsCompare } from './SettingsControls';
 import {
   HERO_HOTKEY_GROUPS,
-  buildHotkeyCategories,
   displayHotkeyValue,
-  flattenHotkeys,
   hotkeyFromKeyboardEvent,
   hotkeyFromMouseEvent,
-  hotkeyLabel,
   hotkeyRefKey,
   isSwitchHotkey,
   quickbindKeyFor,
   type HotkeyBinding,
   type HotkeyCaptureTarget,
-  type HotkeyCategory,
-  type HotkeySectionKey,
 } from './hotkeyModel';
 
 type Change = (section: string, key: string, value: string) => void;
@@ -56,110 +41,25 @@ export const HERO_ACTION_LABELS: Record<string, string> = {
   evtUseVisionItem: '饰品',
 };
 
-const UNBOUND = '[<Unbound>]';
-const NO_SECTIONS: Array<{ key: HotkeySectionKey; label: string }> = [];
+export const UNBOUND = '[<Unbound>]';
 
-function compareText(section: string, value: string): string {
+/** 热键值显示成人话：开关显示开/关，按键显示键名，没有这个键显示「没有」。 */
+export function compareText(section: string, value: string): string {
   if (isSwitchHotkey(section, value)) return value === '1' ? '开' : '关';
   return value ? displayHotkeyValue(value) : '没有';
 }
 
-export function HotkeySettings({
-  values,
-  onChange,
-  showNav = true,
-}: {
-  values: LolHotkeyValues;
-  onChange: Change;
-  /** 嵌进别的页面时不要自己的分区目录。 */
-  showNav?: boolean;
-}) {
-  const compare = useSettingsCompare();
-  const allBindings = useMemo(() => flattenHotkeys(values), [values]);
-  const categories = useMemo(() => buildHotkeyCategories(allBindings), [allBindings]);
-  const navSections = useMemo(
-    () => categories.map((item) => ({ key: item.key, label: item.label })),
-    [categories],
-  );
-  const [activeSection, setActiveSection] = useState<HotkeySectionKey>('hero');
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [captureTarget, setCaptureTarget] = useState<HotkeyCaptureTarget | null>(null);
-  useSettingsScrollSpy<HotkeySectionKey>('hotkeys', showNav ? navSections : NO_SECTIONS, setActiveSection);
-
-  const goToSection = useCallback((section: HotkeySectionKey) => {
-    setActiveSection(section);
-    setOpenSections((current) => ({ ...current, [section]: true }));
-    window.setTimeout(() => scrollToSettingsSection('hotkeys', section), 0);
-  }, []);
-
-  const openCapture = useCallback((binding: HotkeyBinding, label?: string) => {
-    setCaptureTarget({ ...binding, label: label ?? hotkeyLabel(binding.key) });
-  }, []);
-
-  if (allBindings.length === 0) {
-    return (
-      <div className="st-empty st-empty--page">
-        未读取到热键配置（input.ini）
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {showNav && <SectionTabs sections={navSections} active={activeSection} onSelect={goToSection} />}
-      <div className="st-sections">
-        {categories.some((category) => category.key === 'hero') && (
-          <section id="hotkeys-section-hero" className="st-section">
-            <header className="st-section__head">
-              <h3>英雄热键</h3>
-            </header>
-            <HeroHotkeys values={values} onChange={onChange} onCapture={openCapture} />
-          </section>
-        )}
-        <section className="st-section">
-          <header className="st-section__head">
-            <h3>其他热键</h3>
-          </header>
-          <div className="st-folds">
-            {categories.filter((category) => category.key !== 'hero').map((category) => (
-              <HotkeyCategoryPanel
-                key={category.key}
-                category={category}
-                open={openSections[category.key] ?? Boolean(compare && category.bindings.some((binding) => compare.hotkeys.has(`${binding.section}.${binding.key}`)))}
-                onToggle={() => setOpenSections((current) => ({
-                  ...current,
-                  [category.key]: !(current[category.key]
-                    ?? Boolean(compare && category.bindings.some((binding) => compare.hotkeys.has(`${binding.section}.${binding.key}`)))),
-                }))}
-                onChange={onChange}
-                onCapture={openCapture}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-      {captureTarget && (
-        <HotkeyCaptureDialog
-          target={captureTarget}
-          onClose={() => setCaptureTarget(null)}
-          onConfirm={(nextValue) => {
-            onChange(captureTarget.section, captureTarget.key, nextValue);
-            setCaptureTarget(null);
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-function HeroHotkeys({
+// 英雄热键：一排排键帽，点键帽改键，下面的「快捷」切换快捷施法。
+export function HeroHotkeys({
   values,
   onChange,
   onCapture,
+  compact = false,
 }: {
   values: LolHotkeyValues;
   onChange: Change;
   onCapture: (binding: HotkeyBinding, label?: string) => void;
+  compact?: boolean;
 }) {
   const compare = useSettingsCompare();
   const groups = HERO_HOTKEY_GROUPS
@@ -196,6 +96,7 @@ function HeroHotkeys({
                 return (
                   <KeyCap
                     key={hotkeyRefKey(ref)}
+                    compact={compact}
                     was={wasKey !== undefined
                       ? `${compare?.label}：${compareText(ref.section, wasKey)}`
                       : wasQuick !== undefined ? `${compare?.label}：${wasQuick === '1' ? '快捷施法' : '普通施法'}` : undefined}
@@ -215,9 +116,9 @@ function HeroHotkeys({
       </div>
       {quickKeys.length > 0 && (
         <div className="st-keys__foot">
-          <span>快捷施法开了 {quickOn}/{quickKeys.length} 个</span>
-          <button type="button" className="as-btn as-btn--sm" onClick={() => setAllQuick(true)}>全部改成快捷施法</button>
-          <button type="button" className="as-btn as-btn--sm as-btn--ghost" onClick={() => setAllQuick(false)}>全部改成普通施法</button>
+          <span>快捷施法 <b className="num">{quickOn}/{quickKeys.length}</b></span>
+          <button type="button" className="as-btn as-btn--sm as-btn--ghost" onClick={() => setAllQuick(true)}>全部快捷</button>
+          <button type="button" className="as-btn as-btn--sm as-btn--ghost" onClick={() => setAllQuick(false)}>全部普通</button>
         </div>
       )}
     </div>
@@ -274,93 +175,8 @@ export function KeyCap({
   );
 }
 
-function HotkeyCategoryPanel({
-  category,
-  open,
-  onToggle,
-  onChange,
-  onCapture,
-}: {
-  category: HotkeyCategory;
-  open: boolean;
-  onToggle: () => void;
-  onChange: Change;
-  onCapture: (binding: HotkeyBinding) => void;
-}) {
-  const bound = category.bindings.filter((binding) => displayHotkeyValue(binding.value) !== '未绑定').length;
-  return (
-    <div id={`hotkeys-section-${category.key}`} className="st-foldbox">
-      <button type="button" className="st-fold" aria-expanded={open} onClick={onToggle}>
-        <b>{category.label}</b>
-        <span>{category.key === 'quickcast' ? `${category.bindings.length} 项` : `${bound}/${category.bindings.length} 已绑定`}</span>
-        <ChevronDown />
-      </button>
-      {open && (
-        <div className="st-fold__body">
-          {category.bindings.map((binding) => (
-            <HotkeyRow
-              key={`${binding.section}-${binding.key}`}
-              binding={binding}
-              onChange={(nextValue) => onChange(binding.section, binding.key, nextValue)}
-              onCapture={() => onCapture(binding)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HotkeyRow({
-  binding,
-  onChange,
-  onCapture,
-}: {
-  binding: HotkeyBinding;
-  onChange: (value: string) => void;
-  onCapture: () => void;
-}) {
-  const compare = useSettingsCompare();
-  const label = hotkeyLabel(binding.key);
-  const display = displayHotkeyValue(binding.value);
-  const was = compare?.hotkeys.get(`${binding.section}.${binding.key}`);
-  return (
-    <div className="st-row" data-diff={was !== undefined ? 'true' : undefined}>
-      <div className="st-row__label">
-        <b title={label}>{label}</b>
-        {was !== undefined && <CompareNote value={compareText(binding.section, was)} />}
-      </div>
-      <div className="st-row__control">
-        {isSwitchHotkey(binding.section, binding.value) ? (
-          <SwitchControl checked={binding.value === '1'} onChange={(checked) => onChange(checked ? '1' : '0')} />
-        ) : (
-          <span className="st-keyline">
-            <button
-              type="button"
-              className="st-key"
-              data-unbound={display === '未绑定' ? 'true' : undefined}
-              onClick={onCapture}
-            >
-              {display}
-            </button>
-            <button
-              type="button"
-              className="st-icon-btn"
-              disabled={display === '未绑定'}
-              onClick={() => onChange(UNBOUND)}
-              aria-label="解除绑定"
-              title="解除绑定"
-            >
-              <X />
-            </button>
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function HotkeyCaptureDialog({
+// 改键弹窗：直接按键盘或鼠标。
+export function HotkeyCaptureDialog({
   target,
   onClose,
   onConfirm,

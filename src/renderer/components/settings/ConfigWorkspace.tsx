@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  ArrowRight,
   Check,
+  ChevronDown,
   CircleAlert,
   LoaderCircle,
   Plus,
   RotateCcw,
-  Save,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -19,11 +20,13 @@ import type {
 } from '../../../shared/api';
 import { ALL_CONFIG_PARTS, CONFIG_PARTS } from '../../../shared/configParts';
 import { ConfirmDialog } from '../ui/confirm-dialog';
-import { ClientSettings } from './ClientSettings';
 import {
+  CLIENT_FIELDS,
+  CLIENT_LAYOUT,
   CLIENT_PHASE_LABELS,
   CONFIG_BLOCKED_PHASES,
-  buildFieldBaseline,
+  GAME_FIELDS,
+  GAME_LAYOUT,
   buildHotkeyBaseline,
   countConfigChanges,
   countPartDiffs,
@@ -31,35 +34,48 @@ import {
   withGameValue,
   withHotkeyValue,
 } from './configFields';
-import { GameSettings } from './GameSettings';
-import { HotkeySettings } from './HotkeySettings';
+import { HeroHotkeys, HotkeyCaptureDialog, compareText } from './HotkeySettings';
 import {
-  SettingsCompareContext,
-  scrollToSettingsSection,
-  useSettingsScrollSpy,
-  type SettingsCompare,
-} from './SettingsControls';
+  buildHotkeyCategories,
+  displayHotkeyValue,
+  flattenHotkeys,
+  hotkeyLabel,
+  isSwitchHotkey,
+  type HotkeyBinding,
+  type HotkeyCaptureTarget,
+} from './hotkeyModel';
+import { SettingsCompareContext } from './SettingsControls';
+import {
+  CLIENT_CONTROLS,
+  ChoiceMenu,
+  FIELD_HINTS,
+  GAME_CONTROLS,
+  MiniRange,
+  MiniSwitch,
+  ResolutionMenu,
+  SheetRow,
+  VolumeMini,
+} from './SheetControls';
 
-// 「游戏设置」：一个页面看完、改完、存成方案、换号一键用上。
+// 游戏设置与方案。
 //
-// 上面一排卡片：第一张是「这个号现在」（游戏里正在用的设置，可以直接改），
-// 后面每张是一个方案，卡上直接写着它和这个号差几处，一样的标「正在用」。
-// 点哪张，下面就展开哪一套，能直接改；和这个号不一样的行会写出「这个号现在是什么」。
-// 左边目录同时是「应用时带哪几块」的勾选，每块标着差几处。
-// 切换卡片时停在同一个位置，方便来回对比同一块设置。
+// 这一页只回答一件事：我的方案，和现在登录的这个号，一不一样？
+// 顶上一条「方案 → 号」：左边方案，右边这个号，中间那根线就是答案——
+// 一样是绿色实线「已同步」，不一样是金色虚线「12 处不同 · 应用」，点一下就同步过去。
+// 下面是一张设置清单：两列小字，名字在左、值在右，点值就地改；
+// 和这个号不一样的值标金色，旁边划线的是这个号现在的值。
+// 看方案时改的是方案（自动保存），看这个号时改的是游戏（点「写入游戏」才生效）。
 
-type Selection = 'live' | string;
+type View = 'profile' | 'account';
 type Confirm = 'overwrite' | 'delete' | 'offline' | null;
 
 const PART_LABEL = Object.fromEntries(CONFIG_PARTS.map((part) => [part.key, part.label])) as Record<LolConfigPart, string>;
+const AUTOSAVE_MS = 700;
 
-// 目录顺序和下面内容的排列一致。
-const TOC_GROUPS: Array<{ label: string; parts: LolConfigPart[] }> = [
-  { label: '游戏内', parts: ['video', 'controls', 'interface', 'combat', 'audio'] },
-  { label: '按键', parts: ['hotkeys'] },
-  { label: '客户端', parts: ['client'] },
-];
-const TOC_SECTIONS = TOC_GROUPS.flatMap((group) => group.parts).map((part) => ({ key: part, label: PART_LABEL[part] }));
+const sum = (stats: Record<LolConfigPart, number>, parts: LolConfigPart[] = ALL_CONFIG_PARTS) =>
+  parts.reduce((total, part) => total + stats[part], 0);
+
+const shortName = (riotId: string) => riotId.split('#')[0];
 
 function formatDate(time: number): string {
   if (!time) return '';
@@ -68,22 +84,16 @@ function formatDate(time: number): string {
   return `${sameYear ? '' : `${date.getFullYear()}年`}${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-const sum = (stats: Record<LolConfigPart, number>, parts: LolConfigPart[] = ALL_CONFIG_PARTS) =>
-  parts.reduce((total, part) => total + stats[part], 0);
-
-const shortName = (riotId: string) => riotId.split('#')[0];
-
 export interface ConfigWorkspaceProps {
   state: LolConfigState;
   draft: LolConfigValues;
   busy: string | null;
-  /** 目录选择器（游戏目录在哪），放在卡片那一排的右边。 */
   dirControl: ReactNode;
   onDraftChange: (update: (values: LolConfigValues) => LolConfigValues) => void;
   onUndo: () => void;
   onApplyDraft: () => void;
   onRefreshClient: () => void;
-  onSaveProfile: (name: string, values: LolConfigValues) => Promise<string | null>;
+  onSaveProfile: (name: string, values: LolConfigValues, options?: { quiet?: boolean }) => Promise<string | null>;
   onApplyProfile: (profileId: string, parts: LolConfigPart[]) => Promise<void>;
   onDeleteProfile: (profileId: string) => Promise<void>;
 }
@@ -102,126 +112,165 @@ export function ConfigWorkspace({
   onDeleteProfile,
 }: ConfigWorkspaceProps) {
   const { profiles, client } = state;
-  const accountValues = state.values;
-  const [selection, setSelection] = useState<Selection>('live');
-  const touchedRef = useRef(false);
+  const account = state.values;
+  const [view, setView] = useState<View>('account');
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [details, setDetails] = useState<Map<string, LolConfigProfileDetail>>(new Map());
   const [detailErrors, setDetailErrors] = useState<Map<string, string>>(new Map());
-  // 方案里改了但还没保存的，按「id:保存时间」记，保存后自然作废。
-  const [profileDrafts, setProfileDrafts] = useState<Map<string, LolConfigValues>>(new Map());
+  // 方案里正在改的值（乐观更新），自动保存成功、和存好的一样后清掉。
+  const [local, setLocal] = useState<Map<string, LolConfigValues>>(new Map());
+  const [saving, setSaving] = useState<Set<string>>(new Set());
   const [parts, setParts] = useState<Set<LolConfigPart>>(new Set(ALL_CONFIG_PARTS));
   const [naming, setNaming] = useState(false);
   const [newName, setNewName] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<Confirm>(null);
-  const [activePart, setActivePart] = useState<LolConfigPart>('video');
-  useSettingsScrollSpy<LolConfigPart>('cw', TOC_SECTIONS, setActivePart);
+  const touchedRef = useRef(false);
+  const timersRef = useRef(new Map<string, number>());
+  const pendingSaveRef = useRef(new Map<string, () => Promise<unknown>>());
+  // 和 local 同步的一份：同一时刻连着改两项（比如分辨率的宽和高）时，第二次要接着第一次改。
+  const localRef = useRef(new Map<string, LolConfigValues>());
 
-  const keyOf = (profile: { id: string; updatedAt: number }) => `${profile.id}:${profile.updatedAt}`;
-
-  // 把每个方案的内容都读出来：卡片上要写它和这个号差几处。
+  // ---------- 读每个方案的内容（要算它和这个号差几处） ----------
   useEffect(() => {
     let cancelled = false;
     for (const profile of profiles) {
-      const key = keyOf(profile);
-      if (details.has(key) || detailErrors.has(profile.id)) continue;
+      const cached = details.get(profile.id);
+      if ((cached && cached.updatedAt === profile.updatedAt) || detailErrors.has(profile.id)) continue;
       const load = typeof window.lolHelper.config.getProfile === 'function'
         ? window.lolHelper.config.getProfile(profile.id)
         : Promise.reject(new Error('No handler registered'));
       load
         .then((loaded) => {
           if (cancelled) return;
-          if (loaded) setDetails((map) => new Map(map).set(key, loaded));
-          else setDetailErrors((map) => new Map(map).set(profile.id, '这个方案读不出来了，可能已经被删掉'));
+          if (loaded) setDetails((map) => new Map(map).set(profile.id, loaded));
+          else setDetailErrors((map) => new Map(map).set(profile.id, '方案读取失败'));
         })
         .catch((error: unknown) => {
           if (cancelled) return;
           const text = error instanceof Error ? error.message : String(error);
-          setDetailErrors((map) => new Map(map).set(
-            profile.id,
-            /No handler registered/i.test(text)
-              ? '助手刚更新过，后台还是旧的。完全关掉助手再打开一次就好。'
-              : text,
-          ));
+          setDetailErrors((map) => new Map(map).set(profile.id, /No handler registered/i.test(text) ? '请重启助手' : text));
         });
     }
     return () => {
       cancelled = true;
     };
-    // details / detailErrors 只用来跳过已读的，不需要因为它们重跑。
+    // details / detailErrors 只用来跳过已读的。
   }, [profiles]);
 
-  // 选中的方案被删了，就回到「这个号现在」。
+  // 自动保存成功后，本地改动和存好的一样了就清掉。
   useEffect(() => {
-    if (selection !== 'live' && !profiles.some((profile) => profile.id === selection)) setSelection('live');
-  }, [profiles, selection]);
+    setLocal((map) => {
+      let changed = false;
+      const next = new Map(map);
+      for (const [id, values] of map) {
+        const saved = details.get(id);
+        if (saved && !timersRef.current.has(id) && countConfigChanges(values, saved.values) === 0) {
+          next.delete(id);
+          localRef.current.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : map;
+    });
+  }, [details]);
 
-  // 每个方案：现在看到的值（含没保存的修改）、和这个号差几处。
-  const cards = useMemo(() => profiles.map((profile) => {
-    const key = keyOf(profile);
-    const detail = details.get(key) ?? null;
-    const values = profileDrafts.get(key) ?? detail?.values ?? null;
-    const stats = values ? countPartDiffs(values, accountValues) : null;
-    const dirty = detail && values ? countConfigChanges(values, detail.values) : 0;
-    return { profile, key, detail, values, stats, dirty, error: detailErrors.get(profile.id) ?? '' };
-  }), [detailErrors, details, accountValues, profileDrafts, profiles]);
+  // 离开页面时，没来得及存的立刻存。
+  useEffect(() => () => {
+    for (const timer of timersRef.current.values()) window.clearTimeout(timer);
+    for (const save of pendingSaveRef.current.values()) void save();
+  }, []);
 
-  // 一打开：如果有方案而这个号一个都没用上，直接停在最近存的那个方案上，下面就是「应用」。
+  const entries = useMemo(() => profiles.map((profile) => {
+    const detail = details.get(profile.id) ?? null;
+    const values = local.get(profile.id) ?? detail?.values ?? null;
+    const stats = values ? countPartDiffs(values, account) : null;
+    return { profile, values, stats, error: detailErrors.get(profile.id) ?? '' };
+  }), [account, detailErrors, details, local, profiles]);
+
+  // ---------- 一打开停在哪 ----------
+  // 选中的方案：这个号正在用的那个，没有就选最近存的。方案和号不一样时直接看方案，下面就是「应用」。
   useEffect(() => {
-    if (touchedRef.current || cards.length === 0) return;
-    if (cards.some((card) => !card.stats && !card.error)) return;
-    touchedRef.current = true;
-    const matched = cards.some((card) => card.stats && sum(card.stats) === 0);
-    if (matched) return;
-    const newest = [...cards].filter((card) => card.stats).sort((a, b) => b.profile.updatedAt - a.profile.updatedAt)[0];
-    if (newest) setSelection(newest.profile.id);
-  }, [cards]);
+    if (entries.length === 0) {
+      if (profileId !== null) setProfileId(null);
+      if (view !== 'account') setView('account');
+      return;
+    }
+    if (profileId && entries.some((entry) => entry.profile.id === profileId)) return;
+    if (entries.some((entry) => !entry.stats && !entry.error)) return;
+    const matched = entries.find((entry) => entry.stats && sum(entry.stats) === 0);
+    const newest = [...entries].sort((a, b) => b.profile.updatedAt - a.profile.updatedAt)[0];
+    const pick = matched ?? newest;
+    setProfileId(pick.profile.id);
+    if (!touchedRef.current) {
+      touchedRef.current = true;
+      setView(matched ? 'account' : 'profile');
+    }
+  }, [entries, profileId, view]);
 
-  const select = (next: Selection) => {
-    touchedRef.current = true;
-    setSelection(next);
-  };
+  const entry = entries.find((item) => item.profile.id === profileId) ?? null;
+  const showingProfile = view === 'profile' && Boolean(entry);
+  const values = showingProfile ? entry?.values ?? null : draft;
 
-  const card = selection === 'live' ? null : cards.find((item) => item.profile.id === selection) ?? null;
-  const isLive = !card;
-  const values = isLive ? draft : card.values;
   const connected = Boolean(client?.connected);
-  const account = connected ? client?.summonerName || '当前登录的号' : '';
-  const accountShort = account ? shortName(account) : '';
-  const blockedReason = connected && client ? CONFIG_BLOCKED_PHASES[client.phase] : undefined;
-  const pending = countConfigChanges(draft, accountValues);
-
-  const stats = useMemo(() => (values ? countPartDiffs(values, accountValues) : null), [accountValues, values]);
+  const accountName = connected ? client?.summonerName || '当前账号' : '';
+  const accountShort = accountName ? shortName(accountName) : '';
+  const blocked = connected && client ? CONFIG_BLOCKED_PHASES[client.phase] : undefined;
+  const pending = countConfigChanges(draft, account);
   const chosenParts = ALL_CONFIG_PARTS.filter((part) => parts.has(part));
   const skippedParts = ALL_CONFIG_PARTS.filter((part) => !parts.has(part));
-  const resolutionDiffers = Boolean(values && (values.game.width !== accountValues.game.width || values.game.height !== accountValues.game.height));
+  const syncDiff = entry?.stats ? sum(entry.stats, chosenParts) : null;
 
-  const compare = useMemo<SettingsCompare | null>(() => {
-    if (!values) return null;
-    return {
-      label: isLive ? '改之前' : connected ? `${accountShort} 现在` : '游戏里现在',
-      fields: buildFieldBaseline(values, accountValues),
-      hotkeys: buildHotkeyBaseline(values.hotkeys, accountValues.hotkeys),
-    };
-  }, [accountShort, connected, accountValues, isLive, values]);
+  const sheetStats = useMemo(() => (values ? countPartDiffs(values, account) : null), [account, values]);
+  const compare = useMemo(() => (values ? {
+    label: showingProfile ? (connected ? `${accountShort} 现在` : '游戏里现在') : '改之前',
+    fields: new Map<string, string>(),
+    hotkeys: buildHotkeyBaseline(values.hotkeys, account.hotkeys),
+  } : null), [account, accountShort, connected, showingProfile, values]);
 
-  // ---------- 改值：这个号现在 → 改面板草稿；方案 → 改方案草稿 ----------
+  // ---------- 改值 ----------
+  const saveProfileNow = useCallback(async (id: string) => {
+    const save = pendingSaveRef.current.get(id);
+    const timer = timersRef.current.get(id);
+    if (timer) window.clearTimeout(timer);
+    timersRef.current.delete(id);
+    pendingSaveRef.current.delete(id);
+    if (save) await save();
+  }, []);
+
   const edit = useCallback((update: (current: LolConfigValues) => LolConfigValues) => {
-    if (!card) {
+    if (!showingProfile || !entry?.values) {
       onDraftChange(update);
       return;
     }
-    if (!card.values) return;
-    const base = card.values;
-    setProfileDrafts((map) => new Map(map).set(card.key, update(base)));
-  }, [card, onDraftChange]);
+    const { profile } = entry;
+    const next = update(localRef.current.get(profile.id) ?? entry.values);
+    localRef.current.set(profile.id, next);
+    setLocal(new Map(localRef.current));
+    const save = async () => {
+      const latest = localRef.current.get(profile.id);
+      if (!latest) return;
+      setSaving((set) => new Set(set).add(profile.id));
+      await onSaveProfile(profile.name, latest, { quiet: true });
+      setSaving((set) => {
+        const copy = new Set(set);
+        copy.delete(profile.id);
+        return copy;
+      });
+    };
+    pendingSaveRef.current.set(profile.id, save);
+    const old = timersRef.current.get(profile.id);
+    if (old) window.clearTimeout(old);
+    timersRef.current.set(profile.id, window.setTimeout(() => void saveProfileNow(profile.id), AUTOSAVE_MS));
+  }, [entry, onDraftChange, onSaveProfile, saveProfileNow, showingProfile]);
 
-  const updateClient = useCallback(<K extends keyof LolClientConfigValues>(key: K, value: LolClientConfigValues[K]) => {
-    edit((current) => withClientValue(current, key, value));
-  }, [edit]);
-  const updateGame = useCallback(<K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => {
+  const setGame = useCallback(<K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => {
     edit((current) => withGameValue(current, key, value));
   }, [edit]);
-  const updateHotkey = useCallback((section: string, key: string, value: string) => {
+  const setClient = useCallback(<K extends keyof LolClientConfigValues>(key: K, value: LolClientConfigValues[K]) => {
+    edit((current) => withClientValue(current, key, value));
+  }, [edit]);
+  const setHotkey = useCallback((section: string, key: string, value: string) => {
     edit((current) => withHotkeyValue(current, section, key, value));
   }, [edit]);
 
@@ -232,144 +281,109 @@ export function ConfigWorkspace({
     return next;
   });
 
-  const discardProfileEdits = () => {
-    if (!card) return;
-    setProfileDrafts((map) => {
-      const next = new Map(map);
-      next.delete(card.key);
-      return next;
-    });
-  };
-
   // ---------- 存、应用、删 ----------
   const createProfile = async () => {
-    if (!values) return;
     const name = newName.trim() || `方案 ${profiles.length + 1}`;
-    const id = await onSaveProfile(name, values);
+    const id = await onSaveProfile(name, draft);
     if (id) {
       setNaming(false);
       setNewName('');
-      select(id);
+      setProfileId(id);
     }
-  };
-
-  const saveProfileEdits = async (): Promise<string | null> => {
-    if (!card?.values) return null;
-    return onSaveProfile(card.profile.name, card.values);
   };
 
   const applyProfile = async () => {
-    if (!card) return;
-    let id: string | null = card.profile.id;
-    if (card.dirty > 0) id = await saveProfileEdits();
-    if (id) await onApplyProfile(id, chosenParts);
+    if (!entry) return;
+    await saveProfileNow(entry.profile.id);
+    await onApplyProfile(entry.profile.id, chosenParts);
   };
 
-  const startNaming = () => {
-    setNaming(true);
-    setNewName('');
+  const pickProfile = (id: string) => {
+    setProfileId(id);
+    setView('profile');
+    setMenuOpen(false);
   };
 
-  // ---------- 底部一句话 ----------
-  const willChange = stats ? sum(stats, chosenParts) : 0;
-  let footSentence: ReactNode = null;
-  let footDetail = '';
-  if (card) {
-    if (card.error) footSentence = '这个方案读不出来';
-    else if (!stats) footSentence = '正在读取方案…';
-    else if (chosenParts.length === 0) footSentence = '左边至少勾一块';
-    else if (willChange === 0) {
-      footSentence = (
-        <>
-          <Check className="cw-foot__ok" />
-          {connected ? <><b>{accountShort}</b> 已经在用这套设置</> : '和游戏里现在的设置一样'}
-        </>
-      );
-    } else {
-      footSentence = connected
-        ? <>应用后 <b>{accountShort}</b> 会有 <b className="num">{willChange}</b> 项变化</>
-        : <>会改动这台电脑上的 <b className="num">{willChange}</b> 项设置</>;
-    }
-    footDetail = blockedReason
-      ? `${blockedReason}，打完这局再应用`
-      : skippedParts.length > 0 && chosenParts.length > 0
-        ? `这次不带：${skippedParts.map((part) => PART_LABEL[part]).join('、')}`
-        : connected ? '设置会跟着这个号走，换电脑登录也还在' : '客户端没登录：只写进这台电脑的游戏文件';
+  // ---------- 中间那根线 ----------
+  let wireState: 'pending' | 'empty' | 'loading' | 'error' | 'synced' | 'blocked' | 'diff' = 'empty';
+  if (pending > 0) wireState = 'pending';
+  else if (!entry) wireState = 'empty';
+  else if (entry.error) wireState = 'error';
+  else if (syncDiff === null) wireState = 'loading';
+  else if (chosenParts.length > 0 && syncDiff === 0) wireState = 'synced';
+  else if (blocked) wireState = 'blocked';
+  else wireState = 'diff';
+  const applying = busy === 'apply-profile';
+
+  let wire: ReactNode = null;
+  let wireNote = '';
+  if (wireState === 'pending') {
+    wire = (
+      <span className="sy-wire__group">
+        <span className="sy-tag" data-tone="gold">改了 <b className="num">{pending}</b> 项</span>
+        <button type="button" className="sy-ghost" disabled={Boolean(busy)} onClick={onUndo} title="撤销">
+          <RotateCcw />
+        </button>
+        <button
+          type="button"
+          className="sy-go"
+          disabled={Boolean(busy) || Boolean(blocked)}
+          onClick={onApplyDraft}
+        >
+          {busy === 'apply' ? <LoaderCircle className="as-spin" /> : <Upload />}
+          写入游戏
+        </button>
+      </span>
+    );
+    wireNote = blocked ? `${blocked}，打完再写入` : '';
+  } else if (wireState === 'empty') {
+    wire = <span className="sy-tag">还没有方案</span>;
+  } else if (wireState === 'error') {
+    wire = <span className="sy-tag" data-tone="bad"><CircleAlert />{entry?.error}</span>;
+  } else if (wireState === 'loading') {
+    wire = <span className="sy-tag"><LoaderCircle className="as-spin" /></span>;
+  } else if (wireState === 'synced') {
+    wire = <span key="synced" className="sy-tag" data-tone="ok"><Check />已同步</span>;
+  } else if (wireState === 'blocked') {
+    wire = <span className="sy-tag"><b className="num">{syncDiff}</b> 处不同</span>;
+    wireNote = `${blocked}，打完再应用`;
+  } else {
+    wire = (
+      <button
+        type="button"
+        className="sy-go"
+        disabled={Boolean(busy) || chosenParts.length === 0}
+        onClick={() => (connected ? void applyProfile() : setConfirm('offline'))}
+        title={`把「${entry?.profile.name}」应用到${connected ? ` ${accountShort}` : '本机'}`}
+      >
+        <b className="num">{syncDiff}</b> 处不同
+        <i />
+        {applying ? <LoaderCircle className="as-spin" /> : <>应用<ArrowRight /></>}
+      </button>
+    );
+  }
+  if (!wireNote && skippedParts.length > 0 && entry && wireState !== 'pending') {
+    wireNote = `不带 ${skippedParts.map((part) => PART_LABEL[part]).join('、')}`;
   }
 
-  const applyLabel = connected ? `应用到 ${accountShort}` : '写进这台电脑';
-  const applyDisabled = Boolean(busy) || !card || !stats || chosenParts.length === 0 || Boolean(blockedReason)
-    || (willChange === 0 && card.dirty === 0);
-
   return (
-    <div className="cw">
-      {/* ---------- 卡片：这个号现在 + 我的方案 ---------- */}
-      <header className="cw-deck-bar">
-        <div className="cw-deck" role="tablist" aria-label="要看哪一套设置">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isLive}
-            className="cw-card cw-card--live"
-            data-state={!connected ? 'off' : blockedReason ? 'busy' : 'ok'}
-            onClick={() => select('live')}
-            onDoubleClick={onRefreshClient}
-            title="游戏里正在用的设置，可以直接改。双击重新看一下登录的号"
-          >
-            <span className="cw-card__eyebrow"><i />{connected ? '这个号现在' : '客户端没登录'}</span>
-            <b>{connected ? account : '这台电脑上的设置'}</b>
-            <span className="cw-card__meta">
-              {connected ? (blockedReason ?? CLIENT_PHASE_LABELS[client?.phase ?? ''] ?? '在线') : '登录后能直接同步给号'}
-              <span className="num"> · {accountValues.game.width}×{accountValues.game.height}</span>
-            </span>
-            {pending > 0 && <em className="cw-badge" data-tone="gold">改了 {pending} 项</em>}
-          </button>
-
-          {profiles.length > 0 && <span className="cw-deck__rule" aria-hidden="true" />}
-
-          {cards.map((item) => {
-            const total = item.stats ? sum(item.stats) : null;
-            return (
-              <button
-                key={item.profile.id}
-                type="button"
-                role="tab"
-                aria-selected={selection === item.profile.id}
-                className="cw-card"
-                onClick={() => select(item.profile.id)}
-                title={item.profile.sourceAccount ? `从 ${item.profile.sourceAccount} 存的` : undefined}
-              >
-                <span className="cw-card__eyebrow">方案{item.dirty > 0 && <span className="cw-card__dirty">· 没保存</span>}</span>
-                <b>{item.profile.name}</b>
-                <span className="cw-card__meta">
-                  <span className="num">{item.profile.gameResolution}</span> · {formatDate(item.profile.updatedAt)}
-                </span>
-                {item.error ? (
-                  <em className="cw-badge" data-tone="bad">读不了</em>
-                ) : total === null ? (
-                  <em className="cw-badge"><LoaderCircle className="as-spin" /></em>
-                ) : total === 0 ? (
-                  <em key="same" className="cw-badge" data-tone="ok"><Check />{connected ? '正在用' : '一样'}</em>
-                ) : (
-                  <em key="diff" className="cw-badge">差 <span className="num">{total}</span> 处</em>
-                )}
-              </button>
-            );
-          })}
-
+    <div className="sy">
+      {/* ---------- 方案 → 号 ---------- */}
+      <header className="sy-bar">
+        <div className="sy-link">
           {naming ? (
             <form
-              className="cw-card cw-card--naming"
+              className="sy-node sy-node--naming"
               onSubmit={(event) => {
                 event.preventDefault();
                 void createProfile();
               }}
             >
-              <span className="cw-card__eyebrow">存成新方案</span>
+              <span className="sy-node__eyebrow">存成方案</span>
               <input
                 autoFocus
-                id="cw-new-profile-name"
-                className="cw-card__input"
+                id="sy-new-profile"
+                className="sy-node__input"
                 value={newName}
                 placeholder={`方案 ${profiles.length + 1}`}
                 maxLength={40}
@@ -381,238 +395,170 @@ export function ConfigWorkspace({
                   if (!newName.trim() && busy !== 'save-profile') setNaming(false);
                 }}
               />
-              <span className="cw-card__meta">
-                {busy === 'save-profile' ? '正在保存…' : `回车保存 · 存下${isLive ? '这个号现在' : '这个方案'}的设置`}
-              </span>
+              <span className="sy-node__meta">{busy === 'save-profile' ? '保存中…' : '回车保存'}</span>
             </form>
+          ) : entry ? (
+            <div className="sy-node" data-active={showingProfile ? 'true' : undefined}>
+              <button type="button" className="sy-node__hit" onClick={() => setView('profile')} aria-label={`查看方案「${entry.profile.name}」`} />
+              <span className="sy-node__eyebrow">
+                方案{profiles.length > 1 && <span className="num"> · {profiles.findIndex((item) => item.id === entry.profile.id) + 1}/{profiles.length}</span>}
+              </span>
+              <b>{entry.profile.name}</b>
+              <span className="sy-node__meta">
+                <span className="num">{entry.values ? `${entry.values.game.width}×${entry.values.game.height}` : entry.profile.gameResolution}</span>
+                {' · '}
+                {saving.has(entry.profile.id) || local.has(entry.profile.id) ? '保存中…' : formatDate(entry.profile.updatedAt)}
+              </span>
+              <ProfileMenu
+                open={menuOpen}
+                onOpenChange={setMenuOpen}
+                entries={entries}
+                selectedId={entry.profile.id}
+                connected={connected}
+                busy={busy}
+                onPick={pickProfile}
+                onNew={() => {
+                  setMenuOpen(false);
+                  setNewName('');
+                  setNaming(true);
+                }}
+                onOverwrite={() => {
+                  setMenuOpen(false);
+                  setConfirm('overwrite');
+                }}
+                onDelete={() => {
+                  setMenuOpen(false);
+                  setConfirm('delete');
+                }}
+              />
+            </div>
           ) : (
-            <button type="button" className="cw-card cw-card--add" onClick={startNaming} disabled={Boolean(busy) || !values}>
+            <button
+              type="button"
+              className="sy-node sy-node--add"
+              disabled={Boolean(busy)}
+              onClick={() => {
+                setNewName('');
+                setNaming(true);
+              }}
+            >
               <Plus />
-              <span>存成方案</span>
+              <b>存成方案</b>
+              <span className="sy-node__meta">把这个号的设置存下来</span>
             </button>
           )}
+
+          <div className="sy-wire" data-state={wireState} data-running={applying ? 'true' : undefined}>
+            <span className="sy-wire__line" aria-hidden="true" />
+            {wire}
+            {wireNote && <small className="sy-wire__note">{wireNote}</small>}
+          </div>
+
+          <div
+            className="sy-node sy-node--account"
+            data-active={!showingProfile ? 'true' : undefined}
+            data-state={!connected ? 'off' : blocked ? 'busy' : 'ok'}
+          >
+            <button
+              type="button"
+              className="sy-node__hit"
+              onClick={() => setView('account')}
+              onDoubleClick={onRefreshClient}
+              aria-label="查看这个号现在的设置"
+              title="双击刷新账号状态"
+            />
+            <span className="sy-node__eyebrow"><i />{connected ? '这个号' : '未登录'}</span>
+            <b>{connected ? accountName : '本机设置'}</b>
+            <span className="sy-node__meta">
+              {connected ? (blocked ?? CLIENT_PHASE_LABELS[client?.phase ?? ''] ?? '在线') : '只改本机文件'}
+              <span className="num"> · {account.game.width}×{account.game.height}</span>
+            </span>
+          </div>
         </div>
-        <div className="cw-deck-bar__tools">{dirControl}</div>
+        <div className="sy-bar__tools">{dirControl}</div>
       </header>
 
-      {profiles.length === 0 && !naming && (
-        <p className="cw-hello">
-          玩好几个号？在常用的号上把设置调顺手，点<b>「存成方案」</b>。以后换了号，回到这里点一下方案，就能把整套设置用上。
-        </p>
-      )}
-
-      {/* ---------- 正文：目录 + 设置 ---------- */}
-      <main data-settings-scroll className="cw-scroll">
-        <div className="cw-title">
-          <div>
-            <h2>{isLive ? (connected ? `${accountShort} 现在的设置` : '这台电脑上的设置') : card.profile.name}</h2>
-            <p>
-              {isLive
-                ? blockedReason
-                  ? `${blockedReason}：现在可以看、可以存方案，改的设置要等打完才能应用`
-                  : '直接改，改完点下面的「应用到游戏」才会写进去'
-                : (
-                  <>
-                    {formatDate(card.profile.updatedAt)}保存
-                    {card.profile.sourceAccount ? ` · 从 ${card.profile.sourceAccount} 存的` : ''}
-                    {' · 在这里改的是方案本身，不会动游戏'}
-                  </>
-                )}
-            </p>
+      {/* ---------- 设置清单 ---------- */}
+      <main data-settings-scroll className="sy-scroll">
+        {!values || !sheetStats ? (
+          <div className="as-empty">
+            {entry?.error ? <CircleAlert /> : <LoaderCircle className="as-spin" />}
+            <b>{entry?.error || '读取中…'}</b>
           </div>
-          {card && (
-            <div className="cw-title__actions">
-              <button
-                type="button"
-                className="as-btn as-btn--sm as-btn--ghost"
-                disabled={Boolean(busy)}
-                onClick={() => setConfirm('overwrite')}
-                title="把方案换成「这个号现在」的设置"
-              >
-                <RotateCcw />
-                换成这个号现在的
-              </button>
-              <button
-                type="button"
-                className="as-btn as-btn--sm as-btn--ghost"
-                disabled={Boolean(busy)}
-                onClick={() => setConfirm('delete')}
-                aria-label="删除方案"
-                title="删除方案"
-              >
-                <Trash2 />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {card?.error ? (
-          <div className="as-empty"><CircleAlert /><b>看不了这个方案</b><span>{card.error}</span></div>
-        ) : !values || !stats ? (
-          <div className="as-empty"><LoaderCircle className="as-spin" /><b>正在读取方案…</b></div>
         ) : (
-          <div className="cw-editor" data-off={card ? skippedParts.join(' ') : undefined}>
-            <nav className="cw-toc" aria-label="设置分块">
-              {TOC_GROUPS.map((group) => (
-                <div key={group.label} className="cw-toc__group">
-                  {group.parts.length > 1 && <span className="cw-toc__title">{group.label}</span>}
-                  {group.parts.map((part) => {
-                    const on = parts.has(part);
-                    const diff = stats[part];
-                    return (
-                      <div
-                        key={part}
-                        className="cw-toc__item"
-                        aria-current={activePart === part ? 'true' : undefined}
-                        data-off={card && !on ? 'true' : undefined}
-                      >
-                        {card && (
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={on}
-                            className="cw-check"
-                            aria-label={`应用时带上「${PART_LABEL[part]}」`}
-                            title={on ? `应用时会带上「${PART_LABEL[part]}」，点一下这次不带` : `这次不带「${PART_LABEL[part]}」，点一下带上`}
-                            onClick={() => togglePart(part)}
-                          >
-                            {on && <Check />}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="cw-toc__link"
-                          onClick={() => {
-                            setActivePart(part);
-                            scrollToSettingsSection('cw', part);
-                          }}
-                        >
-                          <span>{PART_LABEL[part]}</span>
-                          {diff > 0 && <em className="num" title={isLive ? `改了 ${diff} 项` : `和这个号不一样的有 ${diff} 处`}>{diff}</em>}
-                        </button>
-                        {card && part === 'video' && resolutionDiffers && on && (
-                          <small className="cw-toc__hint">分辨率不一样，换了显示器就别带</small>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-              <p className="cw-toc__legend">
-                {card
-                  ? <>数字是和{connected ? ` ${accountShort} ` : '游戏里'}现在不一样的项数。勾掉的这次不带。</>
-                  : '数字是改了还没应用的项数。'}
-              </p>
-            </nav>
-
-            <SettingsCompareContext.Provider value={compare}>
-              <div className="cw-body">
-                <div className="cw-chapter">
-                  <h2 className="cw-chapter__title">游戏内</h2>
-                  <GameSettings values={values.game} onChange={updateGame} showNav={false} idPrefix="cw" />
-                </div>
-                <section id="cw-section-hotkeys" className="cw-part">
-                  <h2 className="cw-part__title">热键</h2>
-                  <HotkeySettings values={values.hotkeys} onChange={updateHotkey} showNav={false} />
-                </section>
-                <section id="cw-section-client" className="cw-part">
-                  <h2 className="cw-part__title">客户端</h2>
-                  <ClientSettings values={values.client} onChange={updateClient} showNav={false} showBlocked={isLive} />
-                </section>
-              </div>
-            </SettingsCompareContext.Provider>
-          </div>
+          <SettingsCompareContext.Provider value={compare}>
+            <p className="sy-caption">
+              {showingProfile ? (
+                <>方案「{entry?.profile.name}」<span>· 改动自动保存</span></>
+              ) : (
+                <>{connected ? accountShort : '本机'} 现在的设置<span>· 改完点「写入游戏」</span></>
+              )}
+              {(showingProfile ? sum(sheetStats) : pending) > 0 && (
+                <em><i />{showingProfile ? `和${connected ? ` ${accountShort} ` : '游戏'}不同` : '改过的'}</em>
+              )}
+            </p>
+            <Sheet
+              values={values}
+              baseline={account}
+              stats={sheetStats}
+              mode={showingProfile ? 'profile' : 'account'}
+              parts={parts}
+              wasLabel={compare?.label ?? ''}
+              onTogglePart={togglePart}
+              onGame={setGame}
+              onClient={setClient}
+              onHotkey={setHotkey}
+            />
+          </SettingsCompareContext.Provider>
         )}
       </main>
 
-      {/* ---------- 底部：点下去会发生什么 ---------- */}
-      {isLive ? (
-        pending > 0 && (
-          <footer className="cw-foot">
-            <div className="cw-foot__text">
-              <span className="cw-foot__line"><i className="cw-foot__dot" />改了 <b className="num">{pending}</b> 项，还没写进游戏</span>
-              <small>{blockedReason ? `${blockedReason}，打完再应用` : connected ? `应用后会同步给 ${accountShort}` : '客户端没登录：只写进这台电脑的游戏文件'}</small>
-            </div>
-            <button type="button" className="as-btn as-btn--ghost" disabled={Boolean(busy)} onClick={onUndo}>
-              <RotateCcw />
-              撤销
-            </button>
-            <button type="button" className="as-btn" disabled={Boolean(busy)} onClick={startNaming}>
-              <Save />
-              存成方案
-            </button>
-            <button
-              type="button"
-              className="as-btn as-btn--primary"
-              disabled={Boolean(busy) || Boolean(blockedReason)}
-              onClick={onApplyDraft}
-            >
-              {busy === 'apply' ? <LoaderCircle className="as-spin" /> : <Upload />}
-              应用到游戏
-            </button>
-          </footer>
-        )
-      ) : (
-        <footer className="cw-foot" data-tone={willChange === 0 && stats && chosenParts.length > 0 ? 'ok' : undefined}>
-          <div className="cw-foot__text">
-            <span className="cw-foot__line">{footSentence}</span>
-            <small>{footDetail}</small>
-          </div>
-          {card.dirty > 0 && (
-            <>
-              <span className="cw-foot__edits">方案里改了 <b className="num">{card.dirty}</b> 项</span>
-              <button type="button" className="as-btn as-btn--ghost" disabled={Boolean(busy)} onClick={discardProfileEdits}>
-                <RotateCcw />
-                还原
-              </button>
-              <button type="button" className="as-btn" disabled={Boolean(busy)} onClick={() => void saveProfileEdits()}>
-                {busy === 'save-profile' ? <LoaderCircle className="as-spin" /> : <Save />}
-                保存方案
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            className="as-btn as-btn--primary"
-            disabled={applyDisabled}
-            onClick={() => (connected ? void applyProfile() : setConfirm('offline'))}
-            title={blockedReason ? `${blockedReason}，打完再应用` : undefined}
-          >
-            {busy === 'apply-profile' ? <LoaderCircle className="as-spin" /> : <Upload />}
-            {card.dirty > 0 ? `保存并${applyLabel}` : applyLabel}
-          </button>
-        </footer>
-      )}
-
       <ConfirmDialog
         open={confirm === 'overwrite'}
-        title="把方案换成这个号现在的设置"
-        description={`「${card?.profile.name ?? ''}」里原来存的内容会被${connected ? ` ${accountShort} ` : '游戏里'}现在的设置替换${pending > 0 ? `（包括还没应用的 ${pending} 项改动）` : ''}。`}
-        confirmLabel="替换方案"
+        title="用这个号的设置覆盖方案"
+        description={`「${entry?.profile.name ?? ''}」会被替换成${connected ? ` ${accountShort} ` : '游戏里'}现在的设置。`}
+        confirmLabel="覆盖"
         busy={busy === 'save-profile'}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
         onConfirm={() => {
-          if (card) void onSaveProfile(card.profile.name, draft).then(() => setConfirm(null));
+          if (!entry) return;
+          const timer = timersRef.current.get(entry.profile.id);
+          if (timer) window.clearTimeout(timer);
+          timersRef.current.delete(entry.profile.id);
+          pendingSaveRef.current.delete(entry.profile.id);
+          localRef.current.delete(entry.profile.id);
+          setLocal(new Map(localRef.current));
+          void onSaveProfile(entry.profile.name, draft).then(() => setConfirm(null));
         }}
       />
       <ConfirmDialog
         open={confirm === 'delete'}
-        title="删除这个方案"
-        description={`会删掉「${card?.profile.name ?? ''}」。不影响游戏里现在的设置，但删了就找不回来了。`}
-        confirmLabel="删除方案"
+        title="删除方案"
+        description={`删除「${entry?.profile.name ?? ''}」？游戏里现在的设置不受影响。`}
+        confirmLabel="删除"
         destructive
         busy={busy === 'delete-profile'}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
         onConfirm={() => {
-          if (card) void onDeleteProfile(card.profile.id).then(() => setConfirm(null));
+          if (!entry) return;
+          const timer = timersRef.current.get(entry.profile.id);
+          if (timer) window.clearTimeout(timer);
+          timersRef.current.delete(entry.profile.id);
+          pendingSaveRef.current.delete(entry.profile.id);
+          localRef.current.delete(entry.profile.id);
+          setLocal(new Map(localRef.current));
+          void onDeleteProfile(entry.profile.id).then(() => {
+            setProfileId(null);
+            setConfirm(null);
+          });
         }}
       />
       <ConfirmDialog
         open={confirm === 'offline'}
-        title="客户端没登录，确定现在写进去吗？"
-        description="现在只能写进这台电脑的游戏文件。登录时客户端会下载那个号自己的设置，把这些改动盖掉。建议先登录要用的号，再回来点应用。"
-        confirmLabel="仍然写入文件"
-        busy={busy === 'apply-profile'}
+        title="客户端未登录"
+        description="只能写入本机游戏文件，登录后可能被账号的云端设置覆盖。"
+        confirmLabel="仍然写入"
+        busy={applying}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
         onConfirm={() => {
           setConfirm(null);
@@ -620,5 +566,439 @@ export function ConfigWorkspace({
         }}
       />
     </div>
+  );
+}
+
+// ---------- 方案菜单：换方案、新建、覆盖、删除 ----------
+
+function ProfileMenu({
+  open,
+  onOpenChange,
+  entries,
+  selectedId,
+  connected,
+  busy,
+  onPick,
+  onNew,
+  onOverwrite,
+  onDelete,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  entries: Array<{ profile: { id: string; name: string }; stats: Record<LolConfigPart, number> | null; error: string }>;
+  selectedId: string;
+  connected: boolean;
+  busy: string | null;
+  onPick: (id: string) => void;
+  onNew: () => void;
+  onOverwrite: () => void;
+  onDelete: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) onOpenChange(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onOpenChange(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onOpenChange, open]);
+
+  return (
+    <div className="sy-menu" ref={ref}>
+      <button
+        type="button"
+        className="sy-menu__btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="方案菜单"
+        onClick={() => onOpenChange(!open)}
+      >
+        <ChevronDown />
+      </button>
+      {open && (
+        <div className="sy-menu__pop" role="menu">
+          {entries.map((item) => {
+            const total = item.stats ? sum(item.stats) : null;
+            return (
+              <button
+                key={item.profile.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={item.profile.id === selectedId}
+                onClick={() => onPick(item.profile.id)}
+              >
+                <span>{item.profile.name}</span>
+                {item.error ? (
+                  <em data-tone="bad">读不了</em>
+                ) : total === null ? null : total === 0 ? (
+                  <em data-tone="ok"><Check />{connected ? '正在用' : '一致'}</em>
+                ) : (
+                  <em><span className="num">{total}</span> 处不同</em>
+                )}
+              </button>
+            );
+          })}
+          <hr />
+          <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={onNew}>
+            <Plus />
+            <span>把这个号存成新方案</span>
+          </button>
+          <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={onOverwrite}>
+            <RotateCcw />
+            <span>用这个号覆盖此方案</span>
+          </button>
+          <button type="button" role="menuitem" data-tone="danger" disabled={Boolean(busy)} onClick={onDelete}>
+            <Trash2 />
+            <span>删除此方案</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- 设置清单 ----------
+
+const LEFT: LolConfigPart[] = ['video', 'controls'];
+const RIGHT: LolConfigPart[] = ['interface', 'combat', 'audio'];
+
+function Sheet({
+  values,
+  baseline,
+  stats,
+  mode,
+  parts,
+  wasLabel,
+  onTogglePart,
+  onGame,
+  onClient,
+  onHotkey,
+}: {
+  values: LolConfigValues;
+  baseline: LolConfigValues;
+  stats: Record<LolConfigPart, number>;
+  mode: View;
+  parts: Set<LolConfigPart>;
+  wasLabel: string;
+  onTogglePart: (part: LolConfigPart) => void;
+  onGame: <K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => void;
+  onClient: <K extends keyof LolClientConfigValues>(key: K, value: LolClientConfigValues[K]) => void;
+  onHotkey: (section: string, key: string, value: string) => void;
+}) {
+  const card = (part: LolConfigPart, children: ReactNode, wide = false) => (
+    <SheetCard
+      key={part}
+      part={part}
+      wide={wide}
+      diff={stats[part]}
+      mode={mode}
+      included={parts.has(part)}
+      onToggle={() => onTogglePart(part)}
+    >
+      {children}
+    </SheetCard>
+  );
+
+  const gameSection = (part: LolConfigPart) => {
+    const section = GAME_LAYOUT.find((item) => item.part === part);
+    if (!section) return null;
+    return card(part, section.groups.map((group, index) => (
+      <div key={group.title ?? index} className="sy-group">
+        {group.title && <h4>{group.title}</h4>}
+        {group.keys.map((key) => (
+          <GameRow key={key} field={key} values={values} baseline={baseline} wasLabel={wasLabel} onChange={onGame} />
+        ))}
+      </div>
+    )));
+  };
+
+  return (
+    <div className="sy-sheet">
+      <div className="sy-col">{LEFT.map(gameSection)}</div>
+      <div className="sy-col">{RIGHT.map(gameSection)}</div>
+      {card('hotkeys', <HotkeySheet values={values} baseline={baseline} wasLabel={wasLabel} onChange={onHotkey} />, true)}
+      {card('client', (
+        <div className="sy-split">
+          {CLIENT_LAYOUT.map((section) => (
+            <div key={section.key} className="sy-group">
+              <h4>{section.label}</h4>
+              {section.groups.flatMap((group) => group.keys).map((key) => (
+                <ClientRow key={key} field={key} values={values} baseline={baseline} wasLabel={wasLabel} onChange={onClient} />
+              ))}
+              {section.key === 'privacy' && mode === 'account' && (
+                <SheetRow label="聊天黑名单" hint="在客户端好友列表里管理">
+                  <span className="sy-readonly num">{values.client.blockedPlayers?.length ?? 0} 人</span>
+                </SheetRow>
+              )}
+            </div>
+          ))}
+        </div>
+      ), true)}
+    </div>
+  );
+}
+
+function SheetCard({
+  part,
+  wide,
+  diff,
+  mode,
+  included,
+  onToggle,
+  children,
+}: {
+  part: LolConfigPart;
+  wide: boolean;
+  diff: number;
+  mode: View;
+  included: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const label = PART_LABEL[part];
+  const off = mode === 'profile' && !included;
+  let chip: ReactNode = null;
+  if (off) chip = <span className="sy-chip">不带</span>;
+  else if (diff > 0) chip = <span className="sy-chip" data-tone="gold"><b className="num">{diff}</b> {mode === 'profile' ? '处不同' : '项改动'}</span>;
+  else if (mode === 'profile') chip = <span className="sy-chip" data-tone="ok"><Check />一致</span>;
+
+  return (
+    <section className="sy-card" data-wide={wide ? 'true' : undefined} data-off={off ? 'true' : undefined} aria-label={label}>
+      <header className="sy-card__head">
+        {mode === 'profile' && (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={included}
+            className="sy-check"
+            aria-label={`应用时带上「${label}」`}
+            title={included ? '应用时带上，点一下不带' : '这次不带，点一下带上'}
+            onClick={onToggle}
+          >
+            {included && <Check />}
+          </button>
+        )}
+        <h3>{label}</h3>
+        {chip}
+      </header>
+      <div className="sy-card__body">{children}</div>
+    </section>
+  );
+}
+
+function GameRow({
+  field,
+  values,
+  baseline,
+  wasLabel,
+  onChange,
+}: {
+  field: keyof LolGameConfigValues;
+  values: LolConfigValues;
+  baseline: LolConfigValues;
+  wasLabel: string;
+  onChange: <K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => void;
+}) {
+  const meta = GAME_FIELDS[field];
+  if (meta.hidden) return null;
+  const game = values.game;
+  const now = meta.format(game[field], game);
+  const before = meta.format(baseline.game[field], baseline.game);
+  const control = GAME_CONTROLS[field] ?? { kind: 'bool' as const };
+  const set = onChange as (key: keyof LolGameConfigValues, value: unknown) => void;
+
+  let node: ReactNode;
+  switch (control.kind) {
+    case 'choice':
+      node = <ChoiceMenu label={meta.label} value={game[field] as string | number} options={control.options} onChange={(value) => set(field, value)} />;
+      break;
+    case 'range':
+      node = <MiniRange label={meta.label} value={Number(game[field])} min={control.min} max={control.max} onChange={(value) => set(field, value)} />;
+      break;
+    case 'volume':
+      node = (
+        <VolumeMini
+          label={meta.label}
+          volume={Number(game[field])}
+          muted={Boolean(game[control.mute])}
+          onVolume={(value) => set(field, value)}
+          onMuted={(value) => set(control.mute, value)}
+        />
+      );
+      break;
+    case 'resolution':
+      node = (
+        <ResolutionMenu
+          width={game.width}
+          height={game.height}
+          onChange={(width, height) => {
+            set('width', width);
+            set('height', height);
+          }}
+        />
+      );
+      break;
+    case 'readonly':
+      node = <span className="sy-readonly">{now}</span>;
+      break;
+    default:
+      node = <MiniSwitch label={meta.label} checked={Boolean(game[field])} onChange={(value) => set(field, value)} />;
+  }
+
+  return (
+    <SheetRow label={meta.label} hint={FIELD_HINTS[field]} was={now !== before ? before : undefined} wasLabel={wasLabel}>
+      {node}
+    </SheetRow>
+  );
+}
+
+function ClientRow({
+  field,
+  values,
+  baseline,
+  wasLabel,
+  onChange,
+}: {
+  field: keyof LolClientConfigValues;
+  values: LolConfigValues;
+  baseline: LolConfigValues;
+  wasLabel: string;
+  onChange: <K extends keyof LolClientConfigValues>(key: K, value: LolClientConfigValues[K]) => void;
+}) {
+  const meta = CLIENT_FIELDS[field];
+  if (meta.hidden) return null;
+  const clientValues = values.client;
+  const now = meta.format(clientValues[field], clientValues);
+  const before = meta.format(baseline.client[field], baseline.client);
+  const control = CLIENT_CONTROLS[field] ?? { kind: 'bool' as const };
+  const set = onChange as (key: keyof LolClientConfigValues, value: unknown) => void;
+
+  let node: ReactNode;
+  if (control.kind === 'choice') {
+    node = <ChoiceMenu label={meta.label} value={clientValues[field] as string} options={control.options} onChange={(value) => set(field, value)} />;
+  } else if (control.kind === 'range') {
+    node = <MiniRange label={meta.label} value={Number(clientValues[field])} min={control.min} max={control.max} onChange={(value) => set(field, value)} />;
+  } else if (control.kind === 'readonly') {
+    node = <span className="sy-readonly" title={now}>{now}</span>;
+  } else {
+    node = <MiniSwitch label={meta.label} checked={Boolean(clientValues[field])} onChange={(value) => set(field, value)} />;
+  }
+
+  // 麦克风是这台电脑的设备，不算差异。
+  const differs = field !== 'voiceInputDeviceName' && now !== before;
+  return (
+    <SheetRow label={meta.label} hint={FIELD_HINTS[field]} was={differs ? before : undefined} wasLabel={wasLabel}>
+      {node}
+    </SheetRow>
+  );
+}
+
+// ---------- 热键：键帽 + 其他热键按用途折叠 ----------
+
+function HotkeySheet({
+  values,
+  baseline,
+  wasLabel,
+  onChange,
+}: {
+  values: LolConfigValues;
+  baseline: LolConfigValues;
+  wasLabel: string;
+  onChange: (section: string, key: string, value: string) => void;
+}) {
+  const [capture, setCapture] = useState<HotkeyCaptureTarget | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const categories = useMemo(
+    () => buildHotkeyCategories(flattenHotkeys(values.hotkeys)).filter((category) => category.key !== 'hero'),
+    [values.hotkeys],
+  );
+  const changed = (binding: HotkeyBinding) =>
+    (binding.value ?? '').trim().toLowerCase() !== (baseline.hotkeys[binding.section]?.[binding.key] ?? '').trim().toLowerCase();
+
+  if (Object.keys(values.hotkeys).length === 0) {
+    return <p className="sy-empty">未读取到热键配置（input.ini）</p>;
+  }
+
+  return (
+    <>
+      <HeroHotkeys
+        compact
+        values={values.hotkeys}
+        onChange={onChange}
+        onCapture={(binding, label) => setCapture({ ...binding, label: label ?? hotkeyLabel(binding.key) })}
+      />
+      <div className="sy-keys">
+        {categories.map((category) => {
+          const diff = category.bindings.filter(changed).length;
+          const isOpen = open.has(category.key);
+          return (
+            <button
+              key={category.key}
+              type="button"
+              className="sy-keys__tab"
+              aria-expanded={isOpen}
+              onClick={() => setOpen((set) => {
+                const next = new Set(set);
+                if (next.has(category.key)) next.delete(category.key);
+                else next.add(category.key);
+                return next;
+              })}
+            >
+              {category.label}
+              {diff > 0 ? <em className="num">{diff}</em> : <span className="num">{category.bindings.length}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {categories.filter((category) => open.has(category.key)).map((category) => (
+        <div key={category.key} className="sy-group sy-group--keys">
+          <h4>{category.label}</h4>
+          {category.bindings.map((binding) => {
+            const label = hotkeyLabel(binding.key);
+            const before = baseline.hotkeys[binding.section]?.[binding.key] ?? '';
+            const display = displayHotkeyValue(binding.value);
+            return (
+              <SheetRow
+                key={`${binding.section}.${binding.key}`}
+                label={label}
+                was={changed(binding) ? compareText(binding.section, before) : undefined}
+                wasLabel={wasLabel}
+              >
+                {isSwitchHotkey(binding.section, binding.value) ? (
+                  <MiniSwitch label={label} checked={binding.value === '1'} onChange={(on) => onChange(binding.section, binding.key, on ? '1' : '0')} />
+                ) : (
+                  <button
+                    type="button"
+                    className="sy-key"
+                    data-unbound={display === '未绑定' ? 'true' : undefined}
+                    onClick={() => setCapture({ ...binding, label })}
+                  >
+                    {display}
+                  </button>
+                )}
+              </SheetRow>
+            );
+          })}
+        </div>
+      ))}
+      {capture && (
+        <HotkeyCaptureDialog
+          target={capture}
+          onClose={() => setCapture(null)}
+          onConfirm={(next) => {
+            onChange(capture.section, capture.key, next);
+            setCapture(null);
+          }}
+        />
+      )}
+    </>
   );
 }
