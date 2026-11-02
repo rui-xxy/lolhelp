@@ -9,38 +9,27 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
-  Check,
   CheckCircle2,
   ChevronDown,
   FolderOpen,
   FolderSearch,
   Gamepad2,
   Info,
-  Keyboard,
-  Library,
   LoaderCircle,
-  MonitorCog,
   Palette,
   RefreshCw,
-  RotateCcw,
-  Upload,
   X,
 } from 'lucide-react';
 import type {
-  LolClientConfigValues,
   LolConfigPart,
   LolConfigState,
   LolConfigValues,
-  LolGameConfigValues,
 } from '../../../shared/api';
 import { DEFAULT_LOL_ROOT_PATH } from '../../../shared/constants';
 import { AboutSettings } from './AboutSettings';
 import { AppearanceSettings } from './AppearanceSettings';
-import { ClientSettings } from './ClientSettings';
-import { CLIENT_PHASE_LABELS, CONFIG_BLOCKED_PHASES, countConfigChanges } from './configFields';
-import { GameSettings } from './GameSettings';
-import { HotkeySettings } from './HotkeySettings';
-import { ProfileSettings } from './ProfileSettings';
+import { countConfigChanges } from './configFields';
+import { ConfigWorkspace } from './ConfigWorkspace';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -49,23 +38,19 @@ interface SettingsDialogProps {
   embedded?: boolean;
 }
 
-type TabKey = 'appearance' | 'client' | 'game' | 'hotkeys' | 'profiles' | 'about';
+// 「游戏设置」一页包办：看、改、存方案、换号应用（见 ConfigWorkspace）。
+type TabKey = 'appearance' | 'config' | 'about';
 type Notice = { type: 'success' | 'error'; text: string } | null;
 
-const CONFIG_TABS = new Set<TabKey>(['client', 'game', 'hotkeys', 'profiles']);
-
-const TAB_META: Record<TabKey, { label: string; icon: typeof Palette; group: '应用' | '游戏设置' }> = {
-  appearance: { label: '外观', icon: Palette, group: '应用' },
-  about: { label: '关于与游戏目录', icon: Info, group: '应用' },
-  client: { label: '客户端', icon: MonitorCog, group: '游戏设置' },
-  game: { label: '游戏内', icon: Gamepad2, group: '游戏设置' },
-  hotkeys: { label: '热键', icon: Keyboard, group: '游戏设置' },
-  profiles: { label: '方案', icon: Library, group: '游戏设置' },
+const TAB_META: Record<TabKey, { label: string; icon: typeof Palette }> = {
+  config: { label: '游戏设置与方案', icon: Gamepad2 },
+  appearance: { label: '外观', icon: Palette },
+  about: { label: '关于与游戏目录', icon: Info },
 };
 
 const NAV_GROUPS: Array<{ title: string; tabs: TabKey[] }> = [
-  { title: '游戏设置', tabs: ['client', 'game', 'hotkeys', 'profiles'] },
-  { title: '应用', tabs: ['appearance', 'about'] },
+  { title: '英雄联盟', tabs: ['config'] },
+  { title: '助手', tabs: ['appearance', 'about'] },
 ];
 
 function errorText(error: unknown, fallback: string): string {
@@ -73,7 +58,7 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 export function SettingsDialog({ open }: SettingsDialogProps) {
-  const [tab, setTab] = useState<TabKey>('client');
+  const [tab, setTab] = useState<TabKey>('config');
   const [state, setState] = useState<LolConfigState | null>(null);
   const [draft, setDraft] = useState<LolConfigValues | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,60 +111,9 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
 
   useEffect(() => {
     document.querySelector<HTMLElement>('[data-settings-scroll]')?.scrollTo({ top: 0 });
-    // 切到「方案」时顺手看一眼现在登录的是哪个号。
-    if (tab === 'profiles') void refresh(undefined, { keepDraft: true, quiet: true });
+    // 切回游戏设置时顺手看一眼现在登录的是哪个号。
+    if (tab === 'config') void refresh(undefined, { keepDraft: true, quiet: true });
   }, [refresh, tab]);
-
-  const updateClient = useCallback(<K extends keyof LolClientConfigValues>(
-    key: K,
-    value: LolClientConfigValues[K],
-  ) => {
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            client: { ...current.client, [key]: value },
-            game: key === 'hideAllPlayerNamesForMe'
-              ? { ...current.game, hidePlayerNames: Boolean(value) }
-              : current.game,
-          }
-        : current,
-    );
-  }, []);
-
-  const updateGame = useCallback(<K extends keyof LolGameConfigValues>(
-    key: K,
-    value: LolGameConfigValues[K],
-  ) => {
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            game: { ...current.game, [key]: value },
-            client: key === 'hidePlayerNames'
-              ? { ...current.client, hideAllPlayerNamesForMe: Boolean(value) }
-              : current.client,
-          }
-        : current,
-    );
-  }, []);
-
-  const updateHotkey = useCallback((section: string, key: string, value: string) => {
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            hotkeys: {
-              ...current.hotkeys,
-              [section]: {
-                ...(current.hotkeys[section] ?? {}),
-                [key]: value,
-              },
-            },
-          }
-        : current,
-    );
-  }, []);
 
   const detectRoots = useCallback(async () => {
     setBusy('detect-root');
@@ -236,12 +170,11 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
     }
   }, [draft, refresh]);
 
-  const saveProfile = useCallback(async (name: string): Promise<string | null> => {
-    if (!draft) return null;
+  const saveProfile = useCallback(async (name: string, values: LolConfigValues): Promise<string | null> => {
     setBusy('save-profile');
     try {
       const trimmed = name.trim();
-      const nextProfiles = await window.lolHelper.config.saveProfile({ name: trimmed, rootPath: rootPathRef.current, values: draft });
+      const nextProfiles = await window.lolHelper.config.saveProfile({ name: trimmed, rootPath: rootPathRef.current, values });
       setState((current) => (current ? { ...current, profiles: nextProfiles } : current));
       setNotice({ type: 'success', text: `方案「${trimmed}」已保存` });
       return nextProfiles.find((profile) => profile.name === trimmed)?.id ?? null;
@@ -251,7 +184,7 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
     } finally {
       setBusy(null);
     }
-  }, [draft]);
+  }, []);
 
   const applyProfile = useCallback(async (profileId: string, parts: LolConfigPart[]) => {
     setBusy('apply-profile');
@@ -287,12 +220,22 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
 
   if (!open) return null;
 
-  const isConfigTab = CONFIG_TABS.has(tab);
   const client = state?.client;
   const navHints: Partial<Record<TabKey, { text: string; tone?: 'on' | 'count' }>> = {
-    profiles: state?.profiles.length ? { text: String(state.profiles.length), tone: 'count' } : undefined,
+    config: state?.profiles.length ? { text: `${state.profiles.length} 个方案`, tone: 'count' } : undefined,
     about: client?.connected ? { text: '已连接', tone: 'on' } : state ? { text: '未连接' } : undefined,
   };
+
+  const dirControl = (
+    <DirControl
+      state={state}
+      busy={busy}
+      pendingChanges={pendingChanges}
+      onDetect={() => void detectRoots()}
+      onChoose={() => void chooseRoot()}
+      onReload={() => void refresh()}
+    />
+  );
 
   let content: ReactNode;
   if (tab === 'appearance') {
@@ -312,25 +255,24 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
       <div className="as-empty st-empty--page">
         {busy === 'read' ? <LoaderCircle className="as-spin" /> : <AlertCircle />}
         <b>{busy === 'read' ? '正在读取游戏设置…' : '游戏设置读不出来'}</b>
+        {busy !== 'read' && <span>去「关于与游戏目录」确认一下英雄联盟装在哪。</span>}
+        {busy !== 'read' && <div className="st-empty__tools">{dirControl}</div>}
       </div>
     );
-  } else if (tab === 'client') {
-    content = <ClientSettings values={draft.client} onChange={updateClient} />;
-  } else if (tab === 'game') {
-    content = <GameSettings values={draft.game} onChange={updateGame} />;
-  } else if (tab === 'hotkeys') {
-    content = <HotkeySettings values={draft.hotkeys} onChange={updateHotkey} />;
   } else {
     content = (
-      <ProfileSettings
-        profiles={state.profiles}
-        client={client}
-        current={state.values}
-        pendingChanges={pendingChanges}
+      <ConfigWorkspace
+        state={state}
+        draft={draft}
         busy={busy}
-        onSave={saveProfile}
-        onApply={applyProfile}
-        onDelete={deleteProfile}
+        dirControl={dirControl}
+        onDraftChange={(update) => setDraft((current) => (current ? update(current) : current))}
+        onUndo={() => setDraft(state.values)}
+        onApplyDraft={() => void applyDraft()}
+        onRefreshClient={() => void refresh(undefined, { keepDraft: true })}
+        onSaveProfile={saveProfile}
+        onApplyProfile={applyProfile}
+        onDeleteProfile={deleteProfile}
       />
     );
   }
@@ -363,27 +305,25 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
             </div>
           ))}
         </nav>
+        <div className="as-nav__foot">
+          {tab === 'appearance'
+            ? '外观改动立即生效，只影响助手自己。'
+            : tab === 'config'
+              ? '每个号的设置是分开存的。存一套方案，换号以后点一下就能用上。'
+              : '游戏目录找对了，游戏设置才读得出来。'}
+        </div>
       </aside>
 
       <section className="st-main">
-        {isConfigTab && (
-          <ConfigBar
-            state={state}
-            busy={busy}
-            pendingChanges={pendingChanges}
-            onCheck={() => void refresh(undefined, { keepDraft: true })}
-            onDetect={() => void detectRoots()}
-            onChoose={() => void chooseRoot()}
-            onReload={() => void refresh()}
-            onUndo={() => state && setDraft(state.values)}
-            onApply={() => void applyDraft()}
-          />
+        {tab === 'config' && draft && state ? (
+          content
+        ) : (
+          <main data-settings-scroll className="st-scroll">
+            <div className="st-content" data-size={tab === 'appearance' ? 'wide' : undefined}>
+              {content}
+            </div>
+          </main>
         )}
-        <main data-settings-scroll className="st-scroll">
-          <div className="st-content" data-size={tab === 'profiles' || tab === 'appearance' ? 'wide' : undefined}>
-            {content}
-          </div>
-        </main>
 
         <AnimatePresence>
           {notice && (
@@ -410,32 +350,24 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
   );
 }
 
-// 游戏设置页顶上那一条：现在登录的号、游戏目录、还有几项没应用。
-function ConfigBar({
+// 游戏目录：一个小胶囊，点开能自动查找、手动选、重新读取。
+function DirControl({
   state,
   busy,
   pendingChanges,
-  onCheck,
   onDetect,
   onChoose,
   onReload,
-  onUndo,
-  onApply,
 }: {
   state: LolConfigState | null;
   busy: string | null;
   pendingChanges: number;
-  onCheck: () => void;
   onDetect: () => void;
   onChoose: () => void;
   onReload: () => void;
-  onUndo: () => void;
-  onApply: () => void;
 }) {
   const [dirOpen, setDirOpen] = useState(false);
   const dirRef = useRef<HTMLDivElement>(null);
-  const client = state?.client;
-  const blocked = client?.connected ? CONFIG_BLOCKED_PHASES[client.phase] : undefined;
 
   useEffect(() => {
     if (!dirOpen) return undefined;
@@ -449,86 +381,41 @@ function ConfigBar({
   const folderName = state?.rootPath.split(/[\\/]/).filter(Boolean).pop() ?? '';
 
   return (
-    <div className="st-bar">
+    <div className="st-dir" ref={dirRef}>
       <button
         type="button"
-        className="st-account"
-        data-state={!client?.connected ? 'off' : blocked ? 'busy' : 'ok'}
-        onClick={onCheck}
-        title="重新看一下客户端状态"
+        className="st-dir__chip"
+        aria-expanded={dirOpen}
+        data-missing={state && !state.found ? 'true' : undefined}
+        onClick={() => setDirOpen((value) => !value)}
+        title={state?.rootPath}
       >
-        <i />
-        <b>{client?.connected ? (client.summonerName || '已登录') : '客户端没登录'}</b>
-        <span>
-          {client?.connected
-            ? blocked || (CLIENT_PHASE_LABELS[client.phase] ?? '在线')
-            : '仅本机文件'}
-        </span>
+        <FolderOpen />
+        <span>{folderName || '游戏目录'}</span>
+        <ChevronDown />
       </button>
-
-      <div className="st-dir" ref={dirRef}>
-        <button
-          type="button"
-          className="st-dir__chip"
-          aria-expanded={dirOpen}
-          data-missing={state && !state.found ? 'true' : undefined}
-          onClick={() => setDirOpen((value) => !value)}
-          title={state?.rootPath}
-        >
-          <FolderOpen />
-          <span>{folderName || '游戏目录'}</span>
-          <ChevronDown />
-        </button>
-        {dirOpen && (
-          <div className="st-dir__pop" role="dialog" aria-label="游戏目录">
-            <b>游戏目录</b>
-            <p title={state?.rootPath}>{state?.rootPath || '还没有目录'}</p>
-            <span data-missing={state && !state.found ? 'true' : undefined}>
-              {state?.found ? '已找到配置文件' : '未找到配置文件'}
-            </span>
-            <div>
-              <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onDetect(); }}>
-                <FolderSearch />
-                自动查找
-              </button>
-              <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onChoose(); }}>
-                <FolderOpen />
-                选择文件夹
-              </button>
-              <button type="button" className="as-btn as-btn--sm as-btn--ghost" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onReload(); }}>
-                <RefreshCw />
-                {pendingChanges > 0 ? '重新读取（放弃改动）' : '重新读取'}
-              </button>
-            </div>
+      {dirOpen && (
+        <div className="st-dir__pop" role="dialog" aria-label="游戏目录">
+          <b>游戏目录</b>
+          <p title={state?.rootPath}>{state?.rootPath || '还没有目录'}</p>
+          <span data-missing={state && !state.found ? 'true' : undefined}>
+            {state?.found ? '已找到配置文件' : '这里没有英雄联盟的配置文件'}
+          </span>
+          <div>
+            <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onDetect(); }}>
+              <FolderSearch />
+              自动查找
+            </button>
+            <button type="button" className="as-btn as-btn--sm" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onChoose(); }}>
+              <FolderOpen />
+              选择文件夹
+            </button>
+            <button type="button" className="as-btn as-btn--sm as-btn--ghost" disabled={Boolean(busy)} onClick={() => { setDirOpen(false); onReload(); }}>
+              <RefreshCw />
+              {pendingChanges > 0 ? '重新读取（放弃改动）' : '重新读取'}
+            </button>
           </div>
-        )}
-      </div>
-
-      <span className="st-bar__spacer" />
-
-      {pendingChanges > 0 ? (
-        <>
-          <span className="st-pending"><i />改了 {pendingChanges} 项，还没应用</span>
-          <button type="button" className="as-btn as-btn--sm as-btn--ghost" disabled={Boolean(busy)} onClick={onUndo}>
-            <RotateCcw />
-            撤销
-          </button>
-          <button
-            type="button"
-            className="as-btn as-btn--sm as-btn--primary"
-            disabled={Boolean(busy) || Boolean(blocked)}
-            onClick={onApply}
-            title={blocked ? `${blocked}，打完再应用` : undefined}
-          >
-            {busy === 'apply' ? <LoaderCircle className="as-spin" /> : <Upload />}
-            应用到游戏
-          </button>
-        </>
-      ) : (
-        <span className="st-synced">
-          {busy === 'read' ? <LoaderCircle className="as-spin" /> : <Check />}
-          {busy === 'read' ? '正在读取…' : '和游戏里一致'}
-        </span>
+        </div>
       )}
     </div>
   );

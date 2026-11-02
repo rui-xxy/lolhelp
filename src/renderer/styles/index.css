@@ -13,6 +13,7 @@
 @import "./features/scout-friend.css";
 @import "./features/settings.css";
 @import "./features/settings-profiles.css";
+@import "./features/settings-workspace.css";
 @import "./features/assist.css";
 @import "./features/assist-picker.css";
 @import "./features/matches/detail.css";

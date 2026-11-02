@@ -34,6 +34,8 @@ const GAME_SECTIONS: { key: GameSectionKey; label: string }[] = [
   { key: 'audio', label: '声音' },
 ];
 
+const NO_SECTIONS: { key: GameSectionKey; label: string }[] = [];
+
 const QUALITY_KEYS = ['shadowQuality', 'characterQuality', 'effectsQuality', 'environmentQuality'] as const;
 
 type Change = <K extends keyof LolGameConfigValues>(key: K, value: LolGameConfigValues[K]) => void;
@@ -81,17 +83,23 @@ function ResolutionPicker({ values, onChange }: { values: LolGameConfigValues; o
 export function GameSettings({
   values,
   onChange,
+  showNav = true,
+  idPrefix = 'game',
 }: {
   values: LolGameConfigValues;
   onChange: Change;
+  /** 嵌进别的页面时不要自己的分区目录，由外面统一管。 */
+  showNav?: boolean;
+  /** 分区锚点的前缀：#{idPrefix}-section-video */
+  idPrefix?: string;
 }) {
   const [activeSection, setActiveSection] = useState<GameSectionKey>('video');
-  useSettingsScrollSpy<GameSectionKey>('game', GAME_SECTIONS, setActiveSection);
+  useSettingsScrollSpy<GameSectionKey>(idPrefix, showNav ? GAME_SECTIONS : NO_SECTIONS, setActiveSection);
 
   const goToSection = useCallback((section: GameSectionKey) => {
     setActiveSection(section);
-    scrollToSettingsSection('game', section);
-  }, []);
+    scrollToSettingsSection(idPrefix, section);
+  }, [idPrefix]);
 
   // 四项画质一样时，「整体画质」就亮在那一档；不一样时哪档都不亮。
   const qualities = QUALITY_KEYS.map((key) => values[key]);
@@ -99,9 +107,9 @@ export function GameSettings({
 
   return (
     <>
-      <SectionTabs sections={GAME_SECTIONS} active={activeSection} onSelect={goToSection} />
+      {showNav && <SectionTabs sections={GAME_SECTIONS} active={activeSection} onSelect={goToSection} />}
       <div className="st-sections">
-        <SettingsSection prefix="game" id="video" title="画面">
+        <SettingsSection prefix={idPrefix} id="video" title="画面">
           <SettingsGroup>
             <SelectRow label={GAME_FIELDS.windowMode.label} value={values.windowMode} options={WINDOW_MODES} segmented onChange={(value) => onChange('windowMode', value)} />
             <SettingRow label={GAME_FIELDS.width.label} hint="一般选和显示器一样的" wide>
@@ -127,7 +135,7 @@ export function GameSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="controls" title="操作">
+        <SettingsSection prefix={idPrefix} id="controls" title="操作">
           <SettingsGroup title="鼠标和镜头">
             <SliderRow label={GAME_FIELDS.gameMouseSpeed.label} value={values.gameMouseSpeed} min={0} max={100} onChange={(value) => onChange('gameMouseSpeed', value)} />
             <SliderRow label={GAME_FIELDS.mapScrollSpeed.label} value={values.mapScrollSpeed} min={0} max={100} onChange={(value) => onChange('mapScrollSpeed', value)} />
@@ -148,7 +156,7 @@ export function GameSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="interface" title="界面">
+        <SettingsSection prefix={idPrefix} id="interface" title="界面">
           <SettingsGroup title="大小">
             <SliderRow label={GAME_FIELDS.globalScale.label} value={values.globalScale} min={0} max={100} onChange={(value) => onChange('globalScale', value)} />
             <SliderRow label={GAME_FIELDS.minimapScale.label} value={values.minimapScale} min={0} max={100} onChange={(value) => onChange('minimapScale', value)} />
@@ -169,7 +177,7 @@ export function GameSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="combat" title="战斗提示">
+        <SettingsSection prefix={idPrefix} id="combat" title="战斗提示">
           <SettingsGroup>
             <CheckboxRow label={GAME_FIELDS.showAttackRadius.label} checked={values.showAttackRadius} onChange={(value) => onChange('showAttackRadius', value)} />
             <CheckboxRow label={GAME_FIELDS.autoDisplayTarget.label} checked={values.autoDisplayTarget} onChange={(value) => onChange('autoDisplayTarget', value)} />
@@ -183,7 +191,7 @@ export function GameSettings({
           </SettingsGroup>
         </SettingsSection>
 
-        <SettingsSection prefix="game" id="audio" title="声音">
+        <SettingsSection prefix={idPrefix} id="audio" title="声音">
           <SettingsGroup>
             <CheckboxRow label={GAME_FIELDS.enableAudio.label} hint="关掉后游戏里完全没有声音" checked={values.enableAudio} onChange={(value) => onChange('enableAudio', value)} />
             <VolumeRow label={GAME_FIELDS.masterVolume.label} volume={values.masterVolume} muted={values.masterMute} onVolume={(value) => onChange('masterVolume', value)} onMuted={(value) => onChange('masterMute', value)} />

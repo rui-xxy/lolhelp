@@ -90,39 +90,7 @@
     padding-top: 22px;
   }
 
-  /* ---------- 状态栏 ---------- */
-  .st-bar {
-    display: flex;
-    min-height: 56px;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--color-line-1);
-    padding: 10px 24px;
-  }
-
-  .st-account {
-    display: inline-flex;
-    min-width: 0;
-    height: 34px;
-    align-items: center;
-    gap: 8px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    padding: 0 12px 0 10px;
-    color: var(--color-text-2);
-    background: color-mix(in srgb, var(--color-text-1) 5%, transparent);
-    cursor: pointer;
-    font-family: inherit;
-    transition: background-color 140ms ease;
-  }
-
-  .st-account:hover {
-    background: color-mix(in srgb, var(--color-text-1) 9%, transparent);
-  }
-
-  .st-account i,
-  .pf-target i,
+  /* ---------- 状态点（关于页） ---------- */
   .st-row__label--status i {
     width: 7px;
     height: 7px;
@@ -131,38 +99,16 @@
     background: var(--color-text-4);
   }
 
-  .st-account[data-state='ok'] i,
-  .pf-target[data-state='ok'] i,
   .st-row__label--status i[data-on='true'] {
     background: var(--color-ok);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ok) 20%, transparent);
-  }
-
-  .st-account[data-state='busy'] i,
-  .pf-target[data-state='busy'] i {
-    background: var(--color-gold);
   }
 
   .st-row__label--status i[data-tone='bad'] {
     background: var(--color-enemy);
   }
 
-  .st-account b {
-    max-width: 220px;
-    overflow: hidden;
-    color: var(--color-text-1);
-    font-size: 13px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .st-account span {
-    color: var(--color-text-4);
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
+  /* ---------- 游戏目录胶囊 ---------- */
   .st-dir {
     position: relative;
   }
@@ -254,46 +200,6 @@
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 10px;
-  }
-
-  .st-bar__spacer {
-    flex: 1;
-  }
-
-  .st-pending {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    margin-right: 4px;
-    color: var(--color-text-2);
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .st-pending i {
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    background: var(--color-gold);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 22%, transparent);
-  }
-
-  .st-synced {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--color-text-4);
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .st-synced svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .st-synced .as-spin {
-    animation: as-spin 0.9s linear infinite;
   }
 
   /* ---------- 分区胶囊目录（吸顶） ---------- */

@@ -11,9 +11,11 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, X } from 'lucide-react';
 import type { LolHotkeyValues } from '../../../shared/api';
 import {
+  CompareNote,
   SectionTabs,
   SwitchControl,
   scrollToSettingsSection,
+  useSettingsCompare,
   useSettingsScrollSpy,
 } from './SettingsControls';
 import {
@@ -55,14 +57,24 @@ export const HERO_ACTION_LABELS: Record<string, string> = {
 };
 
 const UNBOUND = '[<Unbound>]';
+const NO_SECTIONS: Array<{ key: HotkeySectionKey; label: string }> = [];
+
+function compareText(section: string, value: string): string {
+  if (isSwitchHotkey(section, value)) return value === '1' ? '开' : '关';
+  return value ? displayHotkeyValue(value) : '没有';
+}
 
 export function HotkeySettings({
   values,
   onChange,
+  showNav = true,
 }: {
   values: LolHotkeyValues;
   onChange: Change;
+  /** 嵌进别的页面时不要自己的分区目录。 */
+  showNav?: boolean;
 }) {
+  const compare = useSettingsCompare();
   const allBindings = useMemo(() => flattenHotkeys(values), [values]);
   const categories = useMemo(() => buildHotkeyCategories(allBindings), [allBindings]);
   const navSections = useMemo(
@@ -72,7 +84,7 @@ export function HotkeySettings({
   const [activeSection, setActiveSection] = useState<HotkeySectionKey>('hero');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [captureTarget, setCaptureTarget] = useState<HotkeyCaptureTarget | null>(null);
-  useSettingsScrollSpy<HotkeySectionKey>('hotkeys', navSections, setActiveSection);
+  useSettingsScrollSpy<HotkeySectionKey>('hotkeys', showNav ? navSections : NO_SECTIONS, setActiveSection);
 
   const goToSection = useCallback((section: HotkeySectionKey) => {
     setActiveSection(section);
@@ -94,7 +106,7 @@ export function HotkeySettings({
 
   return (
     <>
-      <SectionTabs sections={navSections} active={activeSection} onSelect={goToSection} />
+      {showNav && <SectionTabs sections={navSections} active={activeSection} onSelect={goToSection} />}
       <div className="st-sections">
         {categories.some((category) => category.key === 'hero') && (
           <section id="hotkeys-section-hero" className="st-section">
@@ -113,8 +125,12 @@ export function HotkeySettings({
               <HotkeyCategoryPanel
                 key={category.key}
                 category={category}
-                open={openSections[category.key] ?? false}
-                onToggle={() => setOpenSections((current) => ({ ...current, [category.key]: !(current[category.key] ?? false) }))}
+                open={openSections[category.key] ?? Boolean(compare && category.bindings.some((binding) => compare.hotkeys.has(`${binding.section}.${binding.key}`)))}
+                onToggle={() => setOpenSections((current) => ({
+                  ...current,
+                  [category.key]: !(current[category.key]
+                    ?? Boolean(compare && category.bindings.some((binding) => compare.hotkeys.has(`${binding.section}.${binding.key}`)))),
+                }))}
                 onChange={onChange}
                 onCapture={openCapture}
               />
@@ -145,6 +161,7 @@ function HeroHotkeys({
   onChange: Change;
   onCapture: (binding: HotkeyBinding, label?: string) => void;
 }) {
+  const compare = useSettingsCompare();
   const groups = HERO_HOTKEY_GROUPS
     .map((group) => ({
       ...group,
@@ -174,9 +191,14 @@ function HeroHotkeys({
                 const quickKey = quickbindKeyFor(ref.key);
                 const quick = quickKey ? values.Quickbinds?.[quickKey] : undefined;
                 const action = HERO_ACTION_LABELS[ref.key] ?? ref.label;
+                const wasKey = compare?.hotkeys.get(`${ref.section}.${ref.key}`);
+                const wasQuick = quickKey ? compare?.hotkeys.get(`Quickbinds.${quickKey}`) : undefined;
                 return (
                   <KeyCap
                     key={hotkeyRefKey(ref)}
+                    was={wasKey !== undefined
+                      ? `${compare?.label}：${compareText(ref.section, wasKey)}`
+                      : wasQuick !== undefined ? `${compare?.label}：${wasQuick === '1' ? '快捷施法' : '普通施法'}` : undefined}
                     action={action}
                     value={value}
                     quick={quick}
@@ -209,6 +231,7 @@ export function KeyCap({
   onCapture,
   onToggleQuick,
   compact = false,
+  was,
 }: {
   action: string;
   value: string;
@@ -216,12 +239,14 @@ export function KeyCap({
   onCapture?: () => void;
   onToggleQuick?: () => void;
   compact?: boolean;
+  /** 和对照那边不一样时，写出对照那边是什么。 */
+  was?: string;
 }) {
   const display = displayHotkeyValue(value);
   const unbound = display === '未绑定';
   const long = display.length > 5;
   return (
-    <div className="st-cap" data-compact={compact ? 'true' : undefined}>
+    <div className="st-cap" data-compact={compact ? 'true' : undefined} data-diff={was ? 'true' : undefined} title={was}>
       <button
         type="button"
         className="st-cap__key"
@@ -295,12 +320,15 @@ function HotkeyRow({
   onChange: (value: string) => void;
   onCapture: () => void;
 }) {
+  const compare = useSettingsCompare();
   const label = hotkeyLabel(binding.key);
   const display = displayHotkeyValue(binding.value);
+  const was = compare?.hotkeys.get(`${binding.section}.${binding.key}`);
   return (
-    <div className="st-row">
+    <div className="st-row" data-diff={was !== undefined ? 'true' : undefined}>
       <div className="st-row__label">
         <b title={label}>{label}</b>
+        {was !== undefined && <CompareNote value={compareText(binding.section, was)} />}
       </div>
       <div className="st-row__control">
         {isSwitchHotkey(binding.section, binding.value) ? (
