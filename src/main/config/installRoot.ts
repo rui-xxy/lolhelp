@@ -13,7 +13,10 @@ export function normalizeInstallRoot(rootPath: string): string {
   const cleaned = cleanRootPath(rootPath);
   if (!cleaned) return '';
 
-  const normalized = path.normalize(cleaned);
+  const raw = path.normalize(cleaned);
+  // 去掉尾部分隔符（'E:\LOL\' → 'E:\LOL'）；保留 'X:\' 盘根不动。
+  const normalized =
+    raw.length > 3 && /[/\\]$/.test(raw) ? raw.slice(0, -1) : raw;
   const baseName = path.basename(normalized).toLowerCase();
   if (baseName === 'game' || baseName === 'leagueclient') {
     return path.dirname(normalized);

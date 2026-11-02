@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronDown, Volume2, VolumeX } from 'lucide-react';
+import { Check, ChevronDown, Undo2, Volume2, VolumeX } from 'lucide-react';
 import type { LolClientConfigValues, LolGameConfigValues } from '../../../shared/api';
 import {
   CAMERA_LOCK_OPTIONS,
@@ -13,8 +13,8 @@ import {
   type Option,
 } from './configFields';
 
-// 设置清单的小控件：一行 30px，名字在左，值在右，点值就地改。
-// 样式在 styles/features/settings-workspace.css（sy- 前缀）。
+// 设置清单的小控件：名字在左，值在右，点值就地改。
+// 一行的版式是 cw- 前缀，控件本身是 sy- 前缀，样式都在 styles/features/settings-workspace.css。
 
 // ---------- 每一项用什么控件 ----------
 
@@ -63,22 +63,32 @@ export const CLIENT_CONTROLS: Partial<Record<keyof LolClientConfigValues, SheetC
   voiceSensitivity: RANGE,
 };
 
-/** 悬停在名字上时的补充说明。 */
+/** 名字下面的一行小字：这一项到底管什么。 */
 export const FIELD_HINTS: Record<string, string> = {
   width: '一般选和显示器一样的',
+  frameCapType: '帧数越高越流畅，笔记本也越费电',
   waitForVerticalSync: '画面不撕裂，但会多一点操作延迟',
+  cameraLockMode: '锁定镜头时，英雄在画面里的位置',
+  middleClickDragScrollEnabled: '按住鼠标中键拖着看地图',
   autoAcquireTarget: '站着不动时自动打身边的目标',
+  predictMovement: '网络卡的时候，让英雄走得更连贯',
   enableTargetedAttackMove: 'A 键优先打离鼠标最近的目标',
   targetChampionsOnlyAsToggle: '不用一直按住',
   disableHudSpellClick: '点技能栏图标不会放技能',
+  recommendJunglePaths: '打野时在小地图上画出推荐路线',
+  autoDisplayTarget: '普攻时在屏幕上方显示目标的血量',
+  enableLineMissileVis: '技能弹道画成一条线，更容易看清和躲开',
+  showSpellRecommendations: '升级时提示先加哪个技能',
+  showNeutralCamps: '小地图上显示野怪什么时候刷新',
+  showOffScreenPointsOfInterest: '队友在屏幕外发的信号，在边上显示箭头',
   hidePlayerNames: '和客户端「隐藏所有人的名字」是同一个开关',
   hideAllPlayerNamesForMe: '和游戏内「隐藏玩家名字」是同一个开关',
-  lowSpecMode: '关掉客户端里大部分动画',
+  lowSpecMode: '关掉客户端里大部分动画，老电脑更流畅',
   closeClientDuringGame: '结算后客户端会重新打开',
   careerPrivate: '别人看不到你的战绩',
   hideMyIdentityFromOthers: '名字、头像、段位都对其他玩家隐藏',
   blockNonFriendGameInvites: '陌生人的房间邀请不再弹出',
-  voiceInputDeviceName: '在客户端里切换',
+  voiceInputDeviceName: '在客户端里切换，不跟着方案走',
   voiceSensitivity: '「有声音就发」时的触发音量',
   enableAudio: '关掉后游戏里完全没有声音',
 };
@@ -86,27 +96,48 @@ export const FIELD_HINTS: Record<string, string> = {
 // ---------- 一行 ----------
 
 export function SheetRow({
+  id,
   label,
   hint,
   was,
   wasLabel,
+  revertLabel,
+  onRevert,
   children,
 }: {
+  /** 从差异列表跳过来时靠它找到这一行 */
+  id?: string;
   label: string;
   hint?: string;
   /** 和对照那边不一样时，对照那边是什么。 */
   was?: string;
   wasLabel?: string;
+  revertLabel?: string;
+  onRevert?: () => void;
   children: ReactNode;
 }) {
   const changed = was !== undefined;
   return (
-    <div className="sy-row" data-diff={changed ? 'true' : undefined}>
-      <span className="sy-row__label" title={hint}>{label}</span>
-      {changed && (
-        <s className="sy-row__was" title={wasLabel ? `${wasLabel}：${was}` : was}>{was}</s>
-      )}
-      <span className="sy-row__ctl">{children}</span>
+    <div className="cw-row" data-row={id} data-diff={changed ? 'true' : undefined}>
+      <div className="cw-row__text">
+        <span className="cw-row__label">{label}</span>
+        {changed ? (
+          <span className="cw-was">
+            <span className="cw-was__value" title={`${wasLabel ?? ''}：${was}`}>
+              {wasLabel && <em>{wasLabel}</em>}
+              {was}
+            </span>
+            {onRevert && (
+              <button type="button" className="cw-was__undo" onClick={onRevert} title={revertLabel} aria-label={revertLabel}>
+                <Undo2 />
+              </button>
+            )}
+          </span>
+        ) : hint ? (
+          <span className="cw-row__hint">{hint}</span>
+        ) : null}
+      </div>
+      <span className="cw-row__ctl">{children}</span>
     </div>
   );
 }

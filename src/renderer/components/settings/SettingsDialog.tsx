@@ -142,8 +142,14 @@ export function SettingsDialog({ open }: SettingsDialogProps) {
     try {
       const selected = await window.lolHelper.config.selectRoot();
       if (!selected) return;
+      // 记住手动选择：主进程发现中心会优先用它定位 LCU，重启后不用再选。
+      await window.lolHelper.db.updateSettings({ gameInstallRoot: selected });
       const next = await refresh(selected);
-      if (next?.found) setNotice({ type: 'success', text: `已切换到：${next.rootPath}` });
+      if (next?.found) {
+        setNotice({ type: 'success', text: `已切换到：${next.rootPath}（已记住此目录）` });
+      } else {
+        setNotice({ type: 'success', text: '已记住此目录（当前没读到配置文件）' });
+      }
     } catch (err) {
       setNotice({ type: 'error', text: errorText(err, '选择文件夹失败') });
     } finally {

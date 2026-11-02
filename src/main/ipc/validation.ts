@@ -210,5 +210,11 @@ export function validateAppSettings(value: unknown): AppSettings {
   ) {
     throw new Error('黑名单格式无效');
   }
+  if (
+    settings.gameInstallRoot !== undefined &&
+    (typeof settings.gameInstallRoot !== 'string' || settings.gameInstallRoot.length > 500)
+  ) {
+    throw new Error('游戏安装目录格式无效');
+  }
   return value as AppSettings;
 }

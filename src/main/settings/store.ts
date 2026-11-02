@@ -60,6 +60,10 @@ export function getSettings(): AppSettings {
       scoutDefaults: parsed.scoutDefaults ?? undefined,
       assist: normalizeAssistSettings(parsed.assist),
       blacklist: normalizeAssistBlacklist(parsed.blacklist),
+      gameInstallRoot:
+        typeof parsed.gameInstallRoot === 'string' && parsed.gameInstallRoot.trim()
+          ? normalizeInstallRoot(parsed.gameInstallRoot)
+          : undefined,
     };
     return structuredClone(settingsCache);
   } catch (err) {
@@ -82,6 +86,10 @@ export function saveSettings(settings: AppSettings): void {
       scoutDefaults: settings.scoutDefaults,
       assist: normalizeAssistSettings(settings.assist),
       blacklist: normalizeAssistBlacklist(settings.blacklist),
+      gameInstallRoot:
+        typeof settings.gameInstallRoot === 'string' && settings.gameInstallRoot.trim()
+          ? normalizeInstallRoot(settings.gameInstallRoot)
+          : undefined,
     };
     const filePath = resolveSettingsPath();
     const dir = path.dirname(filePath);

@@ -10,6 +10,8 @@
 // 扫描在后台循环里做（约 15s 一次），结果写入模块级缓存供同步代码读取。
 
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { normalizeInstallRoot, rootLooksValid } from '../config/installRoot';
 import { getSettings } from '../settings/store';
 import type { LcuCredentials, RiotClientCredentials } from './lockfile';
@@ -29,6 +31,7 @@ interface ProcessDiscoveryState {
 }
 
 let discovered: ProcessDiscoveryState = { roots: [], lcu: null, riotClient: null };
+let scannedRoots: string[] = [];
 let scanInProgress = false;
 let loopTimer: NodeJS.Timeout | null = null;
 
@@ -91,6 +94,55 @@ function queryUxCommandLines(): Promise<string[]> {
   });
 }
 
+// 全盘符两层浅扫：根下一层目录及其子目录里含 LeagueClient 的即视为安装根。
+// 覆盖 WeGame（D:\WeGameApps\英雄联盟）与任意自定义安装位置；实测每轮 <10ms。
+const SHALLOW_SCAN_EXCLUDED = new Set([
+  'windows',
+  'program files',
+  'program files (x86)',
+  'programdata',
+  'users',
+  '$recycle.bin',
+  'system volume information',
+  'perflogs',
+  'node_modules',
+]);
+
+function shallowScanAllDrives(): string[] {
+  const roots: string[] = [];
+  const push = (dir: string) => {
+    if (!roots.some((x) => x.toLowerCase() === dir.toLowerCase())) roots.push(dir);
+  };
+  for (let code = 67; code <= 90; code++) {
+    const drive = `${String.fromCharCode(code)}:\\`;
+    let level1;
+    try {
+      level1 = fs.readdirSync(drive, { withFileTypes: true });
+    } catch {
+      continue; // 盘符不存在/不可读
+    }
+    for (const entry of level1) {
+      if (!entry.isDirectory()) continue;
+      if (SHALLOW_SCAN_EXCLUDED.has(entry.name.toLowerCase())) continue;
+      const dir = path.join(drive, entry.name);
+      try {
+        if (fs.existsSync(path.join(dir, 'LeagueClient'))) {
+          push(dir);
+          continue;
+        }
+        for (const sub of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (!sub.isDirectory()) continue;
+          const subDir = path.join(dir, sub.name);
+          if (fs.existsSync(path.join(subDir, 'LeagueClient'))) push(subDir);
+        }
+      } catch {
+        // 无权限的目录跳过
+      }
+    }
+  }
+  return roots;
+}
+
 function scanOnce(): Promise<ProcessDiscoveryState> {
   return queryUxCommandLines().then((lines) => {
     const roots: string[] = [];
@@ -101,6 +153,14 @@ function scanOnce(): Promise<ProcessDiscoveryState> {
       if (root && rootLooksValid(root) && !roots.includes(root)) roots.push(root);
       lcu = lcu ?? parseProcessLcuCredentials(line);
       riotClient = riotClient ?? parseProcessRiotCredentials(line);
+    }
+    // 进程命令行拿不到（如 WeGame 以管理员运行客户端时 CommandLine 为 null）、
+    // 用户也没手动指定过时，浅扫全盘找安装位置；一旦找到（或有了手动路径）就不再扫。
+    if (roots.length === 0 && !getSettings().gameInstallRoot && scannedRoots.length === 0) {
+      scannedRoots = shallowScanAllDrives();
+    }
+    for (const root of scannedRoots) {
+      if (!roots.some((x) => x.toLowerCase() === root.toLowerCase())) roots.push(root);
     }
     return { roots, lcu, riotClient };
   });

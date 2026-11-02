@@ -176,7 +176,7 @@ export function App() {
   } | null>(null);
   const [scoutSidebarStatus, setScoutSidebarStatus] = useState<ScoutSidebarStatus | null>(null);
   const [rankingChapter, setRankingChapter] = useState<RankingChapter>(
-    initialSession.rankingChapter ?? 'mayhem',
+    initialSession.rankingChapter ?? 'ranking',
   );
   const trackedOutgoingRequestsRef = useRef(loadTrackedOutgoingRequests());
   const friendRequestCheckInFlightRef = useRef(false);

@@ -9,12 +9,13 @@ import { createPortal } from 'react-dom';
 import type { LolHotkeyValues } from '../../../shared/api';
 import { useSettingsCompare } from './SettingsControls';
 import {
+  HERO_ACTION_LABELS,
   HERO_HOTKEY_GROUPS,
+  compareText,
   displayHotkeyValue,
   hotkeyFromKeyboardEvent,
   hotkeyFromMouseEvent,
   hotkeyRefKey,
-  isSwitchHotkey,
   quickbindKeyFor,
   type HotkeyBinding,
   type HotkeyCaptureTarget,
@@ -22,32 +23,7 @@ import {
 
 type Change = (section: string, key: string, value: string) => void;
 
-// 键帽上方的动作名。
-export const HERO_ACTION_LABELS: Record<string, string> = {
-  evtCastSpell1: 'Q 技能',
-  evtCastSpell2: 'W 技能',
-  evtCastSpell3: 'E 技能',
-  evtCastSpell4: 'R 大招',
-  evtCastAvatarSpell1: '召唤师 1',
-  evtCastAvatarSpell2: '召唤师 2',
-  evtCastRoleBound: '分路任务',
-  evtUseItem1: '道具 1',
-  evtUseItem2: '道具 2',
-  evtUseItem3: '道具 3',
-  evtUseItem4: '道具 4',
-  evtUseItem5: '道具 5',
-  evtUseItem6: '道具 6',
-  evtUseItem7: '回城',
-  evtUseVisionItem: '饰品',
-};
-
 export const UNBOUND = '[<Unbound>]';
-
-/** 热键值显示成人话：开关显示开/关，按键显示键名，没有这个键显示「没有」。 */
-export function compareText(section: string, value: string): string {
-  if (isSwitchHotkey(section, value)) return value === '1' ? '开' : '关';
-  return value ? displayHotkeyValue(value) : '没有';
-}
 
 // 英雄热键：一排排键帽，点键帽改键，下面的「快捷」切换快捷施法。
 export function HeroHotkeys({

@@ -215,7 +215,7 @@ export function hotkeyLabel(key: string): string {
   if (HOTKEY_LABELS[key]) return HOTKEY_LABELS[key];
   const quickbindMatch = key.match(/^evtCast(Spell[1-4]|AvatarSpell[1-2]|RoleBound)smart$/)
     ?? key.match(/^evtUse(Item[1-6]|VisionItem)smart$/);
-  if (quickbindMatch) return `${targetLabel(quickbindMatch[1])}快捷施法`;
+  if (quickbindMatch) return `${targetLabel(quickbindMatch[1])} 快捷施法`;
   const smartMatch = key.match(
     /^evt(.+?)(Spell[1-4]|AvatarSpell[1-2]|Item[1-6]|VisionItem|RoleBound)$/,
   );
@@ -395,4 +395,29 @@ export function buildHotkeyCategories(bindings: HotkeyBinding[]): HotkeyCategory
   return HOTKEY_CATEGORIES
     .map((category) => ({ ...category, bindings: grouped.get(category.key) ?? [] }))
     .filter((category) => category.bindings.length > 0);
+}
+
+// 键帽上方的动作名。
+export const HERO_ACTION_LABELS: Record<string, string> = {
+  evtCastSpell1: 'Q 技能',
+  evtCastSpell2: 'W 技能',
+  evtCastSpell3: 'E 技能',
+  evtCastSpell4: 'R 大招',
+  evtCastAvatarSpell1: '召唤师 1',
+  evtCastAvatarSpell2: '召唤师 2',
+  evtCastRoleBound: '分路任务',
+  evtUseItem1: '道具 1',
+  evtUseItem2: '道具 2',
+  evtUseItem3: '道具 3',
+  evtUseItem4: '道具 4',
+  evtUseItem5: '道具 5',
+  evtUseItem6: '道具 6',
+  evtUseItem7: '回城',
+  evtUseVisionItem: '饰品',
+};
+
+/** 热键值显示成人话：开关显示开/关，按键显示键名，没有这个键显示「没有」。 */
+export function compareText(section: string, value: string): string {
+  if (isSwitchHotkey(section, value)) return value === '1' ? '开' : '关';
+  return value ? displayHotkeyValue(value) : '没有';
 }

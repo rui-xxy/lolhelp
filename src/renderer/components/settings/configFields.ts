@@ -210,7 +210,7 @@ export const GAME_LAYOUT: Array<ConfigLayoutSection<keyof LolGameConfigValues> &
     label: '画面',
     part: 'video',
     groups: [
-      { keys: ['windowMode', 'width', 'frameCapType', 'waitForVerticalSync', 'enableFxaa'] },
+      { title: '窗口和帧率', keys: ['windowMode', 'width', 'frameCapType', 'waitForVerticalSync', 'enableFxaa'] },
       { title: '画质', keys: ['shadowQuality', 'characterQuality', 'effectsQuality', 'environmentQuality'] },
     ],
   },
@@ -245,6 +245,7 @@ export const GAME_LAYOUT: Array<ConfigLayoutSection<keyof LolGameConfigValues> &
     part: 'combat',
     groups: [
       {
+        title: '战斗提示',
         keys: ['showAttackRadius', 'autoDisplayTarget', 'enableLineMissileVis', 'showSpellCosts', 'showSpellRecommendations', 'showNeutralCamps', 'flashScreenWhenDamaged', 'flashScreenWhenStunned', 'showOffScreenPointsOfInterest'],
       },
     ],
@@ -254,7 +255,7 @@ export const GAME_LAYOUT: Array<ConfigLayoutSection<keyof LolGameConfigValues> &
     label: '声音',
     part: 'audio',
     groups: [
-      { keys: ['enableAudio', 'masterVolume', 'musicVolume', 'sfxVolume', 'ambienceVolume', 'pingsVolume', 'announcerVolume', 'voiceVolume'] },
+      { title: '音量', keys: ['enableAudio', 'masterVolume', 'musicVolume', 'sfxVolume', 'ambienceVolume', 'pingsVolume', 'announcerVolume', 'voiceVolume'] },
     ],
   },
 ];

@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
 // LCU game-data 预加载：启动后后台拉最新英雄/装备/技能/符文数据覆盖 datas.json 兜底
 import { preloadGameData } from './lcu/gameData';
+import { startLeagueDiscoveryLoop } from './lcu/discover';
 import { APP_LAYOUT } from '../shared/constants';
 import { startAssistEngine, stopAssistEngine } from './assist/engine';
 import { startLiveWatcher, stopLiveWatcher } from './live/liveWatcher';
@@ -45,6 +46,20 @@ if (started) {
   app.quit();
 }
 
+// 单实例锁：已有实例运行时，二次启动把已有窗口拉回前台后自行退出。
+// 避免旧实例（比如挂掉的开发窗口）与新实例叠在桌面上造成困惑，也防两个实例同时写设置文件。
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = mainWindowRef;
+    if (!win || win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
+
 Menu.setApplicationMenu(null);
 
 function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
@@ -67,6 +82,9 @@ function closeLegacyFriendWindows(mainWindow: BrowserWindow): void {
     }
   }
 }
+
+// 主窗口引用提升到模块级：单实例锁的 second-instance 回调需要把它拉回前台。
+let mainWindowRef: BrowserWindow | null = null;
 
 const createWindow = () => {
   const windowState = loadWindowState({
@@ -105,6 +123,7 @@ const createWindow = () => {
 
   if (windowState.maximized) mainWindow.maximize();
   trackWindowState(mainWindow);
+  mainWindowRef = mainWindow;
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -152,6 +171,7 @@ const createWindow = () => {
   });
   mainWindow.once('closed', () => {
     if (rendererRecoveryTimer !== null) clearTimeout(rendererRecoveryTimer);
+    if (mainWindowRef === mainWindow) mainWindowRef = null;
   });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -181,6 +201,9 @@ setTimeout(() => {
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
   createWindow();
+  // 后台发现英雄联盟安装位置（运行中客户端的进程命令行 + 手动设置），
+  // 让装在非默认盘符/目录的客户端也能被识别。
+  startLeagueDiscoveryLoop();
   startLiveWatcher();
   startAssistEngine();
   startSavedMatchFollowWatcher();

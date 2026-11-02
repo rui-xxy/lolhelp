@@ -269,6 +269,8 @@ export interface AppSettings {
   assist: AssistSettings;
   // 辅助功能使用的本地玩家黑名单
   blacklist: AssistBlacklistEntry[];
+  // 手动指定的英雄联盟安装根目录（自动识别不到时由用户在设置里选择，持久化）
+  gameInstallRoot?: string;
 }
 
 export type AssistRole = 'top' | 'jungle' | 'middle' | 'bottom' | 'utility';

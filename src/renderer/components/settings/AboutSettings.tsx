@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FileText, FolderOpen, FolderSearch, RefreshCw } from 'lucide-react';
 import type { AppStatus, LcuConnection, LolConfigState } from '../../../shared/api';
+import { GameLocationCard } from './GameLocationCard';
 
 function formatTime(timestamp: number | null): string {
   if (!timestamp) return '';
@@ -60,6 +61,7 @@ export function AboutSettings({
 
   return (
     <div className="st-sections">
+      <GameLocationCard />
       <section className="st-section">
         <header className="st-section__head">
           <h3>英雄联盟客户端</h3>
