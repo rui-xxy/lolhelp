@@ -42,38 +42,6 @@
   :root[data-mode="light"] .lol-rift-rank { color: #5B646F; }
   :root[data-mode="light"] .lol-rift-kda, :root[data-mode="light"] .lol-rift-damage { color: var(--color-text-1); }
   :root[data-mode="light"] .lol-rift-damage { color: var(--color-text-1); }
-  /* features/ranking.css */
-  :root[data-mode="light"] .ranking-chapter-switch button:first-child.is-active > svg { color: #007C6C; }
-  /* features/mayhem.css */
-  :root[data-mode="light"] .mayhem-content-tabs button.is-active svg { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-augment-summary > span { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-removed-toggle:hover, :root[data-mode="light"] .mayhem-removed-toggle.is-active { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-augment-rank { color: #6A6258; }
-  :root[data-mode="light"] .mayhem-augment-icon { background: var(--color-app-elevated); }
-  :root[data-mode="light"] .mayhem-augment-identity small em { color: #A14662; }
-  :root[data-mode="light"] .mayhem-augment-rate.is-win { color: #007D60; }
-  :root[data-mode="light"] .mayhem-combo-rank { color: #6A6258; }
-  :root[data-mode="light"] .mayhem-combo-portraits .is-augment { background: var(--color-app-elevated); }
-  :root[data-mode="light"] .mayhem-combo-names > span { color: #775D86; }
-  :root[data-mode="light"] .mayhem-combo-names b { color: #925362; }
-  :root[data-mode="light"] .mayhem-combo-names em { color: #007C6D; }
-  :root[data-mode="light"] .mayhem-combo-names i { color: #8C5F00; }
-  :root[data-mode="light"] .mayhem-combo-description { color: #484E55; }
-  :root[data-mode="light"] .mayhem-combo-row:hover .mayhem-combo-votes { color: #7A5A89; }
-  :root[data-mode="light"] .mayhem-combo-page-status span { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-combo-page-controls button { color: #686358; }
-  :root[data-mode="light"] .mayhem-combo-page-controls button:hover:not(:disabled) { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-role-filter button.is-active { color: #087A6B; }
-  :root[data-mode="light"] .mayhem-list-summary > span { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-profile-copy > span { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-profile-balance [data-direction="down"] strong { color: #A6425D; }
-  :root[data-mode="light"] .mayhem-profile-balance [data-direction="up"] strong { color: #007D60; }
-  :root[data-mode="light"] .mayhem-section-kicker { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-skill-summary strong { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-build-option-stats strong { color: #007D60; }
-  :root[data-mode="light"] .mayhem-augment-row small { color: #5B646F; }
-  :root[data-mode="light"] .mayhem-skill-priority { color: #007C6C; }
-  :root[data-mode="light"] .mayhem-loading-orbit { color: #007C6C; }
   /* features/matches/analytics.css */
   :root[data-mode="light"] .lol-event > time { color: #5B656D; }
   :root[data-mode="light"] .lol-event > .lol-event__dot { background: var(--color-app-elevated); }
@@ -82,15 +50,6 @@
   :root[data-mode="light"] .lol-events__filters > strong { color: #5C646C; }
   :root[data-mode="light"] .lol-events__filters > label { color: #4A4D51; }
   :root[data-mode="light"] .lol-events__select-all { color: #007F69; }
-
-  /* 手工补充：大乱斗强度分级的文字色是变量，脚本扫不到 */
-  :root[data-mode="light"] .mayhem-tier-group { --tier-ink: #5D646C; }
-  :root[data-mode="light"] .mayhem-tier-group--Splus { --tier-ink: #B0475F; }
-  :root[data-mode="light"] .mayhem-tier-group--S { --tier-ink: #8C6420; }
-  :root[data-mode="light"] .mayhem-tier-group--A { --tier-ink: #2C7A6A; }
-  :root[data-mode="light"] .mayhem-tier-group--B { --tier-ink: #3B6299; }
-  :root[data-mode="light"] .mayhem-tier-group--C,
-  :root[data-mode="light"] .mayhem-tier-group--D { --tier-ink: #5D646C; }
 
   /* ---------- 以下为手写部分（不是脚本生成的）---------- */
   /* 开黑 / 常一起玩的玩家：浅色底上换成更深的同色系，去掉发光（浅底上发光会糊） */

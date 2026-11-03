@@ -78,6 +78,17 @@
   --color-ok-soft: rgb(59 138 87 / 0.12);
   --color-warn: #B8692A;
   --color-warn-soft: rgb(184 105 42 / 0.13);
+  /* 强度分级 / 强化稀有度：浅色底上换成同色相、更深的版本，保证文字可读 */
+  --color-grade-splus: #C4475A;
+  --color-grade-s: #B4661A;
+  --color-grade-a: #95761A;
+  --color-grade-b: #2A857B;
+  --color-grade-c: #4C6C94;
+  --color-grade-d: #69707A;
+  --color-rarity-prismatic: #7B58A8;
+  --color-rarity-gold: #9C701C;
+  --color-rarity-silver: #5C707E;
+  --color-augment-well: #3A3B39;
   --color-app-danger: #C8474C;
   --color-app-danger-hover: #B33B40;
   --color-app-success: #3B8A57;

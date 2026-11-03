@@ -1,5 +1,11 @@
 import type {
   ChampionCounterSummary,
+  ChampionDetail,
+  ChampionDetailBuild,
+  ChampionDetailItem,
+  ChampionDetailRequest,
+  ChampionDetailResult,
+  ChampionDetailRunePage,
   ChampionRankingEntry,
   ChampionRankingMode,
   ChampionRankingPosition,
@@ -8,7 +14,7 @@ import type {
   ChampionRankingResult,
   ChampionSummary,
 } from '../../shared/api';
-import { getHeroByKey } from '../lcu/heroData';
+import { getHeroByKey, getItemById, getRuneById, getSummonerSpellById } from '../lcu/heroData';
 
 const OP_GG_BASE_URL = 'https://lol-api-champion.op.gg/api';
 const HEXTECH_RANKING_URL = 'https://yuumi.s3.bitiful.net/datas/blitz/hex/champions.json';
@@ -50,7 +56,7 @@ interface OpggCounter {
 
 interface OpggPosition {
   name?: string;
-  stats?: OpggStats;
+  stats?: OpggStats & { role_rate?: number };
   counters?: OpggCounter[];
 }
 
@@ -156,6 +162,12 @@ function normalizeCounters(counters: OpggCounter[] | null | undefined): Champion
   });
 }
 
+function positionName(value: string | undefined): ChampionRankingPosition | null {
+  return value && VALID_POSITIONS.has(value as ChampionRankingPosition) && value !== 'ALL'
+    ? value as ChampionRankingPosition
+    : null;
+}
+
 function statsRank(stats: OpggStats): number {
   return finiteNumber(stats.tier_data?.rank ?? stats.rank, Number.MAX_SAFE_INTEGER);
 }
@@ -198,6 +210,8 @@ export function normalizeOpggRanking(
       firstPlaceRate: mode === 'arena' && games > 0
         ? (finiteNumber(stats.first_place) / games) * 100
         : null,
+      roleRate: matchingPosition?.stats?.role_rate !== undefined ? rate(matchingPosition.stats.role_rate) : null,
+      mainPosition: positionName(dominantPosition?.name),
       counters: normalizeCounters(dominantPosition?.counters),
     }];
   });
@@ -220,6 +234,8 @@ export function normalizeHextechRanking(payload: HextechChampion[]): ChampionRan
       kda: null,
       games: finiteNumber(row.data.num_games),
       firstPlaceRate: null,
+      roleRate: null,
+      mainPosition: null,
       counters: [],
     }];
   });
@@ -286,5 +302,213 @@ export async function getChampionRanking(rawRequest: ChampionRankingRequest): Pr
       },
       error: error instanceof Error ? error.message : '英雄排行获取失败',
     };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 英雄详情（OP.GG 单英雄接口）：出装、符文、加点、版本走势、时长胜率、对位
+// ---------------------------------------------------------------------------
+
+interface OpggBuildRow {
+  ids?: Array<number | string>;
+  play?: number;
+  win?: number;
+  pick_rate?: number;
+}
+
+interface OpggRuneRow extends OpggBuildRow {
+  primary_page_id?: number;
+  primary_rune_ids?: number[];
+  secondary_page_id?: number;
+  secondary_rune_ids?: number[];
+}
+
+interface OpggSkillMastery extends OpggBuildRow {
+  builds?: Array<OpggBuildRow & { order?: string[] }>;
+}
+
+interface OpggTrendRow {
+  version?: string;
+  rate?: number;
+  rank?: number;
+}
+
+interface OpggDetailResponse {
+  data?: {
+    summoner_spells?: OpggBuildRow[];
+    starter_items?: OpggBuildRow[];
+    boots?: OpggBuildRow[];
+    core_items?: OpggBuildRow[];
+    runes?: OpggRuneRow[];
+    skill_masteries?: OpggSkillMastery[];
+    trends?: { win?: OpggTrendRow[]; pick?: OpggTrendRow[]; ban?: OpggTrendRow[] };
+    game_lengths?: Array<{ game_length?: number; rate?: number }>;
+    counters?: OpggCounter[];
+  };
+}
+
+// 符文系的图标不在 datas.json 里，五系固定，直接写死。
+const RUNE_STYLES: Record<number, { name: string; icon: string }> = {
+  8000: { name: '精密', icon: 'perk-images/Styles/7201_Precision.png' },
+  8100: { name: '主宰', icon: 'perk-images/Styles/7200_Domination.png' },
+  8200: { name: '巫术', icon: 'perk-images/Styles/7202_Sorcery.png' },
+  8300: { name: '启迪', icon: 'perk-images/Styles/7203_Whimsy.png' },
+  8400: { name: '坚决', icon: 'perk-images/Styles/7204_Resolve.png' },
+};
+
+const OPGG_POSITION_PATHS: Partial<Record<ChampionRankingPosition, string>> = {
+  TOP: 'top',
+  JUNGLE: 'jungle',
+  MID: 'mid',
+  ADC: 'adc',
+  SUPPORT: 'support',
+};
+
+const detailCache = new Map<string, { expiresAt: number; result: ChampionDetailResult }>();
+
+function itemSummary(rawId: number | string): ChampionDetailItem | null {
+  const numeric = finiteNumber(rawId);
+  if (!numeric) return null;
+  // 斗魂竞技场的装备 ID 带 22 前缀（223031 = 3031），名字和图标按原装备取。
+  const id = numeric > 220000 && numeric < 230000 ? numeric - 220000 : numeric;
+  const item = getItemById(id);
+  return { id, name: item?.name || `装备 ${id}`, icon: item?.icon ?? '' };
+}
+
+function spellSummary(rawId: number | string): ChampionDetailItem | null {
+  const id = finiteNumber(rawId);
+  const spell = id ? getSummonerSpellById(id) : null;
+  return spell ? { id, name: spell.name, icon: spell.icon } : null;
+}
+
+function runeSummary(rawId: number | undefined): ChampionDetailItem | null {
+  const id = finiteNumber(rawId);
+  if (!id) return null;
+  const style = RUNE_STYLES[id];
+  if (style) return { id, name: style.name, icon: `https://ddragon.leagueoflegends.com/cdn/img/${style.icon}` };
+  const rune = getRuneById(id);
+  return rune ? { id, name: rune.name, icon: rune.icon } : null;
+}
+
+function buildRows(
+  rows: OpggBuildRow[] | undefined,
+  resolve: (id: number | string) => ChampionDetailItem | null,
+  limit: number,
+): ChampionDetailBuild[] {
+  return (rows ?? []).slice(0, limit).flatMap((row) => {
+    const items = (row.ids ?? []).map(resolve).filter((item): item is ChampionDetailItem => item !== null);
+    const games = finiteNumber(row.play);
+    if (!items.length || !games) return [];
+    return [{
+      items,
+      games,
+      winRate: (finiteNumber(row.win) / games) * 100,
+      pickRate: rate(row.pick_rate),
+    }];
+  });
+}
+
+export function normalizeChampionDetail(
+  payload: OpggDetailResponse,
+  request: { championId: number; mode: ChampionDetailRequest['mode']; position: ChampionRankingPosition },
+): ChampionDetail {
+  const data = payload.data ?? {};
+  const runes: ChampionDetailRunePage[] = (data.runes ?? []).slice(0, 3).flatMap((row) => {
+    const games = finiteNumber(row.play);
+    const primary = (row.primary_rune_ids ?? []).map(runeSummary).filter((rune): rune is ChampionDetailItem => rune !== null);
+    if (!games || !primary.length) return [];
+    return [{
+      keystone: primary[0] ?? null,
+      primary: primary.slice(1),
+      secondary: (row.secondary_rune_ids ?? []).map(runeSummary).filter((rune): rune is ChampionDetailItem => rune !== null),
+      primaryStyle: runeSummary(row.primary_page_id),
+      secondaryStyle: runeSummary(row.secondary_page_id),
+      games,
+      winRate: (finiteNumber(row.win) / games) * 100,
+      pickRate: rate(row.pick_rate),
+    }];
+  });
+
+  const skills = (data.skill_masteries ?? []).slice(0, 3).flatMap((mastery) => {
+    const games = finiteNumber(mastery.play);
+    const priority = (mastery.ids ?? []).map(String).filter((key) => /^[QWER]$/.test(key));
+    if (!games || priority.length < 3) return [];
+    const order = (mastery.builds?.[0]?.order ?? []).map(String).filter((key) => /^[QWER]$/.test(key));
+    return [{
+      priority,
+      order,
+      winRate: (finiteNumber(mastery.win) / games) * 100,
+      pickRate: rate(mastery.pick_rate),
+    }];
+  });
+
+  const pickByVersion = new Map((data.trends?.pick ?? []).map((row) => [row.version ?? '', rate(row.rate)]));
+  const banByVersion = new Map((data.trends?.ban ?? []).map((row) => [row.version ?? '', rate(row.rate)]));
+  const trend = (data.trends?.win ?? []).slice(0, 10).flatMap((row) => {
+    if (!row.version) return [];
+    return [{
+      version: row.version,
+      winRate: rate(row.rate),
+      pickRate: pickByVersion.get(row.version) ?? null,
+      banRate: banByVersion.get(row.version) ?? null,
+      rank: row.rank ? finiteNumber(row.rank) : null,
+    }];
+  }).reverse();
+
+  const matchups = (data.counters ?? []).flatMap((counter) => {
+    const championId = finiteNumber(counter.champion_id);
+    const games = finiteNumber(counter.play);
+    if (!championId || games < 30) return [];
+    return [{ champion: championSummary(championId), games, winRate: (finiteNumber(counter.win) / games) * 100 }];
+  });
+  // 样本太少的对位不可信：只看样本量排在前面的那一批。
+  const reliable = matchups.sort((a, b) => b.games - a.games).slice(0, 30);
+
+  return {
+    championId: request.championId,
+    mode: request.mode,
+    position: request.position,
+    spells: buildRows(data.summoner_spells, spellSummary, 2),
+    starters: buildRows(data.starter_items, itemSummary, 2),
+    boots: buildRows(data.boots, itemSummary, 3),
+    core: buildRows(data.core_items, itemSummary, 4),
+    runes,
+    skills,
+    trend,
+    gameLengths: (data.game_lengths ?? []).flatMap((row) => (
+      row.rate === undefined ? [] : [{ minute: finiteNumber(row.game_length), winRate: rate(row.rate) }]
+    )),
+    toughMatchups: [...reliable].sort((a, b) => a.winRate - b.winRate).slice(0, 4),
+    easyMatchups: [...reliable].sort((a, b) => b.winRate - a.winRate).slice(0, 4),
+  };
+}
+
+export async function getChampionDetail(rawRequest: ChampionDetailRequest): Promise<ChampionDetailResult> {
+  const championId = Math.trunc(finiteNumber(rawRequest?.championId));
+  const mode = rawRequest?.mode === 'aram' || rawRequest?.mode === 'arena' ? rawRequest.mode : 'ranked';
+  const region = rawRequest?.region && VALID_REGIONS.has(rawRequest.region) ? rawRequest.region : 'global';
+  const tier = typeof rawRequest?.tier === 'string' && /^[a-z_]+$/i.test(rawRequest.tier) ? rawRequest.tier : 'all';
+  const requested = rawRequest?.position && VALID_POSITIONS.has(rawRequest.position) ? rawRequest.position : 'TOP';
+  const position: ChampionRankingPosition = mode === 'ranked' && requested !== 'ALL' ? requested : mode === 'ranked' ? 'TOP' : 'ALL';
+  if (championId <= 0 || championId > 100_000) return { detail: null, error: '英雄编号无效' };
+
+  const key = `${mode}:${region}:${tier}:${position}:${championId}`;
+  const cached = detailCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  const path = mode === 'ranked'
+    ? `ranked/${championId}/${OPGG_POSITION_PATHS[position] ?? 'top'}`
+    : mode === 'aram' ? `aram/${championId}/none` : `arena/${championId}`;
+  const url = new URL(`${OP_GG_BASE_URL}/${region}/champions/${path}`);
+  if (mode !== 'arena') url.searchParams.set('tier', tier);
+
+  try {
+    const payload = await fetchJson<OpggDetailResponse>(url.toString());
+    const result = { detail: normalizeChampionDetail(payload, { championId, mode, position }) };
+    detailCache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+    return result;
+  } catch (error) {
+    if (cached) return { ...cached.result, error: '刷新失败，当前显示上一次的数据' };
+    return { detail: null, error: error instanceof Error ? error.message : '英雄详情获取失败' };
   }
 }

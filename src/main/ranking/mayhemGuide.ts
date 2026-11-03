@@ -1,47 +1,56 @@
 import { load, type Cheerio, type CheerioAPI } from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type {
-  MayhemAugmentRarity,
+  MayhemAugmentChampionFit,
+  MayhemAugmentChampionRef,
+  MayhemAugmentDetail,
+  MayhemAugmentDetailResult,
   MayhemAugmentRankingResult,
+  MayhemAugmentRarity,
+  MayhemAugmentRecommendation,
+  MayhemBuildCombo,
   MayhemChampionBuild,
   MayhemChampionBuildResult,
   MayhemChampionRole,
   MayhemChampionTier,
   MayhemComboResult,
   MayhemComboTier,
+  MayhemDataOrigin,
   MayhemItemBuildOption,
   MayhemItemGroupKey,
+  MayhemPartner,
   MayhemSkillOrder,
   MayhemTierListResult,
 } from '../../shared/api';
+import { getAllHeroes, type HeroSummary } from '../lcu/heroData';
+import effectSnapshot from './mayhemAugmentEffects.json';
+import { readDiskCache, writeDiskCache } from './rankingDiskCache';
+
+// 海克斯大乱斗数据：arammayhem.com（Astro 静态页 + 组合索引 JSON）。
+// 网站 2026-10 改版后：强化不再公开胜率，改成「等级 + 登场率」；出装页新增
+// 强化组合、最佳搭档；英雄卡片把胜率、名次放进 data-* 属性。
+// 解析尽量认语义（data-*、标题文字），不依赖样式类名，下次改版时更不容易整页失效。
 
 const MAYHEM_BASE_URL = 'https://arammayhem.com';
 const MAYHEM_TIER_LIST_URL = `${MAYHEM_BASE_URL}/zh-cn/tier-list/`;
 const MAYHEM_AUGMENTS_URL = `${MAYHEM_BASE_URL}/zh-cn/augments/`;
 const MAYHEM_COMBOS_INDEX_URL = `${MAYHEM_BASE_URL}/zh-cn/combo-index-data.json`;
+const SOURCE_NAME = 'ARAM Mayhem';
 const CACHE_TTL_MS = 15 * 60_000;
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 6 * 1024 * 1024;
+const SLUG_PATTERN = /^[a-z0-9-]{1,64}$/;
 
 const VALID_TIERS = new Set<MayhemChampionTier>(['S+', 'S', 'A', 'B', 'C', 'D']);
-const VALID_ROLES = new Set<MayhemChampionRole>([
-  'assassin',
-  'fighter',
-  'mage',
-  'marksman',
-  'support',
-  'tank',
-]);
+const VALID_COMBO_TIERS = new Set<MayhemComboTier>(['S+', 'S', 'A', 'B', 'C']);
+const VALID_ROLES = new Set<MayhemChampionRole>(['assassin', 'fighter', 'mage', 'marksman', 'support', 'tank']);
+const ROLE_NAMES_ZH = ['刺客', '战士', '法师', '射手', '辅助', '坦克'];
+const SKILL_PRIORITY = /^[QWE]\s*>\s*[QWE]\s*>\s*[QWE]$/;
+const AUGMENT_EFFECTS = effectSnapshot as Record<string, string>;
 
-interface CacheEntry<T> {
-  expiresAt: number;
-  value: T;
-}
-
-let tierListCache: CacheEntry<MayhemTierListResult> | null = null;
-let augmentRankingCache: CacheEntry<MayhemAugmentRankingResult> | null = null;
-let comboCache: CacheEntry<MayhemComboResult> | null = null;
-const buildCache = new Map<string, CacheEntry<MayhemChampionBuildResult>>();
+// ---------------------------------------------------------------------------
+// 小工具
+// ---------------------------------------------------------------------------
 
 function cleanText(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
@@ -52,182 +61,250 @@ function finiteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function percentFromText(value: string, label?: string): number {
-  const scoped = label
-    ? value.match(new RegExp(`${label}\\s*[:：]?\\s*(-?\\d+(?:\\.\\d+)?)%`, 'i'))?.[1]
-    : value.match(/(-?\d+(?:\.\d+)?)%/)?.[1];
-  return finiteNumber(scoped);
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-function optionalPercentFromText(value: string): number | null {
-  const match = value.match(/(-?\d+(?:\.\d+)?)%/)?.[1];
-  return match === undefined ? null : finiteNumber(match);
+// 「登场率 35.27%」「胜率: 48.74%」里取百分比；不带 label 时取第一个百分比。
+function percentAfter(value: string, label?: string): number | null {
+  const match = label
+    ? value.match(new RegExp(`${label}\\s*[:：]?\\s*(-?\\d+(?:\\.\\d+)?)\\s*%`, 'i'))
+    : value.match(/(-?\d+(?:\.\d+)?)\s*%/);
+  return match ? finiteNumber(match[1]) : null;
 }
 
 function absoluteUrl(value: string | undefined): string {
   if (!value) return '';
-  return new URL(value, MAYHEM_BASE_URL).toString();
+  try {
+    return new URL(value, MAYHEM_BASE_URL).toString();
+  } catch {
+    return '';
+  }
 }
 
-function tierFromText(value: string): MayhemChampionTier {
+function championTier(value: string): MayhemChampionTier {
   const match = value.match(/S\+|S|A|B|C|D/)?.[0] as MayhemChampionTier | undefined;
   return match && VALID_TIERS.has(match) ? match : 'C';
 }
 
-function findSection($: CheerioAPI, heading: string): Cheerio<AnyNode> | null {
+// 强化等级带细分：S+ / S / S- / A+ / A / A- …
+function augmentTier(value: string): string {
+  return value.match(/[SABCD][+-]?/)?.[0] ?? '';
+}
+
+function rankNumber(value: string): number | null {
+  const match = value.match(/#\s*(\d+)/);
+  return match ? finiteNumber(match[1]) : null;
+}
+
+function trendFromText(value: string): number | null {
+  const match = value.match(/([▲▼])\s*(\d+)/);
+  if (!match) return null;
+  return finiteNumber(match[2]) * (match[1] === '▲' ? 1 : -1);
+}
+
+function slugFrom(href: string | undefined, segment: string): string {
+  return (href ?? '').match(new RegExp(`/${segment}/([^/?#]+)`))?.[1]?.toLocaleLowerCase() ?? '';
+}
+
+function rarityFromText(value: string): MayhemAugmentRarity | null {
+  if (/棱彩|prismatic/i.test(value)) return 'prismatic';
+  if (/金色|gold/i.test(value)) return 'gold';
+  if (/银色|silver/i.test(value)) return 'silver';
+  return null;
+}
+
+// arammayhem 的英雄 slug 就是 Data Dragon 英雄 key 的小写（monkeyking、jarvaniv…）。
+let heroBySlug: Map<string, HeroSummary> | null = null;
+
+function heroForSlug(slug: string): HeroSummary | null {
+  if (!heroBySlug) {
+    heroBySlug = new Map();
+    try {
+      for (const hero of getAllHeroes()) {
+        if (hero.alias) heroBySlug.set(hero.alias.toLocaleLowerCase(), hero);
+      }
+    } catch {
+      // datas.json 不可用时只是少了真名和 ID，不影响主体数据。
+    }
+  }
+  return heroBySlug.get(slug.toLocaleLowerCase()) ?? null;
+}
+
+function championIdFromIcon(icon: string): number {
+  return finiteNumber(icon.match(/champion-icons\/(\d+)\.png/)?.[1]);
+}
+
+function championSlugFromIcon(icon: string): string {
+  return icon.match(/\/champions\/(?:icons|square)\/([a-z0-9]+)/i)?.[1]?.toLocaleLowerCase() ?? '';
+}
+
+function championRef(icon: string, name: string, slugHint = ''): MayhemAugmentChampionRef {
+  const slug = slugHint || championSlugFromIcon(icon);
+  const hero = slug ? heroForSlug(slug) : null;
+  return {
+    id: championIdFromIcon(icon) || hero?.id || 0,
+    slug: slug || hero?.alias.toLocaleLowerCase() || '',
+    name,
+    icon,
+  };
+}
+
+// 客户端文本里残留的 @变量@ 占位符和多余空格，读起来像乱码，统一换成「若干」。
+export function cleanEffect(value: string): string {
+  return value
+    .replace(/@[^@\s]*@\s*%?/g, '若干')
+    .replace(/\s+%/g, '%')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function effectFor(slug: string): string {
+  return cleanEffect(AUGMENT_EFFECTS[slug] ?? AUGMENT_EFFECTS[slug.replace(/_/g, '-')] ?? '');
+}
+
+function sectionByHeading($: CheerioAPI, heading: string | RegExp): Cheerio<AnyNode> | null {
   let result: Cheerio<AnyNode> | null = null;
   $('main section').each((_index, element) => {
     if (result) return;
     const firstChildText = cleanText($(element).children().first().text());
-    if (firstChildText === heading) result = $(element);
+    const matches = typeof heading === 'string' ? firstChildText === heading : heading.test(firstChildText);
+    if (matches) result = $(element);
   });
   return result;
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+export function isMayhemSourceUrl(value: string): boolean {
   try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        'User-Agent': 'lolhelp/1.0',
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    if (Buffer.byteLength(html, 'utf8') > MAX_RESPONSE_BYTES) {
-      throw new Error('海克斯大乱斗数据超过大小限制');
-    }
-    return html;
-  } finally {
-    clearTimeout(timeout);
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['arammayhem.com', 'www.op.gg', 'op.gg'].includes(url.hostname);
+  } catch {
+    return false;
   }
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        'User-Agent': 'lolhelp/1.0',
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = await response.text();
-    if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
-      throw new Error('海克斯大乱斗数据超过大小限制');
-    }
-    return JSON.parse(text) as T;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+// ---------------------------------------------------------------------------
+// 英雄强度榜
+// ---------------------------------------------------------------------------
 
-export function parseMayhemTierList(html: string): MayhemTierListResult {
+export function parseMayhemTierList(html: string): Omit<MayhemTierListResult, 'meta'> & {
+  meta: { patch: string; updatedAt: string };
+} {
   const $ = load(html);
-  const subtitle = cleanText($('main h1').first().next('p').text());
-  const patch = subtitle.match(/补丁\s*([\d.]+)/)?.[1] ?? '';
-  const updatedAt = subtitle.match(/数据更新时间[:：]\s*([\d-]+)/)?.[1] ?? '';
+  const pageText = cleanText($('main').text());
+  const patch = pageText.match(/补丁\s*([\d.]+)/)?.[1] ?? pageText.match(/（([\d.]+)\s*版本）/)?.[1] ?? '';
+  const updatedAt = pageText.match(/数据更新时间[:：]\s*([\d-]+)/)?.[1] ?? '';
+  const seen = new Set<string>();
   const entries: MayhemTierListResult['entries'] = [];
 
-  $('main .tier-section').each((_sectionIndex, section) => {
-    const tier = tierFromText(cleanText($(section).children().first().text()));
-    $(section).find('a.champion-card[href*="/build/"]').each((_cardIndex, card) => {
-      const href = $(card).attr('href') ?? '';
-      const slug = href.match(/\/build\/([^/]+)/)?.[1] ?? '';
-      const title = $(card).attr('title') ?? '';
-      const image = absoluteUrl($(card).find('img').first().attr('src'));
-      const name = cleanText($(card).find('img').first().attr('alt'));
-      const championId = finiteNumber(image.match(/champion-icons\/(\d+)\.png/)?.[1]);
-      const rank = finiteNumber(title.match(/排名[:：]\s*#?(\d+)/)?.[1]);
-      const roleValues = ($(card).attr('data-tags') ?? '')
+  $('.tier-section').each((_sectionIndex, section) => {
+    const sectionTier = championTier(
+      $(section).attr('data-tier') ?? cleanText($(section).children().first().text()),
+    );
+    $(section).find('a[href*="/build/"]').each((_cardIndex, card) => {
+      const element = $(card);
+      const slug = slugFrom(element.attr('href'), 'build');
+      if (!slug || seen.has(slug)) return;
+      const title = element.attr('title') ?? '';
+      const image = absoluteUrl(element.find('img').first().attr('src'));
+      const name = cleanText(element.find('img').first().attr('alt'))
+        || cleanText(element.find('[title]').first().attr('title'));
+      const rank = finiteNumber(element.attr('data-hero-rank') ?? title.match(/排名[:：]\s*#?(\d+)/)?.[1]);
+      const winRate = optionalNumber(element.attr('data-win-rate')) ?? percentAfter(title, '胜率') ?? 0;
+      const chip = cleanText(element.find('[class*="tier-chip"]').first().text());
+      const roles = (element.attr('data-tags') ?? '')
         .split(',')
         .map((role) => role.trim())
         .filter((role): role is MayhemChampionRole => VALID_ROLES.has(role as MayhemChampionRole));
-      const trendMatch = cleanText($(card).text()).match(/([▲▼])\s*(\d+)/);
-      const trend = trendMatch
-        ? finiteNumber(trendMatch[2]) * (trendMatch[1] === '▲' ? 1 : -1)
-        : null;
+      if (!name || !rank) return;
 
-      if (!slug || !name || !rank) return;
+      const hero = heroForSlug(slug);
+      seen.add(slug);
       entries.push({
-        id: championId,
+        id: hero?.id ?? championIdFromIcon(image),
         slug,
         name,
+        title: hero?.title ?? '',
+        alias: hero?.alias ?? '',
         image,
         rank,
-        tier,
-        roles: roleValues,
-        winRate: percentFromText(title, '胜率'),
-        pickRate: percentFromText(title, '登场率'),
-        trend,
+        tier: chip ? championTier(chip) : sectionTier,
+        roles,
+        winRate,
+        pickRate: percentAfter(title, '登场率'),
+        trend: trendFromText(cleanText(element.text())),
       });
     });
   });
 
   return {
     entries: entries.sort((left, right) => left.rank - right.rank),
-    meta: { patch, updatedAt, source: 'ARAM Mayhem' },
+    meta: { patch, updatedAt },
   };
 }
 
-export function parseMayhemAugmentRanking(html: string): MayhemAugmentRankingResult {
+// ---------------------------------------------------------------------------
+// 强化符文总榜
+// ---------------------------------------------------------------------------
+
+export function parseMayhemAugmentRanking(html: string): Omit<MayhemAugmentRankingResult, 'meta'> & {
+  meta: Omit<MayhemAugmentRankingResult['meta'], 'source' | 'origin' | 'fetchedAt'>;
+} {
   const $ = load(html);
   const entries: MayhemAugmentRankingResult['entries'] = [];
 
-  $('a.augment-rank-row').each((_index, row) => {
+  // 「本版本新增」区块带效果说明，优先于内置的效果快照。
+  const latestEffects = new Map<string, string>();
+  $('a[data-latest-augment]').each((_index, element) => {
+    const slug = slugFrom($(element).attr('href'), 'augments');
+    const effect = cleanText($(element).find('p').first().text());
+    if (slug && effect) latestEffects.set(slug, effect);
+  });
+
+  $('a.augment-rank-row, a[data-all-rank]').each((_index, row) => {
     const element = $(row);
-    const href = element.attr('href') ?? '';
-    const slug = href.match(/\/augments\/([^/?#]+)/)?.[1] ?? '';
-    const rarityValue = element.attr('data-rarity') ?? '';
-    const availabilityValue = element.attr('data-availability') ?? '';
-    if (!slug || !['prismatic', 'gold', 'silver'].includes(rarityValue)) return;
-    if (!['live', 'removed'].includes(availabilityValue)) return;
+    const slug = slugFrom(element.attr('href'), 'augments');
+    const rarity = rarityFromText(element.attr('data-rarity') ?? '');
+    const availabilityValue = element.attr('data-availability') ?? 'live';
+    if (!slug || !rarity || !['live', 'removed'].includes(availabilityValue)) return;
+    if (entries.some((entry) => entry.slug === slug && entry.availability === availabilityValue)) return;
 
     const images = element.find('img').toArray();
-    const augmentImage = images[0];
-    const name = cleanText($(augmentImage).attr('alt'));
+    const name = cleanText($(images[0]).attr('alt'));
     if (!name) return;
 
+    const children = element.children();
+    const scoreText = cleanText(children.eq(2).text());
     const allRank = finiteNumber(element.attr('data-all-rank'));
     const liveRank = finiteNumber(element.attr('data-live-rank'));
     const availability = availabilityValue as 'live' | 'removed';
-    const children = element.children();
-    const topChampions = images.slice(1).flatMap((image) => {
-      const icon = absoluteUrl($(image).attr('src'));
-      const championName = cleanText($(image).attr('alt'));
-      if (!icon || !championName) return [];
-      return [{
-        id: finiteNumber(icon.match(/champion-icons\/(\d+)\.png/)?.[1]),
-        name: championName,
-        icon,
-      }];
-    });
 
     entries.push({
       slug,
       name,
-      icon: absoluteUrl($(augmentImage).attr('src')),
-      rarity: rarityValue as MayhemAugmentRarity,
+      icon: absoluteUrl($(images[0]).attr('src')),
+      rarity,
       availability,
       rank: availability === 'live' && liveRank > 0 ? liveRank : allRank,
       allRank,
-      winRate: optionalPercentFromText(cleanText(children.eq(2).text())),
-      pickRate: optionalPercentFromText(cleanText(children.eq(3).text())),
+      // 旧版第三列是胜率，新版是等级：两种都认。
+      tier: scoreText.includes('%') ? null : augmentTier(scoreText) || null,
+      winRate: scoreText.includes('%') ? percentAfter(scoreText) : null,
+      pickRate: percentAfter(cleanText(children.eq(3).text())),
       isNew: element.find('span').toArray().some((span) => cleanText($(span).text()) === '新'),
-      topChampions,
+      effect: latestEffects.get(slug) ?? effectFor(slug),
+      topChampions: images.slice(1).flatMap((image) => {
+        const icon = absoluteUrl($(image).attr('src'));
+        const championName = cleanText($(image).attr('alt'));
+        return icon && championName ? [championRef(icon, championName)] : [];
+      }),
     });
   });
 
   const liveEntries = entries.filter((entry) => entry.availability === 'live');
-  const updatedAt = cleanText($('main').text()).match(/数据更新\s*([0-9年月日-]+)/)?.[1] ?? '';
+  const pageText = cleanText($('main').text());
   const rarityCounts = liveEntries.reduce<MayhemAugmentRankingResult['meta']['rarityCounts']>(
     (counts, entry) => ({ ...counts, [entry.rarity]: counts[entry.rarity] + 1 }),
     { prismatic: 0, gold: 0, silver: 0 },
@@ -236,100 +313,109 @@ export function parseMayhemAugmentRanking(html: string): MayhemAugmentRankingRes
   return {
     entries: entries.sort((left, right) => left.allRank - right.allRank),
     meta: {
-      updatedAt,
+      patch: pageText.match(/（([\d.]+)\s*版本）/)?.[1] ?? '',
+      updatedAt: pageText.match(/数据更新\s*[:：]?\s*([0-9年月日-]+)/)?.[1] ?? '',
       activeCount: liveEntries.length,
       removedCount: entries.length - liveEntries.length,
       rarityCounts,
-      source: 'ARAM Mayhem',
     },
   };
 }
 
-function parseStringArray(value: string | undefined): string[] {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
-  } catch {
-    return [];
-  }
-}
+// ---------------------------------------------------------------------------
+// 强化符文详情
+// ---------------------------------------------------------------------------
 
-export function parseMayhemCombos(html: string): MayhemComboResult {
+export function parseMayhemAugmentDetail(html: string, slug: string): MayhemAugmentDetail {
   const $ = load(html);
-  const entries: MayhemComboResult['entries'] = [];
-  const summary = cleanText($('main').text());
-  const summaryMatch = summary.match(/(\d+)\s*个组合[^\d]+(\d+)\s*位英雄/);
-
-  $('main article.combo-card[data-combo-id]').each((index, article) => {
-    const element = $(article);
-    const tierValue = element.attr('data-tier') ?? '';
-    if (!['S+', 'S', 'A', 'B', 'C'].includes(tierValue)) return;
-
-    const comboLink = element.find('a[href*="/combo/"]').first();
-    const buildLink = element.find('a[href*="/build/"]').first();
-    const comboHref = comboLink.attr('href') ?? '';
-    const buildHref = buildLink.attr('href') ?? '';
-    const slug = comboHref.match(/\/combo\/([^/?#]+)/)?.[1] ?? '';
-    const championSlug = buildHref.match(/\/build\/([^/?#]+)/)?.[1] ?? '';
-    const images = element.find('img').toArray();
-    const augmentImage = images[0];
-    const championImage = images[1];
-    const augmentImagePath = $(augmentImage).attr('src') ?? '';
-    const augmentName = cleanText($(augmentImage).attr('alt'));
-    const championName = cleanText($(championImage).attr('alt'));
-    const championIcon = absoluteUrl($(championImage).attr('src'));
-    const id = cleanText(element.attr('data-combo-id'));
-    if (!id || !slug || !augmentName || !championName) return;
-
-    entries.push({
-      id,
-      slug,
-      rank: index + 1,
-      tier: tierValue as MayhemComboTier,
-      types: parseStringArray(element.attr('data-types')),
-      description: cleanText(element.find('p').first().text()),
-      votes: finiteNumber(element.attr('data-upvote-count')),
-      rankScore: finiteNumber(element.attr('data-rank-score')),
-      curated: element.find('span').toArray().some((span) => cleanText($(span).text()) === 'Curated'),
-      champion: {
-        id: finiteNumber(championIcon.match(/champion-icons\/(\d+)\.png/)?.[1]),
-        slug: championSlug,
-        name: championName,
-        icon: championIcon,
-      },
-      augment: {
-        slug: (augmentImagePath.split('/').pop() ?? '')
-          .replace(/_mayhem_augment\.webp$/i, '')
-          .replace(/_/g, '-')
-          .toLocaleLowerCase(),
-        name: augmentName,
-        icon: absoluteUrl(augmentImagePath),
-      },
-      sourceUrl: absoluteUrl(comboHref),
-    });
+  const main = $('main');
+  const name = cleanText(main.find('h1').first().text());
+  const icon = absoluteUrl(main.find(`img[alt="${name.replace(/"/g, '')}"]`).first().attr('src'));
+  const badges = main.find('[data-slot="badge"]').toArray().map((badge) => cleanText($(badge).text()));
+  const stats = new Map<string, string>();
+  main.find('section[aria-label="stats"] > div').each((_index, element) => {
+    const label = cleanText($(element).children().first().text());
+    const value = cleanText($(element).children().eq(1).text());
+    if (label) stats.set(label, value);
   });
 
+  const guide: MayhemAugmentDetail['guide'] = [];
+  const guideRoot = main.find('[data-augment-official-guide]').first();
+  const officialEffect = cleanText(guideRoot.children('p').first().text());
+  guideRoot.find('h3').each((_index, heading) => {
+    const text = cleanText($(heading).nextUntil('h3', 'p').first().text());
+    if (text) guide.push({ title: cleanText($(heading).text()), text });
+  });
+
+  const history = main.find('#trend tbody tr').toArray().flatMap((row) => {
+    const cells = $(row).find('td').toArray().map((cell) => cleanText($(cell).text()));
+    if (cells.length < 5) return [];
+    return [{
+      date: cells[0],
+      patch: cells[1],
+      rank: rankNumber(cells[2]),
+      tier: augmentTier(cells[3]),
+      pickRate: percentAfter(cells[4]),
+    }];
+  });
+
+  const champions: MayhemAugmentChampionFit[] = main.find('#best-champions tbody tr').toArray().flatMap((row) => {
+    const link = $(row).find('a[href*="/build/"]').first();
+    const championSlug = slugFrom(link.attr('href'), 'build');
+    const cells = $(row).find('td').toArray().map((cell) => cleanText($(cell).text()));
+    const championName = cleanText(link.find('span').first().text());
+    if (!championSlug || !championName) return [];
+    return [{
+      slug: championSlug,
+      name: championName,
+      icon: absoluteUrl(link.find('img').first().attr('src')),
+      tier: augmentTier(cells[1] ?? ''),
+      rank: rankNumber(cells[1] ?? ''),
+      pickRate: percentAfter(cells[2] ?? ''),
+      highlight: $(row).find('[data-slot="badge"]').length > 0,
+    }];
+  });
+
+  const pickText = stats.get('登场率') ?? '';
+  const pickDelta = pickText.match(/([▲▼])\s*(\d+(?:\.\d+)?)/);
+
   return {
-    entries,
-    meta: {
-      totalCount: finiteNumber(summaryMatch?.[1], entries.length),
-      championCount: finiteNumber(summaryMatch?.[2]),
-      featuredCount: entries.length,
-      pageSize: 30,
-      pageCount: Math.max(1, Math.ceil(finiteNumber(summaryMatch?.[1], entries.length) / 30)),
-      source: 'ARAM Mayhem',
-    },
+    slug,
+    name,
+    icon,
+    rarity: badges.map(rarityFromText).find((value): value is MayhemAugmentRarity => value !== null) ?? null,
+    tier: augmentTier(stats.get('等级') ?? ''),
+    rank: rankNumber(stats.get('排名') ?? ''),
+    pickRate: percentAfter(pickText),
+    pickDelta: pickDelta ? finiteNumber(pickDelta[2]) * (pickDelta[1] === '▲' ? 1 : -1) : null,
+    patch: (stats.get('当前版本') ?? '').match(/[\d.]+/)?.[0] ?? '',
+    effect: officialEffect || effectFor(slug),
+    guide,
+    history,
+    champions,
+    sourceUrl: `${MAYHEM_BASE_URL}/zh-cn/augments/${slug}/`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 强势组合（组合索引 JSON）
+// ---------------------------------------------------------------------------
+
+interface MayhemComboLookup {
+  id?: string;
+  name?: string;
+  icon?: string;
 }
 
 interface MayhemComboManifestCard {
   id?: string | number;
   slug?: string;
+  publicSlug?: string;
   championId?: string;
   augmentId?: string;
   tier?: string;
   types?: unknown;
+  description?: string;
   champName?: string;
   champIcon?: string;
   championHref?: string;
@@ -343,51 +429,57 @@ interface MayhemComboManifestCard {
 }
 
 interface MayhemComboManifest {
+  schemaVersion?: number;
   cards?: MayhemComboManifestCard[];
+  champions?: MayhemComboLookup[];
+  augments?: MayhemComboLookup[];
+  typeLabels?: Record<string, string>;
   pageSize?: number;
   totalCombos?: number;
 }
 
-export function parseMayhemComboManifest(manifest: MayhemComboManifest): MayhemComboResult {
+export function parseMayhemComboManifest(manifest: MayhemComboManifest): Omit<MayhemComboResult, 'meta'> & {
+  meta: Omit<MayhemComboResult['meta'], 'source' | 'origin' | 'fetchedAt'>;
+} {
   const cards = Array.isArray(manifest.cards) ? manifest.cards : [];
+  const championLookup = new Map((manifest.champions ?? []).map((item) => [cleanText(item.id), item]));
+  const augmentLookup = new Map((manifest.augments ?? []).map((item) => [cleanText(item.id), item]));
+
   const entries = cards.flatMap<MayhemComboResult['entries'][number]>((card, index) => {
     const id = cleanText(String(card.id ?? ''));
-    const slug = cleanText(card.slug);
-    const tier = cleanText(card.tier);
-    const championName = cleanText(card.champName);
-    const championIcon = absoluteUrl(card.champIcon);
-    const championSlug = card.championHref?.match(/\/build\/([^/?#]+)/)?.[1] ?? '';
-    const augmentName = cleanText(card.augmentName);
-    const augmentIcon = absoluteUrl(card.augmentIcon);
-    const comboHref = card.comboHref || `/zh-cn/combo/${slug}/`;
-    if (!id || !slug || !championName || !augmentName || !['S+', 'S', 'A', 'B', 'C'].includes(tier)) {
-      return [];
-    }
+    const slug = cleanText(card.publicSlug || card.slug);
+    const tier = cleanText(card.tier) as MayhemComboTier;
+    const championKey = cleanText(card.championId);
+    const augmentKey = cleanText(card.augmentId);
+    const champion = championLookup.get(championKey);
+    const augment = augmentLookup.get(augmentKey);
+    const championName = cleanText(card.champName || champion?.name);
+    const championIcon = absoluteUrl(card.champIcon || champion?.icon);
+    const augmentName = cleanText(card.augmentName || augment?.name);
+    const augmentIcon = absoluteUrl(card.augmentIcon || augment?.icon);
+    if (!id || !slug || !championName || !augmentName || !VALID_COMBO_TIERS.has(tier)) return [];
 
+    const championSlug = slugFrom(card.championHref, 'build') || championKey.toLocaleLowerCase();
+    const ref = championRef(championIcon, championName, championSlug);
     return [{
       id,
       slug,
       rank: index + 1,
-      tier: tier as MayhemComboTier,
+      tier,
       types: Array.isArray(card.types)
         ? card.types.filter((value): value is string => typeof value === 'string')
         : [],
-      description: cleanText(card.comboDescription),
+      description: cleanText(card.description || card.comboDescription),
       votes: finiteNumber(card.upvoteCount),
       rankScore: finiteNumber(card.rankScore),
       curated: card.comboRef?.startsWith('curated:') ?? false,
-      champion: {
-        id: finiteNumber(championIcon.match(/champion-icons\/(\d+)\.png/)?.[1]),
-        slug: championSlug || cleanText(card.championId).toLocaleLowerCase(),
-        name: championName,
-        icon: championIcon,
-      },
+      champion: { id: ref.id, slug: ref.slug, name: championName, icon: championIcon },
       augment: {
-        slug: cleanText(card.augmentId).replace(/_/g, '-').toLocaleLowerCase(),
+        slug: augmentKey.replace(/_/g, '-').toLocaleLowerCase(),
         name: augmentName,
         icon: augmentIcon,
       },
-      sourceUrl: absoluteUrl(comboHref),
+      sourceUrl: absoluteUrl(card.comboHref || `/zh-cn/combo/${encodeURIComponent(slug)}/`),
     }];
   });
   const totalCount = Math.max(finiteNumber(manifest.totalCombos), entries.length);
@@ -401,85 +493,162 @@ export function parseMayhemComboManifest(manifest: MayhemComboManifest): MayhemC
       featuredCount: entries.length,
       pageSize,
       pageCount: Math.max(1, Math.ceil(totalCount / pageSize)),
-      source: 'ARAM Mayhem',
+      typeLabels: manifest.typeLabels && typeof manifest.typeLabels === 'object' ? manifest.typeLabels : {},
     },
   };
 }
 
-function parseItemGroup($: CheerioAPI, heading: string): MayhemItemBuildOption[] {
-  const section = findSection($, heading);
-  if (!section) return [];
-  const options: MayhemItemBuildOption[] = [];
-  const rows = section.children('div').eq(1).children('div');
+// ---------------------------------------------------------------------------
+// 英雄出装页
+// ---------------------------------------------------------------------------
 
-  rows.each((_rowIndex, row) => {
+function parseItemGroup($: CheerioAPI, headings: string[]): MayhemItemBuildOption[] {
+  const section = headings.map((heading) => sectionByHeading($, heading)).find(Boolean);
+  if (!section) return [];
+  return section.children('div').eq(1).children('div').toArray().flatMap((row) => {
     const items = $(row).find('a[href*="/items/"]').toArray().flatMap((item) => {
-      const name = cleanText($(item).attr('title') ?? $(item).find('img').attr('alt'));
+      const name = cleanText($(item).attr('title') || $(item).text() || $(item).find('img').attr('alt'));
       const icon = absoluteUrl($(item).find('img').attr('src'));
       return name && icon ? [{ name, icon }] : [];
     });
-    const statsText = cleanText($(row).children('div').eq(1).text());
-    if (!items.length) return;
-    options.push({
+    const statsText = cleanText($(row).text());
+    if (!items.length) return [];
+    return [{
       items,
-      pickRate: percentFromText(statsText, '登场率'),
-      winRate: percentFromText(statsText, '胜率'),
-    });
+      pickRate: percentAfter(statsText, '登场率') ?? 0,
+      winRate: percentAfter(statsText, '胜率') ?? 0,
+    }];
   });
-
-  return options;
 }
 
 function parseSkillOrders($: CheerioAPI): MayhemSkillOrder[] {
-  const section = findSection($, '技能主升顺序');
+  const section = sectionByHeading($, '技能主升顺序');
   if (!section) return [];
   const orders: MayhemSkillOrder[] = [];
-
-  section.find('div.rounded-lg').each((_orderIndex, row) => {
-    const summary = $(row).children('div').first();
-    const priority = cleanText(summary.children('span').first().text());
-    if (!priority || !priority.includes('>')) return;
+  section.find('span').each((_index, span) => {
+    const priority = cleanText($(span).text());
+    if (!SKILL_PRIORITY.test(priority)) return;
+    const summary = $(span).parent();
+    const block = summary.parent();
     const summaryText = cleanText(summary.text());
-    const sequences = $(row).find('div.mt-2 > div').toArray().flatMap((sequenceRow) => {
-      const sequence = cleanText($(sequenceRow).children('span').first().text());
-      const text = cleanText($(sequenceRow).text());
-      return sequence ? [{
-        sequence,
-        pickRate: percentFromText(text, '登场率'),
-        winRate: percentFromText(text, '胜率'),
-      }] : [];
+    const sequences = block.find('span').toArray().flatMap((candidate) => {
+      const text = cleanText($(candidate).text());
+      const sequence = text.match(/技能加点序列[:：]\s*([QWER](?:\s+[QWER])+)/)?.[1];
+      if (!sequence) return [];
+      const statsText = cleanText($(candidate).prev().text());
+      return [{
+        sequence: sequence.replace(/\s+/g, ''),
+        pickRate: percentAfter(statsText, '登场率') ?? 0,
+        winRate: percentAfter(statsText, '胜率') ?? 0,
+      }];
     });
     orders.push({
-      priority,
-      pickRate: percentFromText(summaryText, '登场率'),
-      winRate: percentFromText(summaryText, '胜率'),
+      priority: priority.replace(/\s+/g, ''),
+      pickRate: percentAfter(summaryText, '登场率') ?? 0,
+      winRate: percentAfter(summaryText, '胜率') ?? 0,
       sequences,
     });
   });
-
   return orders;
 }
 
-function rarityFromClass(value: string): MayhemAugmentRarity | null {
-  if (value.includes('rarity-prismatic')) return 'prismatic';
-  if (value.includes('rarity-gold')) return 'gold';
-  if (value.includes('rarity-silver')) return 'silver';
-  return null;
+function parseBuildAugments($: CheerioAPI): MayhemAugmentRecommendation[] {
+  const root = $('#best-augments');
+  const augments: MayhemAugmentRecommendation[] = [];
+  root.find('h3').each((_index, heading) => {
+    const rarity = rarityFromText(cleanText($(heading).text()));
+    if (!rarity) return;
+    $(heading).next().find('a[href*="/augments/"]').each((_linkIndex, link) => {
+      const element = $(link);
+      const slug = slugFrom(element.attr('href'), 'augments');
+      const name = cleanText(element.find('img').first().attr('alt'))
+        || cleanText(element.find('[title]').first().attr('title'));
+      if (!slug || !name) return;
+      const rarityRank = cleanText(element.find('[data-recommendation-rank="rarity"]').text());
+      const overallRank = cleanText(element.find('[data-recommendation-rank="overall"]').text())
+        .replace(/^总榜\s*/, '');
+      const text = cleanText(element.text());
+      augments.push({
+        slug,
+        name,
+        rarity,
+        icon: absoluteUrl(element.find('img').first().attr('src')),
+        tier: augmentTier(rarityRank),
+        rarityRank: rankNumber(rarityRank),
+        overallTier: augmentTier(overallRank),
+        overallRank: rankNumber(overallRank),
+        pickRate: percentAfter(text, '登场率'),
+        winRate: percentAfter(text, '胜率'),
+        effect: effectFor(slug),
+      });
+    });
+  });
+  return augments;
+}
+
+function parseBuildCombos($: CheerioAPI): MayhemBuildCombo[] {
+  return $('#combos article[data-combo-card]').toArray().flatMap((article) => {
+    const element = $(article);
+    const link = element.find('a[href*="/combo/"]').last();
+    const slug = slugFrom(link.attr('href'), 'combo');
+    if (!slug) return [];
+    const badges = link.find('[data-slot="badge"]').toArray().map((badge) => cleanText($(badge).text()));
+    const title = cleanText(link.find('span').first().text()).replace(/\s*组合$/, '');
+    return [{
+      slug,
+      title,
+      tier: badges.find((badge) => /^[SABCD][+-]?$/.test(badge)) ?? '',
+      types: badges.filter((badge) => !/^[SABCD][+-]?$/.test(badge)),
+      description: cleanText(link.find('p').first().text()),
+      augments: element.find('img').toArray().flatMap((image) => {
+        const name = cleanText($(image).attr('alt'));
+        const icon = absoluteUrl($(image).attr('src'));
+        return name && icon ? [{ name, icon }] : [];
+      }),
+      sourceUrl: absoluteUrl(link.attr('href')),
+    }];
+  });
+}
+
+function parsePartners($: CheerioAPI): MayhemPartner[] {
+  return $('#best-partners a[href*="/build/"]').toArray().flatMap((link) => {
+    const element = $(link);
+    const slug = slugFrom(element.attr('href'), 'build');
+    const name = cleanText(element.find('span').first().text()).replace(/^#\d+\s*/, '')
+      || cleanText(element.find('img').attr('alt'));
+    const text = cleanText(element.text());
+    if (!slug || !name) return [];
+    return [{
+      slug,
+      name,
+      icon: absoluteUrl(element.find('img').first().attr('src')),
+      winRate: percentAfter(text, '胜率') ?? 0,
+      pickRate: percentAfter(text, '登场率') ?? 0,
+    }];
+  });
 }
 
 export function parseMayhemChampionBuild(html: string, slug: string): MayhemChampionBuild {
   const $ = load(html);
-  const h1 = $('main h1').first();
-  const h1Text = cleanText(h1.text());
-  const portrait = $('main img[width="96"]').first();
-  const name = cleanText(portrait.attr('alt')) || cleanText(h1Text.split(/\s(?:S\+|S|A|B|C|D)\s/)[0]);
-  const aliasLine = cleanText(h1.next('p').text());
-  const alias = cleanText(aliasLine.split('·').slice(1).join('·'));
-  const profile = h1.parent();
-  const profileText = cleanText(profile.text());
-  const roles = profile.find('span[data-slot="badge"]').toArray()
-    .map((badge) => cleanText($(badge).text()))
-    .filter((role) => ['刺客', '战士', '法师', '射手', '辅助', '坦克'].includes(role));
+  const header = $('#champion-summary').length ? $('#champion-summary') : $('main');
+  const headerText = cleanText(header.text());
+  const portrait = header.find('img').first();
+  const name = cleanText(portrait.attr('alt')) || cleanText(header.find('h1').first().text()).replace(/\s*海克斯大乱斗出装$/, '');
+
+  const facts = new Map<string, string>();
+  header.find('dt').each((_index, term) => {
+    facts.set(cleanText($(term).text()), cleanText($(term).next('dd').text()));
+  });
+  const tierFact = facts.get('梯队') ?? '';
+  const badges = header.find('[data-slot="badge"]').toArray().map((badge) => cleanText($(badge).text()));
+  const tierBadge = badges.find((badge) => VALID_TIERS.has(badge as MayhemChampionTier));
+  const aliasLine = header.find('p').toArray()
+    .map((paragraph) => cleanText($(paragraph).text()))
+    .find((text) => text.includes('·') && !text.includes('版本')) ?? '';
+  const summary = header.find('p').toArray()
+    .map((paragraph) => cleanText($(paragraph).text()))
+    .find((text) => text.includes('级强度')) ?? '';
+
   const balance = $('[title="大乱斗平衡改动"]').toArray().map((modifier) => {
     const parts = $(modifier).children('span').toArray().map((part) => cleanText($(part).text()));
     const arrow = parts[0] ?? '';
@@ -490,89 +659,206 @@ export function parseMayhemChampionBuild(html: string, slug: string): MayhemCham
     };
   }).filter((modifier) => modifier.label && modifier.value);
 
-  const augments = $('a[href*="/augments/"]').toArray().flatMap((augment) => {
-    const className = $(augment).attr('class') ?? '';
-    if (!className.includes('items-start')) return [];
-    const rarity = rarityFromClass(className);
-    const href = $(augment).attr('href') ?? '';
-    const augmentSlug = href.match(/\/augments\/([^/?#]+)/)?.[1] ?? '';
-    const augmentName = cleanText($(augment).find('img').attr('alt'));
-    if (!rarity || !augmentSlug || !augmentName) return [];
-    return [{
-      slug: augmentSlug,
-      name: augmentName,
-      rarity,
-      icon: absoluteUrl($(augment).find('img').attr('src')),
-      winRate: percentFromText(cleanText($(augment).text()), '胜率'),
-      effect: cleanText($(augment).find('div.mt-2').last().text()),
-    }];
-  });
-
   const itemGroups: Record<MayhemItemGroupKey, MayhemItemBuildOption[]> = {
-    starting: parseItemGroup($, '出门装'),
-    boots: parseItemGroup($, '鞋子'),
-    core: parseItemGroup($, '核心出装'),
-    late: parseItemGroup($, '后期出装'),
+    starting: parseItemGroup($, ['出门装']),
+    boots: parseItemGroup($, ['鞋子']),
+    core: parseItemGroup($, ['核心出装']),
+    late: parseItemGroup($, ['其他成装', '后期出装']),
   };
+  const hero = heroForSlug(slug);
 
   return {
     slug,
+    id: hero?.id ?? 0,
     name,
-    alias,
+    alias: hero?.alias ?? '',
+    title: cleanText(aliasLine.split('·').slice(1).join('·')) || hero?.title || '',
     image: absoluteUrl(portrait.attr('src')),
-    tier: tierFromText(h1Text.match(/\s(S\+|S|A|B|C|D)\s*级/)?.[1] ?? h1Text),
-    roles,
-    winRate: percentFromText(profileText.match(/\d+(?:\.\d+)?%\s*WR/i)?.[0] ?? ''),
-    pickRate: percentFromText(profileText.match(/\d+(?:\.\d+)?%\s*PR/i)?.[0] ?? ''),
-    patch: profileText.match(/补丁[:：]\s*([\d.]+)/)?.[1] ?? '',
+    tier: championTier(tierBadge ?? tierFact),
+    rank: rankNumber(tierFact),
+    trend: trendFromText(tierFact),
+    roles: badges.filter((badge) => ROLE_NAMES_ZH.includes(badge)),
+    winRate: percentAfter(facts.get('胜率') ?? '') ?? percentAfter(headerText, '胜率') ?? 0,
+    pickRate: percentAfter(facts.get('登场率') ?? '') ?? percentAfter(headerText, '登场率') ?? 0,
+    patch: headerText.match(/补丁[:：]\s*([\d.]+)/)?.[1] ?? '',
+    updatedAt: (facts.get('数据日期') ?? '').match(/[\d-]{8,10}/)?.[0] ?? '',
+    summary,
     balance,
     skillOrders: parseSkillOrders($),
     itemGroups,
-    augments,
+    augments: parseBuildAugments($),
+    combos: parseBuildCombos($),
+    partners: parsePartners($),
     sourceUrl: `${MAYHEM_BASE_URL}/zh-cn/build/${slug}/`,
   };
 }
 
-export async function getMayhemTierList(refresh = false): Promise<MayhemTierListResult> {
-  if (!refresh && tierListCache && tierListCache.expiresAt > Date.now()) return tierListCache.value;
+// ---------------------------------------------------------------------------
+// 请求 + 缓存（内存 15 分钟；失败时退回磁盘上次成功的结果）
+// ---------------------------------------------------------------------------
+
+async function fetchText(url: string, accept: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const html = await fetchHtml(MAYHEM_TIER_LIST_URL);
-    const value = parseMayhemTierList(html);
-    if (!value.entries.length) throw new Error('没有解析到海克斯大乱斗英雄数据');
-    tierListCache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-    return value;
+    const response = await fetch(url, {
+      headers: {
+        Accept: accept,
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'User-Agent': 'Mozilla/5.0 lolhelp/1.0',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`数据源返回 HTTP ${response.status}`);
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) throw new Error('数据源返回的内容过大');
+    return text;
   } catch (error) {
-    if (tierListCache) return { ...tierListCache.value, error: '刷新失败，当前显示上一次的数据' };
+    if (error instanceof Error && error.name === 'AbortError') throw new Error('数据源响应超时');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+interface Loaded<T> {
+  value: T;
+  origin: MayhemDataOrigin;
+  fetchedAt: string;
+  error?: string;
+}
+
+const memoryCache = new Map<string, { expiresAt: number; loaded: Loaded<unknown> }>();
+
+async function loadWithFallback<T>(
+  key: string,
+  refresh: boolean,
+  loader: () => Promise<T>,
+): Promise<Loaded<T>> {
+  const memory = memoryCache.get(key) as { expiresAt: number; loaded: Loaded<T> } | undefined;
+  if (!refresh && memory && memory.expiresAt > Date.now()) return memory.loaded;
+  try {
+    const value = await loader();
+    const loaded: Loaded<T> = { value, origin: 'live', fetchedAt: new Date().toISOString() };
+    memoryCache.set(key, { loaded, expiresAt: Date.now() + CACHE_TTL_MS });
+    writeDiskCache(`mayhem-${key}`, value);
+    return loaded;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : '数据源暂时不可用';
+    const fallback = memory?.loaded.value !== undefined
+      ? { value: memory.loaded.value, savedAt: memory.loaded.fetchedAt }
+      : readDiskCache<T>(`mayhem-${key}`);
+    if (fallback) {
+      return {
+        value: fallback.value,
+        origin: 'cache',
+        fetchedAt: fallback.savedAt,
+        error: `${reason}，先展示本机上次保存的数据`,
+      };
+    }
+    throw new Error(reason);
+  }
+}
+
+// arammayhem 有些图标文件名带 ' 或 !（Don't_Blink…），浏览器请求时会被编码成 %27，
+// 服务器又重定向回原样，形成无限重定向。这类图标改用 CommunityDragon 的官方游戏图标。
+const CDRAGON_AUGMENTS_URL = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json';
+const CDRAGON_ASSET_BASE = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/';
+let iconFallbacks: { expiresAt: number; map: Map<string, string> } | null = null;
+
+interface CdragonAugment {
+  augmentNameId?: string;
+  nameTRA?: string;
+  augmentSmallIconPath?: string;
+}
+
+export function needsIconFallback(icon: string): boolean {
+  let decoded = icon;
+  try {
+    decoded = decodeURI(icon);
+  } catch {
+    // 编码不合法时按原样判断
+  }
+  return /['!]/.test(decoded);
+}
+
+async function loadIconFallbacks(): Promise<Map<string, string>> {
+  if (iconFallbacks && iconFallbacks.expiresAt > Date.now()) return iconFallbacks.map;
+  const map = new Map<string, string>();
+  try {
+    const rows = JSON.parse(await fetchText(CDRAGON_AUGMENTS_URL, 'application/json')) as CdragonAugment[];
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const name = cleanText(row.nameTRA);
+      const path = (row.augmentSmallIconPath ?? '').replace(/^\/lol-game-data\/assets\//i, '').toLocaleLowerCase();
+      if (!name || !path) continue;
+      // 同名强化（斗魂竞技场 / 大乱斗）优先取大乱斗那份
+      const mayhem = /^aram_/i.test(row.augmentNameId ?? '') || path.includes('/kiwi/');
+      if (!map.has(name) || mayhem) map.set(name, `${CDRAGON_ASSET_BASE}${path}`);
+    }
+  } catch {
+    // 拿不到就保持原图标
+  }
+  iconFallbacks = { expiresAt: Date.now() + 6 * 60 * 60_000, map };
+  return map;
+}
+
+async function withIconFallbacks<T extends { name: string; icon: string }>(items: T[]): Promise<T[]> {
+  if (!items.some((item) => needsIconFallback(item.icon))) return items;
+  const map = await loadIconFallbacks();
+  return items.map((item) => (needsIconFallback(item.icon) && map.has(item.name)
+    ? { ...item, icon: map.get(item.name) as string }
+    : item));
+}
+
+function sourceMeta(loaded: Loaded<unknown>) {
+  return { source: SOURCE_NAME, origin: loaded.origin, fetchedAt: loaded.fetchedAt };
+}
+
+export async function getMayhemTierList(refresh = false): Promise<MayhemTierListResult> {
+  try {
+    const loaded = await loadWithFallback('tier-list', refresh, async () => {
+      const parsed = parseMayhemTierList(await fetchText(MAYHEM_TIER_LIST_URL, 'text/html'));
+      if (!parsed.entries.length) throw new Error('数据源页面结构变了，没能读出英雄强度榜');
+      return parsed;
+    });
+    return {
+      entries: loaded.value.entries,
+      meta: { ...loaded.value.meta, ...sourceMeta(loaded) },
+      error: loaded.error,
+    };
+  } catch (error) {
     return {
       entries: [],
-      meta: { patch: '', updatedAt: '', source: 'ARAM Mayhem' },
+      meta: { patch: '', updatedAt: '', source: SOURCE_NAME, origin: 'live', fetchedAt: '' },
       error: error instanceof Error ? error.message : '海克斯大乱斗强度榜获取失败',
     };
   }
 }
 
 export async function getMayhemAugmentRanking(refresh = false): Promise<MayhemAugmentRankingResult> {
-  if (!refresh && augmentRankingCache && augmentRankingCache.expiresAt > Date.now()) {
-    return augmentRankingCache.value;
-  }
   try {
-    const html = await fetchHtml(MAYHEM_AUGMENTS_URL);
-    const value = parseMayhemAugmentRanking(html);
-    if (!value.entries.length) throw new Error('没有解析到海克斯大乱斗强化符文数据');
-    augmentRankingCache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-    return value;
+    const loaded = await loadWithFallback('augments', refresh, async () => {
+      const parsed = parseMayhemAugmentRanking(await fetchText(MAYHEM_AUGMENTS_URL, 'text/html'));
+      if (!parsed.entries.length) throw new Error('数据源页面结构变了，没能读出强化符文');
+      return parsed;
+    });
+    return {
+      entries: await withIconFallbacks(loaded.value.entries),
+      meta: { ...loaded.value.meta, ...sourceMeta(loaded) },
+      error: loaded.error,
+    };
   } catch (error) {
-    if (augmentRankingCache) {
-      return { ...augmentRankingCache.value, error: '刷新失败，当前显示上一次的数据' };
-    }
     return {
       entries: [],
       meta: {
+        patch: '',
         updatedAt: '',
         activeCount: 0,
         removedCount: 0,
         rarityCounts: { prismatic: 0, gold: 0, silver: 0 },
-        source: 'ARAM Mayhem',
+        source: SOURCE_NAME,
+        origin: 'live',
+        fetchedAt: '',
       },
       error: error instanceof Error ? error.message : '强化符文排行获取失败',
     };
@@ -580,15 +866,20 @@ export async function getMayhemAugmentRanking(refresh = false): Promise<MayhemAu
 }
 
 export async function getMayhemCombos(refresh = false): Promise<MayhemComboResult> {
-  if (!refresh && comboCache && comboCache.expiresAt > Date.now()) return comboCache.value;
   try {
-    const manifest = await fetchJson<MayhemComboManifest>(MAYHEM_COMBOS_INDEX_URL);
-    const value = parseMayhemComboManifest(manifest);
-    if (!value.entries.length) throw new Error('没有解析到海克斯大乱斗强势组合');
-    comboCache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-    return value;
+    const loaded = await loadWithFallback('combos', refresh, async () => {
+      const manifest = JSON.parse(await fetchText(MAYHEM_COMBOS_INDEX_URL, 'application/json')) as MayhemComboManifest;
+      const parsed = parseMayhemComboManifest(manifest);
+      if (!parsed.entries.length) throw new Error('数据源格式变了，没能读出强势组合');
+      return parsed;
+    });
+    const augments = await withIconFallbacks(loaded.value.entries.map((entry) => entry.augment));
+    return {
+      entries: loaded.value.entries.map((entry, index) => ({ ...entry, augment: augments[index] })),
+      meta: { ...loaded.value.meta, ...sourceMeta(loaded) },
+      error: loaded.error,
+    };
   } catch (error) {
-    if (comboCache) return { ...comboCache.value, error: '刷新失败，当前显示上一次的数据' };
     return {
       entries: [],
       meta: {
@@ -597,7 +888,10 @@ export async function getMayhemCombos(refresh = false): Promise<MayhemComboResul
         featuredCount: 0,
         pageSize: 30,
         pageCount: 1,
-        source: 'ARAM Mayhem',
+        typeLabels: {},
+        source: SOURCE_NAME,
+        origin: 'live',
+        fetchedAt: '',
       },
       error: error instanceof Error ? error.message : '强势组合获取失败',
     };
@@ -606,24 +900,38 @@ export async function getMayhemCombos(refresh = false): Promise<MayhemComboResul
 
 export async function getMayhemChampionBuild(slug: string, refresh = false): Promise<MayhemChampionBuildResult> {
   const normalizedSlug = slug.trim().toLocaleLowerCase();
-  if (!/^[a-z0-9-]{1,48}$/.test(normalizedSlug)) {
-    return { build: null, error: '英雄标识无效' };
-  }
-
-  const cached = buildCache.get(normalizedSlug);
-  if (!refresh && cached && cached.expiresAt > Date.now()) return cached.value;
+  if (!SLUG_PATTERN.test(normalizedSlug)) return { build: null, error: '英雄标识无效' };
   try {
-    const html = await fetchHtml(`${MAYHEM_BASE_URL}/zh-cn/build/${normalizedSlug}/`);
-    const build = parseMayhemChampionBuild(html, normalizedSlug);
-    if (!build.name) throw new Error('没有解析到英雄详情');
-    const value = { build };
-    buildCache.set(normalizedSlug, { value, expiresAt: Date.now() + CACHE_TTL_MS });
-    return value;
-  } catch (error) {
-    if (cached) return { ...cached.value, error: '刷新失败，当前显示上一次的数据' };
+    const loaded = await loadWithFallback(`build-${normalizedSlug}`, refresh, async () => {
+      const html = await fetchText(`${MAYHEM_BASE_URL}/zh-cn/build/${normalizedSlug}/`, 'text/html');
+      const build = parseMayhemChampionBuild(html, normalizedSlug);
+      if (!build.name) throw new Error('数据源页面结构变了，没能读出英雄出装');
+      return build;
+    });
+    const build = loaded.value;
     return {
-      build: null,
-      error: error instanceof Error ? error.message : '海克斯大乱斗英雄详情获取失败',
+      build: { ...build, augments: await withIconFallbacks(build.augments) },
+      origin: loaded.origin,
+      error: loaded.error,
     };
+  } catch (error) {
+    return { build: null, error: error instanceof Error ? error.message : '海克斯大乱斗英雄详情获取失败' };
+  }
+}
+
+export async function getMayhemAugmentDetail(slug: string, refresh = false): Promise<MayhemAugmentDetailResult> {
+  const normalizedSlug = slug.trim().toLocaleLowerCase();
+  if (!SLUG_PATTERN.test(normalizedSlug)) return { detail: null, error: '强化符文标识无效' };
+  try {
+    const loaded = await loadWithFallback(`augment-${normalizedSlug}`, refresh, async () => {
+      const html = await fetchText(`${MAYHEM_BASE_URL}/zh-cn/augments/${normalizedSlug}/`, 'text/html');
+      const detail = parseMayhemAugmentDetail(html, normalizedSlug);
+      if (!detail.name) throw new Error('数据源页面结构变了，没能读出强化符文详情');
+      return detail;
+    });
+    const [detail] = await withIconFallbacks([loaded.value]);
+    return { detail, origin: loaded.origin, error: loaded.error };
+  } catch (error) {
+    return { detail: null, error: error instanceof Error ? error.message : '强化符文详情获取失败' };
   }
 }

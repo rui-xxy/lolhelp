@@ -125,6 +125,8 @@
   --color-rarity-prismatic: #A88BC9;
   --color-rarity-gold: #CFA35A;
   --color-rarity-silver: #8EA1AD;
+  /* 强化图标是浅色线稿，深浅模式下都垫一层暗色底座 */
+  --color-augment-well: #232424;
 
   /* ---------- 字体 ---------- */
   --font-sans: Inter, "Microsoft YaHei UI", "PingFang SC", "Segoe UI",

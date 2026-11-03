@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowLeft,
+  BookOpen,
+  CloudOff,
   Crosshair,
   Gem,
   HeartHandshake,
+  Radio,
   RefreshCw,
   Search,
   Shield,
@@ -15,28 +17,39 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
-  MayhemAugmentRarity,
+  LiveBattleInfo,
+  MayhemAugmentRankingResult,
   MayhemChampionBuild,
   MayhemChampionEntry,
   MayhemChampionRole,
-  MayhemChampionTier,
-  MayhemItemBuildOption,
-  MayhemItemGroupKey,
+  MayhemSourceMeta,
   MayhemTierListResult,
 } from '../../../shared/api';
-import { MayhemAugmentRanking } from './MayhemAugmentRanking';
-import { MayhemComboRanking } from './MayhemComboRanking';
-import { formatUpdatedAt } from '../../lib/utils';
+import { cn, formatUpdatedAt } from '../../lib/utils';
+import { MayhemAugmentCodex } from './MayhemAugmentCodex';
+import { MayhemComboBoard } from './MayhemComboRanking';
+import { MayhemPlaybook } from './MayhemPlaybook';
+import {
+  CHAMPION_TIER_COPY,
+  CHAMPION_TIER_ORDER,
+  championForId,
+  liveMayhemTeam,
+  matchesChampion,
+  percent,
+  tierToken,
+} from './mayhemModel';
+import { GradeChip, Portrait } from './rankingParts';
 
+type MayhemTab = 'champions' | 'augments' | 'combos';
 type RoleFilter = 'all' | MayhemChampionRole;
 
-interface RoleOption {
-  value: RoleFilter;
-  label: string;
-  icon: LucideIcon;
-}
+const TABS: Array<{ value: MayhemTab; label: string; icon: LucideIcon }> = [
+  { value: 'champions', label: '英雄攻略', icon: BookOpen },
+  { value: 'augments', label: '强化图鉴', icon: Gem },
+  { value: 'combos', label: '强势组合', icon: Sparkles },
+];
 
-const ROLE_OPTIONS: RoleOption[] = [
+const ROLES: Array<{ value: RoleFilter; label: string; icon: LucideIcon }> = [
   { value: 'all', label: '全部', icon: Sparkles },
   { value: 'assassin', label: '刺客', icon: Zap },
   { value: 'fighter', label: '战士', icon: Swords },
@@ -46,493 +59,330 @@ const ROLE_OPTIONS: RoleOption[] = [
   { value: 'tank', label: '坦克', icon: Shield },
 ];
 
-const ROLE_LABELS: Record<MayhemChampionRole, string> = {
-  assassin: '刺客',
-  fighter: '战士',
-  mage: '法师',
-  marksman: '射手',
-  support: '辅助',
-  tank: '坦克',
-};
-
-const TIER_ORDER: MayhemChampionTier[] = ['S+', 'S', 'A', 'B', 'C', 'D'];
-const TIER_COPY: Record<MayhemChampionTier, string> = {
-  'S+': '神级',
-  S: '强势',
-  A: '优秀',
-  B: '均衡',
-  C: '偏弱',
-  D: '艰难',
-};
-
-const ITEM_GROUP_COPY: Record<MayhemItemGroupKey, { title: string; note: string }> = {
-  starting: { title: '优先装备', note: '单件选择' },
-  boots: { title: '鞋子', note: '移动方案' },
-  core: { title: '核心组合', note: '三件套路线' },
-  late: { title: '前期组件', note: '开局过渡' },
-};
-
-const RARITY_COPY: Record<MayhemAugmentRarity, string> = {
-  prismatic: '棱彩',
-  gold: '金色',
-  silver: '银色',
-};
-
-function compactPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
-}
-
-function RoleFilters({ value, onChange }: { value: RoleFilter; onChange: (value: RoleFilter) => void }) {
+export function SourcePill({ meta, patch, updatedAt }: { meta?: MayhemSourceMeta; patch?: string; updatedAt?: string }) {
+  if (!meta?.fetchedAt) return null;
+  const cached = meta.origin === 'cache';
   return (
-    <div className="mayhem-role-filter" role="tablist" aria-label="英雄职业">
-      {ROLE_OPTIONS.map((option) => {
-        const Icon = option.icon;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={option.value === value}
-            className={option.value === value ? 'is-active' : ''}
-            onClick={() => onChange(option.value)}
-            title={option.label}
-          >
-            <Icon className="size-3.5" />
-            <span>{option.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function TierHeroCard({ champion, onOpen }: { champion: MayhemChampionEntry; onOpen: () => void }) {
-  return (
-    <motion.button
-      layout="position"
-      type="button"
-      className="mayhem-hero-card"
-      onClick={onOpen}
-      whileHover={{ y: -1 }}
-      transition={{ duration: 0.14 }}
+    <span
+      className={cn('mh-source', cached && 'is-cache')}
+      title={cached ? `数据源暂时连不上，这是 ${formatUpdatedAt(meta.fetchedAt)} 保存在本机的数据` : `数据来自 ${meta.source}`}
     >
-      <span className="mayhem-hero-rank">{String(champion.rank).padStart(2, '0')}</span>
-      <img src={champion.image} alt={champion.name} />
-      <span className="mayhem-hero-copy">
-        <strong>{champion.name}</strong>
-        <small>{champion.roles.slice(0, 2).map((role) => ROLE_LABELS[role]).join(' / ')}</small>
+      {cached ? <CloudOff className="size-3.5" /> : <Radio className="size-3.5" />}
+      <span className="num">
+        {patch ? `${patch} 版本` : meta.source}
+        {updatedAt ? ` · ${updatedAt} 数据` : ''}
+        {cached ? ' · 离线缓存' : ''}
       </span>
-      <span className="mayhem-hero-rate">
-        <strong>{compactPercent(champion.winRate)}</strong>
-        <small>{compactPercent(champion.pickRate)} 登场</small>
-      </span>
-    </motion.button>
-  );
-}
-
-function ItemIcons({ option }: { option: MayhemItemBuildOption }) {
-  return (
-    <span className="mayhem-item-icons">
-      {option.items.map((item) => (
-        <span key={`${item.name}:${item.icon}`} title={item.name}>
-          <img src={item.icon} alt={item.name} />
-        </span>
-      ))}
     </span>
   );
 }
 
-function ItemBuildSection({
-  groupKey,
-  options,
+function LiveTeamCard({
+  team,
+  entries,
+  selectedSlug,
+  onOpen,
 }: {
-  groupKey: MayhemItemGroupKey;
-  options: MayhemItemBuildOption[];
+  team: ReturnType<typeof liveMayhemTeam>;
+  entries: MayhemChampionEntry[];
+  selectedSlug: string | null;
+  onOpen: (slug: string) => void;
 }) {
-  const copy = ITEM_GROUP_COPY[groupKey];
+  if (!team) return null;
+  const members = team.championIds.map((id) => ({ id, entry: championForId(entries, id) }));
+  const strongest = members
+    .flatMap((member) => (member.entry ? [member.entry] : []))
+    .sort((a, b) => a.rank - b.rank)[0];
   return (
-    <section className={`mayhem-build-group mayhem-build-group--${groupKey}`}>
+    <section className="mh-live">
       <header>
-        <h3>{copy.title}</h3>
-        <span>{copy.note}</span>
+        <span className="mh-live__pulse" aria-hidden="true" />
+        <strong>{team.phase === 'ChampSelect' ? '正在选英雄' : '本局阵容'}</strong>
+        {strongest && <small>队里最强：{strongest.name} {strongest.tier}</small>}
       </header>
-      <div className="mayhem-build-options">
-        {options.slice(0, groupKey === 'core' ? 5 : 4).map((option, index) => (
-          <div key={`${groupKey}:${index}`} className="mayhem-build-option">
-            <ItemIcons option={option} />
-            <span className="mayhem-build-option-stats">
-              <strong>{compactPercent(option.winRate)}</strong>
-              <small>{compactPercent(option.pickRate)} 使用</small>
-            </span>
-          </div>
+      <div className="mh-live__team">
+        {members.map(({ id, entry }) => (
+          <button
+            key={id}
+            type="button"
+            className={cn('mh-live__member', id === team.myChampionId && 'is-me', entry?.slug === selectedSlug && 'is-selected')}
+            disabled={!entry}
+            onClick={() => entry && onOpen(entry.slug)}
+            title={entry ? `${entry.name} · ${entry.tier} · 胜率 ${percent(entry.winRate)}` : '暂无这个英雄的数据'}
+          >
+            <Portrait src={entry?.image} fallbackId={id} name={entry?.name ?? '?'} size={40} />
+            {entry && <GradeChip label={entry.tier} />}
+            {id === team.myChampionId && <em>你</em>}
+          </button>
         ))}
       </div>
     </section>
   );
 }
 
-function AugmentColumns({ build }: { build: MayhemChampionBuild }) {
-  return (
-    <section className="mayhem-detail-section">
-      <div className="mayhem-section-heading">
-        <div>
-          <span className="mayhem-section-kicker">AUGMENT SIGNAL</span>
-          <h2>强化推荐</h2>
-        </div>
-      </div>
-      <div className="mayhem-augment-columns">
-        {(['prismatic', 'gold', 'silver'] as const).map((rarity) => {
-          const entries = build.augments.filter((augment) => augment.rarity === rarity).slice(0, 6);
-          return (
-            <div key={rarity} className={`mayhem-augment-column mayhem-augment-column--${rarity}`}>
-              <header>
-                <Gem className="size-3.5" />
-                <strong>{RARITY_COPY[rarity]}</strong>
-                <span>{entries.length}</span>
-              </header>
-              <div>
-                {entries.map((augment) => (
-                  <div
-                    key={augment.slug}
-                    className="mayhem-augment-row"
-                    tabIndex={0}
-                    aria-label={`${augment.name}，胜率 ${compactPercent(augment.winRate)}。${augment.effect}`}
-                  >
-                    <img src={augment.icon} alt={augment.name} />
-                    <span>
-                      <strong>{augment.name}</strong>
-                      <small>{augment.effect}</small>
-                    </span>
-                    <b>{compactPercent(augment.winRate)}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function BuildDetail({ build, onBack }: { build: MayhemChampionBuild; onBack: () => void }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const mainSkill = build.skillOrders[0];
+function ChampionRail({
+  entries,
+  loading,
+  selectedSlug,
+  onOpen,
+  team,
+}: {
+  entries: MayhemChampionEntry[];
+  loading: boolean;
+  selectedSlug: string | null;
+  onOpen: (slug: string) => void;
+  team: ReturnType<typeof liveMayhemTeam>;
+}) {
+  const [role, setRole] = useState<RoleFilter>('all');
+  const [search, setSearch] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+  const keyword = search.trim().toLocaleLowerCase();
+  const groups = useMemo(() => {
+    const visible = entries.filter((entry) => (role === 'all' || entry.roles.includes(role)) && matchesChampion(entry, keyword));
+    return CHAMPION_TIER_ORDER
+      .map((tier) => ({ tier, entries: visible.filter((entry) => entry.tier === tier) }))
+      .filter((group) => group.entries.length > 0);
+  }, [entries, keyword, role]);
+  const teamIds = new Set(team?.championIds ?? []);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [build.slug]);
+    listRef.current?.querySelector('.mh-rail__row.is-selected')?.scrollIntoView({ block: 'nearest' });
+  }, [selectedSlug]);
 
   return (
-    <motion.div
-      ref={scrollRef}
-      key={build.slug}
-      className="mayhem-detail-scroll"
-      initial={{ opacity: 0, x: 12 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 8 }}
-      transition={{ duration: 0.2 }}
-    >
-      <button type="button" className="mayhem-back" onClick={onBack}>
-        <ArrowLeft className="size-3.5" />
-        返回强度榜
-      </button>
-
-      <section className="mayhem-profile-band">
-        <div className={`mayhem-profile-tier mayhem-tier-tone--${build.tier.replace('+', 'plus')}`}>
-          {build.tier}
+    <aside className="mh-rail">
+      <LiveTeamCard team={team} entries={entries} selectedSlug={selectedSlug} onOpen={onOpen} />
+      <div className="mh-rail__filters">
+        <label className="rk-search mh-rail__search">
+          <Search className="size-3.5" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="找英雄：提莫 / 迅捷斥候 / teemo" />
+        </label>
+        <div className="mh-roles" role="tablist" aria-label="职业">
+          {ROLES.map((option) => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={role === option.value}
+                className={cn(role === option.value && 'is-active')}
+                onClick={() => setRole(option.value)}
+                title={option.label}
+              >
+                <Icon className="size-3.5" />
+                <span>{option.label}</span>
+              </button>
+            );
+          })}
         </div>
-        <img className="mayhem-profile-avatar" src={build.image} alt={build.name} />
-        <div className="mayhem-profile-copy">
-          <span>{build.alias || '英雄档案'}</span>
-          <h1>{build.name}</h1>
-          <p>{build.roles.join(' · ')}</p>
-        </div>
-        <div className="mayhem-profile-stat">
-          <small>胜率</small>
-          <strong>{compactPercent(build.winRate)}</strong>
-        </div>
-        <div className="mayhem-profile-stat">
-          <small>登场率</small>
-          <strong>{compactPercent(build.pickRate)}</strong>
-        </div>
-        <div className="mayhem-profile-balance">
-          {build.balance.length > 0 ? build.balance.map((modifier) => (
-            <span key={`${modifier.label}:${modifier.value}`} data-direction={modifier.direction}>
-              <small>{modifier.label}</small>
-              <strong>{modifier.value}</strong>
-            </span>
-          )) : <span className="is-neutral">本版本无额外平衡修正</span>}
-        </div>
-      </section>
-
-      <section className="mayhem-detail-section">
-        <div className="mayhem-section-heading">
-          <div>
-            <span className="mayhem-section-kicker">BUILD ROUTES</span>
-            <h2>装备路线</h2>
-          </div>
-          {mainSkill && (
-            <div className="mayhem-skill-summary">
-              <span>技能主升</span>
-              <strong>{mainSkill.priority}</strong>
-              <small>{compactPercent(mainSkill.winRate)} 胜率</small>
-            </div>
-          )}
-        </div>
-        <div className="mayhem-build-grid">
-          {(Object.keys(ITEM_GROUP_COPY) as MayhemItemGroupKey[]).map((groupKey) => (
-            <ItemBuildSection key={groupKey} groupKey={groupKey} options={build.itemGroups[groupKey]} />
-          ))}
-        </div>
-      </section>
-
-      <AugmentColumns build={build} />
-
-      {build.skillOrders.length > 0 && (
-        <section className="mayhem-detail-section mayhem-skill-section">
-          <div className="mayhem-section-heading">
-            <div>
-              <span className="mayhem-section-kicker">LEVEL ORDER</span>
-              <h2>技能加点</h2>
-            </div>
-          </div>
-          <div className="mayhem-skill-orders">
-            {build.skillOrders.map((order) => (
-              <div key={order.priority}>
-                <span className="mayhem-skill-priority">{order.priority}</span>
-                <span>{compactPercent(order.pickRate)} 使用</span>
-                <strong>{compactPercent(order.winRate)}</strong>
-                <small>{order.sequences[0]?.sequence ?? ''}</small>
-              </div>
+      </div>
+      <div className="mh-rail__list" ref={listRef}>
+        {loading && !entries.length ? (
+          <div className="rk-skeleton mh-rail__skeleton">{Array.from({ length: 12 }, (_, index) => <span key={index} />)}</div>
+        ) : groups.length ? groups.map((group) => (
+          <section key={group.tier} className={cn('mh-rail__group', `rk-tone--${tierToken(group.tier)}`)}>
+            <header>
+              <GradeChip label={group.tier} />
+              <strong>{CHAMPION_TIER_COPY[group.tier]}</strong>
+              <small className="num">{group.entries.length}</small>
+            </header>
+            {group.entries.map((entry) => (
+              <button
+                key={entry.slug}
+                type="button"
+                className={cn('mh-rail__row', entry.slug === selectedSlug && 'is-selected', teamIds.has(entry.id) && 'is-team')}
+                onClick={() => onOpen(entry.slug)}
+              >
+                <span className="mh-rail__rank num">{entry.rank}</span>
+                <Portrait src={entry.image} fallbackId={entry.id} name={entry.name} size={32} />
+                <span className="mh-rail__name">
+                  <strong>{entry.name}</strong>
+                  <small>{entry.title || entry.alias}</small>
+                </span>
+                <span className="mh-rail__rate">
+                  <b className={cn('num', entry.winRate >= 50 ? 'is-up' : 'is-down')}>{percent(entry.winRate)}</b>
+                  {entry.trend !== null && entry.trend !== 0 && (
+                    <small className={cn('num', entry.trend > 0 ? 'is-up' : 'is-down')}>
+                      {entry.trend > 0 ? '↑' : '↓'}{Math.abs(entry.trend)}
+                    </small>
+                  )}
+                </span>
+              </button>
             ))}
-          </div>
-        </section>
-      )}
-    </motion.div>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <div className="mayhem-list-skeleton" aria-label="正在载入海克斯大乱斗强度榜">
-      {Array.from({ length: 20 }, (_, index) => <span key={index} />)}
-    </div>
+          </section>
+        )) : (
+          <div className="rk-empty"><Search className="size-5" /><span>没有符合条件的英雄</span></div>
+        )}
+      </div>
+    </aside>
   );
 }
 
 export function MayhemGuidePage() {
-  const [contentTab, setContentTab] = useState<'champions' | 'augments' | 'combos'>('champions');
-  const [role, setRole] = useState<RoleFilter>('all');
-  const [search, setSearch] = useState('');
-  const [result, setResult] = useState<MayhemTierListResult | null>(null);
+  const [tab, setTab] = useState<MayhemTab>('champions');
+  const [tierList, setTierList] = useState<MayhemTierListResult | null>(null);
+  const [augments, setAugments] = useState<MayhemAugmentRankingResult | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [focusAugment, setFocusAugment] = useState<string | null>(null);
   const [build, setBuild] = useState<MayhemChampionBuild | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingBuild, setLoadingBuild] = useState(false);
-  const [error, setError] = useState('');
-  const requestRef = useRef(0);
+  const [battle, setBattle] = useState<LiveBattleInfo | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const autoOpenedRef = useRef<number | null>(null);
 
-  const loadList = useCallback(async (refresh = false) => {
-    setLoadingList(true);
-    setError('');
+  const load = useCallback(async (refresh = false) => {
+    setLoading(true);
     try {
-      const next = await window.lolHelper.ranking.getMayhemTierList(refresh);
-      setResult(next);
-      setError(next.error ?? '');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '海克斯大乱斗强度榜获取失败');
+      const [nextTier, nextAugments] = await Promise.all([
+        window.lolHelper.ranking.getMayhemTierList(refresh),
+        window.lolHelper.ranking.getMayhemAugmentRanking(refresh),
+      ]);
+      setTierList(nextTier);
+      setAugments(nextAugments);
+      setSelectedSlug((current) => current ?? nextTier.entries[0]?.slug ?? null);
+    } catch (error) {
+      setTierList((current) => current ?? {
+        entries: [],
+        meta: { patch: '', updatedAt: '', source: 'ARAM Mayhem', origin: 'live', fetchedAt: '' },
+        error: error instanceof Error ? error.message : '海克斯大乱斗数据获取失败',
+      });
     } finally {
-      setLoadingList(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadList(false);
-  }, [loadList]);
+    void load(false);
+  }, [load]);
 
-  const openChampion = useCallback(async (slug: string) => {
-    const requestId = ++requestRef.current;
+  // 选人 / 对局中自动带出自己的英雄：拿到英雄的那一刻，攻略就已经在眼前了。
+  useEffect(() => {
+    let disposed = false;
+    const refresh = () => {
+      window.lolHelper.live.getBattle()
+        .then((next) => {
+          if (!disposed) setBattle(next);
+        })
+        .catch(() => undefined);
+    };
+    refresh();
+    const unsubscribe = window.lolHelper.live.onStateChanged(() => refresh());
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      disposed = true;
+      unsubscribe();
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const entries = useMemo(() => tierList?.entries ?? [], [tierList?.entries]);
+  const team = useMemo(() => liveMayhemTeam(battle), [battle]);
+
+  useEffect(() => {
+    const myId = team?.myChampionId ?? null;
+    if (!myId || autoOpenedRef.current === myId) return;
+    const mine = championForId(entries, myId);
+    if (!mine) return;
+    autoOpenedRef.current = myId;
+    setSelectedSlug(mine.slug);
+    setTab('champions');
+  }, [entries, team?.myChampionId]);
+
+  const openChampion = useCallback((slug: string) => {
     setSelectedSlug(slug);
-    setBuild(null);
-    setLoadingBuild(true);
-    setError('');
-    try {
-      const next = await window.lolHelper.ranking.getMayhemBuild(slug, false);
-      if (requestId !== requestRef.current) return;
-      setBuild(next.build);
-      setError(next.error ?? '');
-    } catch (reason) {
-      if (requestId !== requestRef.current) return;
-      setError(reason instanceof Error ? reason.message : '英雄详情获取失败');
-    } finally {
-      if (requestId === requestRef.current) setLoadingBuild(false);
-    }
+    setTab('champions');
   }, []);
 
-  const closeBuild = useCallback(() => {
-    requestRef.current += 1;
-    setSelectedSlug(null);
-    setBuild(null);
-    setLoadingBuild(false);
-    setError('');
+  const openAugment = useCallback((slug: string) => {
+    setFocusAugment(slug);
+    setTab('augments');
   }, []);
 
-  const visibleEntries = useMemo(() => {
-    const keyword = search.trim().toLocaleLowerCase();
-    return (result?.entries ?? []).filter((entry) => {
-      const matchesRole = role === 'all' || entry.roles.includes(role);
-      const matchesSearch = !keyword || `${entry.name} ${entry.slug}`.toLocaleLowerCase().includes(keyword);
-      return matchesRole && matchesSearch;
-    });
-  }, [result?.entries, role, search]);
-
-  const groupedEntries = useMemo(() => TIER_ORDER.map((tier) => ({
-    tier,
-    entries: visibleEntries.filter((entry) => entry.tier === tier),
-  })).filter((group) => group.entries.length > 0), [visibleEntries]);
+  const selectedEntry = entries.find((entry) => entry.slug === selectedSlug) ?? null;
+  const teamSlugs = useMemo(() => {
+    const ids = new Set(team?.championIds ?? []);
+    return new Set(entries.filter((entry) => ids.has(entry.id)).map((entry) => entry.slug));
+  }, [entries, team?.championIds]);
+  const error = tab === 'augments' ? augments?.error : tierList?.error;
 
   return (
-    <section className="ranking-page mayhem-page">
-      <header className="ranking-toolbar mayhem-toolbar">
-        <nav className="mayhem-content-tabs" aria-label="海克斯大乱斗数据分类">
-          <button
-            type="button"
-            className={contentTab === 'champions' ? 'is-active' : ''}
-            aria-current={contentTab === 'champions' ? 'page' : undefined}
-            onClick={() => {
-              setContentTab('champions');
-              closeBuild();
-            }}
-          >
-            <Swords className="size-3.5" />
-            英雄排行
-          </button>
-          <button
-            type="button"
-            className={contentTab === 'augments' ? 'is-active' : ''}
-            aria-current={contentTab === 'augments' ? 'page' : undefined}
-            onClick={() => {
-              setContentTab('augments');
-              closeBuild();
-            }}
-          >
-            <Gem className="size-3.5" />
-            符文排行
-          </button>
-          <button
-            type="button"
-            className={contentTab === 'combos' ? 'is-active' : ''}
-            aria-current={contentTab === 'combos' ? 'page' : undefined}
-            onClick={() => {
-              setContentTab('combos');
-              closeBuild();
-            }}
-          >
-            <Sparkles className="size-3.5" />
-            强势组合
-          </button>
+    <section className="mh-page">
+      <header className="mh-toolbar">
+        <nav className="mh-tabs" aria-label="海克斯大乱斗">
+          {TABS.map((option) => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={cn(tab === option.value && 'is-active')}
+                aria-current={tab === option.value ? 'page' : undefined}
+                onClick={() => setTab(option.value)}
+              >
+                <Icon className="size-4" />
+                {option.label}
+                {option.value === 'augments' && augments?.meta.activeCount ? <small className="num">{augments.meta.activeCount}</small> : null}
+                {option.value === 'champions' && entries.length ? <small className="num">{entries.length}</small> : null}
+              </button>
+            );
+          })}
         </nav>
+        <div className="mh-toolbar__tail">
+          <SourcePill meta={tierList?.meta} patch={tierList?.meta.patch} updatedAt={tierList?.meta.updatedAt} />
+          <button
+            type="button"
+            className="rk-icon-button"
+            onClick={() => {
+              setRefreshKey((value) => value + 1);
+              void load(true);
+            }}
+            title="重新拉取海克斯大乱斗数据"
+            aria-label="刷新"
+          >
+            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+          </button>
+        </div>
       </header>
 
-      {error && <div className="ranking-notice">{error}</div>}
+      {error && <div className="rk-notice">{error}</div>}
 
-      <AnimatePresence mode="wait">
-        {contentTab === 'combos' ? (
-          <motion.div
-            key="combo-ranking"
-            className="mayhem-combo-motion"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <MayhemComboRanking />
-          </motion.div>
-        ) : contentTab === 'augments' ? (
-          <motion.div
-            key="augment-ranking"
-            className="mayhem-augment-motion"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <MayhemAugmentRanking />
-          </motion.div>
-        ) : selectedSlug ? (
-          build ? (
-            <BuildDetail key="detail" build={build} onBack={closeBuild} />
-          ) : loadingBuild ? (
-            <div key="detail-loading" className="mayhem-detail-loading">
-              <span className="mayhem-loading-orbit"><Gem className="size-5" /></span>
-              <strong>正在整理英雄出装</strong>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={tab}
+          className="mh-body"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.14 }}
+        >
+          {tab === 'champions' ? (
+            <div className="mh-champions">
+              <ChampionRail entries={entries} loading={loading} selectedSlug={selectedSlug} onOpen={openChampion} team={team} />
+              <MayhemPlaybook
+                slug={selectedSlug}
+                entry={selectedEntry}
+                augments={augments?.entries ?? []}
+                teamSlugs={teamSlugs}
+                refreshKey={refreshKey}
+                onOpenChampion={openChampion}
+                onOpenAugment={openAugment}
+                onBuildLoaded={setBuild}
+              />
             </div>
+          ) : tab === 'augments' ? (
+            <MayhemAugmentCodex
+              result={augments}
+              loading={loading}
+              focusSlug={focusAugment}
+              onFocus={setFocusAugment}
+              build={build}
+              onOpenChampion={openChampion}
+            />
           ) : (
-            <div key="detail-empty" className="mayhem-detail-loading">
-              <strong>暂时无法读取这个英雄</strong>
-              <button type="button" onClick={closeBuild}>返回强度榜</button>
-            </div>
-          )
-        ) : (
-          <motion.div
-            key="list"
-            className="mayhem-tier-scroll"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="mayhem-list-intro">
-              <div className="mayhem-list-summary">
-                <span>PATCH {result?.meta.patch || '—'}</span>
-                <strong>{visibleEntries.length}</strong>
-                <small>位英雄</small>
-                {result?.meta.updatedAt && <time>{formatUpdatedAt(result.meta.updatedAt)} 更新</time>}
-              </div>
-              <div className="mayhem-toolbar-controls">
-                <RoleFilters value={role} onChange={setRole} />
-                <label className="ranking-search mayhem-search">
-                  <Search className="size-3.5" />
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索英雄" />
-                </label>
-                <button
-                  type="button"
-                  className="ranking-refresh"
-                  onClick={() => void loadList(true)}
-                  title="刷新海克斯大乱斗数据"
-                  aria-label="刷新海克斯大乱斗数据"
-                >
-                  <RefreshCw className={`size-3.5 ${loadingList ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            {loadingList && !result ? <ListSkeleton /> : groupedEntries.length > 0 ? (
-              <div className="mayhem-tier-groups">
-                {groupedEntries.map((group) => (
-                  <section key={group.tier} className={`mayhem-tier-group mayhem-tier-group--${group.tier.replace('+', 'plus')}`}>
-                    <header>
-                      <span>{group.tier}</span>
-                      <div>
-                        <strong>{TIER_COPY[group.tier]}</strong>
-                        <small>{group.entries.length} 位英雄</small>
-                      </div>
-                    </header>
-                    <div className="mayhem-hero-grid">
-                      {group.entries.map((champion) => (
-                        <TierHeroCard
-                          key={champion.slug}
-                          champion={champion}
-                          onOpen={() => void openChampion(champion.slug)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            ) : (
-              <div className="ranking-empty"><Search className="size-5" /><span>没有符合条件的英雄</span></div>
-            )}
-          </motion.div>
-        )}
+            <MayhemComboBoard refreshKey={refreshKey} onOpenChampion={openChampion} onOpenAugment={openAugment} />
+          )}
+        </motion.div>
       </AnimatePresence>
     </section>
   );

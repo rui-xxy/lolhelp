@@ -85,6 +85,9 @@ export const IPC_CHANNELS = {
   RANKING_GET_MAYHEM_BUILD: 'ranking:get-mayhem-build',
   RANKING_GET_MAYHEM_AUGMENTS: 'ranking:get-mayhem-augments',
   RANKING_GET_MAYHEM_COMBOS: 'ranking:get-mayhem-combos',
+  RANKING_GET_CHAMPION_DETAIL: 'ranking:get-champion-detail',
+  RANKING_GET_MAYHEM_AUGMENT_DETAIL: 'ranking:get-mayhem-augment-detail',
+  RANKING_OPEN_SOURCE: 'ranking:open-source',
 } as const;
 
 // 通道名类型：所有合法通道名的字面量联合（编译期拼写校验用）

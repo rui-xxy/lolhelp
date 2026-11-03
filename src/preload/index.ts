@@ -4,6 +4,7 @@ import type {
   AssistClaimRewardRequest,
   AssistDisenchantRequest,
   AssistRecommendationRequest,
+  ChampionDetailRequest,
   ChampionRankingRequest,
   LolConfigApplyProfileRequest,
   LolConfigApplyValuesRequest,
@@ -114,6 +115,12 @@ const lolHelper: LolHelper = {
       ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_AUGMENTS, refresh),
     getMayhemCombos: (refresh?: boolean) =>
       ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_COMBOS, refresh),
+    getChampionDetail: (request: ChampionDetailRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_CHAMPION_DETAIL, request),
+    getMayhemAugmentDetail: (slug: string, refresh?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_GET_MAYHEM_AUGMENT_DETAIL, slug, refresh),
+    openSource: (url: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RANKING_OPEN_SOURCE, url),
   },
   live: {
     getBattle: () => ipcRenderer.invoke(IPC_CHANNELS.LIVE_GET_BATTLE),

@@ -1,18 +1,19 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  CircleDot,
+  Ban,
+  Crown,
   Gem,
+  Globe2,
   LandPlot,
-  Layers3,
-  Minus,
+  LayoutList,
   Orbit,
   RefreshCw,
+  ScatterChart,
   Search,
   Snowflake,
+  Sparkles,
+  TrendingUp,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,24 +24,50 @@ import type {
   ChampionRankingRegion,
   ChampionRankingResult,
 } from '../../../shared/api';
-import { RANKING_HERO_TONES, RANKING_MODE_TONES } from '../../styles/palette';
+import { cn, formatUpdatedAt } from '../../lib/utils';
+import { LaneIcon } from '../LaneIcon';
+import { ChampionDossier } from './ChampionDossier';
 import { MayhemGuidePage } from './MayhemGuidePage';
+import {
+  formatGames,
+  formatPercent,
+  primaryRateLabel,
+  quadrantDomain,
+  quadrantPickPosition,
+  quadrantPosition,
+  rankChange,
+  rankingAverages,
+  rankingInsights,
+  sortEntries,
+  thirdRate,
+  thirdRateLabel,
+  tierLabel,
+  tierNote,
+  winBar,
+  winScale,
+  type InsightKind,
+  type RankingAverages,
+  type RankingSortKey,
+} from './rankingModel';
+import { FilterMenu, GradeChip, Portrait, championIcon, type MenuOption } from './rankingParts';
 
 export type RankingChapter = 'mayhem' | 'ranking';
+type RiftMode = Exclude<ChampionRankingMode, 'hextech'>;
+type ViewMode = 'list' | 'map';
 
-interface MenuOption<T extends string> {
-  value: T;
-  label: string;
-  description?: string;
-  icon?: LucideIcon;
-  tone?: string;
-}
+const MODES: Array<{ value: RiftMode; label: string; icon: LucideIcon }> = [
+  { value: 'ranked', label: '召唤师峡谷', icon: LandPlot },
+  { value: 'aram', label: '极地大乱斗', icon: Snowflake },
+  { value: 'arena', label: '斗魂竞技场', icon: Orbit },
+];
 
-const MODE_OPTIONS: MenuOption<ChampionRankingMode>[] = [
-  { value: 'ranked', label: '召唤师峡谷', description: '排位赛综合强度', icon: LandPlot, tone: RANKING_MODE_TONES.ranked },
-  { value: 'aram', label: '极地大乱斗', description: '嚎哭深渊全英雄', icon: Snowflake, tone: RANKING_MODE_TONES.aram },
-  { value: 'arena', label: '斗魂竞技场', description: '双人竞技场表现', icon: Orbit, tone: RANKING_MODE_TONES.arena },
-  { value: 'hextech', label: '海克斯大乱斗', description: '强化符文环境', icon: Gem, tone: RANKING_MODE_TONES.hextech },
+const POSITIONS: Array<{ value: ChampionRankingPosition; label: string; lane?: string }> = [
+  { value: 'TOP', label: '上单', lane: 'top' },
+  { value: 'JUNGLE', label: '打野', lane: 'jungle' },
+  { value: 'MID', label: '中单', lane: 'middle' },
+  { value: 'ADC', label: '下路', lane: 'bottom' },
+  { value: 'SUPPORT', label: '辅助', lane: 'utility' },
+  { value: 'ALL', label: '全部' },
 ];
 
 const REGION_OPTIONS: MenuOption<ChampionRankingRegion>[] = [
@@ -53,378 +80,233 @@ const REGION_OPTIONS: MenuOption<ChampionRankingRegion>[] = [
 
 const TIER_OPTIONS: MenuOption<string>[] = [
   { value: 'all', label: '全部段位' },
+  { value: 'emerald_plus', label: '翡翠以上', description: '大多数玩家的参考线' },
+  { value: 'diamond_plus', label: '钻石以上' },
+  { value: 'master_plus', label: '大师以上' },
   { value: 'challenger', label: '王者' },
-  { value: 'master_plus', label: '大师+' },
-  { value: 'diamond_plus', label: '钻石+' },
-  { value: 'emerald_plus', label: '翡翠+' },
-  { value: 'platinum_plus', label: '铂金+' },
-  { value: 'gold_plus', label: '黄金+' },
+  { value: 'platinum_plus', label: '铂金以上' },
+  { value: 'gold_plus', label: '黄金以上' },
 ];
 
-const POSITION_OPTIONS: MenuOption<ChampionRankingPosition>[] = [
-  { value: 'ALL', label: '全部位置' },
-  { value: 'TOP', label: '上单' },
-  { value: 'JUNGLE', label: '打野' },
-  { value: 'MID', label: '中单' },
-  { value: 'ADC', label: '下路' },
-  { value: 'SUPPORT', label: '辅助' },
+const INSIGHT_ICONS: Record<InsightKind, LucideIcon> = {
+  answer: Crown,
+  rising: TrendingUp,
+  ban: Ban,
+  hidden: Gem,
+};
+
+const SORT_COLUMNS: Array<{ key: RankingSortKey; label: (mode: RiftMode) => string }> = [
+  { key: 'winRate', label: primaryRateLabel },
+  { key: 'pickRate', label: () => '登场率' },
+  { key: 'banRate', label: thirdRateLabel },
+  { key: 'trend', label: () => '变化' },
 ];
 
-const TIER_NAMES: Record<number, string> = {
-  1: 'S',
-  2: 'A',
-  3: 'B',
-  4: 'C',
-  5: 'D',
-};
+const SESSION_KEY = 'lolhelp.ranking.filters';
 
-const ROLE_NAMES: Record<string, string> = {
-  Assassin: '刺客',
-  Fighter: '战士',
-  Mage: '法师',
-  Marksman: '射手',
-  Support: '辅助',
-  Tank: '坦克',
-};
-
-const HERO_TONES = RANKING_HERO_TONES;
-
-export function RankingChapterSwitch({
-  value,
-  onChange,
-}: {
-  value: RankingChapter;
-  onChange: (value: RankingChapter) => void;
-}) {
-  return (
-    <div className="ranking-chapter-switch" role="tablist" aria-label="排行章节">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === 'mayhem'}
-        className={value === 'mayhem' ? 'is-active' : ''}
-        onClick={() => onChange('mayhem')}
-      >
-        <Gem className="size-4" />
-        <strong>海克斯大乱斗</strong>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === 'ranking'}
-        className={value === 'ranking' ? 'is-active' : ''}
-        onClick={() => onChange('ranking')}
-      >
-        <Layers3 className="size-4" />
-        <strong>英雄排行</strong>
-      </button>
-    </div>
-  );
+interface SavedFilters {
+  mode: RiftMode;
+  region: ChampionRankingRegion;
+  tier: string;
+  position: ChampionRankingPosition;
+  view: ViewMode;
 }
 
-function FilterMenu<T extends string>({
-  value,
-  options,
-  onChange,
-  icon: TriggerIcon,
-  wide = false,
-  disabled = false,
-}: {
-  value: T;
-  options: MenuOption<T>[];
-  onChange: (value: T) => void;
-  icon?: LucideIcon;
-  wide?: boolean;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0];
-  const SelectedIcon = selected.icon ?? TriggerIcon;
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+function loadFilters(): SavedFilters {
+  const fallback: SavedFilters = { mode: 'ranked', region: 'global', tier: 'emerald_plus', position: 'TOP', view: 'list' };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) ?? '{}') as Partial<SavedFilters>;
+    return {
+      mode: MODES.some((mode) => mode.value === parsed.mode) ? parsed.mode as RiftMode : fallback.mode,
+      region: REGION_OPTIONS.some((option) => option.value === parsed.region) ? parsed.region as ChampionRankingRegion : fallback.region,
+      tier: TIER_OPTIONS.some((option) => option.value === parsed.tier) ? parsed.tier as string : fallback.tier,
+      position: POSITIONS.some((option) => option.value === parsed.position) ? parsed.position as ChampionRankingPosition : fallback.position,
+      view: parsed.view === 'map' ? 'map' : 'list',
     };
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className={`ranking-filter-trigger ${wide ? 'ranking-filter-trigger--wide' : ''} ${disabled ? 'ranking-filter-trigger--disabled' : ''}`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        title={disabled ? '当前模式使用统一数据' : undefined}
-      >
-        {SelectedIcon && (
-          <SelectedIcon
-            className="size-3.5 shrink-0"
-            style={selected.tone ? { color: selected.tone } : undefined}
-          />
-        )}
-        <span className="truncate">{selected.label}</span>
-        <ChevronDown className={`ml-auto size-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -3, scale: 0.99 }}
-            transition={{ duration: 0.15 }}
-            className={`ranking-filter-popover ${wide ? 'ranking-filter-popover--wide' : ''}`}
-            role="listbox"
-          >
-            {options.map((option) => {
-              const OptionIcon = option.icon;
-              const active = option.value === value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`ranking-filter-option ${active ? 'ranking-filter-option--active' : ''}`}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                  role="option"
-                  aria-selected={active}
-                >
-                  {OptionIcon && (
-                    <span className="ranking-filter-option-icon" style={{ color: option.tone }}>
-                      <OptionIcon className="size-4" />
-                    </span>
-                  )}
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="block truncate text-xs font-semibold">{option.label}</span>
-                    {option.description && (
-                      <span className="mt-0.5 block truncate text-[11px] text-app-subtle">{option.description}</span>
-                    )}
-                  </span>
-                  {active && <Check className="size-3.5 shrink-0 text-app-primary" />}
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function formatCompactNumber(value: number | null): string {
-  if (!value) return '0';
-  return new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-}
-
-function formatPercent(value: number | null): string {
-  return value === null || !Number.isFinite(value) ? '—' : `${value.toFixed(1)}%`;
-}
-
-function trendValue(entry: ChampionRankingEntry): number | null {
-  return entry.previousRank === null ? null : entry.previousRank - entry.rank;
+  } catch {
+    return fallback;
+  }
 }
 
 function TrendMark({ entry }: { entry: ChampionRankingEntry }) {
-  const change = trendValue(entry);
-  if (change === null || change === 0) {
-    return <span className="ranking-trend ranking-trend--flat"><Minus className="size-3" /></span>;
-  }
-  if (change > 0) {
-    return <span className="ranking-trend ranking-trend--up"><ArrowUp className="size-3" />{change}</span>;
-  }
-  return <span className="ranking-trend ranking-trend--down"><ArrowDown className="size-3" />{Math.abs(change)}</span>;
-}
-
-function ChampionAvatar({ entry, size = 'row' }: { entry: ChampionRankingEntry; size?: 'row' | 'detail' }) {
-  const tone = HERO_TONES[entry.champion.id % HERO_TONES.length];
+  const change = rankChange(entry);
+  if (change === null || change === 0) return <span className="rk-trend is-flat">—</span>;
   return (
-    <span
-      className={`ranking-avatar ranking-avatar--${size}`}
-      style={{ '--champion-tone': tone } as React.CSSProperties}
-    >
-      {entry.champion.avatar ? (
-        <img src={entry.champion.avatar} alt={entry.champion.name} />
-      ) : (
-        <span>{entry.champion.name.slice(0, 1)}</span>
-      )}
+    <span className={cn('rk-trend num', change > 0 ? 'is-up' : 'is-down')}>
+      {change > 0 ? '↑' : '↓'}{Math.abs(change)}
     </span>
   );
 }
 
-function DetailPanel({
+function WinCell({ entry, averages, scale }: { entry: ChampionRankingEntry; averages: RankingAverages; scale: number }) {
+  const bar = winBar(entry.winRate, averages.winRate, scale);
+  return (
+    <span className={cn('rk-win', bar.side === 'up' ? 'is-up' : 'is-down')}>
+      <span className="rk-win__track" aria-hidden="true">
+        <i style={{ width: `${bar.width}%` }} />
+      </span>
+      <b className="num">{formatPercent(entry.winRate)}</b>
+    </span>
+  );
+}
+
+function RankingRow({
   entry,
   mode,
-  totalEntries,
+  averages,
+  maxPick,
+  scale,
+  selected,
+  onSelect,
 }: {
-  entry: ChampionRankingEntry | null;
-  mode: ChampionRankingMode;
-  totalEntries: number;
+  entry: ChampionRankingEntry;
+  mode: RiftMode;
+  averages: RankingAverages;
+  maxPick: number;
+  scale: number;
+  selected: boolean;
+  onSelect: () => void;
 }) {
-  if (!entry) {
-    return (
-      <aside className="ranking-detail ranking-detail--empty">
-        <CircleDot className="size-5 text-app-primary/55" />
-        <span>选择一位英雄</span>
-      </aside>
-    );
-  }
+  const third = thirdRate(entry, mode);
+  return (
+    <button
+      type="button"
+      className={cn('rk-row', selected && 'is-selected')}
+      onClick={onSelect}
+      aria-pressed={selected}
+    >
+      <span className={cn('rk-row__rank num', entry.rank <= 3 && 'is-podium')}>{entry.rank}</span>
+      <span className="rk-row__champion">
+        <Portrait src={entry.champion.avatar} fallbackId={entry.champion.id} name={entry.champion.name} size={34} />
+        <span>
+          <strong>{entry.champion.name}</strong>
+          <small>{entry.champion.title || `${formatGames(entry.games)} 场`}</small>
+        </span>
+      </span>
+      <WinCell entry={entry} averages={averages} scale={scale} />
+      <span className="rk-pick">
+        <span className="rk-pick__track" aria-hidden="true"><i style={{ width: `${Math.min(100, (entry.pickRate / maxPick) * 100)}%` }} /></span>
+        <span className="num">{formatPercent(entry.pickRate)}</span>
+      </span>
+      <span className={cn('rk-row__third num', third !== null && third >= 15 && 'is-hot')}>{formatPercent(third)}</span>
+      <TrendMark entry={entry} />
+    </button>
+  );
+}
 
-  const splash = entry.champion.alias
-    ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${entry.champion.alias}_0.jpg`
-    : '';
-  const primaryLabel = mode === 'arena' ? '前二率' : '胜率';
-  const thirdLabel = mode === 'arena' ? '第一率' : '禁用率';
-  const thirdValue = mode === 'arena' ? entry.firstPlaceRate : entry.banRate;
-  const rankingPercent = totalEntries > 0
-    ? Math.max(1, Math.ceil((entry.rank / totalEntries) * 100))
-    : 100;
-  const winScalePosition = Math.min(100, Math.max(0, ((entry.winRate - 40) / 20) * 100));
-  const tone = HERO_TONES[entry.champion.id % HERO_TONES.length];
-  const roleNames = entry.champion.tags.map((tag) => ROLE_NAMES[tag] ?? tag).filter(Boolean);
+function QuadrantMap({
+  entries,
+  averages,
+  selectedId,
+  onSelect,
+  mode,
+}: {
+  entries: ChampionRankingEntry[];
+  averages: RankingAverages;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  mode: RiftMode;
+}) {
+  const domain = quadrantDomain(entries, averages);
+  const midY = (1 - (averages.winRate - domain.minWin) / (domain.maxWin - domain.minWin)) * 100;
+  const midX = quadrantPickPosition(averages.pickRate, domain);
+  const [hover, setHover] = useState<ChampionRankingEntry | null>(null);
+  const rateLabel = primaryRateLabel(mode);
 
   return (
-    <motion.aside
-      key={entry.champion.id}
-      initial={{ opacity: 0.72, x: 8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.2 }}
-      className="ranking-detail"
-      style={{ '--champion-tone': tone } as React.CSSProperties}
-    >
-      <div className="ranking-detail-art">
-        {splash && <img src={splash} alt={entry.champion.name} />}
-        <div className="ranking-detail-art-shade" />
-      </div>
-
-      <div className="ranking-detail-profile">
-        <ChampionAvatar entry={entry} size="detail" />
-        <div className="min-w-0">
-          <p>
-            {entry.champion.title || '英雄档案'}
-            {roleNames.length > 0 ? ` · ${roleNames.join('/')}` : ''}
-          </p>
-          <h2>{entry.champion.name}</h2>
-        </div>
-      </div>
-
-      <div className="ranking-detail-body">
-        <div className="ranking-rank-story">
-          <span className="ranking-rank-story-number">{String(entry.rank).padStart(2, '0')}</span>
-          <span className="ranking-rank-story-copy">
-            <strong>{TIER_NAMES[entry.tier] ?? entry.tier} 级</strong>
-            <small>{formatCompactNumber(entry.games)} 场样本</small>
-          </span>
-          <span className="ranking-rank-story-percent">
-            <strong>前 {rankingPercent}%</strong>
-            <small>综合位置</small>
-          </span>
-        </div>
-
-        <div className="ranking-signature">
-          <div className="ranking-signature-head">
-            <span>{primaryLabel}表现</span>
-            <strong>{entry.winRate.toFixed(1)}<small>%</small></strong>
-          </div>
-          <div className="ranking-signature-scale">
-            <span className="ranking-signature-scale-mid" />
-            <motion.i
+    <div className="rk-map">
+      <div className="rk-map__plane">
+        <span className="rk-map__zone is-tl" style={{ width: `${midX}%`, height: `${midY}%` }}><b>冷门宝藏</b><small>玩的人少，但很能赢</small></span>
+        <span className="rk-map__zone is-tr" style={{ left: `${midX}%`, height: `${midY}%` }}><b>版本答案</b><small>又热门又能赢</small></span>
+        <span className="rk-map__zone is-bl" style={{ width: `${midX}%`, top: `${midY}%` }}><b>暂避锋芒</b><small>冷门且偏弱</small></span>
+        <span className="rk-map__zone is-br" style={{ left: `${midX}%`, top: `${midY}%` }}><b>人气陷阱</b><small>很多人玩，但输得多</small></span>
+        <span className="rk-map__axis is-h" style={{ top: `${midY}%` }}><small className="num">平均{rateLabel} {averages.winRate.toFixed(1)}%</small></span>
+        <span className="rk-map__axis is-v" style={{ left: `${midX}%` }} />
+        {entries.map((entry) => {
+          const point = quadrantPosition(entry, domain);
+          const selected = entry.champion.id === selectedId;
+          return (
+            <button
               key={entry.champion.id}
-              initial={{ left: '50%', opacity: 0 }}
-              animate={{ left: `${winScalePosition}%`, opacity: 1 }}
-              transition={{ duration: 0.38, ease: [0.23, 1, 0.32, 1] }}
-            />
-          </div>
-          <div className="ranking-signature-ticks"><span>40</span><span>50</span><span>60+</span></div>
-          <div className="ranking-signature-secondary">
-            <span><small>登场率</small><strong>{formatPercent(entry.pickRate)}</strong></span>
-            <span><small>{thirdLabel}</small><strong>{formatPercent(thirdValue)}</strong></span>
-            {entry.kda !== null && <span><small>KDA</small><strong>{entry.kda.toFixed(2)}</strong></span>}
-          </div>
-        </div>
-
-        {entry.counters.length > 0 && (
-          <div className="ranking-counter-section">
-            <div className="ranking-detail-section-title">
-              <span>克制关系</span>
-              <small>对阵胜率</small>
-            </div>
-            <div className="ranking-counter-list">
-              {entry.counters.map((counter) => (
-                <div key={counter.champion.id} className="ranking-counter-portrait">
-                  <span className="ranking-counter-avatar">
-                    {counter.champion.avatar && <img src={counter.champion.avatar} alt={counter.champion.name} />}
-                  </span>
-                  <span>{counter.champion.name}</span>
-                  <strong>{formatPercent(counter.winRate)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+              type="button"
+              className={cn('rk-map__dot', `rk-tier-ring--${tierLabel(entry.tier) === 'S+' ? 'splus' : tierLabel(entry.tier).toLowerCase()}`, selected && 'is-selected')}
+              style={{ left: `${point.x}%`, top: `${point.y}%` }}
+              onClick={() => onSelect(entry.champion.id)}
+              onPointerEnter={() => setHover(entry)}
+              onPointerLeave={() => setHover((current) => (current === entry ? null : current))}
+              aria-label={`${entry.champion.name}，${rateLabel} ${formatPercent(entry.winRate)}，登场率 ${formatPercent(entry.pickRate)}`}
+            >
+              <img src={championIcon(entry.champion.id)} alt="" draggable={false} />
+            </button>
+          );
+        })}
+        {hover && (() => {
+          const point = quadrantPosition(hover, domain);
+          return (
+            <span
+              className={cn('rk-map__tip', point.x > 70 && 'is-left', point.y < 18 && 'is-below')}
+              style={{ left: `${point.x}%`, top: `${point.y}%` }}
+            >
+              <strong>{hover.champion.name}</strong>
+              <small className="num">{rateLabel} {formatPercent(hover.winRate)} · 登场 {formatPercent(hover.pickRate)}</small>
+            </span>
+          );
+        })()}
       </div>
-    </motion.aside>
+      <div className="rk-map__legend">
+        <span>↑ {rateLabel}</span>
+        <span>登场率 →</span>
+      </div>
+    </div>
   );
 }
 
 function RankingSkeleton() {
   return (
-    <div className="ranking-list-body" aria-label="正在载入英雄排行">
-      {Array.from({ length: 10 }, (_, index) => (
-        <div key={index} className="ranking-row ranking-row--skeleton">
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-      ))}
+    <div className="rk-list__body" aria-label="正在载入英雄排行">
+      {Array.from({ length: 12 }, (_, index) => <span key={index} className="rk-row is-skeleton" />)}
     </div>
   );
 }
 
 export function ChampionRankingPage({ chapter }: { chapter: RankingChapter }) {
-  const [mode, setMode] = useState<ChampionRankingMode>('ranked');
-  const [region, setRegion] = useState<ChampionRankingRegion>('global');
-  const [tier, setTier] = useState('all');
-  const [position, setPosition] = useState<ChampionRankingPosition>('TOP');
+  const initial = useMemo(loadFilters, []);
+  const [mode, setMode] = useState<RiftMode>(initial.mode);
+  const [region, setRegion] = useState<ChampionRankingRegion>(initial.region);
+  const [tier, setTier] = useState(initial.tier);
+  const [position, setPosition] = useState<ChampionRankingPosition>(initial.position);
+  const [view, setView] = useState<ViewMode>(initial.view);
+  const [sortKey, setSortKey] = useState<RankingSortKey>('rank');
   const [search, setSearch] = useState('');
   const [result, setResult] = useState<ChampionRankingResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const requestRef = useRef(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ mode, region, tier, position, view }));
+    } catch {
+      // 存不了就算了，只是下次打开回到默认筛选
+    }
+  }, [mode, position, region, tier, view]);
 
   const load = useCallback(async (refresh = false) => {
     const requestId = ++requestRef.current;
     setLoading(true);
     try {
-      const next = await window.lolHelper.ranking.getChampions({
-        mode,
-        region,
-        tier,
-        position,
-        refresh,
-      });
+      const next = await window.lolHelper.ranking.getChampions({ mode, region, tier, position, refresh });
       if (requestId !== requestRef.current) return;
       setResult(next);
-      setSelectedId((current) => next.entries.some((entry) => entry.champion.id === current)
+      setSelectedId((current) => (next.entries.some((entry) => entry.champion.id === current)
         ? current
-        : next.entries[0]?.champion.id ?? null);
+        : next.entries[0]?.champion.id ?? null));
     } catch (error) {
       if (requestId !== requestRef.current) return;
       setResult({
         entries: [],
-        meta: { mode, version: '', analyzedAt: '', matchCount: null, source: '' },
+        meta: { mode, version: '', analyzedAt: '', matchCount: null, source: 'OP.GG' },
         error: error instanceof Error ? error.message : '英雄排行获取失败',
       });
     } finally {
@@ -436,142 +318,217 @@ export function ChampionRankingPage({ chapter }: { chapter: RankingChapter }) {
     if (chapter === 'ranking') void load(false);
   }, [chapter, load]);
 
-  const visibleEntries = useMemo(() => {
+  const entries = useMemo(() => result?.entries ?? [], [result?.entries]);
+  const averages = useMemo(() => rankingAverages(entries), [entries]);
+  const insights = useMemo(() => rankingInsights(entries, mode), [entries, mode]);
+  const maxPick = useMemo(() => Math.max(1, ...entries.map((entry) => entry.pickRate)), [entries]);
+  const scale = useMemo(() => winScale(entries, averages.winRate), [averages.winRate, entries]);
+
+  const visible = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase();
-    if (!keyword) return result?.entries ?? [];
-    return (result?.entries ?? []).filter((entry) =>
-      `${entry.champion.name} ${entry.champion.title} ${entry.champion.alias}`
-        .toLocaleLowerCase()
-        .includes(keyword));
-  }, [result?.entries, search]);
+    const filtered = keyword
+      ? entries.filter((entry) => `${entry.champion.name} ${entry.champion.title} ${entry.champion.alias}`.toLocaleLowerCase().includes(keyword))
+      : entries;
+    return sortEntries(filtered, sortKey, mode);
+  }, [entries, mode, search, sortKey]);
 
-  const selectedEntry = useMemo(() => {
-    const entries = result?.entries ?? [];
-    return entries.find((entry) => entry.champion.id === selectedId) ?? visibleEntries[0] ?? null;
-  }, [result?.entries, selectedId, visibleEntries]);
+  const groups = useMemo(() => {
+    if (sortKey !== 'rank') return [{ tier: -1, entries: visible }];
+    const map = new Map<number, ChampionRankingEntry[]>();
+    for (const entry of visible) map.set(entry.tier, [...(map.get(entry.tier) ?? []), entry]);
+    return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([groupTier, groupEntries]) => ({ tier: groupTier, entries: groupEntries }));
+  }, [sortKey, visible]);
 
-  const primaryLabel = mode === 'arena' ? '前二率' : '胜率';
-  const thirdLabel = mode === 'arena' ? '第一率' : '禁用率';
-  const canChooseRegion = mode !== 'hextech';
-  const canChooseTier = mode === 'ranked' || mode === 'aram';
-  const canChoosePosition = mode === 'ranked';
-  const fixedRegionOptions: MenuOption<ChampionRankingRegion>[] = [{ value: 'global', label: '统一数据' }];
-  const fixedTierOptions: MenuOption<string>[] = [{ value: 'all', label: '全部段位' }];
-  const fixedPositionOptions: MenuOption<ChampionRankingPosition>[] = [{ value: 'ALL', label: '全部位置' }];
-  if (chapter === 'mayhem') {
-    return <MayhemGuidePage />;
-  }
+  const selected = entries.find((entry) => entry.champion.id === selectedId) ?? visible[0] ?? null;
+
+  const selectChampion = useCallback((id: number) => {
+    setSelectedId(id);
+    // 在版图里选中后，切回榜单时能直接看到它
+    requestAnimationFrame(() => {
+      listRef.current?.querySelector('.rk-row.is-selected')?.scrollIntoView({ block: 'nearest' });
+    });
+  }, []);
+
+  if (chapter === 'mayhem') return <MayhemGuidePage />;
+
+  const meta = result?.meta;
+  const canPickTier = mode !== 'arena';
 
   return (
-    <section className="ranking-page">
-      <header className="ranking-toolbar">
-        <div className="ranking-filters">
-          <FilterMenu value={mode} options={MODE_OPTIONS} onChange={setMode} wide />
-          <FilterMenu
-            value={canChooseRegion ? region : 'global'}
-            options={canChooseRegion ? REGION_OPTIONS : fixedRegionOptions}
-            onChange={setRegion}
-            disabled={!canChooseRegion}
-          />
-          <FilterMenu
-            value={canChooseTier ? tier : 'all'}
-            options={canChooseTier ? TIER_OPTIONS : fixedTierOptions}
-            onChange={setTier}
-            disabled={!canChooseTier}
-          />
-          <FilterMenu
-            value={canChoosePosition ? position : 'ALL'}
-            options={canChoosePosition ? POSITION_OPTIONS : fixedPositionOptions}
-            onChange={setPosition}
-            disabled={!canChoosePosition}
-          />
-          <label className="ranking-search">
+    <section className="rk-page">
+      <header className="rk-toolbar">
+        <div className="rk-modes" role="tablist" aria-label="游戏模式">
+          {MODES.map((option) => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={mode === option.value}
+                className={cn(mode === option.value && 'is-active')}
+                onClick={() => {
+                  setMode(option.value);
+                  setSortKey('rank');
+                }}
+              >
+                <Icon className="size-3.5" />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {mode === 'ranked' && (
+          <div className="rk-lanes" role="tablist" aria-label="位置">
+            {POSITIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={position === option.value}
+                className={cn(position === option.value && 'is-active')}
+                onClick={() => setPosition(option.value)}
+                title={option.label}
+              >
+                {option.lane ? <LaneIcon lane={option.lane} className="rk-lanes__icon" /> : <Sparkles className="size-3.5" />}
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="rk-toolbar__tail">
+          {canPickTier && <FilterMenu value={tier} options={TIER_OPTIONS} onChange={setTier} icon={Trophy} ariaLabel="段位" />}
+          <FilterMenu value={region} options={REGION_OPTIONS} onChange={setRegion} icon={Globe2} ariaLabel="地区" />
+          <label className="rk-search">
             <Search className="size-3.5" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索英雄"
-            />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜英雄、真名或拼写" />
           </label>
-          <button
-            type="button"
-            onClick={() => void load(true)}
-            className="ranking-refresh"
-            title="刷新排行"
-            aria-label="刷新排行"
-          >
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <button type="button" className="rk-icon-button" onClick={() => void load(true)} title="刷新数据" aria-label="刷新数据">
+            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
           </button>
         </div>
       </header>
 
-      {result?.error && <div className="ranking-notice">{result.error}</div>}
+      {result?.error && <div className="rk-notice">{result.error}</div>}
 
-      <div className="ranking-workspace">
-        <div className="ranking-list">
-          <div className="ranking-list-head">
-            <span>排名</span>
-            <span>英雄</span>
-            <span>级别</span>
-            <span>{primaryLabel}</span>
-            <span>登场率</span>
-            <span>{thirdLabel}</span>
-            <span>变化</span>
-          </div>
-
-          {loading && !result ? (
-            <RankingSkeleton />
-          ) : visibleEntries.length > 0 ? (
-            <div className="ranking-list-body">
-              {visibleEntries.map((entry, index) => {
-                const selected = entry.champion.id === selectedEntry?.champion.id;
-                const tone = HERO_TONES[entry.champion.id % HERO_TONES.length];
-                const thirdValue = mode === 'arena' ? entry.firstPlaceRate : entry.banRate;
+      <div className="rk-workspace">
+        <div className="rk-main">
+          {insights.length > 0 && (
+            <div className="rk-insights">
+              {insights.map((insight) => {
+                const Icon = INSIGHT_ICONS[insight.kind];
                 return (
-                  <motion.button
-                    layout="position"
-                    key={entry.champion.id}
+                  <button
+                    key={insight.kind}
                     type="button"
-                    onClick={() => setSelectedId(entry.champion.id)}
-                    className={`ranking-row ${selected ? 'ranking-row--selected' : ''}`}
-                    style={{ '--champion-tone': tone } as React.CSSProperties}
-                    initial={index < 12 ? { opacity: 0, y: 5 } : false}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.18, delay: Math.min(index, 8) * 0.018 }}
+                    className={cn('rk-insight', `rk-insight--${insight.kind}`, selected?.champion.id === insight.entry.champion.id && 'is-selected')}
+                    onClick={() => selectChampion(insight.entry.champion.id)}
                   >
-                    <span className={`ranking-number ranking-number--${Math.min(entry.rank, 4)}`}>
-                      {String(entry.rank).padStart(2, '0')}
-                    </span>
-                    <span className="ranking-champion-cell">
-                      <ChampionAvatar entry={entry} />
-                      <span className="min-w-0">
-                        <strong>{entry.champion.name}</strong>
-                        <small>{entry.champion.title || formatCompactNumber(entry.games) + ' 场'}</small>
+                    <span className="rk-insight__label"><Icon className="size-3.5" />{insight.label}</span>
+                    <span className="rk-insight__body">
+                      <Portrait src={insight.entry.champion.avatar} fallbackId={insight.entry.champion.id} name={insight.entry.champion.name} size={40} />
+                      <span>
+                        <strong>{insight.entry.champion.name}</strong>
+                        <small>{insight.note}</small>
                       </span>
+                      <b className="num">{insight.value}</b>
                     </span>
-                    <span className={`ranking-tier ranking-tier--${entry.tier}`}>
-                      {TIER_NAMES[entry.tier] ?? entry.tier}
-                    </span>
-                    <span className={entry.winRate >= 50 ? 'ranking-positive' : ''}>{formatPercent(entry.winRate)}</span>
-                    <span>{formatPercent(entry.pickRate)}</span>
-                    <span>{formatPercent(thirdValue)}</span>
-                    <TrendMark entry={entry} />
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>
-          ) : (
-            <div className="ranking-empty">
-              <Search className="size-5" />
-              <span>{search ? '没有找到这个英雄' : '暂时没有排行数据'}</span>
-            </div>
           )}
+
+          <div className="rk-board">
+            <div className="rk-board__bar">
+              <div className="rk-views" role="tablist" aria-label="展示方式">
+                <button type="button" role="tab" aria-selected={view === 'list'} className={cn(view === 'list' && 'is-active')} onClick={() => setView('list')}>
+                  <LayoutList className="size-3.5" />榜单
+                </button>
+                <button type="button" role="tab" aria-selected={view === 'map'} className={cn(view === 'map' && 'is-active')} onClick={() => setView('map')}>
+                  <ScatterChart className="size-3.5" />版图
+                </button>
+              </div>
+              <span className="rk-board__meta num">
+                {meta?.version ? `${meta.version} 版本` : ''}
+                {meta?.matchCount ? ` · ${formatGames(meta.matchCount)} 场对局` : ''}
+                {meta?.analyzedAt ? ` · ${formatUpdatedAt(meta.analyzedAt)} 更新` : ''}
+                {' · '}{visible.length} 位英雄
+              </span>
+            </div>
+
+            {view === 'map' && entries.length > 0 ? (
+              <QuadrantMap entries={visible} averages={averages} selectedId={selected?.champion.id ?? null} onSelect={selectChampion} mode={mode} />
+            ) : (
+              <div className="rk-list" ref={listRef}>
+                <div className="rk-list__head">
+                  <button type="button" className={cn(sortKey === 'rank' && 'is-active')} onClick={() => setSortKey('rank')}>排名</button>
+                  <span>英雄</span>
+                  {SORT_COLUMNS.map((column) => (
+                    <button
+                      key={column.key}
+                      type="button"
+                      className={cn(sortKey === column.key && 'is-active')}
+                      onClick={() => setSortKey((current) => (current === column.key ? 'rank' : column.key))}
+                      title={`按${column.label(mode)}排序`}
+                    >
+                      {column.label(mode)}
+                    </button>
+                  ))}
+                </div>
+                {loading && !result ? <RankingSkeleton /> : visible.length > 0 ? (
+                  <div className="rk-list__body">
+                    {groups.map((group) => (
+                      <div key={group.tier} className="rk-group">
+                        {group.tier >= 0 && (
+                          <div className={cn('rk-group__head', `rk-tone--${tierLabel(group.tier) === 'S+' ? 'splus' : tierLabel(group.tier).toLowerCase()}`)}>
+                            <GradeChip label={tierLabel(group.tier)} />
+                            <strong>{tierNote(group.tier)}</strong>
+                            <small className="num">{group.entries.length} 位</small>
+                          </div>
+                        )}
+                        {group.entries.map((entry, index) => (
+                          <motion.div
+                            key={entry.champion.id}
+                            initial={index < 14 ? { opacity: 0, y: 4 } : false}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.16, delay: Math.min(index, 10) * 0.012 }}
+                          >
+                            <RankingRow
+                              entry={entry}
+                              mode={mode}
+                              averages={averages}
+                              maxPick={maxPick}
+                              scale={scale}
+                              selected={entry.champion.id === selected?.champion.id}
+                              onSelect={() => setSelectedId(entry.champion.id)}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rk-empty">
+                    <Search className="size-5" />
+                    <span>{search ? `没找到「${search}」` : '暂时没有排行数据，稍后点右上角刷新试试'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <DetailPanel
-          entry={selectedEntry}
+        <ChampionDossier
+          entry={selected}
           mode={mode}
-          totalEntries={result?.entries.length ?? 0}
+          averages={averages}
+          total={entries.length}
+          region={region}
+          tier={canPickTier ? tier : 'all'}
+          position={mode === 'ranked' ? position : 'ALL'}
         />
       </div>
     </section>

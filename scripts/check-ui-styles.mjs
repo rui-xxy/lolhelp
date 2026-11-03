@@ -60,7 +60,7 @@ const legacyCssColorCount = cssFiles
     0,
   );
 // 2026-10 改版后的基线：每迁移一页就把这个数调低，只许减少。
-const LEGACY_CSS_COLOR_BUDGET = 395;
+const LEGACY_CSS_COLOR_BUDGET = 269;
 if (legacyCssColorCount > LEGACY_CSS_COLOR_BUDGET) {
   errors.push(`CSS 硬编码颜色数量从基线 ${LEGACY_CSS_COLOR_BUDGET} 增长到 ${legacyCssColorCount}。`);
 }

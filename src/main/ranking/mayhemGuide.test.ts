@@ -1,228 +1,282 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cleanEffect,
+  isMayhemSourceUrl,
+  needsIconFallback,
+  parseMayhemAugmentDetail,
   parseMayhemAugmentRanking,
   parseMayhemChampionBuild,
   parseMayhemComboManifest,
-  parseMayhemCombos,
   parseMayhemTierList,
 } from './mayhemGuide';
 
-describe('ARAM Mayhem guide parsing', () => {
-  it('keeps champion, augment, tier and description from featured combos', () => {
-    const result = parseMayhemCombos(`
-      <main>
-        <h1>海克斯大乱斗组合</h1>
-        <p>666 个组合，覆盖 157 位英雄</p>
-        <article class="combo-card" data-combo-id="738" data-tier="S+" data-types='["god"]'
-          data-upvote-count="17" data-rank-score="133">
-          <a href="/zh-cn/combo/vayne-featured/"><img src="/augments/Fan_The_Hammer_mayhem_augment.webp" alt="连拨击锤"></a>
-          <a href="/zh-cn/build/vayne/"><img src="https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/67.png" alt="暗夜猎手"></a>
-          <span>Curated</span><span>S+</span>
-          <p>普攻能够连续触发攻击特效。</p>
-        </article>
-      </main>
-    `);
+// 片段按 arammayhem.com 2026-11（26.21）改版后的真实结构精简而来。
 
-    expect(result.meta).toEqual({
-      totalCount: 666,
-      championCount: 157,
-      featuredCount: 1,
-      pageSize: 30,
-      pageCount: 23,
-      source: 'ARAM Mayhem',
-    });
-    expect(result.entries[0]).toMatchObject({
-      id: '738',
-      slug: 'vayne-featured',
-      rank: 1,
-      tier: 'S+',
-      types: ['god'],
-      description: '普攻能够连续触发攻击特效。',
-      votes: 17,
-      rankScore: 133,
-      curated: true,
-      champion: { id: 67, slug: 'vayne', name: '暗夜猎手' },
-      augment: { name: '连拨击锤' },
-    });
-  });
-
-  it('keeps every combo from the index manifest for real pagination', () => {
-    const result = parseMayhemComboManifest({
-      pageSize: 30,
-      totalCombos: 666,
-      cards: [
-        {
-          id: 738,
-          slug: 'vayne-featured',
-          championId: 'Vayne',
-          augmentId: 'fan_the_hammer',
-          tier: 'S+',
-          types: ['god'],
-          champName: '暗夜猎手',
-          champIcon: 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/67.png',
-          championHref: '/zh-cn/build/vayne/',
-          augmentName: '连拨击锤',
-          augmentIcon: '/augments/Fan_The_Hammer_mayhem_augment.webp',
-          comboHref: '/zh-cn/combo/vayne-featured/',
-          comboDescription: '普攻能够连续触发攻击特效。',
-          comboRef: 'curated:vayne-featured',
-          upvoteCount: 17,
-          rankScore: 133,
-        },
-      ],
-    });
-
-    expect(result.meta).toMatchObject({
-      totalCount: 666,
-      championCount: 1,
-      featuredCount: 1,
-      pageSize: 30,
-      pageCount: 23,
-    });
-    expect(result.entries[0]).toMatchObject({
-      rank: 1,
-      champion: { id: 67, slug: 'vayne', name: '暗夜猎手' },
-      augment: { slug: 'fan-the-hammer', name: '连拨击锤' },
-      curated: true,
-    });
-  });
-
-  it('keeps real augment ranking fields and separates removed entries', () => {
-    const result = parseMayhemAugmentRanking(`
-      <main>
-        <p>数据更新 7月10日</p>
-        <a class="augment-rank-row" href="/zh-cn/augments/tank-engine"
-          data-rarity="gold" data-availability="live" data-live-rank="1" data-all-rank="1">
-          <div><span data-rank-label>1</span></div>
-          <div><img src="/augments/tank-engine.webp" alt="坦克引擎"><span>金色</span><span>67.14%</span></div>
-          <div>67.48%</div><div>67.14%</div>
-          <div><img src="https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/111.png" alt="深海泰坦"></div>
-        </a>
-        <a class="augment-rank-row" href="/zh-cn/augments/old-one"
-          data-rarity="silver" data-availability="removed" data-live-rank="" data-all-rank="2">
-          <div><span data-rank-label>2</span></div>
-          <div><img src="/augments/old-one.webp" alt="旧强化"><span>银色</span></div>
-          <div>—</div><div>—</div><div></div>
-        </a>
-      </main>
-    `);
-
-    expect(result.meta).toEqual({
-      updatedAt: '7月10日',
-      activeCount: 1,
-      removedCount: 1,
-      rarityCounts: { prismatic: 0, gold: 1, silver: 0 },
-      source: 'ARAM Mayhem',
-    });
-    expect(result.entries[0]).toMatchObject({
-      slug: 'tank-engine',
-      name: '坦克引擎',
-      rarity: 'gold',
-      availability: 'live',
-      rank: 1,
-      winRate: 67.48,
-      pickRate: 67.14,
-      topChampions: [{ id: 111, name: '深海泰坦' }],
-    });
-    expect(result.entries[1]).toMatchObject({
-      availability: 'removed',
-      winRate: null,
-      pickRate: null,
-    });
-  });
-
-  it('keeps champion tier, roles and rates from the tier list', () => {
+describe('ARAM Mayhem tier list', () => {
+  it('reads tier, rank, win rate, roles and rank change from champion cards', () => {
     const result = parseMayhemTierList(`
       <main>
-        <h1>海克斯大乱斗英雄强度等级表</h1>
-        <p>已更新至补丁 26.13 · 数据更新时间：2026-07-11</p>
-        <div class="tier-section">
-          <div>神级 / S+ <span>(1 位英雄)</span></div>
-          <div>
-            <a class="champion-card" href="/zh-cn/build/brand/" data-tags="mage,support"
-              title="复仇焰魂\n排名：#1\n胜率：55.60%\n登场率：14.19%">
-              <img src="https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/63.png" alt="复仇焰魂">
-              <span>▼1</span>
-            </a>
-          </div>
+        <h1>海克斯大乱斗英雄强度等级表（26.21版本）</h1>
+        <p>已更新至补丁 26.21 · 数据更新时间：2026-11-01</p>
+        <div class="tier-section" data-tier="S+">
+          <div><span>神级 / S+</span></div>
+          <a href="/zh-cn/build/teemo/" class="champion-card group" data-tags="marksman,mage" data-win-rate="54.47" data-hero-rank="1">
+            <div><img src="https://cdn.example/champions/square/teemo.jpg" alt="迅捷斥候">
+              <div><span class="champion-tier-chip">S+</span><span class="champion-win-rate">54.47%</span></div>
+            </div>
+          </a>
+        </div>
+        <div class="tier-section" data-tier="C">
+          <div><span>偏弱 / C</span></div>
+          <a href="/zh-cn/build/garen/" class="champion-card group" data-tags="fighter,tank" data-win-rate="46.29" data-hero-rank="110">
+            <div><img src="https://cdn.example/champions/square/garen.jpg" alt="德玛西亚之力">
+              <div><span class="champion-tier-chip">C</span><span class="champion-rank-delta">▼1</span></div>
+            </div>
+          </a>
         </div>
       </main>
     `);
 
-    expect(result.meta).toMatchObject({ patch: '26.13', updatedAt: '2026-07-11' });
-    expect(result.entries).toEqual([expect.objectContaining({
-      id: 63,
-      slug: 'brand',
-      name: '复仇焰魂',
+    expect(result.meta).toEqual({ patch: '26.21', updatedAt: '2026-11-01' });
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0]).toMatchObject({
+      slug: 'teemo',
+      name: '迅捷斥候',
       rank: 1,
       tier: 'S+',
-      roles: ['mage', 'support'],
-      winRate: 55.6,
-      pickRate: 14.19,
-      trend: -1,
-    })]);
+      roles: ['marksman', 'mage'],
+      winRate: 54.47,
+      pickRate: null,
+      trend: null,
+    });
+    expect(result.entries[1]).toMatchObject({ slug: 'garen', tier: 'C', rank: 110, trend: -1 });
   });
+});
 
-  it('keeps grouped items, skill orders and augment rarity on a build page', () => {
-    const build = parseMayhemChampionBuild(`
+describe('ARAM Mayhem augment ranking', () => {
+  it('uses tier and pick rate columns and attaches effects for new augments', () => {
+    const result = parseMayhemAugmentRanking(`
       <main>
-        <div>
-          <img width="96" src="https://example.com/brand.png" alt="复仇焰魂">
-          <div>
-            <h1>复仇焰魂 S+ 级 海克斯大乱斗出装</h1>
-            <p>复仇焰魂 · 布兰德</p>
-            <span data-slot="badge">法师</span><span data-slot="badge">辅助</span>
-            <span>55.60% WR</span><span>14.19% PR</span><span>补丁：26.13</span>
-          </div>
-          <span title="大乱斗平衡改动"><span>↓</span><span>造成伤害</span><span>-5%</span></span>
-        </div>
-        <section>
-          <div>技能主升顺序</div>
-          <div class="space-y-3">
-            <div class="rounded-lg">
-              <div><span>Q&gt;E&gt;W</span><span>登场率: 34.27%</span><span>胜率: 52.90%</span></div>
-              <div class="mt-2"><div><span>Q W E Q Q R</span><span>登场率: 12.11%</span><span>胜率: 52.99%</span></div></div>
-            </div>
-          </div>
-        </section>
-        <section>
-          <div>核心出装</div>
-          <div>
-            <div>
-              <div>
-                <a href="/zh-cn/items/torch/" title="黯炎火炬"><img src="/items/2503.png"></a>
-                <a href="/zh-cn/items/liandry/" title="兰德里的折磨"><img src="/items/6653.png"></a>
-              </div>
-              <div>登场率: 21.06% 胜率: 55.32%</div>
-            </div>
-          </div>
-        </section>
-        <a href="/zh-cn/augments/infernal-conduit" class="group flex items-start border-rarity-prismatic">
-          <img src="/augments/infernal.webp" alt="炼狱导管">
-          <div>炼狱导管 <span>胜率: 58.74%</span><div class="mt-2">技能命中会施加灼烧。</div></div>
+        <h1>海克斯大乱斗强化符文强度榜（26.21版本）</h1>
+        <a href="/zh-cn/augments/bees/" data-latest-augment="bees"><img src="/augments/bees.webp" alt="小蜜蜂！！！">
+          <div><h3>小蜜蜂！！！</h3><p>你的技能有时会向敌人投掷一个爆炸蜂巢。</p></div></a>
+        <a href="/zh-cn/augments/bees/" class="augment-rank-row" data-rarity="gold" data-availability="live" data-live-rank="1" data-all-rank="1">
+          <div><span>1</span></div>
+          <div><img src="/augments/bees.webp" alt="小蜜蜂！！！"><span>小蜜蜂！！！</span><span>新</span></div>
+          <div>S+</div>
+          <div>73.95%</div>
+          <div><img src="https://cdn.example/champions/icons/teemo/64.png" alt="迅捷斥候"></div>
+        </a>
+        <a href="/zh-cn/augments/tank-engine/" class="augment-rank-row" data-rarity="gold" data-availability="live" data-live-rank="2" data-all-rank="2">
+          <div><span>2</span></div>
+          <div><img src="/augments/tank.webp" alt="坦克引擎"></div>
+          <div>S-</div>
+          <div>12.10%</div>
+          <div></div>
         </a>
       </main>
-    `, 'brand');
+    `);
+
+    expect(result.meta).toMatchObject({ patch: '26.21', activeCount: 2, removedCount: 0 });
+    expect(result.entries[0]).toMatchObject({
+      slug: 'bees',
+      tier: 'S+',
+      winRate: null,
+      pickRate: 73.95,
+      isNew: true,
+      effect: '你的技能有时会向敌人投掷一个爆炸蜂巢。',
+      icon: 'https://arammayhem.com/augments/bees.webp',
+    });
+    expect(result.entries[0].topChampions[0]).toMatchObject({ slug: 'teemo', name: '迅捷斥候' });
+    // 没有出现在「新增」区块的强化，用内置效果快照补上说明。
+    expect(result.entries[1].effect).toContain('参与击杀');
+  });
+});
+
+describe('ARAM Mayhem combos', () => {
+  it('resolves champion and augment from the v2 lookup tables', () => {
+    const result = parseMayhemComboManifest({
+      schemaVersion: 2,
+      pageSize: 30,
+      totalCombos: 419,
+      typeLabels: { god: '神级' },
+      champions: [{ id: 'Aurora', name: '双界灵兔', icon: 'https://cdn.example/v1/champion-icons/893.png' }],
+      augments: [{ id: 'ethereal_weapon', name: '虚幻武器', icon: '/augments/Ethereal_Weapon_mayhem_augment.webp' }],
+      cards: [{
+        id: 639,
+        slug: 'aurora-虚幻武器兔子',
+        publicSlug: 'aurora-ethereal-weapon-639',
+        championId: 'Aurora',
+        augmentId: 'ethereal_weapon',
+        tier: 'S+',
+        types: ['god'],
+        description: '多次触发三环效果。',
+        upvoteCount: 3,
+      }],
+    });
+
+    expect(result.meta).toMatchObject({ totalCount: 419, pageCount: 14, typeLabels: { god: '神级' } });
+    expect(result.entries[0]).toMatchObject({
+      id: '639',
+      slug: 'aurora-ethereal-weapon-639',
+      tier: 'S+',
+      types: ['god'],
+      votes: 3,
+      champion: { id: 893, slug: 'aurora', name: '双界灵兔' },
+      augment: { slug: 'ethereal-weapon', name: '虚幻武器', icon: 'https://arammayhem.com/augments/Ethereal_Weapon_mayhem_augment.webp' },
+      sourceUrl: 'https://arammayhem.com/zh-cn/combo/aurora-ethereal-weapon-639/',
+    });
+  });
+});
+
+describe('ARAM Mayhem champion build', () => {
+  it('reads header facts, augment tiers, skills, items, combos and partners', () => {
+    const build = parseMayhemChampionBuild(`
+      <main>
+        <header id="champion-summary"><section><div>
+          <div><img src="https://cdn.example/champions/square/teemo.jpg" alt="迅捷斥候"><span data-slot="badge">S+</span></div>
+          <div>
+            <h1>迅捷斥候 海克斯大乱斗出装</h1>
+            <dl>
+              <div><dt>胜率</dt><dd>54.47%</dd></div>
+              <div><dt>登场率</dt><dd>13.82%</dd></div>
+              <div><dt>梯队</dt><dd><span>S+</span><span>#1</span><span>排名变化: ▲2</span></dd></div>
+              <div><dt>数据日期</dt><dd><time>2026-11-01</time></dd></div>
+            </dl>
+            <p>迅捷斥候 · 提莫</p>
+            <div><span data-slot="badge">射手</span><span data-slot="badge">法师</span><span>补丁：26.21</span></div>
+          </div>
+          <div><span title="大乱斗平衡改动"><span>↓</span><span>造成伤害</span><span>-5%</span></span></div>
+        </div><p>迅捷斥候在海克斯大乱斗 26.21版本为S+级强度，胜率 54.47%。</p></section></header>
+        <section id="best-augments"><div>
+          <div><h3>棱彩强化符文</h3><div>
+            <a href="/zh-cn/augments/goliath/"><img src="/augments/Goliath.webp" alt="歌利亚巨人"><div>
+              <span data-recommendation-rank="rarity">S · #4</span><span data-recommendation-rank="overall">总榜 S- · #15</span>
+              <span>登场率: <span>7.47%</span></span></div></a>
+          </div></div>
+        </div></section>
+        <section id="combos"><article data-combo-card>
+          <div><a href="/zh-cn/combo/teemo-eureka-929/"><img src="/augments/Eureka.webp" alt="尤里卡"></a></div>
+          <div><a href="/zh-cn/combo/teemo-eureka-929/"><div><span>尤里卡 + 缩小引擎 组合</span><span data-slot="badge">S</span><span data-slot="badge">强力</span></div><p>堆冷却，全图种蘑菇</p></a></div>
+        </article></section>
+        <section id="mayhem-build">
+          <section><div>技能主升顺序</div><div><div>
+            <div><span>Q&gt;E&gt;W</span><span>登场率 <span>38.93%</span></span><span>胜率 <span>49.98%</span></span></div>
+            <div><div><div><table></table></div><div><span>登场率 <span>12.90%</span></span><span>胜率 <span>49.80%</span></span></div></div>
+              <span>技能加点序列: Q W E Q Q R Q E Q E R E E W W</span></div>
+          </div></div></section>
+          <section><div>核心出装</div><div>
+            <div><div><a href="/zh-cn/items/malignance/" title="残疫"><img src="https://cdn.example/items/malignance.png"></a></div>
+              <div><span>登场率 <span>16.22%</span></span><span>胜率 <span>49.90%</span></span></div></div>
+          </div></section>
+          <section><div>其他成装</div><div>
+            <div><div><a href="/zh-cn/items/rabadon/" title="灭世者的死亡之帽"><img src="https://cdn.example/items/rabadon.png"></a></div>
+              <div><span>登场率 <span>40.00%</span></span><span>胜率 <span>51.20%</span></span></div></div>
+          </div></section>
+        </section>
+        <section id="best-partners"><div>
+          <a href="/zh-cn/build/yasuo/"><div><img src="https://cdn.example/icons/yasuo/64.png" alt="疾风剑豪"><span>#1 疾风剑豪</span></div>
+            <div><span>登场率 <strong>3.39%</strong></span><span>胜率 <strong>64.24%</strong></span></div></a>
+        </div></section>
+      </main>
+    `, 'teemo');
 
     expect(build).toMatchObject({
-      slug: 'brand',
-      name: '复仇焰魂',
-      alias: '布兰德',
+      slug: 'teemo',
+      name: '迅捷斥候',
+      title: '提莫',
       tier: 'S+',
-      roles: ['法师', '辅助'],
-      winRate: 55.6,
-      pickRate: 14.19,
-      patch: '26.13',
+      rank: 1,
+      trend: 2,
+      roles: ['射手', '法师'],
+      winRate: 54.47,
+      pickRate: 13.82,
+      patch: '26.21',
+      updatedAt: '2026-11-01',
+      balance: [{ direction: 'down', label: '造成伤害', value: '-5%' }],
     });
-    expect(build.balance[0]).toEqual({ direction: 'down', label: '造成伤害', value: '-5%' });
-    expect(build.skillOrders[0]).toMatchObject({ priority: 'Q>E>W', pickRate: 34.27, winRate: 52.9 });
-    expect(build.itemGroups.core[0].items.map((item) => item.name)).toEqual(['黯炎火炬', '兰德里的折磨']);
     expect(build.augments[0]).toMatchObject({
-      slug: 'infernal-conduit',
+      slug: 'goliath',
       rarity: 'prismatic',
-      name: '炼狱导管',
-      winRate: 58.74,
-      effect: '技能命中会施加灼烧。',
+      tier: 'S',
+      rarityRank: 4,
+      overallTier: 'S-',
+      overallRank: 15,
+      pickRate: 7.47,
     });
+    expect(build.skillOrders[0]).toMatchObject({
+      priority: 'Q>E>W',
+      pickRate: 38.93,
+      winRate: 49.98,
+      sequences: [{ sequence: 'QWEQQRQEQEREEWW', pickRate: 12.9, winRate: 49.8 }],
+    });
+    expect(build.itemGroups.core[0]).toMatchObject({ pickRate: 16.22, winRate: 49.9, items: [{ name: '残疫' }] });
+    expect(build.itemGroups.late[0].items[0].name).toBe('灭世者的死亡之帽');
+    expect(build.combos[0]).toMatchObject({
+      slug: 'teemo-eureka-929',
+      title: '尤里卡 + 缩小引擎',
+      tier: 'S',
+      types: ['强力'],
+      description: '堆冷却，全图种蘑菇',
+    });
+    expect(build.partners[0]).toMatchObject({ slug: 'yasuo', name: '疾风剑豪', winRate: 64.24, pickRate: 3.39 });
+  });
+});
+
+describe('ARAM Mayhem augment detail', () => {
+  it('reads stats, guide, history and best champions', () => {
+    const detail = parseMayhemAugmentDetail(`
+      <main>
+        <div><img src="/augments/bees.webp" alt="小蜜蜂！！！"><h1>小蜜蜂！！！</h1><span data-slot="badge">金色</span></div>
+        <section aria-label="stats">
+          <div><div>等级</div><div><span>S+</span></div></div>
+          <div><div>登场率</div><div><span>73.95<span>%</span></span><span>▲ 0.28</span></div></div>
+          <div><div>排名</div><div><span>#1</span></div></div>
+          <div><div>当前版本</div><div><span>26.21</span></div></div>
+        </section>
+        <div id="trend"><table><tbody>
+          <tr><td>2026-11-01</td><td>26.21</td><td>#1</td><td>S+</td><td>73.95%</td></tr>
+        </tbody></table></div>
+        <div data-augment-official-guide>
+          <p>你的技能有时会向敌人投掷一个爆炸蜂巢。</p>
+          <h3>适合何时选择</h3><p>适合技能命中可靠的英雄。</p>
+        </div>
+        <div id="best-champions"><table><tbody>
+          <tr><td><div><a href="/zh-cn/build/brand/"><img src="https://cdn.example/icons/brand/64.png"><span>复仇焰魂</span></a><span data-slot="badge">上分英雄</span></div></td>
+            <td><strong>S</strong> #1</td><td>18.24%</td></tr>
+        </tbody></table></div>
+      </main>
+    `, 'bees');
+
+    expect(detail).toMatchObject({
+      name: '小蜜蜂！！！',
+      rarity: 'gold',
+      tier: 'S+',
+      rank: 1,
+      pickRate: 73.95,
+      pickDelta: 0.28,
+      patch: '26.21',
+      effect: '你的技能有时会向敌人投掷一个爆炸蜂巢。',
+      guide: [{ title: '适合何时选择', text: '适合技能命中可靠的英雄。' }],
+      history: [{ date: '2026-11-01', patch: '26.21', rank: 1, tier: 'S+', pickRate: 73.95 }],
+      champions: [{ slug: 'brand', name: '复仇焰魂', tier: 'S', rank: 1, pickRate: 18.24, highlight: true }],
+    });
+  });
+
+  it('replaces client placeholders in effect text', () => {
+    expect(cleanEffect('获得@ADAmp*100@%攻击力。')).toBe('获得若干攻击力。');
+    expect(cleanEffect('持续@InvulnDuration@秒的免疫状态')).toBe('持续若干秒的免疫状态');
+  });
+
+  it('flags icon names the source server cannot serve to browsers', () => {
+    expect(needsIconFallback("https://arammayhem.com/augments/Don't_Blink_mayhem_augment.webp")).toBe(true);
+    expect(needsIconFallback('https://arammayhem.com/augments/Stats_on_Stats%21_mayhem_augment.webp')).toBe(true);
+    expect(needsIconFallback('https://arammayhem.com/augments/bees.webp')).toBe(false);
+  });
+
+  it('only lets data source pages open externally', () => {
+    expect(isMayhemSourceUrl('https://arammayhem.com/zh-cn/build/garen/')).toBe(true);
+    expect(isMayhemSourceUrl('http://arammayhem.com/')).toBe(false);
+    expect(isMayhemSourceUrl('https://evil.example/arammayhem.com')).toBe(false);
   });
 });

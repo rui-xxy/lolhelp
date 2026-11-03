@@ -1483,6 +1483,10 @@ export interface ChampionRankingEntry {
   kda: number | null;
   games: number;
   firstPlaceRate: number | null;
+  // 这个英雄的对局里有多少比例是走当前位置（仅峡谷分位置时有值）
+  roleRate: number | null;
+  // 主玩位置（峡谷「全部位置」时用来拉详情）
+  mainPosition: ChampionRankingPosition | null;
   counters: ChampionCounterSummary[];
 }
 
@@ -1498,30 +1502,122 @@ export interface ChampionRankingResult {
   error?: string;
 }
 
+// ----------------------------------------------------------------------------
+// 英雄详情（峡谷 / 极地 / 斗魂）：选中英雄后按需拉取的「档案」
+// ----------------------------------------------------------------------------
+
+export interface ChampionDetailRequest {
+  mode: Exclude<ChampionRankingMode, 'hextech'>;
+  championId: number;
+  region?: ChampionRankingRegion;
+  tier?: string;
+  position?: ChampionRankingPosition;
+}
+
+export interface ChampionDetailItem {
+  id: number;
+  name: string;
+  icon: string;
+}
+
+export interface ChampionDetailBuild {
+  items: ChampionDetailItem[];
+  games: number;
+  winRate: number;
+  pickRate: number;
+}
+
+export interface ChampionDetailRunePage {
+  keystone: ChampionDetailItem | null;
+  primary: ChampionDetailItem[];
+  secondary: ChampionDetailItem[];
+  primaryStyle: ChampionDetailItem | null;
+  secondaryStyle: ChampionDetailItem | null;
+  games: number;
+  winRate: number;
+  pickRate: number;
+}
+
+export interface ChampionDetailSkillOrder {
+  priority: string[];
+  order: string[];
+  winRate: number;
+  pickRate: number;
+}
+
+export interface ChampionDetailTrendPoint {
+  version: string;
+  winRate: number;
+  pickRate: number | null;
+  banRate: number | null;
+  rank: number | null;
+}
+
+export interface ChampionDetailGameLength {
+  minute: number;
+  winRate: number;
+}
+
+export interface ChampionDetail {
+  championId: number;
+  mode: ChampionDetailRequest['mode'];
+  position: ChampionRankingPosition;
+  spells: ChampionDetailBuild[];
+  starters: ChampionDetailBuild[];
+  boots: ChampionDetailBuild[];
+  core: ChampionDetailBuild[];
+  runes: ChampionDetailRunePage[];
+  skills: ChampionDetailSkillOrder[];
+  trend: ChampionDetailTrendPoint[];
+  gameLengths: ChampionDetailGameLength[];
+  toughMatchups: ChampionCounterSummary[];
+  easyMatchups: ChampionCounterSummary[];
+}
+
+export interface ChampionDetailResult {
+  detail: ChampionDetail | null;
+  error?: string;
+}
+
+// ----------------------------------------------------------------------------
+// 海克斯大乱斗（数据源：arammayhem.com，失败时用本机上次成功的缓存）
+// ----------------------------------------------------------------------------
+
 export type MayhemChampionRole = 'assassin' | 'fighter' | 'mage' | 'marksman' | 'support' | 'tank';
 export type MayhemChampionTier = 'S+' | 'S' | 'A' | 'B' | 'C' | 'D';
 export type MayhemAugmentRarity = 'prismatic' | 'gold' | 'silver';
 export type MayhemItemGroupKey = 'starting' | 'boots' | 'core' | 'late';
+// live = 刚从数据源拿到；cache = 数据源不可用，展示本机上次成功的结果。
+export type MayhemDataOrigin = 'live' | 'cache';
+
+export interface MayhemSourceMeta {
+  source: string;
+  origin: MayhemDataOrigin;
+  // 本机拿到这份数据的时间（ISO）
+  fetchedAt: string;
+}
 
 export interface MayhemChampionEntry {
   id: number;
   slug: string;
   name: string;
+  // 英雄真名（如「盖伦」），name 是称号（如「德玛西亚之力」）
+  title: string;
+  alias: string;
   image: string;
   rank: number;
   tier: MayhemChampionTier;
   roles: MayhemChampionRole[];
   winRate: number;
-  pickRate: number;
+  pickRate: number | null;
   trend: number | null;
 }
 
 export interface MayhemTierListResult {
   entries: MayhemChampionEntry[];
-  meta: {
+  meta: MayhemSourceMeta & {
     patch: string;
     updatedAt: string;
-    source: string;
   };
   error?: string;
 }
@@ -1530,6 +1626,7 @@ export type MayhemAugmentAvailability = 'live' | 'removed';
 
 export interface MayhemAugmentChampionRef {
   id: number;
+  slug: string;
   name: string;
   icon: string;
 }
@@ -1542,21 +1639,65 @@ export interface MayhemAugmentRankingEntry {
   availability: MayhemAugmentAvailability;
   rank: number;
   allRank: number;
+  // 强度等级（S+ / S / S- / A+ …），数据源不再提供强化胜率后以它为主
+  tier: string | null;
   winRate: number | null;
   pickRate: number | null;
   isNew: boolean;
+  effect: string;
   topChampions: MayhemAugmentChampionRef[];
 }
 
 export interface MayhemAugmentRankingResult {
   entries: MayhemAugmentRankingEntry[];
-  meta: {
+  meta: MayhemSourceMeta & {
+    patch: string;
     updatedAt: string;
     activeCount: number;
     removedCount: number;
     rarityCounts: Record<MayhemAugmentRarity, number>;
-    source: string;
   };
+  error?: string;
+}
+
+export interface MayhemAugmentHistoryPoint {
+  date: string;
+  patch: string;
+  rank: number | null;
+  tier: string;
+  pickRate: number | null;
+}
+
+export interface MayhemAugmentChampionFit {
+  slug: string;
+  name: string;
+  icon: string;
+  tier: string;
+  rank: number | null;
+  pickRate: number | null;
+  highlight: boolean;
+}
+
+export interface MayhemAugmentDetail {
+  slug: string;
+  name: string;
+  icon: string;
+  rarity: MayhemAugmentRarity | null;
+  tier: string;
+  rank: number | null;
+  pickRate: number | null;
+  pickDelta: number | null;
+  patch: string;
+  effect: string;
+  guide: Array<{ title: string; text: string }>;
+  history: MayhemAugmentHistoryPoint[];
+  champions: MayhemAugmentChampionFit[];
+  sourceUrl: string;
+}
+
+export interface MayhemAugmentDetailResult {
+  detail: MayhemAugmentDetail | null;
+  origin?: MayhemDataOrigin;
   error?: string;
 }
 
@@ -1588,13 +1729,13 @@ export interface MayhemComboEntry {
 
 export interface MayhemComboResult {
   entries: MayhemComboEntry[];
-  meta: {
+  meta: MayhemSourceMeta & {
     totalCount: number;
     championCount: number;
     featuredCount: number;
     pageSize: number;
     pageCount: number;
-    source: string;
+    typeLabels: Record<string, string>;
   };
   error?: string;
 }
@@ -1634,38 +1775,77 @@ export interface MayhemAugmentRecommendation {
   name: string;
   rarity: MayhemAugmentRarity;
   icon: string;
-  winRate: number;
+  // 在该英雄同品质强化里的等级与名次（如 S · #4）
+  tier: string;
+  rarityRank: number | null;
+  // 在全部强化总榜里的等级与名次（如 总榜 S- · #15）
+  overallTier: string;
+  overallRank: number | null;
+  // 该英雄选择它的频率
+  pickRate: number | null;
+  winRate: number | null;
   effect: string;
+}
+
+export interface MayhemPartner {
+  slug: string;
+  name: string;
+  icon: string;
+  winRate: number;
+  pickRate: number;
+}
+
+export interface MayhemBuildCombo {
+  slug: string;
+  title: string;
+  tier: string;
+  types: string[];
+  description: string;
+  augments: MayhemBuildItem[];
+  sourceUrl: string;
 }
 
 export interface MayhemChampionBuild {
   slug: string;
+  id: number;
   name: string;
   alias: string;
+  title: string;
   image: string;
   tier: MayhemChampionTier;
+  rank: number | null;
+  trend: number | null;
   roles: string[];
   winRate: number;
   pickRate: number;
   patch: string;
+  updatedAt: string;
+  summary: string;
   balance: MayhemBalanceModifier[];
   skillOrders: MayhemSkillOrder[];
   itemGroups: Record<MayhemItemGroupKey, MayhemItemBuildOption[]>;
   augments: MayhemAugmentRecommendation[];
+  combos: MayhemBuildCombo[];
+  partners: MayhemPartner[];
   sourceUrl: string;
 }
 
 export interface MayhemChampionBuildResult {
   build: MayhemChampionBuild | null;
+  origin?: MayhemDataOrigin;
   error?: string;
 }
 
 export interface RankingApi {
   getChampions: (request: ChampionRankingRequest) => Promise<ChampionRankingResult>;
+  getChampionDetail: (request: ChampionDetailRequest) => Promise<ChampionDetailResult>;
   getMayhemTierList: (refresh?: boolean) => Promise<MayhemTierListResult>;
   getMayhemBuild: (slug: string, refresh?: boolean) => Promise<MayhemChampionBuildResult>;
   getMayhemAugmentRanking: (refresh?: boolean) => Promise<MayhemAugmentRankingResult>;
+  getMayhemAugmentDetail: (slug: string, refresh?: boolean) => Promise<MayhemAugmentDetailResult>;
   getMayhemCombos: (refresh?: boolean) => Promise<MayhemComboResult>;
+  // 打开数据源网页（只允许数据源白名单域名）
+  openSource: (url: string) => Promise<boolean>;
 }
 
 // ============================================================================
